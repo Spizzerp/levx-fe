@@ -1,0 +1,24 @@
+/* desktop-first responsive variants */
+@custom-variant xl {
+  @media (min-width: 1367px) {
+    @slot;
+  }
+}
+
+@custom-variant lg {
+  @media (max-width: 1366px) {
+    @slot;
+  }
+}
+
+@custom-variant md {
+  @media (max-width: 1024px) {
+    @slot;
+  }
+}
+
+@custom-variant sm {
+  @media (max-width: 768px) {
+    @slot;
+  }
+}

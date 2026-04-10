@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@import './customVariants.css';
 
 :root {
   font-family: 'Pretendard', 'SUIT', 'Noto Sans KR', sans-serif;
