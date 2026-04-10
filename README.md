@@ -5,6 +5,7 @@ A frontend base project for LEVX.
 ## Tech Stack
 
 - React 19 + TypeScript + Vite
+- Tailwind CSS v4
 - TanStack Router
 - TanStack Query
 - Zustand
