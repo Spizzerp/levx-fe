@@ -21,7 +21,7 @@ const LINK_ACTIVE = 'border-ink-strong text-ink-strong'
 export function Nav() {
   return (
     <nav className="border-line flex items-center justify-between border-0 border-b px-8 py-5">
-      <img src="/logo_white.png" alt="LevX" className="h-7 w-auto" />
+      <img src="/logo_white.png" alt="LevX" className="h-11 w-auto" />
       <ul className="flex gap-9">
         {links.map((l) => (
           <li key={l.to}>
