@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# GSD planning directory (local-only)
+.planning/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
