@@ -1,13 +1,5 @@
-import { Link } from '@tanstack/react-router'
+import { Stub } from '@/components/Stub'
 
 export function NotFoundPage() {
-  return (
-    <section className="page">
-      <h1 className="page-title">404</h1>
-      <p className="page-description">The page you requested was not found.</p>
-      <Link className="link" to="/">
-        Go to Home
-      </Link>
-    </section>
-  )
+  return <Stub title="404 · Page Not Found" subtitle="Check the URL and try again" />
 }

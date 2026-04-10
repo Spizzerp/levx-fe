@@ -1,10 +1,12 @@
 import type { PropsWithChildren } from 'react'
 
+import { Nav } from '@/components/Nav'
+
 export function CommonLayout({ children }: PropsWithChildren) {
   return (
-    <div className="app-shell">
-      <header className="app-header">LEVX Frontend</header>
-      <main className="app-main">{children}</main>
-    </div>
+    <>
+      <Nav />
+      {children}
+    </>
   )
 }

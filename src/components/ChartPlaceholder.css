@@ -1,0 +1,94 @@
+.chart-placeholder {
+  margin-top: 56px;
+  position: relative;
+}
+
+.chart-placeholder__svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  overflow: visible;
+}
+
+.chart-placeholder__axis-x {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 14px;
+  padding-right: 70px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-disabled);
+}
+
+.cp-grid {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.cp-axis {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  fill: var(--text-disabled);
+  letter-spacing: 0.08em;
+}
+
+.cp-history {
+  stroke: var(--text-display);
+  stroke-width: 2;
+  fill: none;
+  stroke-linejoin: round;
+}
+
+.cp-pred {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.5;
+}
+.cp-pred--ultra-bull {
+  stroke: var(--success);
+  stroke-dasharray: 5 4;
+  opacity: 0.95;
+}
+.cp-pred--bull {
+  stroke: var(--success);
+  stroke-dasharray: 4 4;
+  opacity: 0.45;
+}
+.cp-pred--neutral {
+  stroke: var(--text-secondary);
+  stroke-dasharray: 2 4;
+  opacity: 0.65;
+}
+.cp-pred--bear {
+  stroke: var(--accent);
+  stroke-dasharray: 4 4;
+  opacity: 0.45;
+}
+.cp-pred--ultra-bear {
+  stroke: var(--accent);
+  stroke-dasharray: 5 4;
+  opacity: 0.95;
+}
+
+.cp-selected {
+  stroke: var(--text-display);
+  stroke-width: 2.5;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.4));
+}
+
+.cp-now-line {
+  stroke: var(--text-display);
+  stroke-width: 1;
+  stroke-dasharray: 2 4;
+  opacity: 0.4;
+}
+
+.cp-now-dot {
+  fill: var(--text-display);
+}

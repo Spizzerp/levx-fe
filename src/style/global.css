@@ -1,0 +1,55 @@
+/*
+ * Base layer overrides on top of Tailwind's preflight.
+ * Preflight already resets margin/padding, link styling, lists, images, etc.
+ * This file only contains the LevX-specific additions preflight doesn't cover.
+ */
+
+@layer base {
+  html,
+  body,
+  #root {
+    min-height: 100vh;
+    background: var(--color-surface);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  #root {
+    display: flex;
+    flex-direction: column;
+  }
+
+  body {
+    overflow-x: hidden;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  input,
+  textarea,
+  select {
+    background: none;
+    border: none;
+    outline: none;
+  }
+
+  ::selection {
+    background: var(--color-ink-strong);
+    color: var(--color-surface);
+  }
+
+  /* Nothing-style focus ring: no outline rings, just border highlight */
+  :focus {
+    outline: none;
+  }
+
+  :focus-visible {
+    outline: 1px solid var(--color-ink-strong);
+    outline-offset: 2px;
+  }
+}

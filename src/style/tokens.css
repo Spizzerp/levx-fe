@@ -1,0 +1,62 @@
+/*
+ * LevX Design Tokens — Nothing-inspired.
+ * Defined as Tailwind v4 @theme so every token becomes a utility class:
+ *   --color-foo    → bg-foo / text-foo / border-foo / etc
+ *   --font-foo     → font-foo
+ *   --text-foo     → text-foo (font-size)
+ *   --duration-foo → duration-foo
+ *   --ease-foo     → ease-foo
+ *
+ * Dark mode only for v0. Light mode will be added as a separate pass.
+ */
+
+@theme {
+  /* ── Surfaces (backgrounds) ─────────────────────
+     surface   — page / root
+     surface-1 — default card
+     surface-2 — raised card (hover, selected)
+  */
+  --color-surface: #000000;
+  --color-surface-1: #111111;
+  --color-surface-2: #1a1a1a;
+
+  /* ── Ink (foreground / text) ───────────────────
+     ink-strong — display / emphasized (#fff)
+     ink        — default body text (#e8e8e8)
+     ink-muted  — secondary text (#999)
+     ink-dim    — disabled / captions (#666)
+  */
+  --color-ink-strong: #ffffff;
+  --color-ink: #e8e8e8;
+  --color-ink-muted: #999999;
+  --color-ink-dim: #666666;
+
+  /* ── Lines (borders) ────────────────────────── */
+  --color-line: #222222;
+  --color-line-strong: #333333;
+
+  /* ── Accent + semantic ──────────────────────── */
+  --color-accent: #d71921;
+  --color-accent-subtle: rgba(215, 25, 33, 0.15);
+  --color-success: #4a9e5c;
+  --color-warning: #d4a843;
+  --color-interactive: #5b9bf6;
+
+  /* ── Typography ───────────────────────────────
+     Inherits Tailwind's default text sizes (text-xs … text-9xl).
+     Only custom sizes need to be declared here.
+  */
+  --font-display: 'Doto', 'Space Mono', monospace;
+  --font-sans: 'Space Grotesk', system-ui, sans-serif;
+  --font-mono: 'Space Mono', 'JetBrains Mono', monospace;
+
+  --text-label: 11px;
+
+  /* ── Motion ───────────────────────────────────
+     Extends Tailwind's default duration/ease scales.
+  */
+  --ease-levx: cubic-bezier(0.25, 0.1, 0.25, 1);
+  --duration-micro: 150ms;
+  --duration-short: 200ms;
+  --duration-medium: 300ms;
+}
