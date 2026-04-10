@@ -2,12 +2,12 @@
   "folders": [
     {
       "name": "ROOT",
-      "path": "."
-    }
+      "path": ".",
+    },
   ],
   "settings": {
     "editor.codeActionsOnSave": {
-      "source.fixAll": "explicit"
+      "source.fixAll": "explicit",
     },
     "editor.defaultFormatter": "esbenp.prettier-vscode",
     "editor.formatOnSave": true,
@@ -15,15 +15,11 @@
       "**/dist": true,
       "**/node_modules": true,
       "pnpm-lock.yaml": true,
-      "*.tsbuildinfo": true
+      "*.tsbuildinfo": true,
     },
-    "typescript.tsdk": "ROOT/node_modules/typescript/lib"
+    "typescript.tsdk": "ROOT/node_modules/typescript/lib",
   },
   "extensions": {
-    "recommendations": [
-      "dbaeumer.vscode-eslint",
-      "esbenp.prettier-vscode",
-      "usernamehw.errorlens"
-    ]
-  }
+    "recommendations": ["dbaeumer.vscode-eslint", "esbenp.prettier-vscode", "usernamehw.errorlens"],
+  },
 }

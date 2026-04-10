@@ -6,7 +6,8 @@ When a `className` has 8 or more Tailwind utility classes, use `cn(...)` and gro
 
 ```tsx
 <div
-  className={cn(
+  className={
+    cn()
     // display
     // flex, grid
     // position, inset, left, top, bottom, right, z-index, overflow
@@ -18,7 +19,7 @@ When a `className` has 8 or more Tailwind utility classes, use `cn(...)` and gro
     // others
     // hover:, focus:, ...
     // responsive media query areas (wideDesktop:, desktop:, tablet:)
-  )}
+  }
 />
 ```
 

@@ -1,7 +1,7 @@
 export type ScreenOptions = {
-  minWidth?: string;
-  maxWidth?: string;
-};
+  minWidth?: string
+  maxWidth?: string
+}
 
 /* --------------------------------------------------
  *   Breakpoints
@@ -9,44 +9,41 @@ export type ScreenOptions = {
 
 export const screens = {
   /** 1367 ~ infinity (1920+) */
-  xl: { minWidth: "1367px" },
+  xl: { minWidth: '1367px' },
   /** 0 (1024) ~ 1366 */
-  lg: { maxWidth: "1366px" },
+  lg: { maxWidth: '1366px' },
   /** 0 (768) ~ 1024 */
-  md: { maxWidth: "1024px" },
+  md: { maxWidth: '1024px' },
   /** 0 ~ 768 */
-  sm: { maxWidth: "768px" },
-} as const satisfies Record<string, ScreenOptions>;
+  sm: { maxWidth: '768px' },
+} as const satisfies Record<string, ScreenOptions>
 
-export const colors = {} as const;
+export const colors = {} as const
 
 /* --------------------------------------------------
  *   Gradients
  * ----------------------------------------------- */
 
-export const gradients = {} as const;
+export const gradients = {} as const
 
 /* --------------------------------------------------
  *   Shadows
  * ----------------------------------------------- */
 
-type ShadowTuple = [number, number, number] | [number, number, number, number];
-type ShadowPalette = [string, string][];
+type ShadowTuple = [number, number, number] | [number, number, number, number]
+type ShadowPalette = [string, string][]
 
-function toDropShadowObject(
-  shadowTuples: ShadowTuple[],
-  palette: ShadowPalette
-) {
+function toDropShadowObject(shadowTuples: ShadowTuple[], palette: ShadowPalette) {
   return Object.fromEntries(
     shadowTuples.flatMap(([x, y, blur, spread = 0]) => {
-      const keyBase = `${x}-${y}-${blur}${spread ? `-${spread}` : ""}`;
+      const keyBase = `${x}-${y}-${blur}${spread ? `-${spread}` : ''}`
 
       return palette.map(([name, color]) => [
         `${keyBase}-${name}`,
         `${x}px ${y}px ${blur}px ${spread}px ${color}`,
-      ]);
-    })
-  ) as Record<string, string>;
+      ])
+    }),
+  ) as Record<string, string>
 }
 
 /**
@@ -88,5 +85,5 @@ export const shadows = toDropShadowObject(
       `white/${opacity}`,
       `rgba(255 255 255 / ${opacity / 100})`,
     ]) as [string, string][]),
-  ]
-);
+  ],
+)
