@@ -18,6 +18,9 @@ export function usePythFeed(feedId: string | null): void {
   useEffect(() => {
     if (!feedId) return
 
+    // Capture feedId as a non-null local for use inside closures
+    const activeFeedId: string = feedId
+
     let source: EventSource | null = null
     let cancelled = false
     let backoffMs = 1000
@@ -26,8 +29,9 @@ export function usePythFeed(feedId: string | null): void {
       usePythStore.getState().setStatus('connecting')
       try {
         const client = getPythClient()
+        // HermesClient.getStreamingPriceUpdates returns a promise of EventSource-like object
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const stream = await (client as any).getStreamingPriceUpdates([feedId])
+        const stream = (await (client as any).getStreamingPriceUpdates([activeFeedId])) as EventSource
 
         // Pitfall 4 race guard: if cleanup fired while awaiting, close and bail
         if (cancelled) {
@@ -39,14 +43,18 @@ export function usePythFeed(feedId: string | null): void {
         backoffMs = 1000 // reset backoff on successful connect
         usePythStore.getState().setStatus('connected')
 
-        source.onmessage = (e: MessageEvent) => {
+        const src = source // local non-null ref for the closure
+
+        src.onmessage = (e: MessageEvent) => {
           try {
-            const update = JSON.parse(e.data)
+            const update = JSON.parse(e.data as string) as {
+              parsed?: Array<{
+                id: string
+                price: { price: string; expo: number; publish_time: number }
+              }>
+            }
             // Hermes SSE emits parsed price updates array
-            const priceFeeds: Array<{
-              id: string
-              price: { price: string; expo: number; publish_time: number }
-            }> = update?.parsed ?? []
+            const priceFeeds = update?.parsed ?? []
 
             for (const feed of priceFeeds) {
               if (!feed.price) continue
@@ -60,15 +68,15 @@ export function usePythFeed(feedId: string | null): void {
                 time: publishTime * 1000,
                 value,
               }
-              usePythStore.getState().setPythTick(feedId, tick)
+              usePythStore.getState().setPythTick(activeFeedId, tick)
             }
           } catch {
             // Ignore malformed SSE messages
           }
         }
 
-        source.onerror = () => {
-          source?.close()
+        src.onerror = () => {
+          src.close()
           source = null
           if (!cancelled) scheduleReconnect()
         }

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 
 // Mock env to prevent loud-failure throws when importing pyth modules
 vi.mock('@/env/env.config', () => ({
