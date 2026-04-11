@@ -17,6 +17,10 @@ export function useMarket(id: string | undefined) {
   })
 }
 
+/**
+ * @deprecated Phase 1 retired this hook in favor of `usePythFeed` + `useLatestPrice`
+ * from `@/lib/pyth/hooks`. Do not use in new code. Will be removed in a later cleanup pass.
+ */
 export function useCurrentPrice(pair: string | undefined) {
   return useQuery({
     queryKey: ['price', pair],

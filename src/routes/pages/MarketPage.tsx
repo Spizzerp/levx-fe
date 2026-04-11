@@ -1,7 +1,8 @@
 import { useParams } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { Button } from '@/components/Button'
+import { DrawingLayer } from '@/components/DrawingLayer'
 import { Input } from '@/components/Input'
 import { Label } from '@/components/Label'
 import { LevXChart } from '@/components/LevXChart'
@@ -10,8 +11,11 @@ import { SegmentedSlider } from '@/components/SegmentedSlider'
 import { StatusDot } from '@/components/StatusDot'
 import { Stub } from '@/components/Stub'
 import { cn } from '@/lib/cn'
-import { useCurrentPrice, useMarket } from '@/lib/api/hooks'
+import { useMarket } from '@/lib/api/hooks'
 import { getNow } from '@/lib/api/mock'
+import { usePythFeed, useLatestPrice } from '@/lib/pyth/hooks'
+import { feedIdForPair } from '@/lib/pyth/feedIds'
+import { useDrawingStore } from '@/stores/drawingStore'
 import {
   formatCountdown,
   formatDeltaBps,
@@ -46,11 +50,24 @@ const META_SEP = <span className="text-line-strong mx-0.5">·</span>
 export function MarketPage() {
   const { id } = useParams({ from: '/market/$id' })
   const { data: market, isLoading, error } = useMarket(id)
-  const { data: currentPrice } = useCurrentPrice(market?.pair)
+
+  const pair = market?.pair ?? null
+  const feedId = pair ? feedIdForPair(pair) : null
+  usePythFeed(feedId)
+  const latestTick = useLatestPrice(feedId)
+
+  const drawingPhase = useDrawingStore((s) => s.state.phase)
+  const enterDrawMode = useDrawingStore((s) => s.enterDrawMode)
+  const exitDrawMode = useDrawingStore((s) => s.exitDrawMode)
 
   const [selectedPathId, setSelectedPathId] = useState<string | null>(null)
   const [leverage, setLeverage] = useState(22)
   const [collateral, setCollateral] = useState('25.00')
+
+  const now = getNow()
+
+  // Exit draw mode on unmount so a user navigating away doesn't leave the store in sweeping state.
+  useEffect(() => () => exitDrawMode(), [exitDrawMode])
 
   if (isLoading) return <Stub title="Loading Market…" />
   if (error || !market) return <Stub title="Market Not Found" subtitle={id} />
@@ -61,15 +78,17 @@ export function MarketPage() {
   const lastPoint = selectedPath?.data[selectedPath.data.length - 1]
   const firstPoint = selectedPath?.data[0]
   const isLong = lastPoint && firstPoint ? lastPoint.value >= firstPoint.value : true
-
-  const now = getNow()
   const msRemaining = Math.max(0, market.endTime - now)
   const durationMs = market.endTime - market.startTime
   const leverageCap = maxLeverageByDuration(durationMs)
 
-  const priceDisplay = currentPrice?.value ?? market.history[market.history.length - 1]?.value ?? 0
-  const deltaDisplay = currentPrice?.delta24hBps ?? 0
+  // Live price from Pyth tick; fall back to last history point
+  const priceDisplay = latestTick?.value ?? market.history[market.history.length - 1]?.value ?? 0
+  // Delta is only available from the mock layer (not from live Pyth ticks in Phase 1)
+  const deltaDisplay = 0
   const deltaColor = deltaDisplay >= 0 ? 'text-success' : 'text-accent'
+
+  const isInDrawMode = drawingPhase !== 'idle'
 
   return (
     <main className="mx-auto grid max-w-[1680px] grid-cols-1 gap-14 px-10 pt-14 pb-12 [@media(min-width:1181px)]:grid-cols-[1fr_400px] [@media(min-width:1181px)]:gap-[72px]">
@@ -125,10 +144,27 @@ export function MarketPage() {
           <LevXChart
             history={market.history}
             predictions={market.paths}
-            nowTime={now}
+            nowTime={latestTick ? latestTick.time : now}
             marketStart={market.startTime}
             marketEnd={market.endTime}
             selectedPathId={activePathId}
+            pair={market.pair}
+            isLoading={false}
+            error={null}
+            market={market}
+            renderDrawingOverlay={({ xScale, yScale, innerWidth, innerHeight, checkpointXs, marketStart }) => (
+              <DrawingLayer
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                xScale={xScale as any}
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                yScale={yScale as any}
+                innerWidth={innerWidth}
+                innerHeight={innerHeight}
+                margin={{ top: 0, right: 0, bottom: 0, left: 0 }}
+                checkpointXs={checkpointXs}
+                marketStart={marketStart}
+              />
+            )}
           />
         </div>
       </section>
@@ -150,9 +186,26 @@ export function MarketPage() {
           ))}
         </div>
 
-        <Button variant="dashed" fullWidth className="mt-5">
-          + Draw Custom Path
-        </Button>
+        {/* ── Draw button — desktop only (mobile gate: pure Tailwind CSS) ── */}
+        <div className="hidden md:block">
+          <Button
+            variant={isInDrawMode ? 'primary' : 'dashed'}
+            fullWidth
+            className="mt-5"
+            onClick={() => {
+              if (drawingPhase === 'idle') {
+                enterDrawMode(market.totalCheckpoints)
+              } else {
+                exitDrawMode()
+              }
+            }}
+          >
+            {isInDrawMode ? 'Cancel Drawing' : '+ Draw Custom Path'}
+          </Button>
+        </div>
+        <div className="mt-5 block md:hidden font-mono text-sm text-[color:var(--color-ink-dim,#666)]">
+          Drawing requires desktop
+        </div>
 
         {market.leverageEnabled && (
           <>
