@@ -6,7 +6,8 @@ import { ParentSize } from '@visx/responsive'
 import { scaleLinear, scaleTime } from '@visx/scale'
 import { Bar, Circle, Line, LinePath } from '@visx/shape'
 import { bisector } from 'd3-array'
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import type { ReactNode } from 'react'
 
 import type { PathTone, PredictionPath, PricePoint } from '@/types/market'
 import type { Market } from '@/types/market'
@@ -14,6 +15,7 @@ import { useDrawingStore } from '@/stores/drawingStore'
 import { useLatestPrice } from '@/lib/pyth/hooks'
 import { feedIdForPair } from '@/lib/pyth/feedIds'
 import { buildCheckpointXs } from '@/lib/drawing/geometry'
+import { useYAxisFreeze } from '@/lib/drawing/yFreeze'
 import { DrawingGrid } from '@/components/DrawingGrid'
 import { Stub } from '@/components/Stub'
 
@@ -60,6 +62,21 @@ export interface LevXChartProps {
   error?: Error | null
   /** The full market is needed to build checkpoint Xs for the draw-mode grid. */
   market?: Pick<Market, 'startTime' | 'checkpointInterval' | 'totalCheckpoints'> | null
+  /**
+   * Optional render prop invoked INSIDE the SVG inner group (after DrawingGrid, before crosshair).
+   * Receives live scales and checkpoint Xs so the consumer can mount DrawingLayer with
+   * the correct coordinate space. Omitting it is backward-compatible (no overlay rendered).
+   */
+  renderDrawingOverlay?: (args: {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    xScale: any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    yScale: any
+    innerWidth: number
+    innerHeight: number
+    checkpointXs: readonly number[]
+    marketStart: number
+  }) => ReactNode
 }
 
 interface InnerProps extends LevXChartProps {
@@ -78,6 +95,7 @@ function ChartInner({
   selectedPathId,
   pair,
   market,
+  renderDrawingOverlay,
 }: InnerProps) {
   const innerWidth = Math.max(0, width - MARGIN.left - MARGIN.right)
   const innerHeight = Math.max(0, height - MARGIN.top - MARGIN.bottom)
@@ -96,13 +114,14 @@ function ChartInner({
 
   /* ── Drawing store subscription ─────────────────────────── */
   const isDrawMode = useDrawingStore((s) => s.state.phase !== 'idle')
+  const drawingPhase = useDrawingStore((s) => s.state.phase)
   const checkpointXs = useMemo(
     () => (market ? buildCheckpointXs(market as Market) : []),
     [market],
   )
 
   /* ── Price domain: envelope of all data ± padding ────────── */
-  const priceDomain = useMemo<[number, number]>(() => {
+  const priceDomainLive = useMemo<[number, number]>(() => {
     const all: number[] = []
     mergedHistory.forEach((p) => all.push(p.value))
     predictions.forEach((path) => path.data.forEach((p) => all.push(p.value)))
@@ -111,6 +130,14 @@ function ChartInner({
     const max = Math.max(...all)
     return [min * 0.9, max * 1.05]
   }, [mergedHistory, predictions])
+
+  /* ── Y-axis freeze: domain held fixed during sweeping phase ── */
+  const { effectiveDomain, freeze, thaw } = useYAxisFreeze(priceDomainLive)
+
+  useEffect(() => {
+    if (drawingPhase === 'sweeping') freeze()
+    else thaw()
+  }, [drawingPhase, freeze, thaw])
 
   /* ── Time domain: include pre-market history and post-market predictions ── */
   const timeDomain = useMemo<[number, number]>(() => {
@@ -128,8 +155,8 @@ function ChartInner({
     [innerWidth, timeDomain],
   )
   const priceScale = useMemo(
-    () => scaleLinear<number>({ domain: priceDomain, range: [innerHeight, 0], nice: true }),
-    [innerHeight, priceDomain],
+    () => scaleLinear<number>({ domain: effectiveDomain, range: [innerHeight, 0], nice: true }),
+    [innerHeight, effectiveDomain],
   )
 
   /* ── Crosshair state ─────────────────────────────────────── */
@@ -241,6 +268,16 @@ function ChartInner({
           strokeLinejoin="round"
           curve={curveMonotoneX}
         />
+
+        {/* ── Drawing overlay (render prop) ────────── */}
+        {renderDrawingOverlay?.({
+          xScale: timeScale,
+          yScale: priceScale,
+          innerWidth,
+          innerHeight,
+          checkpointXs,
+          marketStart,
+        })}
 
         {/* ── Empty-paths message (PATHS-04) ──────── */}
         {predictions.length === 0 && (

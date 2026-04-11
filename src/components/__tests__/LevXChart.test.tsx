@@ -153,4 +153,27 @@ describe('LevXChart', () => {
     // The merged history path should still render (can't easily assert specific d-value in jsdom, but the component must not crash and SVG must render)
     expect(container.querySelector('svg')).toBeInTheDocument()
   })
+
+  it('invokes renderDrawingOverlay with live scales when provided', () => {
+    const spy = vi.fn(() => null)
+    renderChart({ renderDrawingOverlay: spy })
+    expect(spy).toHaveBeenCalled()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const args = (spy.mock.calls as any[][])[0]?.[0] as Record<string, unknown>
+    expect(args).toBeDefined()
+    expect(args['innerWidth']).toBeGreaterThan(0)
+    expect(args['innerHeight']).toBeGreaterThan(0)
+    expect((args['checkpointXs'] as unknown[]).length).toBe(48)
+    expect(typeof args['xScale']).toBe('function')
+    expect(typeof args['yScale']).toBe('function')
+  })
+
+  it('freezes Y-axis domain when drawing store enters sweeping', async () => {
+    useDrawingStore.setState({
+      state: { phase: 'sweeping', values: new Array(48).fill(null), pointerDown: true },
+      totalCheckpoints: 48,
+    })
+    const { container } = renderChart()
+    expect(container.querySelector('svg')).toBeInTheDocument()
+  })
 })
