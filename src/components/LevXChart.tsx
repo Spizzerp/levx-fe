@@ -1,5 +1,5 @@
 import { AxisBottom, AxisRight } from '@visx/axis'
-import { curveMonotoneX } from '@visx/curve'
+import { curveCatmullRom, curveMonotoneX } from '@visx/curve'
 import { GridRows } from '@visx/grid'
 import { Group } from '@visx/group'
 import { ParentSize } from '@visx/responsive'
@@ -9,8 +9,18 @@ import { bisector } from 'd3-array'
 import { useCallback, useMemo, useState } from 'react'
 
 import type { PathTone, PredictionPath, PricePoint } from '@/types/market'
+import type { Market } from '@/types/market'
+import { useDrawingStore } from '@/stores/drawingStore'
+import { useLatestPrice } from '@/lib/pyth/hooks'
+import { feedIdForPair } from '@/lib/pyth/feedIds'
+import { buildCheckpointXs } from '@/lib/drawing/geometry'
+import { DrawingGrid } from '@/components/DrawingGrid'
+import { Stub } from '@/components/Stub'
 
 import './LevXChart.css'
+
+/* ── Module-level Catmull-Rom factory — created once, never recreated per render ── */
+const CATMULL_ROM_ALPHA_05 = curveCatmullRom.alpha(0.5)
 
 /* ── Visual config — derived from Nothing tokens ────────────────── */
 
@@ -42,6 +52,14 @@ export interface LevXChartProps {
   selectedPathId?: string | null
   /** override fixed height; if omitted, fills parent */
   height?: number
+  /** Pair string used for pythStore subscription. If null, no live updates. */
+  pair?: string | null
+  /** Loading state of the outer data layer. */
+  isLoading?: boolean
+  /** Error state of the outer data layer. */
+  error?: Error | null
+  /** The full market is needed to build checkpoint Xs for the draw-mode grid. */
+  market?: Pick<Market, 'startTime' | 'checkpointInterval' | 'totalCheckpoints'> | null
 }
 
 interface InnerProps extends LevXChartProps {
@@ -58,31 +76,52 @@ function ChartInner({
   marketStart,
   marketEnd,
   selectedPathId,
+  pair,
+  market,
 }: InnerProps) {
   const innerWidth = Math.max(0, width - MARGIN.left - MARGIN.right)
   const innerHeight = Math.max(0, height - MARGIN.top - MARGIN.bottom)
 
+  /* ── Pyth live tick subscription ────────────────────────── */
+  const feedId = pair ? feedIdForPair(pair) : null
+  const latestTick = useLatestPrice(feedId)
+
+  /* ── Merge live tick into visible history ────────────────── */
+  const mergedHistory = useMemo(() => {
+    if (!latestTick) return history
+    const lastHistoryPoint = history[history.length - 1]
+    if (lastHistoryPoint && latestTick.time <= lastHistoryPoint.time) return history
+    return [...history, { time: latestTick.time, value: latestTick.value }]
+  }, [history, latestTick])
+
+  /* ── Drawing store subscription ─────────────────────────── */
+  const isDrawMode = useDrawingStore((s) => s.state.phase !== 'idle')
+  const checkpointXs = useMemo(
+    () => (market ? buildCheckpointXs(market as Market) : []),
+    [market],
+  )
+
   /* ── Price domain: envelope of all data ± padding ────────── */
   const priceDomain = useMemo<[number, number]>(() => {
     const all: number[] = []
-    history.forEach((p) => all.push(p.value))
+    mergedHistory.forEach((p) => all.push(p.value))
     predictions.forEach((path) => path.data.forEach((p) => all.push(p.value)))
     if (all.length === 0) return [0, 1]
     const min = Math.min(...all)
     const max = Math.max(...all)
     return [min * 0.9, max * 1.05]
-  }, [history, predictions])
+  }, [mergedHistory, predictions])
 
   /* ── Time domain: include pre-market history and post-market predictions ── */
   const timeDomain = useMemo<[number, number]>(() => {
-    const firstHistory = history[0]?.time ?? marketStart
+    const firstHistory = mergedHistory[0]?.time ?? marketStart
     let lastPred = marketEnd
     predictions.forEach((p) => {
       const last = p.data[p.data.length - 1]
       if (last && last.time > lastPred) lastPred = last.time
     })
     return [Math.min(firstHistory, marketStart), Math.max(lastPred, marketEnd)]
-  }, [history, predictions, marketStart, marketEnd])
+  }, [mergedHistory, predictions, marketStart, marketEnd])
 
   const timeScale = useMemo(
     () => scaleTime<number>({ domain: timeDomain, range: [0, innerWidth] }),
@@ -109,7 +148,7 @@ function ChartInner({
       }
       const t = timeScale.invert(xInner).getTime()
       // In the past → read from history. In the future → read from selected prediction (if any).
-      let sourceData: PricePoint[] = history
+      let sourceData: PricePoint[] = mergedHistory
       if (t > nowTime && selectedPathId) {
         const selected = predictions.find((p) => p.id === selectedPathId)
         if (selected) sourceData = selected.data
@@ -121,7 +160,7 @@ function ChartInner({
       const d = !d1 ? d0 : !d0 ? d1 : t - d0.time > d1.time - t ? d1 : d0
       if (d) setHover({ x: timeScale(d.time), time: d.time, value: d.value })
     },
-    [innerWidth, selectedPathId, timeScale, history, predictions, nowTime],
+    [innerWidth, selectedPathId, timeScale, mergedHistory, predictions, nowTime],
   )
 
   const handleLeave = useCallback(() => setHover(null), [])
@@ -130,7 +169,7 @@ function ChartInner({
 
   const nowX = timeScale(nowTime)
   const selected = predictions.find((p) => p.id === selectedPathId)
-  const lastHistoryPoint = history[history.length - 1]
+  const lastHistoryPoint = mergedHistory[mergedHistory.length - 1]
   const showMarketStartMarker = marketStart > nowTime
   const marketStartX = timeScale(marketStart)
 
@@ -144,6 +183,16 @@ function ChartInner({
           stroke="#222222"
           strokeWidth={1}
           numTicks={6}
+        />
+
+        {/* ── Draw-mode grid overlay (vertical checkpoint columns + prominent horizontal grid) ── */}
+        <DrawingGrid
+          xScale={timeScale}
+          yScale={priceScale}
+          innerWidth={innerWidth}
+          innerHeight={innerHeight}
+          checkpointXs={checkpointXs}
+          isDrawMode={isDrawMode}
         />
 
         {/* ── Prediction paths ────────────────────── */}
@@ -162,7 +211,7 @@ function ChartInner({
               strokeLinecap="round"
               strokeLinejoin="round"
               opacity={isSelected ? 0 : style.opacity}
-              curve={curveMonotoneX}
+              curve={CATMULL_ROM_ALPHA_05}
             />
           )
         })}
@@ -177,14 +226,14 @@ function ChartInner({
             strokeWidth={2.5}
             strokeLinecap="round"
             strokeLinejoin="round"
-            curve={curveMonotoneX}
+            curve={CATMULL_ROM_ALPHA_05}
             style={{ filter: 'drop-shadow(0 0 4px rgba(255,255,255,0.4))' }}
           />
         )}
 
         {/* ── Historical price line ───────────────── */}
         <LinePath<PricePoint>
-          data={history}
+          data={mergedHistory}
           x={(d) => timeScale(d.time)}
           y={(d) => priceScale(d.value)}
           stroke="#FFFFFF"
@@ -192,6 +241,19 @@ function ChartInner({
           strokeLinejoin="round"
           curve={curveMonotoneX}
         />
+
+        {/* ── Empty-paths message (PATHS-04) ──────── */}
+        {predictions.length === 0 && (
+          <text
+            x={innerWidth / 2}
+            y={innerHeight / 2}
+            textAnchor="middle"
+            className="fill-ink-dim font-mono text-xs"
+            data-testid="empty-paths-message"
+          >
+            No candidate paths yet
+          </text>
+        )}
 
         {/* ── Now marker ──────────────────────────── */}
         <Line
@@ -333,8 +395,22 @@ function ChartInner({
   )
 }
 
-export function LevXChart(props: LevXChartProps) {
-  const { height } = props
+/**
+ * LevXChartOuter handles all top-level state reading (hooks called unconditionally)
+ * and early-return UI states (loading, error, empty) before delegating to ParentSize + ChartInner.
+ */
+function LevXChartOuter(props: LevXChartProps) {
+  const { height, isLoading, error, history, pair } = props
+
+  /* ── All hooks called unconditionally at top level ───────── */
+  const feedId = pair ? feedIdForPair(pair) : null
+  const latestTick = useLatestPrice(feedId)
+
+  /* ── Loading / error / empty early returns ───────────────── */
+  if (isLoading) return <Stub title="Loading chart…" />
+  if (error) return <Stub title="Chart error" subtitle={error.message} />
+  if (history.length === 0 && !latestTick) return <Stub title="Waiting for price data…" />
+
   return (
     <div className="levx-chart-wrap" style={height ? { height } : undefined}>
       <ParentSize>
@@ -344,4 +420,8 @@ export function LevXChart(props: LevXChartProps) {
       </ParentSize>
     </div>
   )
+}
+
+export function LevXChart(props: LevXChartProps) {
+  return <LevXChartOuter {...props} />
 }

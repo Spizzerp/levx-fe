@@ -1,10 +1,13 @@
 import { GridRows } from '@visx/grid'
 import { Line } from '@visx/shape'
-import type { ScaleLinear, ScaleTime } from 'd3-scale'
+import type { D3Scale } from '@visx/scale'
+
+/** Minimal callable scale: maps a numeric/Date input to a number output. Used for xScale. */
+type CallableScale = (v: number | Date) => number
 
 export interface DrawingGridProps {
-  xScale: ScaleTime<number, number>
-  yScale: ScaleLinear<number, number>
+  xScale: CallableScale
+  yScale: D3Scale<number>
   innerWidth: number
   innerHeight: number
   checkpointXs: readonly number[]
