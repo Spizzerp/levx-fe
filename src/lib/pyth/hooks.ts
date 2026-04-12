@@ -1,7 +1,11 @@
 import { useEffect } from 'react'
+import type { HermesClient } from '@pythnetwork/hermes-client'
 import { getPythClient } from './client'
 import { usePythStore } from '@/stores/pythStore'
 import type { PythTick } from './types'
+
+/** Awaited EventSource type returned by HermesClient.getPriceUpdatesStream. */
+type HermesStream = Awaited<ReturnType<HermesClient['getPriceUpdatesStream']>>
 
 /** Convert Pyth fixed-point price object to a plain number. */
 function pythPriceToNumber(priceObj: { price: string; expo: number }): number {
@@ -21,7 +25,7 @@ export function usePythFeed(feedId: string | null): void {
     // Capture feedId as a non-null local for use inside closures
     const activeFeedId: string = feedId
 
-    let source: EventSource | null = null
+    let source: HermesStream | null = null
     let cancelled = false
     let backoffMs = 1000
 
@@ -29,9 +33,10 @@ export function usePythFeed(feedId: string | null): void {
       usePythStore.getState().setStatus('connecting')
       try {
         const client = getPythClient()
-        // HermesClient.getStreamingPriceUpdates returns a promise of EventSource-like object
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const stream = (await (client as any).getStreamingPriceUpdates([activeFeedId])) as EventSource
+        // HermesClient.getPriceUpdatesStream returns a Promise<EventSource> wrapper
+        // from the `eventsource` package. We must pass { parsed: true } — the
+        // default is `false`, which omits the `parsed` array we consume below.
+        const stream = await client.getPriceUpdatesStream([activeFeedId], { parsed: true })
 
         // Pitfall 4 race guard: if cleanup fired while awaiting, close and bail
         if (cancelled) {

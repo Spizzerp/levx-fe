@@ -4,7 +4,6 @@ import { LevXChart } from '@/components/LevXChart'
 import { Stub } from '@/components/Stub'
 import { cn } from '@/lib/cn'
 import { useMarket } from '@/lib/api/hooks'
-import { getNow } from '@/lib/api/mock'
 
 const CHIP_BASE = cn(
   'cursor-pointer rounded-full border border-line-strong bg-transparent px-4 py-2.5',
@@ -21,8 +20,9 @@ const CHIP_ACTIVE =
  * Loads a fixed mock market and exposes its paths as chip toggles.
  */
 export function LabsChartPage() {
-  const { data: market, isLoading } = useMarket('1')
+  const { data: market, isLoading } = useMarket('btc')
   const [selectedPathId, setSelectedPathId] = useState<string | null>(null)
+  const [now] = useState(() => Date.now())
 
   if (isLoading || !market) return <Stub title="Loading…" />
 
@@ -43,7 +43,7 @@ export function LabsChartPage() {
         <LevXChart
           history={market.history}
           predictions={market.paths}
-          nowTime={getNow()}
+          nowTime={now}
           marketStart={market.startTime}
           marketEnd={market.endTime}
           selectedPathId={activeId}

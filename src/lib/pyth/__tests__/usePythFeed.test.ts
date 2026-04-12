@@ -30,7 +30,7 @@ const mockSource = {
   close: mockClose,
 }
 
-const mockGetStreamingPriceUpdates = vi.fn()
+const mockGetPriceUpdatesStream = vi.fn()
 
 vi.mock('@/env/env.config', () => ({
   env: {
@@ -48,7 +48,7 @@ vi.mock('@pythnetwork/hermes-client', () => ({
 
 vi.mock('@/lib/pyth/client', () => ({
   getPythClient: () => ({
-    getStreamingPriceUpdates: mockGetStreamingPriceUpdates,
+    getPriceUpdatesStream: mockGetPriceUpdatesStream,
   }),
   __resetPythClientForTests: () => {},
 }))
@@ -59,10 +59,10 @@ describe('usePythFeed', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     mockClose.mockClear()
-    mockGetStreamingPriceUpdates.mockClear()
+    mockGetPriceUpdatesStream.mockClear()
     mockOnMessage = null
     mockOnError = null
-    mockGetStreamingPriceUpdates.mockResolvedValue(mockSource)
+    mockGetPriceUpdatesStream.mockResolvedValue(mockSource)
     usePythStore.setState({ ticks: {}, status: 'idle' })
   })
 
@@ -78,8 +78,8 @@ describe('usePythFeed', () => {
       await flushMicrotasks()
     })
 
-    expect(mockGetStreamingPriceUpdates).toHaveBeenCalledOnce()
-    expect(mockGetStreamingPriceUpdates).toHaveBeenCalledWith([FEED_ID])
+    expect(mockGetPriceUpdatesStream).toHaveBeenCalledOnce()
+    expect(mockGetPriceUpdatesStream).toHaveBeenCalledWith([FEED_ID], { parsed: true })
 
     unmount()
   })
@@ -104,7 +104,7 @@ describe('usePythFeed', () => {
       await flushMicrotasks()
     })
 
-    expect(mockGetStreamingPriceUpdates).toHaveBeenCalledTimes(1)
+    expect(mockGetPriceUpdatesStream).toHaveBeenCalledTimes(1)
 
     // Trigger onerror
     act(() => {
@@ -118,7 +118,7 @@ describe('usePythFeed', () => {
     })
 
     // Should have reconnected (called again)
-    expect(mockGetStreamingPriceUpdates).toHaveBeenCalledTimes(2)
+    expect(mockGetPriceUpdatesStream).toHaveBeenCalledTimes(2)
   })
 
   it('sets status to "reconnecting" during backoff window', async () => {
@@ -144,7 +144,7 @@ describe('usePythFeed', () => {
     const slowStreamPromise = new Promise<typeof mockSource>((resolve) => {
       resolveStream = resolve
     })
-    mockGetStreamingPriceUpdates.mockReturnValue(slowStreamPromise)
+    mockGetPriceUpdatesStream.mockReturnValue(slowStreamPromise)
 
     const { usePythFeed } = await import('@/lib/pyth/hooks')
     const { unmount } = renderHook(() => usePythFeed(FEED_ID))
@@ -170,6 +170,6 @@ describe('usePythFeed', () => {
     })
 
     // getStreamingPriceUpdates should only have been called once
-    expect(mockGetStreamingPriceUpdates).toHaveBeenCalledTimes(1)
+    expect(mockGetPriceUpdatesStream).toHaveBeenCalledTimes(1)
   })
 })

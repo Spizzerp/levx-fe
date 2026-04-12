@@ -102,9 +102,10 @@ describe('LevXChart', () => {
     expect(screen.getByText(/waiting for price data/i)).toBeInTheDocument()
   })
 
-  it('renders empty-paths message when predictions is empty', () => {
+  it('renders chart without predictions when predictions array is empty', () => {
     const { container } = renderChart({ predictions: [] })
-    expect(container.querySelector('[data-testid="empty-paths-message"]')).toBeInTheDocument()
+    // Should still render the SVG with just the history line
+    expect(container.querySelector('svg')).toBeInTheDocument()
   })
 
   it('renders DrawingGrid when drawing store is in draw mode', () => {

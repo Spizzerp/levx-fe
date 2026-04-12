@@ -69,6 +69,7 @@ export function DrawingLayer({
   yScale,
   innerWidth,
   innerHeight,
+  margin,
   checkpointXs,
   marketStart,
   onStrokeStart,
@@ -123,14 +124,20 @@ export function DrawingLayer({
     (e: React.PointerEvent<SVGRectElement>) => {
       if (!isActive) return
 
-      // getBoundingClientRect on pointerdown — standard coord conversion.
-      const rect = e.currentTarget.getBoundingClientRect()
-      const screenX = e.clientX - rect.left
-      const screenY = e.clientY - rect.top
+      // Convert pointer position to chart-area coords (0..innerWidth) by using
+      // the ownerSVGElement's bounding rect.  The overlay <rect> lives inside a
+      // translated <g> (MARGIN offset), so going via the SVG root and subtracting
+      // the margin gives us the correct inner-chart pixel position regardless of
+      // where the overlay rect itself is positioned.
+      const svg = (e.currentTarget as SVGElement).ownerSVGElement
+      if (!svg) return
+      const svgRect = svg.getBoundingClientRect()
+      const chartX = e.clientX - svgRect.left - margin.left
+      const chartY = e.clientY - svgRect.top - margin.top
 
       const { xScale: xs, yScale: ys } = scalesRef.current
-      const domainX = Number(xs.invert(screenX))
-      const domainY = Number(ys.invert(screenY))
+      const domainX = Number(xs.invert(chartX))
+      const domainY = Number(ys.invert(chartY))
 
       // History-region guard (Pitfall 5): ignore pointerdown before marketStart.
       if (domainX < marketStart) return
@@ -138,8 +145,8 @@ export function DrawingLayer({
       // Capture pointer so fast drags off the SVG edge don't break the stroke.
       e.currentTarget.setPointerCapture(e.pointerId)
 
-      // Seed the raw stroke path.
-      rawPathDRef.current = `M ${screenX} ${screenY}`
+      // Seed the raw stroke path in chart-area coords.
+      rawPathDRef.current = `M ${chartX} ${chartY}`
       rawStrokeRef.current?.setAttribute('d', rawPathDRef.current)
 
       // Seed previous-position refs for the first pointermove.
@@ -151,7 +158,7 @@ export function DrawingLayer({
       // Notify parent (Y-axis freeze).
       onStrokeStart?.()
     },
-    [isActive, marketStart, onStrokeStart],
+    [isActive, marketStart, margin.left, margin.top, onStrokeStart],
   )
 
   const onPointerMove = useCallback(
@@ -161,17 +168,29 @@ export function DrawingLayer({
       const storeState = useDrawingStore.getState().state
       if (storeState.phase !== 'sweeping') return
 
-      // Pitfall 5: getBoundingClientRect on EVERY pointermove (never cached from pointerdown).
-      const rect = e.currentTarget.getBoundingClientRect()
-      const screenX = e.clientX - rect.left
-      const screenY = e.clientY - rect.top
+      // Safety: if no buttons are pressed, the pointer was released without a
+      // pointerUp firing (e.g., focus loss, pointer capture lost). End the stroke.
+      if (e.buttons === 0) {
+        useDrawingStore.getState().endStroke()
+        prevDomainXRef.current = null
+        prevDomainYRef.current = null
+        onStrokeEnd?.()
+        return
+      }
+
+      // Pitfall 5: fresh bounding rect on EVERY pointermove (never cached from pointerdown).
+      const svg = (e.currentTarget as SVGElement).ownerSVGElement
+      if (!svg) return
+      const svgRect = svg.getBoundingClientRect()
+      const chartX = e.clientX - svgRect.left - margin.left
+      const chartY = e.clientY - svgRect.top - margin.top
 
       const { xScale: xs, yScale: ys } = scalesRef.current
-      const domainX = Number(xs.invert(screenX))
-      const domainY = Number(ys.invert(screenY))
+      const domainX = Number(xs.invert(chartX))
+      const domainY = Number(ys.invert(chartY))
 
       // --- Direct DOM mutation for the raw in-flight stroke (no React state) ---
-      rawPathDRef.current += ` L ${screenX} ${screenY}`
+      rawPathDRef.current += ` L ${chartX} ${chartY}`
       rawStrokeRef.current?.setAttribute('d', rawPathDRef.current)
 
       // --- Crossing detection → Zustand commit (sparse events only) ---
@@ -202,7 +221,8 @@ export function DrawingLayer({
       prevDomainXRef.current = domainX
       prevDomainYRef.current = domainY
     },
-    [isActive, checkpointXs],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isActive, checkpointXs, margin.left, margin.top, marketStart],
   )
 
   const endStroke = useCallback(
@@ -240,6 +260,17 @@ export function DrawingLayer({
     [isActive, onStrokeEnd],
   )
 
+  /** Safety net: if the browser revokes pointer capture, end the stroke. */
+  const onLostCapture = useCallback(() => {
+    const storeState = useDrawingStore.getState().state
+    if (storeState.phase === 'sweeping') {
+      useDrawingStore.getState().endStroke()
+      prevDomainXRef.current = null
+      prevDomainYRef.current = null
+      onStrokeEnd?.()
+    }
+  }, [onStrokeEnd])
+
   // ----------------------------------------------------------------
   // Render guard: no overlay when idle
   // ----------------------------------------------------------------
@@ -275,6 +306,7 @@ export function DrawingLayer({
         onPointerMove={onPointerMove}
         onPointerUp={endStroke}
         onPointerCancel={endStroke}
+        onLostPointerCapture={onLostCapture}
         data-testid="drawing-overlay"
       />
 
@@ -302,26 +334,42 @@ export function DrawingLayer({
         />
       )}
 
-      {/* Checkpoint dots + price labels — one per non-null value. Visual only, no drag. */}
-      {values.map((v, i) =>
-        v !== null && checkpointXs[i] !== undefined ? (
-          <g key={i} data-testid="checkpoint-dot">
-            <circle
-              cx={Number(xScale(checkpointXs[i]))}
-              cy={Number(yScale(v))}
-              r={4}
-              fill="#5B9BF6"
-            />
-            <text
-              x={Number(xScale(checkpointXs[i])) + 6}
-              y={Number(yScale(v)) - 6}
-              className="fill-ink-strong font-mono text-[10px]"
-            >
-              {v.toFixed(2)}
-            </text>
-          </g>
-        ) : null,
-      )}
+      {/* Checkpoint dots — one per non-null value.
+          Price labels only on the global max and min of the drawn path. */}
+      {(() => {
+        let globalMax = -Infinity
+        let globalMin = Infinity
+        let maxIdx = -1
+        let minIdx = -1
+        for (let i = 0; i < values.length; i++) {
+          const v = values[i]
+          if (v === null) continue
+          if (v > globalMax) { globalMax = v; maxIdx = i }
+          if (v < globalMin) { globalMin = v; minIdx = i }
+        }
+
+        return values.map((v, i) => {
+          if (v === null || checkpointXs[i] === undefined) return null
+          const cx = Number(xScale(checkpointXs[i]))
+          const cy = Number(yScale(v))
+          const showLabel = i === maxIdx || (i === minIdx && minIdx !== maxIdx)
+
+          return (
+            <g key={i} data-testid="checkpoint-dot">
+              <circle cx={cx} cy={cy} r={4} fill="#5B9BF6" />
+              {showLabel && (
+                <text
+                  x={cx + 6}
+                  y={i === maxIdx ? cy - 8 : cy + 14}
+                  className="fill-ink-strong font-mono text-[10px]"
+                >
+                  {v.toFixed(0)}
+                </text>
+              )}
+            </g>
+          )
+        })
+      })()}
     </g>
   )
 }

@@ -17,14 +17,15 @@ describe('benchmarksClient', () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
+        s: 'ok',
         t: [1_700_000_000, 1_700_000_060],
-        c: [150.25, 151.00],
+        c: [150.25, 151.0],
       }),
     })
     vi.stubGlobal('fetch', mockFetch)
 
     await fetchHistoricalPrices({
-      feedId: '0xef0d8b6fda2ceba41da15d4095d1da392a0d2f8ed0c6c7bc0f4cfac8c280b56d',
+      symbol: 'Crypto.SOL/USD',
       from: 1_700_000_000,
       to: 1_700_003_600,
       resolution: '1',
@@ -43,12 +44,12 @@ describe('benchmarksClient', () => {
       'fetch',
       vi.fn().mockResolvedValue({
         ok: true,
-        json: async () => ({ t, c }),
+        json: async () => ({ s: 'ok', t, c }),
       }),
     )
 
     const result = await fetchHistoricalPrices({
-      feedId: '0xabc',
+      symbol: 'Crypto.BTC/USD',
       from: t[0],
       to: t[2] + 60,
       resolution: '1',
@@ -72,12 +73,49 @@ describe('benchmarksClient', () => {
 
     await expect(
       fetchHistoricalPrices({
-        feedId: '0xabc',
+        symbol: 'Crypto.BTC/USD',
         from: 1_700_000_000,
         to: 1_700_003_600,
         resolution: '1',
       }),
     ).rejects.toThrow('404')
+  })
+
+  it('throws when response body reports application-level error (HTTP 200 + s:"error")', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ s: 'error', errmsg: "Symbol Crypto.XYZ/USD doesn't exist" }),
+      }),
+    )
+
+    await expect(
+      fetchHistoricalPrices({
+        symbol: 'Crypto.XYZ/USD',
+        from: 1_700_000_000,
+        to: 1_700_003_600,
+        resolution: '1',
+      }),
+    ).rejects.toThrow(/doesn't exist/)
+  })
+
+  it('returns [] when response body reports no_data', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ s: 'no_data' }),
+      }),
+    )
+
+    const result = await fetchHistoricalPrices({
+      symbol: 'Crypto.BTC/USD',
+      from: 1_700_000_000,
+      to: 1_700_003_600,
+      resolution: '1',
+    })
+    expect(result).toEqual([])
   })
 
   it('aligns resolution parameter to market.checkpointInterval', () => {
@@ -93,18 +131,18 @@ describe('benchmarksClient', () => {
   it('includes symbol, resolution, from, to as URL params', async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ t: [], c: [] }),
+      json: async () => ({ s: 'ok', t: [], c: [] }),
     })
     vi.stubGlobal('fetch', mockFetch)
 
-    const feedId = '0xtest123'
+    const symbol = 'Crypto.BTC/USD'
     const from = 1_700_000_000
     const to = 1_700_003_600
 
-    await fetchHistoricalPrices({ feedId, from, to, resolution: '15' })
+    await fetchHistoricalPrices({ symbol, from, to, resolution: '15' })
 
     const calledUrl = mockFetch.mock.calls[0][0] as string
-    expect(calledUrl).toContain(`symbol=${feedId}`)
+    expect(calledUrl).toContain('symbol=Crypto.BTC%2FUSD')
     expect(calledUrl).toContain('resolution=15')
     expect(calledUrl).toContain(`from=${from}`)
     expect(calledUrl).toContain(`to=${to}`)

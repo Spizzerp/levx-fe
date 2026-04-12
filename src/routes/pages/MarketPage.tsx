@@ -6,15 +6,17 @@ import { DrawingLayer } from '@/components/DrawingLayer'
 import { Input } from '@/components/Input'
 import { Label } from '@/components/Label'
 import { LevXChart } from '@/components/LevXChart'
+import { TimeRangePicker, type CandleInterval } from '@/components/TimeRangePicker'
 import { PathRow } from '@/components/PathRow'
 import { SegmentedSlider } from '@/components/SegmentedSlider'
 import { StatusDot } from '@/components/StatusDot'
 import { Stub } from '@/components/Stub'
 import { cn } from '@/lib/cn'
 import { useMarket } from '@/lib/api/hooks'
-import { getNow } from '@/lib/api/mock'
 import { usePythFeed, useLatestPrice } from '@/lib/pyth/hooks'
 import { feedIdForPair } from '@/lib/pyth/feedIds'
+import { useBenchmarksHistory } from '@/lib/pyth/useBenchmarksHistory'
+
 import { useDrawingStore } from '@/stores/drawingStore'
 import {
   formatCountdown,
@@ -24,6 +26,31 @@ import {
   maxLeverageByDuration,
 } from '@/lib/format'
 import type { MarketState } from '@/types/market'
+
+/* ── Market duration options ─────────────────────────────── */
+
+type DurationOption = '1d' | '3d' | '7d' | '30d' | '90d'
+
+const DURATION_OPTIONS: { id: DurationOption; label: string; ms: number }[] = [
+  { id: '1d', label: '1 Day', ms: 1 * 24 * 60 * 60 * 1000 },
+  { id: '3d', label: '3 Days', ms: 3 * 24 * 60 * 60 * 1000 },
+  { id: '7d', label: '7 Days', ms: 7 * 24 * 60 * 60 * 1000 },
+  { id: '30d', label: '30 Days', ms: 30 * 24 * 60 * 60 * 1000 },
+  { id: '90d', label: '90 Days', ms: 90 * 24 * 60 * 60 * 1000 },
+]
+
+/* ── Checkpoint interval options (seconds) ───────────────── */
+
+type IntervalOption = '5m' | '15m' | '30m' | '1h' | '2h' | '4h'
+
+const INTERVAL_OPTIONS: { id: IntervalOption; label: string; sec: number }[] = [
+  { id: '5m', label: '5 Min', sec: 5 * 60 },
+  { id: '15m', label: '15 Min', sec: 15 * 60 },
+  { id: '30m', label: '30 Min', sec: 30 * 60 },
+  { id: '1h', label: '1 Hour', sec: 60 * 60 },
+  { id: '2h', label: '2 Hours', sec: 2 * 60 * 60 },
+  { id: '4h', label: '4 Hours', sec: 4 * 60 * 60 },
+]
 
 const STATE_TO_STATUS: Record<MarketState, MarketState> = {
   pending: 'pending',
@@ -56,6 +83,13 @@ export function MarketPage() {
   usePythFeed(feedId)
   const latestTick = useLatestPrice(feedId)
 
+  const [candleInterval, setCandleInterval] = useState<CandleInterval>('1h')
+
+  const { data: benchmarksHistory } = useBenchmarksHistory({
+    pair,
+    interval: candleInterval,
+  })
+
   const drawingPhase = useDrawingStore((s) => s.state.phase)
   const enterDrawMode = useDrawingStore((s) => s.enterDrawMode)
   const exitDrawMode = useDrawingStore((s) => s.exitDrawMode)
@@ -63,13 +97,14 @@ export function MarketPage() {
   const [selectedPathId, setSelectedPathId] = useState<string | null>(null)
   const [leverage, setLeverage] = useState(22)
   const [collateral, setCollateral] = useState('25.00')
-
-  const now = getNow()
+  const [mountTime] = useState(() => Date.now())
+  const [marketDuration, setMarketDuration] = useState<DurationOption>('7d')
+  const [checkpointIntervalId, setCheckpointIntervalId] = useState<IntervalOption>('1h')
 
   // Exit draw mode on unmount so a user navigating away doesn't leave the store in sweeping state.
   useEffect(() => () => exitDrawMode(), [exitDrawMode])
 
-  if (isLoading) return <Stub title="Loading Market…" />
+  if (isLoading) return <Stub title="Loading Market..." />
   if (error || !market) return <Stub title="Market Not Found" subtitle={id} />
 
   // Default selection = the middle (neutral) path on first load
@@ -78,12 +113,27 @@ export function MarketPage() {
   const lastPoint = selectedPath?.data[selectedPath.data.length - 1]
   const firstPoint = selectedPath?.data[0]
   const isLong = lastPoint && firstPoint ? lastPoint.value >= firstPoint.value : true
-  const msRemaining = Math.max(0, market.endTime - now)
-  const durationMs = market.endTime - market.startTime
+  const now = mountTime
+
+  // Derive market schedule from user-selected duration + interval
+  const selectedDuration = DURATION_OPTIONS.find((d) => d.id === marketDuration)!
+  const selectedInterval = INTERVAL_OPTIONS.find((i) => i.id === checkpointIntervalId)!
+  const chartMarketStart = latestTick ? latestTick.time : now
+  const chartMarketEnd = chartMarketStart + selectedDuration.ms
+  const chartCheckpointInterval = selectedInterval.sec
+  const chartTotalCheckpoints = Math.floor(selectedDuration.ms / 1000 / chartCheckpointInterval)
+
+  const durationMs = selectedDuration.ms
+  const msRemaining = Math.max(0, chartMarketEnd - now)
   const leverageCap = maxLeverageByDuration(durationMs)
 
+  // Prefer real Benchmarks candles; fall back to mock history while loading
+  const chartHistory =
+    benchmarksHistory && benchmarksHistory.length > 0 ? benchmarksHistory : market.history
+
   // Live price from Pyth tick; fall back to last history point
-  const priceDisplay = latestTick?.value ?? market.history[market.history.length - 1]?.value ?? 0
+  const priceDisplay =
+    latestTick?.value ?? chartHistory[chartHistory.length - 1]?.value ?? 0
   // Delta is only available from the mock layer (not from live Pyth ticks in Phase 1)
   const deltaDisplay = 0
   const deltaColor = deltaDisplay >= 0 ? 'text-success' : 'text-accent'
@@ -130,7 +180,7 @@ export function MarketPage() {
           {META_SEP}
           <span>CHECKPOINTS</span>
           <span className="text-ink-muted ml-1">
-            {market.completedCheckpoints} / {market.totalCheckpoints}
+            {market.completedCheckpoints} / {chartTotalCheckpoints}
           </span>
           {META_SEP}
           <span>TRADERS</span>
@@ -140,19 +190,27 @@ export function MarketPage() {
           <span className="text-ink-muted ml-1">{(market.entryFeeBps / 100).toFixed(1)}%</span>
         </div>
 
-        <div className="mt-12 h-[420px] [@media(min-width:1181px)]:h-[520px]">
+        <div className="mt-8">
+          <TimeRangePicker value={candleInterval} onChange={setCandleInterval} />
+        </div>
+
+        <div className="mt-4 h-[420px] [@media(min-width:1181px)]:h-[520px]">
           <LevXChart
-            history={market.history}
+            history={chartHistory}
             predictions={market.paths}
             nowTime={latestTick ? latestTick.time : now}
-            marketStart={market.startTime}
-            marketEnd={market.endTime}
+            marketStart={chartMarketStart}
+            marketEnd={chartMarketEnd}
             selectedPathId={activePathId}
             pair={market.pair}
             isLoading={false}
             error={null}
-            market={market}
-            renderDrawingOverlay={({ xScale, yScale, innerWidth, innerHeight, checkpointXs, marketStart }) => (
+            market={{
+              startTime: chartMarketStart,
+              checkpointInterval: chartCheckpointInterval,
+              totalCheckpoints: chartTotalCheckpoints,
+            }}
+            renderDrawingOverlay={({ xScale, yScale, innerWidth, innerHeight, checkpointXs, marketStart, margin }) => (
               <DrawingLayer
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 xScale={xScale as any}
@@ -160,7 +218,7 @@ export function MarketPage() {
                 yScale={yScale as any}
                 innerWidth={innerWidth}
                 innerHeight={innerHeight}
-                margin={{ top: 0, right: 0, bottom: 0, left: 0 }}
+                margin={margin}
                 checkpointXs={checkpointXs}
                 marketStart={marketStart}
               />
@@ -171,6 +229,51 @@ export function MarketPage() {
 
       {/* ── Right rail ───────────────────────────────── */}
       <aside className="flex flex-col">
+        {/* ── Market Duration ─────────────────────── */}
+        <Label>Market Duration</Label>
+        <div className="mt-3 inline-flex flex-wrap gap-1 font-mono text-[11px] tracking-[0.12em] uppercase">
+          {DURATION_OPTIONS.map((d) => (
+            <button
+              key={d.id}
+              type="button"
+              onClick={() => setMarketDuration(d.id)}
+              className={cn(
+                'border px-3 py-1 transition-opacity',
+                marketDuration === d.id
+                  ? 'border-line-strong text-ink-strong'
+                  : 'border-line text-ink-muted hover:text-ink-strong',
+              )}
+            >
+              {d.label}
+            </button>
+          ))}
+        </div>
+
+        {/* ── Checkpoint Interval ─────────────────── */}
+        <Label className="mt-6">Checkpoint Interval</Label>
+        <div className="mt-3 inline-flex flex-wrap gap-1 font-mono text-[11px] tracking-[0.12em] uppercase">
+          {INTERVAL_OPTIONS.map((i) => (
+            <button
+              key={i.id}
+              type="button"
+              onClick={() => setCheckpointIntervalId(i.id)}
+              className={cn(
+                'border px-3 py-1 transition-opacity',
+                checkpointIntervalId === i.id
+                  ? 'border-line-strong text-ink-strong'
+                  : 'border-line text-ink-muted hover:text-ink-strong',
+              )}
+            >
+              {i.label}
+            </button>
+          ))}
+        </div>
+        <p className="text-ink-dim mt-2 font-mono text-[10px] tracking-[0.06em]">
+          {chartTotalCheckpoints} checkpoints
+        </p>
+
+        <hr className="bg-line my-7 h-px border-0" />
+
         <Label>Select A Line</Label>
 
         <div className="border-line mt-5 border-0 border-t">
@@ -186,15 +289,20 @@ export function MarketPage() {
           ))}
         </div>
 
-        {/* ── Draw button — desktop only (mobile gate: pure Tailwind CSS) ── */}
-        <div className="hidden md:block">
+        {/*
+          ── Draw button — desktop only (mobile gate: pure Tailwind CSS) ──
+          This project uses DESKTOP-FIRST custom variants in src/style/customVariants.css:
+          `md:` = `@media (max-width: 1024px)`. So base classes apply on desktop
+          and `md:` variants override on viewports ≤1024px.
+        */}
+        <div data-testid="draw-button-wrapper" className="block md:hidden">
           <Button
             variant={isInDrawMode ? 'primary' : 'dashed'}
             fullWidth
             className="mt-5"
             onClick={() => {
               if (drawingPhase === 'idle') {
-                enterDrawMode(market.totalCheckpoints)
+                enterDrawMode(chartTotalCheckpoints)
               } else {
                 exitDrawMode()
               }
@@ -203,7 +311,10 @@ export function MarketPage() {
             {isInDrawMode ? 'Cancel Drawing' : '+ Draw Custom Path'}
           </Button>
         </div>
-        <div className="mt-5 block md:hidden font-mono text-sm text-[color:var(--color-ink-dim,#666)]">
+        <div
+          data-testid="drawing-desktop-notice"
+          className="mt-5 hidden md:block font-mono text-sm text-[color:var(--color-ink-dim,#666)]"
+        >
           Drawing requires desktop
         </div>
 

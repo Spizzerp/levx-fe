@@ -23,21 +23,30 @@ const xScale = scaleTime({ domain: [marketStart, marketEnd], range: [0, 800] })
 // Price domain [100, 200] → pixels [400, 0] (price increases upward)
 const yScale = scaleLinear({ domain: [100, 200], range: [400, 0] })
 
-/** Helper: mock the overlay's pointer-event methods that jsdom doesn't implement. */
+const MOCK_SVG_RECT = {
+  left: 0,
+  top: 0,
+  width: 800,
+  height: 400,
+  right: 800,
+  bottom: 400,
+  x: 0,
+  y: 0,
+  toJSON: () => ({}),
+}
+
+/** Helper: mock pointer-event methods that jsdom doesn't implement.
+ *  The DrawingLayer now uses ownerSVGElement.getBoundingClientRect() for coord
+ *  conversion, so we mock that on the parent <svg> rather than the overlay rect.
+ */
 function stubOverlayMethods(overlay: Element) {
   ;(overlay as unknown as Record<string, unknown>).setPointerCapture = vi.fn()
   ;(overlay as unknown as Record<string, unknown>).releasePointerCapture = vi.fn()
-  ;(overlay as unknown as Record<string, unknown>).getBoundingClientRect = () => ({
-    left: 0,
-    top: 0,
-    width: 800,
-    height: 400,
-    right: 800,
-    bottom: 400,
-    x: 0,
-    y: 0,
-    toJSON: () => ({}),
-  })
+  // Mock getBoundingClientRect on the ownerSVGElement (the parent <svg>)
+  const svg = (overlay as SVGElement).ownerSVGElement ?? (overlay.closest('svg') as Element | null)
+  if (svg) {
+    ;(svg as unknown as Record<string, unknown>).getBoundingClientRect = () => MOCK_SVG_RECT
+  }
 }
 
 function renderLayer() {
@@ -126,7 +135,7 @@ describe('DrawingLayer', () => {
     fireEvent.pointerDown(overlay, { pointerId: 1, clientX: 10, clientY: 200 })
     setAttrSpy.mockClear()
 
-    fireEvent.pointerMove(overlay, { pointerId: 1, clientX: 50, clientY: 210 })
+    fireEvent.pointerMove(overlay, { pointerId: 1, buttons: 1, clientX: 50, clientY: 210 })
 
     expect(setAttrSpy).toHaveBeenCalledWith('d', expect.stringContaining('L'))
   })
@@ -146,7 +155,7 @@ describe('DrawingLayer', () => {
 
     fireEvent.pointerDown(overlay, { pointerId: 1, clientX: 0, clientY: 200 })
     // A very small move — no checkpoint crossed → store unchanged → no React re-render
-    fireEvent.pointerMove(overlay, { pointerId: 1, clientX: 1, clientY: 200 })
+    fireEvent.pointerMove(overlay, { pointerId: 1, buttons: 1, clientX: 1, clientY: 200 })
 
     // Smoothed curve should NOT exist (needs >= 2 captured points).
     expect(container.querySelector('[data-testid="smoothed-curve"]')).toBeNull()
@@ -166,7 +175,7 @@ describe('DrawingLayer', () => {
 
     // pointerdown at x=0, pointermove to x=800 → crosses all 48 checkpoints
     fireEvent.pointerDown(overlay, { pointerId: 1, clientX: 0, clientY: 200 })
-    fireEvent.pointerMove(overlay, { pointerId: 1, clientX: 800, clientY: 200 })
+    fireEvent.pointerMove(overlay, { pointerId: 1, buttons: 1, clientX: 800, clientY: 200 })
 
     const st = useDrawingStore.getState().state
     expect(st.phase).toBe('sweeping')
@@ -189,22 +198,27 @@ describe('DrawingLayer', () => {
     expect(container.querySelector('[data-testid="smoothed-curve"]')).toBeInTheDocument()
   })
 
-  it('renders a checkpoint dot + price label at each captured value', () => {
+  it('renders checkpoint dots with price labels only at global max and min', () => {
     const vals = new Array(totalCheckpoints).fill(null) as (number | null)[]
     vals[0] = 150
-    vals[10] = 160
-    vals[20] = 170
+    vals[5] = 160
+    vals[10] = 170 // global max
+    vals[15] = 155
+    vals[20] = 140 // global min
+    vals[25] = 165
     useDrawingStore.setState({
       state: { phase: 'sweeping', values: vals, pointerDown: true },
       totalCheckpoints,
     })
     const { container } = renderLayer()
     const dots = container.querySelectorAll('[data-testid="checkpoint-dot"]')
-    expect(dots).toHaveLength(3)
-    // Each dot group contains a circle and a text element with the price label.
-    const firstDot = dots[0]
-    expect(firstDot.querySelector('circle')).toBeInTheDocument()
-    expect(firstDot.querySelector('text')?.textContent).toBe('150.00')
+    expect(dots).toHaveLength(6)
+
+    // Labels only on global max (170) and global min (140)
+    const labels = container.querySelectorAll('[data-testid="checkpoint-dot"] text')
+    expect(labels).toHaveLength(2)
+    expect(labels[0].textContent).toBe('170')
+    expect(labels[1].textContent).toBe('140')
   })
 
   it('fades raw stroke to opacity 0 after pointerup', async () => {
@@ -336,7 +350,7 @@ describe('DrawingLayer', () => {
     expect(useDrawingStore.getState().state.phase).toBe('sweeping')
 
     // Move across some checkpoints to overwrite values.
-    fireEvent.pointerMove(overlay, { pointerId: 1, clientX: 200, clientY: 50 })
+    fireEvent.pointerMove(overlay, { pointerId: 1, buttons: 1, clientX: 200, clientY: 50 })
     const st = useDrawingStore.getState().state
     if (st.phase === 'sweeping') {
       // Some values near the start should now differ from the original 150.

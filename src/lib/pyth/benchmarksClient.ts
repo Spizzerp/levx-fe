@@ -8,11 +8,16 @@ import type { PricePoint } from '@/types/market'
  *  Note: Benchmarks has its own domain (benchmarks.pyth.network), separate from
  *  the Hermes SSE endpoint (hermes.pyth.network). Do NOT conflate them.
  *  The origin is hard-coded for Phase 1; a future phase may add APP_BENCHMARKS_URL.
+ *
+ *  IMPORTANT: the `symbol` param must be a TradingView-style symbol string like
+ *  "Crypto.BTC/USD", NOT a hex Hermes feed ID. Use benchmarkSymbolForPair() from
+ *  feedIds.ts to resolve a pair to its Benchmarks symbol.
  */
 export type BenchmarksResolution = '1' | '5' | '15' | '60' | '240' | 'D'
 
 export interface FetchHistoricalPricesArgs {
-  feedId: string
+  /** TradingView-shim symbol (e.g. "Crypto.BTC/USD") */
+  symbol: string
   /** unix seconds */
   from: number
   /** unix seconds */
@@ -20,11 +25,24 @@ export interface FetchHistoricalPricesArgs {
   resolution: BenchmarksResolution
 }
 
+interface BenchmarksOkResponse {
+  s: 'ok'
+  t: number[]
+  c: number[]
+}
+
+interface BenchmarksErrorResponse {
+  s: 'error' | 'no_data'
+  errmsg?: string
+}
+
+type BenchmarksResponse = BenchmarksOkResponse | BenchmarksErrorResponse
+
 export async function fetchHistoricalPrices(
   args: FetchHistoricalPricesArgs,
 ): Promise<PricePoint[]> {
   const url = new URL('/v1/shims/tradingview/history', 'https://benchmarks.pyth.network')
-  url.searchParams.set('symbol', args.feedId)
+  url.searchParams.set('symbol', args.symbol)
   url.searchParams.set('resolution', args.resolution)
   url.searchParams.set('from', String(args.from))
   url.searchParams.set('to', String(args.to))
@@ -33,7 +51,14 @@ export async function fetchHistoricalPrices(
   if (!res.ok) {
     throw new Error(`Benchmarks REST error ${res.status}`)
   }
-  const json = (await res.json()) as { t: number[]; c: number[] }
+  const json = (await res.json()) as BenchmarksResponse
+  // The TradingView shim returns HTTP 200 with { s: "error", errmsg } on
+  // application-level errors (unknown symbol, bad range, etc.), so we must
+  // check the status field rather than relying on res.ok alone.
+  if (json.s !== 'ok') {
+    if (json.s === 'no_data') return []
+    throw new Error(`Benchmarks REST error: ${json.errmsg ?? 'unknown error'}`)
+  }
   // TradingView shim returns parallel arrays: t = publishTime seconds, c = close prices
   return json.t.map((t, i) => ({ time: t * 1000, value: json.c[i] }))
 }

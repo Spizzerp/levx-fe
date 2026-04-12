@@ -5,7 +5,6 @@ import { StatusDot } from '@/components/StatusDot'
 import { Stub } from '@/components/Stub'
 import { cn } from '@/lib/cn'
 import { useMarkets } from '@/lib/api/hooks'
-import { getNow } from '@/lib/api/mock'
 import { formatCountdown, formatUSD } from '@/lib/format'
 import type { Market, MarketState } from '@/types/market'
 
@@ -39,7 +38,7 @@ function matchesFilter(state: MarketState, filter: StateFilter): boolean {
 }
 
 function endsInLabel(m: Market): string {
-  const now = getNow()
+  const now = Date.now()
   if (m.state === 'pending') {
     const diff = m.startTime - now
     return diff > 0 ? `STARTS IN ${formatCountdown(diff)}` : 'STARTS SOON'

@@ -1,46 +1,47 @@
 import { useState } from 'react'
 import { cn } from '@/lib/cn'
 
-export type TimeRange = '1h' | '1d' | '1w' | '1m'
+export type CandleInterval = '1m' | '5m' | '15m' | '1h' | '1d'
 
-const RANGES: readonly TimeRange[] = ['1h', '1d', '1w', '1m']
-const RANGE_LABELS: Record<TimeRange, string> = {
+const INTERVALS: readonly CandleInterval[] = ['1m', '5m', '15m', '1h', '1d']
+const INTERVAL_LABELS: Record<CandleInterval, string> = {
+  '1m': '1M',
+  '5m': '5M',
+  '15m': '15M',
   '1h': '1H',
   '1d': '1D',
-  '1w': '1W',
-  '1m': '1M',
 }
 
 export interface TimeRangePickerProps {
   /** Controlled value. If omitted, the component manages its own state. */
-  value?: TimeRange
+  value?: CandleInterval
   /** Initial selection when uncontrolled. */
-  defaultRange?: TimeRange
-  onChange?: (range: TimeRange) => void
+  defaultInterval?: CandleInterval
+  onChange?: (interval: CandleInterval) => void
   className?: string
 }
 
 export function TimeRangePicker({
   value,
-  defaultRange = '1d',
+  defaultInterval = '1h',
   onChange,
   className,
 }: TimeRangePickerProps) {
-  const [internal, setInternal] = useState<TimeRange>(defaultRange)
+  const [internal, setInternal] = useState<CandleInterval>(defaultInterval)
   const active = value ?? internal
 
-  const handleClick = (range: TimeRange) => {
-    if (value === undefined) setInternal(range)
-    onChange?.(range)
+  const handleClick = (interval: CandleInterval) => {
+    if (value === undefined) setInternal(interval)
+    onChange?.(interval)
   }
 
   return (
     <div
       role="tablist"
-      aria-label="Chart time range"
+      aria-label="Chart candle interval"
       className={cn('inline-flex gap-1 font-mono text-[11px] tracking-[0.12em] uppercase', className)}
     >
-      {RANGES.map((r) => {
+      {INTERVALS.map((r) => {
         const isActive = r === active
         return (
           <button
@@ -57,7 +58,7 @@ export function TimeRangePicker({
                 : 'border-line text-ink-muted hover:text-ink-strong',
             )}
           >
-            {RANGE_LABELS[r]}
+            {INTERVAL_LABELS[r]}
           </button>
         )
       })}

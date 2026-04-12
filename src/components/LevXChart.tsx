@@ -76,6 +76,7 @@ export interface LevXChartProps {
     innerHeight: number
     checkpointXs: readonly number[]
     marketStart: number
+    margin: { top: number; right: number; bottom: number; left: number }
   }) => ReactNode
 }
 
@@ -139,16 +140,27 @@ function ChartInner({
     else thaw()
   }, [drawingPhase, freeze, thaw])
 
-  /* ── Time domain: include pre-market history and post-market predictions ── */
+  /* ── Time domain ─────────────────────────────────────────── */
   const timeDomain = useMemo<[number, number]>(() => {
-    const firstHistory = mergedHistory[0]?.time ?? marketStart
-    let lastPred = marketEnd
+    const first = mergedHistory[0]?.time ?? nowTime - 7 * 24 * 60 * 60 * 1000
+    const lastData = mergedHistory[mergedHistory.length - 1]?.time ?? nowTime
+
+    // Right edge: extend to marketEnd if it's in the future (blank space for
+    // predictions / drawing), or to the end of prediction data, whichever is later.
+    let rightEdge = Math.max(lastData, marketEnd)
     predictions.forEach((p) => {
       const last = p.data[p.data.length - 1]
-      if (last && last.time > lastPred) lastPred = last.time
+      if (last && last.time > rightEdge) rightEdge = last.time
     })
-    return [Math.min(firstHistory, marketStart), Math.max(lastPred, marketEnd)]
-  }, [mergedHistory, predictions, marketStart, marketEnd])
+
+    // Small right padding so the live tick / right edge doesn't touch the axis
+    if (rightEdge <= lastData) {
+      const span = lastData - first || 1
+      rightEdge = lastData + span * 0.02
+    }
+
+    return [first, rightEdge]
+  }, [mergedHistory, predictions, marketEnd, nowTime])
 
   const timeScale = useMemo(
     () => scaleTime<number>({ domain: timeDomain, range: [0, innerWidth] }),
@@ -269,29 +281,6 @@ function ChartInner({
           curve={curveMonotoneX}
         />
 
-        {/* ── Drawing overlay (render prop) ────────── */}
-        {renderDrawingOverlay?.({
-          xScale: timeScale,
-          yScale: priceScale,
-          innerWidth,
-          innerHeight,
-          checkpointXs,
-          marketStart,
-        })}
-
-        {/* ── Empty-paths message (PATHS-04) ──────── */}
-        {predictions.length === 0 && (
-          <text
-            x={innerWidth / 2}
-            y={innerHeight / 2}
-            textAnchor="middle"
-            className="fill-ink-dim font-mono text-xs"
-            data-testid="empty-paths-message"
-          >
-            No candidate paths yet
-          </text>
-        )}
-
         {/* ── Now marker ──────────────────────────── */}
         <Line
           from={{ x: nowX, y: 0 }}
@@ -347,7 +336,9 @@ function ChartInner({
           })}
           tickFormat={(v) => {
             const n = Number(v)
-            return n >= 1000 ? `${(n / 1000).toFixed(0)}K` : String(n)
+            if (n >= 1000) return `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}K`
+            if (n >= 1) return n.toFixed(n >= 100 ? 0 : 2)
+            return n.toPrecision(3)
           }}
         />
 
@@ -355,7 +346,12 @@ function ChartInner({
         <AxisBottom
           scale={timeScale}
           top={innerHeight}
-          numTicks={8}
+          numTicks={(() => {
+            const spanHrs = (timeDomain[1] - timeDomain[0]) / (60 * 60 * 1000)
+            if (spanHrs <= 12) return 6      // HH:MM labels are short
+            if (spanHrs <= 72) return 5      // "12 APR 14:00" labels are wider
+            return 8
+          })()}
           stroke="transparent"
           tickStroke="transparent"
           tickLabelProps={() => ({
@@ -368,6 +364,27 @@ function ChartInner({
           })}
           tickFormat={(v) => {
             const date = new Date(v as number)
+            const [tStart, tEnd] = timeDomain
+            const spanHours = (tEnd - tStart) / (60 * 60 * 1000)
+
+            if (spanHours <= 12) {
+              // Sub-day: "14:30"
+              return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
+            }
+            if (spanHours <= 72) {
+              // 1–3 days: "12 APR 14:00" — compact day+time
+              const day = date.getDate()
+              const month = date.toLocaleString('en-US', { month: 'short' }).toUpperCase()
+              const h = String(date.getHours()).padStart(2, '0')
+              const m = String(date.getMinutes()).padStart(2, '0')
+              return `${day} ${month} ${h}:${m}`
+            }
+            if (spanHours <= 30 * 24) {
+              // Up to ~30 days: "APR 12"
+              const month = date.toLocaleString('en-US', { month: 'short' }).toUpperCase()
+              return `${month} ${date.getDate()}`
+            }
+            // Longer: "APR 26"
             const month = date.toLocaleString('en-US', { month: 'short' }).toUpperCase()
             const year = String(date.getFullYear()).slice(2)
             return `${month} ${year}`
@@ -397,11 +414,25 @@ function ChartInner({
           width={innerWidth}
           height={innerHeight}
           fill="transparent"
-          onMouseMove={handleMove}
-          onMouseLeave={handleLeave}
-          onTouchMove={handleMove}
-          onTouchEnd={handleLeave}
+          onMouseMove={isDrawMode ? undefined : handleMove}
+          onMouseLeave={isDrawMode ? undefined : handleLeave}
+          onTouchMove={isDrawMode ? undefined : handleMove}
+          onTouchEnd={isDrawMode ? undefined : handleLeave}
         />
+
+        {/* ── Drawing overlay (render prop) ──────────
+            Rendered LAST so its pointer-receiving <rect> sits above the hit-area
+            <Bar> in SVG paint order. Otherwise the transparent Bar intercepts
+            pointerdown and the drawing layer never fires. */}
+        {renderDrawingOverlay?.({
+          xScale: timeScale,
+          yScale: priceScale,
+          innerWidth,
+          innerHeight,
+          checkpointXs,
+          marketStart,
+          margin: MARGIN,
+        })}
       </Group>
 
       {/* ── Floating readout ────────────────────────── */}

@@ -11,14 +11,6 @@ const mockFetchHistoricalPrices = vi.fn()
 vi.mock('@/lib/pyth/benchmarksClient', () => ({
   fetchHistoricalPrices: (...args: Parameters<typeof mockFetchHistoricalPrices>) =>
     mockFetchHistoricalPrices(...args),
-  resolutionForCheckpointInterval: (intervalSec: number) => {
-    if (intervalSec <= 60) return '1'
-    if (intervalSec <= 300) return '5'
-    if (intervalSec <= 900) return '15'
-    if (intervalSec <= 3600) return '60'
-    if (intervalSec <= 14400) return '240'
-    return 'D'
-  },
 }))
 
 function makeWrapper() {
@@ -34,7 +26,7 @@ function makeWrapper() {
     React.createElement(QueryClientProvider, { client: queryClient }, children)
 }
 
-const FEED_ID = '0xef0d8b6fda2ceba41da15d4095d1da392a0d2f8ed0c6c7bc0f4cfac8c280b56d'
+const PAIR = 'SOL/USDC'
 const MOCK_PRICE_POINTS: PricePoint[] = [
   { time: 1_700_000_000_000, value: 100.0 },
   { time: 1_700_003_600_000, value: 105.0 },
@@ -51,9 +43,8 @@ describe('useBenchmarksHistory', () => {
     const { result } = renderHook(
       () =>
         useBenchmarksHistory({
-          feedId: FEED_ID,
-          range: '1d',
-          checkpointIntervalSec: 60,
+          pair: PAIR,
+          interval: '1h',
           toTime: 1_700_086_400,
         }),
       { wrapper: makeWrapper() },
@@ -69,9 +60,8 @@ describe('useBenchmarksHistory', () => {
     const { result } = renderHook(
       () =>
         useBenchmarksHistory({
-          feedId: FEED_ID,
-          range: '1h',
-          checkpointIntervalSec: 60,
+          pair: PAIR,
+          interval: '1m',
           toTime: 1_700_086_400,
         }),
       { wrapper: makeWrapper() },
@@ -89,9 +79,8 @@ describe('useBenchmarksHistory', () => {
     const { result } = renderHook(
       () =>
         useBenchmarksHistory({
-          feedId: FEED_ID,
-          range: '1d',
-          checkpointIntervalSec: 60,
+          pair: PAIR,
+          interval: '1h',
           toTime: 1_700_086_400,
         }),
       { wrapper: makeWrapper() },
@@ -103,17 +92,16 @@ describe('useBenchmarksHistory', () => {
     expect((result.current.error as Error).message).toContain('503')
   })
 
-  it('refetches when range param changes', async () => {
+  it('refetches when interval changes', async () => {
     mockFetchHistoricalPrices.mockResolvedValue(MOCK_PRICE_POINTS)
 
-    let range: '1h' | '1d' = '1h'
+    let interval: '1m' | '1h' = '1m'
 
     const { result, rerender } = renderHook(
       () =>
         useBenchmarksHistory({
-          feedId: FEED_ID,
-          range,
-          checkpointIntervalSec: 60,
+          pair: PAIR,
+          interval,
           toTime: 1_700_086_400,
         }),
       { wrapper: makeWrapper() },
@@ -122,30 +110,66 @@ describe('useBenchmarksHistory', () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
     expect(mockFetchHistoricalPrices).toHaveBeenCalledTimes(1)
 
-    // Change range — should trigger a new query
-    range = '1d'
+    // Change interval — should trigger a new query
+    interval = '1h'
     rerender()
 
     await waitFor(() => expect(mockFetchHistoricalPrices).toHaveBeenCalledTimes(2))
   })
 
-  it('does not fetch when feedId is null', () => {
+  it('does not fetch when pair is null', () => {
     mockFetchHistoricalPrices.mockResolvedValue(MOCK_PRICE_POINTS)
 
     const { result } = renderHook(
       () =>
         useBenchmarksHistory({
-          feedId: null,
-          range: '1d',
-          checkpointIntervalSec: 60,
+          pair: null,
+          interval: '1h',
           toTime: 1_700_086_400,
         }),
       { wrapper: makeWrapper() },
     )
 
-    // enabled: false when feedId is null
+    // enabled: false when pair is null (no symbol to resolve)
     expect(result.current.isLoading).toBe(false)
     expect(result.current.fetchStatus).toBe('idle')
     expect(mockFetchHistoricalPrices).not.toHaveBeenCalled()
+  })
+
+  it('does not fetch when pair is unknown (no Benchmarks symbol)', () => {
+    mockFetchHistoricalPrices.mockResolvedValue(MOCK_PRICE_POINTS)
+
+    const { result } = renderHook(
+      () =>
+        useBenchmarksHistory({
+          pair: 'XYZ/UNKNOWN',
+          interval: '1h',
+          toTime: 1_700_086_400,
+        }),
+      { wrapper: makeWrapper() },
+    )
+
+    expect(result.current.isLoading).toBe(false)
+    expect(result.current.fetchStatus).toBe('idle')
+    expect(mockFetchHistoricalPrices).not.toHaveBeenCalled()
+  })
+
+  it('passes the resolved Benchmarks symbol (not the raw pair) to fetchHistoricalPrices', async () => {
+    mockFetchHistoricalPrices.mockResolvedValue(MOCK_PRICE_POINTS)
+
+    const { result } = renderHook(
+      () =>
+        useBenchmarksHistory({
+          pair: 'BTC/USDC',
+          interval: '15m',
+          toTime: 1_700_086_400,
+        }),
+      { wrapper: makeWrapper() },
+    )
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(mockFetchHistoricalPrices).toHaveBeenCalledWith(
+      expect.objectContaining({ symbol: 'Crypto.BTC/USD', resolution: '15' }),
+    )
   })
 })
