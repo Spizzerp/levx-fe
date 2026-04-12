@@ -17,6 +17,7 @@ import { feedIdForPair } from '@/lib/pyth/feedIds'
 import { buildCheckpointXs } from '@/lib/drawing/geometry'
 import { useYAxisFreeze } from '@/lib/drawing/yFreeze'
 import { DrawingGrid } from '@/components/DrawingGrid'
+import { ChartMorphLine } from '@/components/ChartMorphLine'
 import { Stub } from '@/components/Stub'
 
 import './LevXChart.css'
@@ -52,6 +53,8 @@ export interface LevXChartProps {
   marketEnd: number
   /** which prediction path is currently highlighted */
   selectedPathId?: string | null
+  /** when true, show paths that other users have wagered on at low opacity */
+  showOtherPositions?: boolean
   /** override fixed height; if omitted, fills parent */
   height?: number
   /** Pair string used for pythStore subscription. If null, no live updates. */
@@ -94,12 +97,21 @@ function ChartInner({
   marketStart,
   marketEnd,
   selectedPathId,
+  showOtherPositions,
   pair,
   market,
+  isLoading,
   renderDrawingOverlay,
 }: InnerProps) {
   const innerWidth = Math.max(0, width - MARGIN.left - MARGIN.right)
   const innerHeight = Math.max(0, height - MARGIN.top - MARGIN.bottom)
+
+  /* ── Morph animation state ─────────────────────────────────── */
+  const [chartRevealing, setChartRevealing] = useState(!isLoading)
+  useEffect(() => {
+    if (isLoading) setChartRevealing(false)
+  }, [isLoading])
+  const handleRevealChart = useCallback(() => setChartRevealing(true), [])
 
   /* ── Pyth live tick subscription ────────────────────────── */
   const feedId = pair ? feedIdForPair(pair) : null
@@ -171,6 +183,15 @@ function ChartInner({
     [innerHeight, effectiveDomain],
   )
 
+  /* ── Mapped history points for the morph line ───────────── */
+  const historyPixelPoints = useMemo(
+    () => mergedHistory.map((d) => ({ x: timeScale(d.time) as number, y: priceScale(d.value) as number })),
+    [mergedHistory, timeScale, priceScale],
+  )
+
+  /** True once the morph is close enough that real chart elements can fade in */
+  const chartRevealed = chartRevealing && !isLoading
+
   /* ── Crosshair state ─────────────────────────────────────── */
   const [hover, setHover] = useState<{ x: number; time: number; value: number } | null>(null)
 
@@ -234,89 +255,120 @@ function ChartInner({
           isDrawMode={isDrawMode}
         />
 
-        {/* ── Prediction paths ────────────────────── */}
-        {predictions.map((path) => {
-          const style = TONE_STYLES[path.tone]
-          const isSelected = selectedPathId === path.id
-          return (
+        {/* ── Loading / morph line ─────────────────── */}
+        <ChartMorphLine
+          innerWidth={innerWidth}
+          innerHeight={innerHeight}
+          isLoading={!!isLoading}
+          dataPoints={historyPixelPoints}
+          onRevealChart={handleRevealChart}
+        />
+
+        {/* ── Chart data (fades in after morph) ──────── */}
+        <g style={{ opacity: chartRevealed ? 1 : 0, transition: 'opacity 400ms ease' }}>
+          {/* ── Prediction paths ────────────────────── */}
+          {predictions.map((path) => {
+            const style = TONE_STYLES[path.tone]
+            const isSelected = selectedPathId === path.id
+            return (
+              <LinePath<PricePoint>
+                key={path.id}
+                data={path.data}
+                x={(d) => timeScale(d.time)}
+                y={(d) => priceScale(d.value)}
+                stroke={style.stroke}
+                strokeWidth={1.5}
+                strokeDasharray={style.dash}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                opacity={isSelected ? 0 : style.opacity}
+                curve={CATMULL_ROM_ALPHA_05}
+              />
+            )
+          })}
+
+          {/* ── Other positions overlay (wagered paths, not selected) ── */}
+          {showOtherPositions &&
+            predictions
+              .filter((p) => p.id !== selectedPathId && p.totalWagered > 0)
+              .map((path) => (
+                <LinePath<PricePoint>
+                  key={`wager-${path.id}`}
+                  data={path.data}
+                  x={(d) => timeScale(d.time)}
+                  y={(d) => priceScale(d.value)}
+                  stroke="#FFFFFF"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  opacity={0.3}
+                  curve={CATMULL_ROM_ALPHA_05}
+                />
+              ))}
+
+          {/* ── Selected prediction overlay ─────────── */}
+          {selected && (
             <LinePath<PricePoint>
-              key={path.id}
-              data={path.data}
+              data={selected.data}
               x={(d) => timeScale(d.time)}
               y={(d) => priceScale(d.value)}
-              stroke={style.stroke}
-              strokeWidth={1.5}
-              strokeDasharray={style.dash}
+              stroke="#FFFFFF"
+              strokeWidth={2.5}
               strokeLinecap="round"
               strokeLinejoin="round"
-              opacity={isSelected ? 0 : style.opacity}
               curve={CATMULL_ROM_ALPHA_05}
+              style={{ filter: 'drop-shadow(0 0 4px rgba(255,255,255,0.4))' }}
             />
-          )
-        })}
+          )}
 
-        {/* ── Selected prediction overlay ─────────── */}
-        {selected && (
+          {/* ── Historical price line ───────────────── */}
           <LinePath<PricePoint>
-            data={selected.data}
+            data={mergedHistory}
             x={(d) => timeScale(d.time)}
             y={(d) => priceScale(d.value)}
             stroke="#FFFFFF"
-            strokeWidth={2.5}
-            strokeLinecap="round"
+            strokeWidth={2}
             strokeLinejoin="round"
-            curve={CATMULL_ROM_ALPHA_05}
-            style={{ filter: 'drop-shadow(0 0 4px rgba(255,255,255,0.4))' }}
+            curve={curveMonotoneX}
           />
-        )}
 
-        {/* ── Historical price line ───────────────── */}
-        <LinePath<PricePoint>
-          data={mergedHistory}
-          x={(d) => timeScale(d.time)}
-          y={(d) => priceScale(d.value)}
-          stroke="#FFFFFF"
-          strokeWidth={2}
-          strokeLinejoin="round"
-          curve={curveMonotoneX}
-        />
+          {/* ── Now marker ──────────────────────────── */}
+          <Line
+            from={{ x: nowX, y: 0 }}
+            to={{ x: nowX, y: innerHeight }}
+            stroke="#FFFFFF"
+            strokeWidth={1}
+            strokeDasharray="2 4"
+            opacity={0.4}
+          />
+          {lastHistoryPoint && (
+            <Circle cx={nowX} cy={priceScale(lastHistoryPoint.value)} r={5} fill="#FFFFFF" />
+          )}
 
-        {/* ── Now marker ──────────────────────────── */}
-        <Line
-          from={{ x: nowX, y: 0 }}
-          to={{ x: nowX, y: innerHeight }}
-          stroke="#FFFFFF"
-          strokeWidth={1}
-          strokeDasharray="2 4"
-          opacity={0.4}
-        />
-        {lastHistoryPoint && (
-          <Circle cx={nowX} cy={priceScale(lastHistoryPoint.value)} r={5} fill="#FFFFFF" />
-        )}
-
-        {/* ── Market opens marker (pending state) ─── */}
-        {showMarketStartMarker && (
-          <>
-            <Line
-              from={{ x: marketStartX, y: 0 }}
-              to={{ x: marketStartX, y: innerHeight }}
-              stroke="#999999"
-              strokeWidth={1}
-              strokeDasharray="4 4"
-              opacity={0.5}
-            />
-            <text
-              x={marketStartX + 6}
-              y={12}
-              fontFamily="Space Mono, monospace"
-              fontSize="9"
-              letterSpacing="0.12em"
-              fill="#999999"
-            >
-              [ OPENS ]
-            </text>
-          </>
-        )}
+          {/* ── Market opens marker (pending state) ─── */}
+          {showMarketStartMarker && (
+            <>
+              <Line
+                from={{ x: marketStartX, y: 0 }}
+                to={{ x: marketStartX, y: innerHeight }}
+                stroke="#999999"
+                strokeWidth={1}
+                strokeDasharray="4 4"
+                opacity={0.5}
+              />
+              <text
+                x={marketStartX + 6}
+                y={12}
+                fontFamily="Space Mono, monospace"
+                fontSize="9"
+                letterSpacing="0.12em"
+                fill="#999999"
+              >
+                [ OPENS ]
+              </text>
+            </>
+          )}
+        </g>
 
         {/* ── Right Y-axis ────────────────────────── */}
         <AxisRight
@@ -474,10 +526,9 @@ function LevXChartOuter(props: LevXChartProps) {
   const feedId = pair ? feedIdForPair(pair) : null
   const latestTick = useLatestPrice(feedId)
 
-  /* ── Loading / error / empty early returns ───────────────── */
-  if (isLoading) return <Stub title="Loading chart…" />
+  /* ── Error / empty early returns ─────────────────────────── */
   if (error) return <Stub title="Chart error" subtitle={error.message} />
-  if (history.length === 0 && !latestTick) return <Stub title="Waiting for price data…" />
+  if (!isLoading && history.length === 0 && !latestTick) return <Stub title="Waiting for price data…" />
 
   return (
     <div className="levx-chart-wrap" style={height ? { height } : undefined}>

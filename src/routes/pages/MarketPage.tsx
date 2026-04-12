@@ -1,5 +1,5 @@
 import { useParams } from '@tanstack/react-router'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { Button } from '@/components/Button'
 import { DrawingLayer } from '@/components/DrawingLayer'
@@ -16,6 +16,7 @@ import { useMarket } from '@/lib/api/hooks'
 import { usePythFeed, useLatestPrice } from '@/lib/pyth/hooks'
 import { feedIdForPair } from '@/lib/pyth/feedIds'
 import { useBenchmarksHistory } from '@/lib/pyth/useBenchmarksHistory'
+import { buildAiPathFixture } from '@/tests/fixtures/aiPaths'
 
 import { useDrawingStore } from '@/stores/drawingStore'
 import {
@@ -85,7 +86,7 @@ export function MarketPage() {
 
   const [candleInterval, setCandleInterval] = useState<CandleInterval>('1h')
 
-  const { data: benchmarksHistory } = useBenchmarksHistory({
+  const { data: benchmarksHistory, isLoading: isBenchmarksLoading } = useBenchmarksHistory({
     pair,
     interval: candleInterval,
   })
@@ -98,47 +99,74 @@ export function MarketPage() {
   const [leverage, setLeverage] = useState(22)
   const [collateral, setCollateral] = useState('25.00')
   const [mountTime] = useState(() => Date.now())
-  const [marketDuration, setMarketDuration] = useState<DurationOption>('7d')
-  const [checkpointIntervalId, setCheckpointIntervalId] = useState<IntervalOption>('1h')
+  const [marketDuration, setMarketDuration] = useState<DurationOption | null>(null)
+  const [checkpointIntervalId, setCheckpointIntervalId] = useState<IntervalOption | null>(null)
+  const [showOtherPositions, setShowOtherPositions] = useState(false)
 
   // Exit draw mode on unmount so a user navigating away doesn't leave the store in sweeping state.
   useEffect(() => () => exitDrawMode(), [exitDrawMode])
 
-  if (isLoading) return <Stub title="Loading Market..." />
-  if (error || !market) return <Stub title="Market Not Found" subtitle={id} />
-
-  // Default selection = the middle (neutral) path on first load
-  const activePathId = selectedPathId ?? market.paths[2]?.id ?? null
-  const selectedPath = market.paths.find((p) => p.id === activePathId)
-  const lastPoint = selectedPath?.data[selectedPath.data.length - 1]
-  const firstPoint = selectedPath?.data[0]
-  const isLong = lastPoint && firstPoint ? lastPoint.value >= firstPoint.value : true
   const now = mountTime
 
-  // Derive market schedule from user-selected duration + interval
-  const selectedDuration = DURATION_OPTIONS.find((d) => d.id === marketDuration)!
-  const selectedInterval = INTERVAL_OPTIONS.find((i) => i.id === checkpointIntervalId)!
-  const chartMarketStart = latestTick ? latestTick.time : now
-  const chartMarketEnd = chartMarketStart + selectedDuration.ms
-  const chartCheckpointInterval = selectedInterval.sec
-  const chartTotalCheckpoints = Math.floor(selectedDuration.ms / 1000 / chartCheckpointInterval)
+  // Whether both market params are selected — AI paths require both
+  const marketParamsReady = marketDuration != null && checkpointIntervalId != null
 
-  const durationMs = selectedDuration.ms
+  // Derive market schedule from user-selected duration + interval
+  const selectedDuration = marketDuration ? DURATION_OPTIONS.find((d) => d.id === marketDuration)! : null
+  const selectedInterval = checkpointIntervalId ? INTERVAL_OPTIONS.find((i) => i.id === checkpointIntervalId)! : null
+  const chartMarketStart = latestTick ? latestTick.time : now
+  const chartMarketEnd = chartMarketStart + (selectedDuration?.ms ?? 0)
+  const chartCheckpointInterval = selectedInterval?.sec ?? 3600
+  const chartTotalCheckpoints = selectedDuration
+    ? Math.floor(selectedDuration.ms / 1000 / chartCheckpointInterval)
+    : 0
+
+  const durationMs = selectedDuration?.ms ?? 0
   const msRemaining = Math.max(0, chartMarketEnd - now)
   const leverageCap = maxLeverageByDuration(durationMs)
 
   // Prefer real Benchmarks candles; fall back to mock history while loading
   const chartHistory =
-    benchmarksHistory && benchmarksHistory.length > 0 ? benchmarksHistory : market.history
+    benchmarksHistory && benchmarksHistory.length > 0 ? benchmarksHistory : (market?.history ?? [])
 
   // Live price from Pyth tick; fall back to last history point
   const priceDisplay =
     latestTick?.value ?? chartHistory[chartHistory.length - 1]?.value ?? 0
+
+  // Generate 5 AI prediction paths anchored to current price + market params.
+  // When a real backend exists, these come from on-chain PathOutcome accounts.
+  const aiPaths = useMemo(() => {
+    if (!marketParamsReady || priceDisplay <= 0) return []
+    const paths = buildAiPathFixture({
+      startTime: chartMarketStart,
+      checkpointInterval: chartCheckpointInterval,
+      totalCheckpoints: chartTotalCheckpoints,
+      basePrice: priceDisplay,
+    })
+    // Mock opponent wagers on a few paths so the "Show Other Positions" toggle
+    // has something to render. Remove this when real on-chain data flows in.
+    paths[0].totalWagered = 4_250  // ultra-bull
+    paths[1].totalWagered = 12_800 // bull — most popular
+    paths[3].totalWagered = 1_900  // bear
+    return paths
+  }, [marketParamsReady, chartMarketStart, chartCheckpointInterval, chartTotalCheckpoints, priceDisplay])
+
+  // Default selection = the middle (neutral) path on first load
+  const activePathId = selectedPathId ?? aiPaths[2]?.id ?? null
+  const selectedPath = aiPaths.find((p) => p.id === activePathId)
+  const lastPoint = selectedPath?.data[selectedPath.data.length - 1]
+  const firstPoint = selectedPath?.data[0]
+  const isLong = lastPoint && firstPoint ? lastPoint.value >= firstPoint.value : true
+
   // Delta is only available from the mock layer (not from live Pyth ticks in Phase 1)
   const deltaDisplay = 0
   const deltaColor = deltaDisplay >= 0 ? 'text-success' : 'text-accent'
 
   const isInDrawMode = drawingPhase !== 'idle'
+
+  /* ── Early returns AFTER all hooks ─────────────────────────── */
+  if (isLoading) return <Stub title="Loading Market..." />
+  if (error || !market) return <Stub title="Market Not Found" subtitle={id} />
 
   return (
     <main className="mx-auto grid max-w-[1680px] grid-cols-1 gap-14 px-10 pt-14 pb-12 [@media(min-width:1181px)]:grid-cols-[1fr_400px] [@media(min-width:1181px)]:gap-[72px]">
@@ -197,13 +225,14 @@ export function MarketPage() {
         <div className="mt-4 h-[420px] [@media(min-width:1181px)]:h-[520px]">
           <LevXChart
             history={chartHistory}
-            predictions={market.paths}
+            predictions={aiPaths}
             nowTime={latestTick ? latestTick.time : now}
             marketStart={chartMarketStart}
             marketEnd={chartMarketEnd}
             selectedPathId={activePathId}
+            showOtherPositions={showOtherPositions}
             pair={market.pair}
-            isLoading={false}
+            isLoading={isBenchmarksLoading}
             error={null}
             market={{
               startTime: chartMarketStart,
@@ -269,7 +298,7 @@ export function MarketPage() {
           ))}
         </div>
         <p className="text-ink-dim mt-2 font-mono text-[10px] tracking-[0.06em]">
-          {chartTotalCheckpoints} checkpoints
+          {marketParamsReady ? `${chartTotalCheckpoints} checkpoints` : 'Select duration & interval'}
         </p>
 
         <hr className="bg-line my-7 h-px border-0" />
@@ -277,17 +306,42 @@ export function MarketPage() {
         <Label>Select A Line</Label>
 
         <div className="border-line mt-5 border-0 border-t">
-          {market.paths.map((p, idx) => (
+          {aiPaths.map((p, idx) => (
             <PathRow
               key={p.id}
               index={idx + 1}
               name={p.label}
               multiplier={`${p.multiplier.toFixed(2)}×`}
+              wagered={p.totalWagered}
               active={activePathId === p.id}
               onClick={() => setSelectedPathId(p.id)}
             />
           ))}
         </div>
+
+        <button
+          type="button"
+          onClick={() => setShowOtherPositions((v) => !v)}
+          className={cn(
+            'mt-4 flex w-full items-center gap-2.5 py-2 font-mono text-[11px] tracking-[0.1em] uppercase',
+            'duration-short ease-levx transition-colors',
+            showOtherPositions ? 'text-ink-strong' : 'text-ink-dim hover:text-ink-muted',
+          )}
+        >
+          <span
+            className={cn(
+              'flex h-3.5 w-3.5 items-center justify-center border',
+              showOtherPositions ? 'border-ink-strong bg-ink-strong' : 'border-line-strong bg-transparent',
+            )}
+          >
+            {showOtherPositions && (
+              <svg width="8" height="6" viewBox="0 0 8 6" fill="none">
+                <path d="M1 3L3 5L7 1" stroke="var(--color-surface, #000)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            )}
+          </span>
+          Show Other Positions
+        </button>
 
         {/*
           ── Draw button — desktop only (mobile gate: pure Tailwind CSS) ──
@@ -300,6 +354,7 @@ export function MarketPage() {
             variant={isInDrawMode ? 'primary' : 'dashed'}
             fullWidth
             className="mt-5"
+            disabled={!marketParamsReady && !isInDrawMode}
             onClick={() => {
               if (drawingPhase === 'idle') {
                 enterDrawMode(chartTotalCheckpoints)
