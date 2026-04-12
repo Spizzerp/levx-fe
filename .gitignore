@@ -15,6 +15,8 @@ dist-ssr
 # GSD planning directory (local-only)
 .planning/
 
+.claude/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
