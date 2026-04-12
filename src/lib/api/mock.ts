@@ -14,9 +14,34 @@ import type { CurrentPrice, Market } from '@/types/market'
 
 const DAY = 24 * 60 * 60 * 1000
 
+/** Sensible defaults for on-chain fields not yet populated in mock layer. */
+const ON_CHAIN_DEFAULTS: Pick<
+  Market,
+  | 'numPaths'
+  | 'amplitudes'
+  | 'lmsrShareQuantities'
+  | 'lambda'
+  | 'decoherenceRate'
+  | 'minimumProbability'
+  | 'pathMaxAge'
+  | 'pathsScored'
+  | 'pathsDissolved'
+> = {
+  numPaths: 0,
+  amplitudes: [],
+  lmsrShareQuantities: [],
+  lambda: 0,
+  decoherenceRate: 500_000,
+  minimumProbability: 10_000,
+  pathMaxAge: 3600,
+  pathsScored: 0,
+  pathsDissolved: 0,
+}
+
 const MARKETS: Market[] = [
   {
     id: 'btc',
+    marketId: 0,
     pair: 'BTC/USDC',
     base: 'BTC',
     quote: 'USDC',
@@ -33,9 +58,11 @@ const MARKETS: Market[] = [
     entryFeeBps: 150,
     history: [],
     paths: [],
+    ...ON_CHAIN_DEFAULTS,
   },
   {
     id: 'eth',
+    marketId: 1,
     pair: 'ETH/USDC',
     base: 'ETH',
     quote: 'USDC',
@@ -52,9 +79,11 @@ const MARKETS: Market[] = [
     entryFeeBps: 150,
     history: [],
     paths: [],
+    ...ON_CHAIN_DEFAULTS,
   },
   {
     id: 'sol',
+    marketId: 2,
     pair: 'SOL/USDC',
     base: 'SOL',
     quote: 'USDC',
@@ -71,6 +100,7 @@ const MARKETS: Market[] = [
     entryFeeBps: 150,
     history: [],
     paths: [],
+    ...ON_CHAIN_DEFAULTS,
   },
 ]
 

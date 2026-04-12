@@ -34,6 +34,24 @@ const TONE_SLOPES: Record<PathTone, number> = {
   custom: 0,
 }
 
+/** Defaults for on-chain PathOutcome fields in test fixtures. */
+const PATH_OUTCOME_DEFAULTS = {
+  checkpointsRoot: '0'.repeat(64),
+  checkpointsUri: '',
+  creator: '11111111111111111111111111111111',
+  cumulativeAction: 0,
+  compositeScore: 0,
+  peakAmplitude: 1_000_000,
+  amplitudeAtDecoherence: 0,
+  dissolved: false,
+  dissolvedAtCheckpoint: 0,
+  checkpointsProcessed: 0,
+  totalWagered: 0,
+  totalLeveragedExposure: 0,
+  lmsrSharesOutstanding: 0,
+  currentImpliedProbability: 2000, // 20%
+} as const
+
 /** Build a deterministic, test-friendly set of 5 AI candidate paths. */
 export function buildAiPathFixture(args: BuildAiPathFixtureArgs): PredictionPath[] {
   const { startTime, checkpointInterval, totalCheckpoints, basePrice } = args
@@ -53,9 +71,14 @@ export function buildAiPathFixture(args: BuildAiPathFixtureArgs): PredictionPath
       id: `ai-${tone}`,
       label: `Path ${String.fromCharCode(65 + toneIdx)}`, // A..E
       tone,
-      origin: 'ai',
+      origin: 'ai' as const,
       multiplier: MULTIPLIERS[tone],
       data,
+      pathIndex: toneIdx,
+      numCheckpoints: totalCheckpoints,
+      initialProbabilityBps: Math.round(10_000 / TONES.length),
+      generationTimestamp: startTime,
+      ...PATH_OUTCOME_DEFAULTS,
     }
   })
 }

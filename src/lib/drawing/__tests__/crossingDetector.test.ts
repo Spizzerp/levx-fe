@@ -80,6 +80,7 @@ describe('crossingDetector', () => {
 
 const mockMarket = (overrides: Partial<Market> = {}): Market => ({
   id: 'test',
+  marketId: 0,
   pair: 'SOL/USDC',
   base: 'SOL',
   quote: 'USDC',
@@ -96,6 +97,15 @@ const mockMarket = (overrides: Partial<Market> = {}): Market => ({
   entryFeeBps: 0,
   history: [],
   paths: [],
+  numPaths: 0,
+  amplitudes: [],
+  lmsrShareQuantities: [],
+  lambda: 0,
+  decoherenceRate: 500_000,
+  minimumProbability: 10_000,
+  pathMaxAge: 3600,
+  pathsScored: 0,
+  pathsDissolved: 0,
   ...overrides,
 })
 

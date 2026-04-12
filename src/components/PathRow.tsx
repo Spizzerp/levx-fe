@@ -1,14 +1,17 @@
 import { cn } from '@/lib/cn'
+import { formatUSD } from '@/lib/format'
 
 interface PathRowProps {
   index: number
   name: string
   multiplier: string
+  /** Total USDC wagered on this path by all users */
+  wagered?: number
   active?: boolean
   onClick?: () => void
 }
 
-export function PathRow({ index, name, multiplier, active = false, onClick }: PathRowProps) {
+export function PathRow({ index, name, multiplier, wagered, active = false, onClick }: PathRowProps) {
   const idx = String(index).padStart(2, '0')
   return (
     <button
@@ -22,14 +25,21 @@ export function PathRow({ index, name, multiplier, active = false, onClick }: Pa
       )}
     >
       <span className="text-label text-ink-dim font-mono tracking-[0.05em]">[ {idx} ]</span>
-      <span
-        className={cn(
-          'font-mono text-xs tracking-[0.1em] uppercase',
-          active ? 'text-ink-strong' : 'text-ink',
+      <div className="flex flex-col gap-0.5">
+        <span
+          className={cn(
+            'font-mono text-xs tracking-[0.1em] uppercase',
+            active ? 'text-ink-strong' : 'text-ink',
+          )}
+        >
+          {name}
+        </span>
+        {wagered != null && wagered > 0 && (
+          <span className="text-ink-dim font-mono text-[9px] tracking-[0.06em]">
+            {formatUSD(wagered)} wagered
+          </span>
         )}
-      >
-        {name}
-      </span>
+      </div>
       <span className="text-ink-strong font-mono text-[13px]">{multiplier}</span>
     </button>
   )
