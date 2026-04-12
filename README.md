@@ -49,3 +49,7 @@ Example `.env.local`:
 APP_ENV=local
 APP_API_BASE_URL=http://localhost:3000
 ```
+
+## Shared Docs
+
+- Wireframe document: `docs/wireframe-document.md`
