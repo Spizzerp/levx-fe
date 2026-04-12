@@ -6,6 +6,7 @@ import { Stub } from '@/components/Stub'
 import { cn } from '@/lib/cn'
 import { useMarkets } from '@/lib/api/hooks'
 import { formatCountdown, formatUSD } from '@/lib/format'
+import { PageLayout } from '@/layouts/PageLayout'
 import type { Market, MarketState } from '@/types/market'
 
 type StateFilter = 'all' | 'active' | 'pending' | 'settled'
@@ -78,42 +79,37 @@ export function MarketsPage() {
   if (error) return <Stub title="Error Loading Markets" />
 
   return (
-    <main className="mx-auto max-w-[1680px] px-10 pt-14 pb-12">
-      <header className="mb-12">
-        <h1 className="font-display text-ink-strong mb-4 text-[56px] leading-none font-medium tracking-[-0.01em] [font-variation-settings:'ROND'_100]">
-          Markets
-        </h1>
-        <p className="text-ink-muted font-mono text-xs tracking-[0.08em] uppercase">
-          Predict the path, not the destination. Five AI-generated routes per market.
-        </p>
-      </header>
-
-      <div className="border-line mb-8 flex items-center gap-2 border-0 border-b pb-5">
-        {FILTERS.map((f) => {
-          const isActive = filter === f.id
-          return (
-            <button
-              key={f.id}
-              type="button"
-              onClick={() => setFilter(f.id)}
-              className={cn(
-                'cursor-pointer rounded-full border px-4 py-2.5',
-                'font-mono text-[11px] tracking-[0.1em] uppercase',
-                'duration-short ease-levx transition-[color,border-color,background]',
-                isActive
-                  ? 'border-ink-strong bg-ink-strong text-surface'
-                  : 'border-line-strong text-ink-muted hover:border-ink hover:text-ink-strong bg-transparent',
-              )}
-            >
-              [ {f.label.toUpperCase()} ]
-            </button>
-          )
-        })}
-        <div className="text-ink-dim ml-auto font-mono text-[10px] tracking-[0.1em] uppercase">
-          {visible.length} {visible.length === 1 ? 'MARKET' : 'MARKETS'}
+    <PageLayout
+      title="Markets"
+      subtitle="Predict the path, not the destination. Five AI-generated routes per market."
+      headerActions={
+        <div className="border-line flex items-center gap-2 border-0 border-b pb-5">
+          {FILTERS.map((f) => {
+            const isActive = filter === f.id
+            return (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => setFilter(f.id)}
+                className={cn(
+                  'cursor-pointer rounded-full border px-4 py-2.5',
+                  'font-mono text-[11px] tracking-[0.1em] uppercase',
+                  'duration-short ease-levx transition-[color,border-color,background]',
+                  isActive
+                    ? 'border-ink-strong bg-ink-strong text-surface'
+                    : 'border-line-strong text-ink-muted hover:border-ink hover:text-ink-strong bg-transparent',
+                )}
+              >
+                [ {f.label.toUpperCase()} ]
+              </button>
+            )
+          })}
+          <div className="text-ink-dim ml-auto font-mono text-[10px] tracking-[0.1em] uppercase">
+            {visible.length} {visible.length === 1 ? 'MARKET' : 'MARKETS'}
+          </div>
         </div>
-      </div>
-
+      }
+    >
       <div className="flex flex-col">
         <div
           className={cn(
@@ -177,6 +173,6 @@ export function MarketsPage() {
           </div>
         )}
       </div>
-    </main>
+    </PageLayout>
   )
 }

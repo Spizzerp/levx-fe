@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Button } from '@/components/Button'
 import { cn } from '@/lib/cn'
 import { formatUSD } from '@/lib/format'
+import { PageLayout } from '@/layouts/PageLayout'
 
 type PositionStatus = 'active' | 'sampling' | 'at-risk'
 
@@ -106,45 +107,38 @@ export function PositionsPage() {
   }
 
   return (
-    <main className="mx-auto max-w-[1680px] px-10 pt-14 pb-12">
-      <header className="mb-12">
-        <h1 className="font-display text-ink-strong mb-4 text-[56px] leading-none font-medium tracking-[-0.01em] [font-variation-settings:'ROND'_100]">
-          Positions
-        </h1>
-        <p className="text-ink-muted font-mono text-xs tracking-[0.08em] uppercase">
-          Track your active positions and real-time performance
-        </p>
-      </header>
-
-      {/* Summary Bar */}
-      <div className="border-line mb-8 flex items-center gap-12 border-0 border-b pb-8">
-        <div>
-          <div className="text-label text-ink-muted mb-2 font-mono tracking-[0.1em] uppercase">
-            Total Wagered
+    <PageLayout
+      title="Positions"
+      subtitle="Track your active positions and real-time performance"
+      summaryBar={
+        <div className="border-line flex items-center gap-12 border-0 border-b pb-8">
+          <div>
+            <div className="text-label text-ink-muted mb-2 font-mono tracking-[0.1em] uppercase">
+              Total Wagered
+            </div>
+            <div className="text-ink-strong font-mono text-3xl font-bold tracking-[0.02em]">
+              {formatUSD(MOCK_POSITIONS.reduce((sum, p) => sum + p.amount, 0))}
+            </div>
           </div>
-          <div className="text-ink-strong font-mono text-3xl font-bold tracking-[0.02em]">
-            {formatUSD(MOCK_POSITIONS.reduce((sum, p) => sum + p.amount, 0))}
+          <div>
+            <div className="text-label text-ink-muted mb-2 font-mono tracking-[0.1em] uppercase">
+              Avg Score
+            </div>
+            <div className="text-ink-strong font-mono text-3xl font-bold tracking-[0.02em]">
+              {(
+                MOCK_POSITIONS.reduce((sum, p) => sum + p.currentScore, 0) /
+                MOCK_POSITIONS.length
+              ).toFixed(1)}
+            </div>
           </div>
-        </div>
-        <div>
-          <div className="text-label text-ink-muted mb-2 font-mono tracking-[0.1em] uppercase">
-            Avg Score
-          </div>
-          <div className="text-ink-strong font-mono text-3xl font-bold tracking-[0.02em]">
-            {(
-              MOCK_POSITIONS.reduce((sum, p) => sum + p.currentScore, 0) /
-              MOCK_POSITIONS.length
-            ).toFixed(1)}
-          </div>
-        </div>
-        <div className="ml-auto">
-          <div className="text-ink-dim font-mono text-[10px] tracking-[0.1em] uppercase">
-            {MOCK_POSITIONS.length} {MOCK_POSITIONS.length === 1 ? 'POSITION' : 'POSITIONS'}
+          <div className="ml-auto">
+            <div className="text-ink-dim font-mono text-[10px] tracking-[0.1em] uppercase">
+              {MOCK_POSITIONS.length} {MOCK_POSITIONS.length === 1 ? 'POSITION' : 'POSITIONS'}
+            </div>
           </div>
         </div>
-      </div>
-
-      {/* Positions List */}
+      }
+    >
       {MOCK_POSITIONS.length > 0 ? (
         <div className="flex flex-col">
           {/* Header Row */}
@@ -224,6 +218,6 @@ export function PositionsPage() {
           <span>[ NO OPEN POSITIONS ]</span>
         </div>
       )}
-    </main>
+    </PageLayout>
   )
 }
