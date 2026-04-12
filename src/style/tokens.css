@@ -52,6 +52,17 @@
 
   --text-label: 11px;
 
+  /* ── Z-index layers ───────────────────────────
+      above    — above everything else
+      nav      — sticky top navigation
+     overlay  — modals / dropdowns
+     toast    — floating notifications
+  */
+  --z-above: 10;
+  --z-nav: 100;
+  --z-overlay: 200;
+  --z-toast: 300;
+
   /* ── Motion ───────────────────────────────────
      Extends Tailwind's default duration/ease scales.
   */

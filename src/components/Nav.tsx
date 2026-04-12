@@ -20,7 +20,7 @@ const LINK_ACTIVE = 'border-ink-strong text-ink-strong'
 
 export function Nav() {
   return (
-    <nav className="border-line sticky top-0 z-50 flex items-center justify-between border-0 border-b bg-surface px-8 py-5">
+    <nav className="border-line sticky top-0 z-nav flex items-center justify-between border-0 border-b bg-surface px-8 py-5">
       <img src="/logo_white.png" alt="LevX" className="h-11 w-auto" />
       <ul className="flex gap-9">
         {links.map((l) => (
