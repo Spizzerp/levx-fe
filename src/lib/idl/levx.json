@@ -1,0 +1,2756 @@
+{
+  "address": "LhDfCNTdm8Xr5cpEaSCfVSsbReA8muHFsS8zgjJn7Kk",
+  "metadata": {
+    "name": "levx",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
+  "instructions": [
+    {
+      "name": "activate_market",
+      "discriminator": [
+        10,
+        26,
+        197,
+        116,
+        113,
+        99,
+        72,
+        89
+      ],
+      "accounts": [
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "Market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "cranker",
+          "docs": [
+            "Anyone can crank this (permissionless).",
+            "remaining_accounts: all PathOutcome accounts for this market (for freshness check)."
+          ],
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "add_path",
+      "discriminator": [
+        173,
+        144,
+        101,
+        58,
+        144,
+        107,
+        129,
+        117
+      ],
+      "accounts": [
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "Market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "path_outcome",
+          "writable": true
+        },
+        {
+          "name": "creator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "params",
+          "type": {
+            "defined": {
+              "name": "AddPathParams"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "add_supported_pair",
+      "discriminator": [
+        128,
+        207,
+        52,
+        183,
+        219,
+        201,
+        191,
+        230
+      ],
+      "accounts": [
+        {
+          "name": "protocol_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "base_mint",
+          "type": "pubkey"
+        },
+        {
+          "name": "quote_mint",
+          "type": "pubkey"
+        },
+        {
+          "name": "pyth_feed_id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "check_dissolution",
+      "discriminator": [
+        43,
+        26,
+        246,
+        111,
+        207,
+        62,
+        15,
+        240
+      ],
+      "accounts": [
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "Market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "path_outcome",
+          "writable": true
+        },
+        {
+          "name": "price_sample",
+          "docs": [
+            "The most recent PriceSample for this market."
+          ]
+        },
+        {
+          "name": "keeper",
+          "docs": [
+            "Permissionless keeper"
+          ],
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "checkpoint_leaf",
+          "type": {
+            "defined": {
+              "name": "CheckpointLeaf"
+            }
+          }
+        },
+        {
+          "name": "merkle_proof",
+          "type": {
+            "vec": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "claim",
+      "discriminator": [
+        62,
+        198,
+        214,
+        193,
+        213,
+        159,
+        108,
+        210
+      ],
+      "accounts": [
+        {
+          "name": "protocol_state",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "Market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "path_outcome"
+        },
+        {
+          "name": "position",
+          "writable": true
+        },
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "user_token_account",
+          "writable": true
+        },
+        {
+          "name": "treasury",
+          "docs": [
+            "Treasury — receives settlement rake share"
+          ],
+          "writable": true
+        },
+        {
+          "name": "insurance_fund",
+          "docs": [
+            "Insurance fund — receives settlement rake share"
+          ],
+          "writable": true
+        },
+        {
+          "name": "user",
+          "signer": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "create_market",
+      "discriminator": [
+        103,
+        226,
+        97,
+        235,
+        200,
+        188,
+        251,
+        254
+      ],
+      "accounts": [
+        {
+          "name": "protocol_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "protocol_state.total_markets_created",
+                "account": "ProtocolState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "collateral_mint"
+        },
+        {
+          "name": "insurance_fund",
+          "docs": [
+            "Insurance fund receives the market creation fee"
+          ],
+          "writable": true
+        },
+        {
+          "name": "creator_token_account",
+          "docs": [
+            "Creator's USDC token account — pays the creation fee"
+          ],
+          "writable": true
+        },
+        {
+          "name": "creator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "rent",
+          "address": "SysvarRent111111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "params",
+          "type": {
+            "defined": {
+              "name": "CreateMarketParams"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "dispute_settlement",
+      "discriminator": [
+        4,
+        60,
+        11,
+        150,
+        42,
+        129,
+        191,
+        152
+      ],
+      "accounts": [
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "Market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "disputer",
+          "docs": [
+            "Anyone can dispute"
+          ],
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "exit_position",
+      "discriminator": [
+        130,
+        193,
+        80,
+        25,
+        78,
+        132,
+        189,
+        111
+      ],
+      "accounts": [
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "Market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "path_outcome",
+          "writable": true
+        },
+        {
+          "name": "position",
+          "writable": true
+        },
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "user_token_account",
+          "writable": true
+        },
+        {
+          "name": "user",
+          "signer": true
+        },
+        {
+          "name": "token_program",
+          "docs": [
+            "remaining_accounts[0]: Optional EigenCache (mut) — for quantum-correlated",
+            "pricing and perturbation. Loaded via eigen_utils::load_eigen_cache()."
+          ],
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "finalize_market",
+      "discriminator": [
+        16,
+        225,
+        38,
+        28,
+        213,
+        217,
+        1,
+        247
+      ],
+      "accounts": [
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "Market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "cranker",
+          "docs": [
+            "Permissionless"
+          ],
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "init_eigen_cache",
+      "discriminator": [
+        106,
+        174,
+        36,
+        13,
+        154,
+        176,
+        77,
+        62
+      ],
+      "accounts": [
+        {
+          "name": "market",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "Market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "eigen_cache",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  105,
+                  103,
+                  101,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "Market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "keeper",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize_protocol",
+      "discriminator": [
+        188,
+        233,
+        252,
+        106,
+        134,
+        146,
+        202,
+        91
+      ],
+      "accounts": [
+        {
+          "name": "protocol_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "treasury"
+        },
+        {
+          "name": "insurance_fund"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize_vault",
+      "discriminator": [
+        48,
+        191,
+        163,
+        44,
+        71,
+        129,
+        63,
+        164
+      ],
+      "accounts": [
+        {
+          "name": "protocol_state",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "lev_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  101,
+                  118,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "place_wager",
+      "discriminator": [
+        225,
+        163,
+        84,
+        25,
+        21,
+        42,
+        138,
+        30
+      ],
+      "accounts": [
+        {
+          "name": "protocol_state",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "Market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "path_outcome",
+          "writable": true
+        },
+        {
+          "name": "position",
+          "writable": true
+        },
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "treasury",
+          "docs": [
+            "Treasury token account — receives 80% of entry fee"
+          ],
+          "writable": true
+        },
+        {
+          "name": "insurance_fund",
+          "docs": [
+            "Insurance fund token account — receives 20% of entry fee"
+          ],
+          "writable": true
+        },
+        {
+          "name": "user_token_account",
+          "writable": true
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "token_program",
+          "docs": [
+            "remaining_accounts[0]: Optional EigenCache (mut) — pass the PDA if a",
+            "verified eigendecomp is available, or omit for λ=0 fallback.",
+            "Loaded via eigen_utils::load_eigen_cache() to avoid BPF stack overflow."
+          ],
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "path_index",
+          "type": "u8"
+        },
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "resolve_dispute",
+      "discriminator": [
+        231,
+        6,
+        202,
+        6,
+        96,
+        103,
+        12,
+        230
+      ],
+      "accounts": [
+        {
+          "name": "protocol_state",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "Market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "uphold",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "sample_price",
+      "discriminator": [
+        15,
+        172,
+        110,
+        234,
+        15,
+        105,
+        46,
+        55
+      ],
+      "accounts": [
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "Market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "price_sample",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  109,
+                  112,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "Market"
+              },
+              {
+                "kind": "arg",
+                "path": "checkpoint_index"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pyth_price_update",
+          "docs": [
+            "Pyth PriceUpdateV2 account — must be owned by the Pyth Receiver Program.",
+            "The keeper posts the price update to Pyth's receiver program in a prior",
+            "instruction within the same transaction. We read the verified result here."
+          ]
+        },
+        {
+          "name": "keeper",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "checkpoint_index",
+          "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "score_path",
+      "discriminator": [
+        122,
+        82,
+        125,
+        20,
+        70,
+        241,
+        94,
+        152
+      ],
+      "accounts": [
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "Market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "path_outcome",
+          "writable": true
+        },
+        {
+          "name": "keeper",
+          "docs": [
+            "Permissionless keeper"
+          ],
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "max_action",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "settle_market",
+      "discriminator": [
+        193,
+        153,
+        95,
+        216,
+        166,
+        6,
+        144,
+        217
+      ],
+      "accounts": [
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "Market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "cranker",
+          "docs": [
+            "Permissionless"
+          ],
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "submit_eigendecomp",
+      "discriminator": [
+        159,
+        124,
+        73,
+        248,
+        239,
+        6,
+        149,
+        18
+      ],
+      "accounts": [
+        {
+          "name": "market",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "Market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "eigen_cache",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  105,
+                  103,
+                  101,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "Market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "keeper",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "eigenvalues",
+          "type": {
+            "vec": "i64"
+          }
+        },
+        {
+          "name": "eigenvectors_flat",
+          "type": {
+            "vec": "i64"
+          }
+        }
+      ]
+    },
+    {
+      "name": "void_market",
+      "discriminator": [
+        243,
+        175,
+        46,
+        124,
+        95,
+        101,
+        39,
+        69
+      ],
+      "accounts": [
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "Market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "cranker",
+          "docs": [
+            "Permissionless"
+          ],
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "void_market_governance",
+      "discriminator": [
+        13,
+        211,
+        25,
+        212,
+        91,
+        228,
+        59,
+        239
+      ],
+      "accounts": [
+        {
+          "name": "protocol_state",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "Market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "EigenCache",
+      "discriminator": [
+        211,
+        253,
+        217,
+        80,
+        231,
+        215,
+        20,
+        120
+      ]
+    },
+    {
+      "name": "LevVault",
+      "discriminator": [
+        126,
+        56,
+        31,
+        33,
+        68,
+        83,
+        245,
+        126
+      ]
+    },
+    {
+      "name": "Market",
+      "discriminator": [
+        219,
+        190,
+        213,
+        55,
+        0,
+        227,
+        198,
+        154
+      ]
+    },
+    {
+      "name": "PathOutcome",
+      "discriminator": [
+        19,
+        217,
+        237,
+        13,
+        108,
+        43,
+        32,
+        129
+      ]
+    },
+    {
+      "name": "Position",
+      "discriminator": [
+        170,
+        188,
+        143,
+        228,
+        122,
+        64,
+        247,
+        208
+      ]
+    },
+    {
+      "name": "PriceSample",
+      "discriminator": [
+        54,
+        226,
+        181,
+        40,
+        71,
+        220,
+        77,
+        24
+      ]
+    },
+    {
+      "name": "ProtocolState",
+      "discriminator": [
+        33,
+        51,
+        173,
+        134,
+        35,
+        140,
+        195,
+        248
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "MarketPendingNoWagers",
+      "msg": "Market is in Pending state; wagers are not yet accepted"
+    },
+    {
+      "code": 6001,
+      "name": "MarketSettlingRejected",
+      "msg": "Market is in Settling state; no new wagers or exits accepted"
+    },
+    {
+      "code": 6002,
+      "name": "MarketMaturingRejected",
+      "msg": "Market is in Maturing state; claims not yet available (verification window active)"
+    },
+    {
+      "code": 6003,
+      "name": "MarketSettledRejected",
+      "msg": "Market has been settled; no further actions except claim"
+    },
+    {
+      "code": 6004,
+      "name": "MarketVoidedRejected",
+      "msg": "Market has been voided; use claim to recover collateral"
+    },
+    {
+      "code": 6005,
+      "name": "InsufficientPaths",
+      "msg": "Market activation rejected; fewer than 3 paths registered"
+    },
+    {
+      "code": 6006,
+      "name": "MarketNotStarted",
+      "msg": "Market activation rejected; start_time has not been reached"
+    },
+    {
+      "code": 6007,
+      "name": "PathFreshnessExpired",
+      "msg": "Market activation rejected; AI path exceeds freshness window"
+    },
+    {
+      "code": 6008,
+      "name": "MaxPathsReached",
+      "msg": "Maximum number of paths (16) reached"
+    },
+    {
+      "code": 6009,
+      "name": "InvalidMarketState",
+      "msg": "Market is not in the expected state for this operation"
+    },
+    {
+      "code": 6010,
+      "name": "AlreadyClaimed",
+      "msg": "Position has already been claimed"
+    },
+    {
+      "code": 6011,
+      "name": "PathDissolved",
+      "msg": "Cannot wager on dissolved path"
+    },
+    {
+      "code": 6012,
+      "name": "Unauthorized",
+      "msg": "Unauthorized signer for this operation"
+    },
+    {
+      "code": 6013,
+      "name": "CheckpointMismatch",
+      "msg": "Checkpoint count mismatch"
+    },
+    {
+      "code": 6014,
+      "name": "WagersNotAccepted",
+      "msg": "Market is not accepting wagers in current state"
+    },
+    {
+      "code": 6015,
+      "name": "WagerTooSmall",
+      "msg": "Wager amount too small or yields zero shares"
+    },
+    {
+      "code": 6016,
+      "name": "CheckpointNotDue",
+      "msg": "Checkpoint not yet due"
+    },
+    {
+      "code": 6017,
+      "name": "CheckpointAlreadySampled",
+      "msg": "Checkpoint already sampled"
+    },
+    {
+      "code": 6018,
+      "name": "OracleConfidenceTooLow",
+      "msg": "Oracle confidence too low or price invalid"
+    },
+    {
+      "code": 6019,
+      "name": "TooManySkippedCheckpoints",
+      "msg": "Too many checkpoints skipped; market should be voided"
+    },
+    {
+      "code": 6020,
+      "name": "PathAlreadyDissolved",
+      "msg": "Path has already been dissolved"
+    },
+    {
+      "code": 6021,
+      "name": "QuantumStateCollapsed",
+      "msg": "All path amplitudes collapsed to zero"
+    },
+    {
+      "code": 6022,
+      "name": "EigenNonConvergence",
+      "msg": "Eigendecomposition did not converge within iteration limit"
+    },
+    {
+      "code": 6023,
+      "name": "EigenVerificationFailed",
+      "msg": "Eigendecomposition verification failed: reconstruction error exceeds tolerance"
+    },
+    {
+      "code": 6024,
+      "name": "LambdaExceedsMax",
+      "msg": "Lambda exceeds maximum allowed coupling strength"
+    },
+    {
+      "code": 6025,
+      "name": "SettlementIncomplete",
+      "msg": "Settlement not complete; not all paths scored"
+    },
+    {
+      "code": 6026,
+      "name": "MarketNotSettled",
+      "msg": "Market not in Settled or Void state; cannot claim"
+    },
+    {
+      "code": 6027,
+      "name": "NoSurvivingPaths",
+      "msg": "No surviving paths to settle"
+    },
+    {
+      "code": 6028,
+      "name": "InvalidScoringWeights",
+      "msg": "Invalid scoring weights; must sum to 10000"
+    },
+    {
+      "code": 6029,
+      "name": "InvalidPathIndex",
+      "msg": "Invalid path index"
+    },
+    {
+      "code": 6030,
+      "name": "MaturityNotElapsed",
+      "msg": "Maturity window has not elapsed; cannot finalize"
+    },
+    {
+      "code": 6031,
+      "name": "MarketDisputed",
+      "msg": "Market is disputed; paused for governance review"
+    },
+    {
+      "code": 6032,
+      "name": "MathOverflow",
+      "msg": "Arithmetic overflow"
+    },
+    {
+      "code": 6033,
+      "name": "DivisionByZero",
+      "msg": "Division by zero"
+    },
+    {
+      "code": 6034,
+      "name": "InvalidFee",
+      "msg": "Invalid fee configuration"
+    },
+    {
+      "code": 6035,
+      "name": "FeeExceedsCap",
+      "msg": "Fee exceeds maximum cap (5%)"
+    },
+    {
+      "code": 6036,
+      "name": "LeverageNotEnabled",
+      "msg": "Leverage is not enabled for this market"
+    },
+    {
+      "code": 6037,
+      "name": "LeverageExceedsMaximum",
+      "msg": "Leverage exceeds maximum for this market's timeframe"
+    },
+    {
+      "code": 6038,
+      "name": "VaultInsufficientCapacity",
+      "msg": "Insufficient vault capacity for this leveraged position"
+    },
+    {
+      "code": 6039,
+      "name": "VaultUtilizationExceeded",
+      "msg": "Vault utilization would exceed maximum after this borrow"
+    },
+    {
+      "code": 6040,
+      "name": "LeveragedOICapExceeded",
+      "msg": "Market leveraged open interest cap would be exceeded"
+    },
+    {
+      "code": 6041,
+      "name": "PositionUnderwater",
+      "msg": "Position health factor below liquidation threshold"
+    },
+    {
+      "code": 6042,
+      "name": "PositionHealthy",
+      "msg": "Position health factor is above liquidation threshold; cannot liquidate"
+    },
+    {
+      "code": 6043,
+      "name": "UnauthorizedBackstopLiquidator",
+      "msg": "Caller is not the configured backstop liquidator"
+    },
+    {
+      "code": 6044,
+      "name": "BackstopLiquidatorDisabled",
+      "msg": "Backstop liquidator is disabled"
+    },
+    {
+      "code": 6045,
+      "name": "BackstopGracePeriodActive",
+      "msg": "Backstop grace period has not elapsed; regular keepers have priority"
+    },
+    {
+      "code": 6046,
+      "name": "BucketGuardCooldown",
+      "msg": "Operation rate-limited; cooldown period has not elapsed"
+    }
+  ],
+  "types": [
+    {
+      "name": "AddPathParams",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "checkpoints_root",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "checkpoints_uri",
+            "type": "string"
+          },
+          {
+            "name": "num_checkpoints",
+            "type": "u16"
+          },
+          {
+            "name": "initial_probability_bps",
+            "type": "u16"
+          },
+          {
+            "name": "generation_method",
+            "type": {
+              "defined": {
+                "name": "PathOrigin"
+              }
+            }
+          },
+          {
+            "name": "generation_timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CheckpointLeaf",
+      "docs": [
+        "A single predicted checkpoint leaf."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "checkpoint_index",
+            "type": "u16"
+          },
+          {
+            "name": "predicted_price",
+            "type": "u64"
+          },
+          {
+            "name": "upper_tolerance",
+            "type": "u64"
+          },
+          {
+            "name": "lower_tolerance",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CreateMarketParams",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "base_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "quote_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "pyth_feed_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "start_time",
+            "type": "i64"
+          },
+          {
+            "name": "end_time",
+            "type": "i64"
+          },
+          {
+            "name": "checkpoint_interval",
+            "type": "u32"
+          },
+          {
+            "name": "action_alpha",
+            "type": "u64"
+          },
+          {
+            "name": "action_beta",
+            "type": "u64"
+          },
+          {
+            "name": "decoherence_rate",
+            "type": "u64"
+          },
+          {
+            "name": "minimum_probability",
+            "type": "u64"
+          },
+          {
+            "name": "path_max_age",
+            "type": "i64"
+          },
+          {
+            "name": "lambda",
+            "docs": [
+              "Quantum coupling strength (0 = no correlation, reduces to LMSR pricing)."
+            ],
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "EigenCache",
+      "docs": [
+        "Cached eigendecomposition for a market's quantum cost function.",
+        "",
+        "Populated by `submit_eigendecomp` (permissionless keeper).",
+        "Read by `place_wager` and `exit_position` for quantum-correlated pricing.",
+        "",
+        "Uses Vec fields with #[max_len] instead of fixed arrays to avoid",
+        "BPF stack overflow during Anchor's init serialization.",
+        "",
+        "Fresh when `version == market.eigendecomp_version`."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market",
+            "docs": [
+              "The market this decomposition is for."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "eigenvalues",
+            "docs": [
+              "Eigenvalues of M = (diag(q) + λK) / b, fixed-point i64."
+            ],
+            "type": {
+              "vec": "i64"
+            }
+          },
+          {
+            "name": "eigenvectors_flat",
+            "docs": [
+              "Eigenvector matrix Q (row-major: entry [i*n + k] = k-th component of i-th eigenvector).",
+              "This is the TRANSPOSE of the Jacobi output (which stores eigenvectors as columns)."
+            ],
+            "type": {
+              "vec": "i64"
+            }
+          },
+          {
+            "name": "num_paths",
+            "docs": [
+              "Number of active curated paths when this was computed."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "version",
+            "docs": [
+              "Matches market.eigendecomp_version when fresh."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "needs_refresh",
+            "docs": [
+              "Set when a large trade exceeds perturbation safety threshold.",
+              "Keeper checks this flag and resubmits full eigendecomp when set."
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LevVault",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault_usdc",
+            "type": "pubkey"
+          },
+          {
+            "name": "levusd_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "total_deposits",
+            "type": "u64"
+          },
+          {
+            "name": "total_borrowed",
+            "type": "u64"
+          },
+          {
+            "name": "total_reserved",
+            "type": "u64"
+          },
+          {
+            "name": "utilization_rate",
+            "docs": [
+              "total_borrowed / total_deposits (fixed-point 6 dec)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "accumulated_borrow_fees",
+            "type": "u64"
+          },
+          {
+            "name": "accumulated_liquidation_fees",
+            "type": "u64"
+          },
+          {
+            "name": "accumulated_settle_share",
+            "type": "u64"
+          },
+          {
+            "name": "max_utilization_bps",
+            "type": "u16"
+          },
+          {
+            "name": "base_borrow_rate_bps",
+            "type": "u16"
+          },
+          {
+            "name": "kink_utilization_bps",
+            "type": "u16"
+          },
+          {
+            "name": "kink_borrow_rate_bps",
+            "type": "u16"
+          },
+          {
+            "name": "max_borrow_rate_bps",
+            "type": "u16"
+          },
+          {
+            "name": "max_payout_per_market_bps",
+            "type": "u16"
+          },
+          {
+            "name": "liquidation_fee_bps",
+            "type": "u16"
+          },
+          {
+            "name": "keeper_reward_bps",
+            "type": "u16"
+          },
+          {
+            "name": "withdrawal_cooldown",
+            "type": "i64"
+          },
+          {
+            "name": "pending_withdrawals",
+            "type": "u64"
+          },
+          {
+            "name": "total_outstanding_profit_claims",
+            "type": "u64"
+          },
+          {
+            "name": "haircut_ratio",
+            "docs": [
+              "h = min(1, vault_residual / total_profit_claims); fixed-point 6 dec"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "profit_warmup_checkpoints",
+            "type": "u16"
+          },
+          {
+            "name": "num_pair_buffers",
+            "type": "u8"
+          },
+          {
+            "name": "current_shortfall",
+            "docs": [
+              "USDC amount of unresolved bad debt (6 decimals)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "haircut_active",
+            "docs": [
+              "True when haircut ratio H < 1.0 (quick-read flag)"
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "pair_shortfall_count",
+            "docs": [
+              "Number of pair buffers currently in deficit"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "backstop_liquidator",
+            "docs": [
+              "Governance-configured fallback liquidator. system_program::ID = disabled."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "backstop_grace_period",
+            "docs": [
+              "Seconds before backstop can act after health drops. Default 300."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Market",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market_id",
+            "type": "u64"
+          },
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "base_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "quote_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "pyth_feed_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "start_time",
+            "type": "i64"
+          },
+          {
+            "name": "end_time",
+            "type": "i64"
+          },
+          {
+            "name": "checkpoint_interval",
+            "type": "u32"
+          },
+          {
+            "name": "total_checkpoints",
+            "type": "u16"
+          },
+          {
+            "name": "completed_checkpoints",
+            "type": "u16"
+          },
+          {
+            "name": "state",
+            "type": {
+              "defined": {
+                "name": "MarketState"
+              }
+            }
+          },
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "total_pool",
+            "type": "u64"
+          },
+          {
+            "name": "total_leveraged_notional",
+            "type": "u64"
+          },
+          {
+            "name": "lmsr_alpha",
+            "docs": [
+              "Alpha parameter for adaptive liquidity: b = α × Σ|q_j| (fixed-point 6 dec; default 50_000 = 0.05)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "lmsr_share_quantities",
+            "docs": [
+              "Share quantities per path. Input to both LMSR and quantum cost functions."
+            ],
+            "type": {
+              "array": [
+                "i64",
+                16
+              ]
+            }
+          },
+          {
+            "name": "lambda",
+            "docs": [
+              "Quantum coupling strength. 0 = no inter-path correlation (reduces to LMSR)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "eigendecomp_version",
+            "docs": [
+              "Monotonic counter incremented on every trade that changes quantities.",
+              "EigenCache is fresh only when its version matches this value."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "action_alpha",
+            "docs": [
+              "Alpha coefficient for price term: S = α(Δp)² + β(Δv)². Default: 700_000 (0.7)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "action_beta",
+            "docs": [
+              "Beta coefficient for velocity term. Default: 300_000 (0.3)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "amplitudes",
+            "docs": [
+              "Amplitude for each path. Born rule: probability ~ |ψ_i|²"
+            ],
+            "type": {
+              "array": [
+                "u64",
+                16
+              ]
+            }
+          },
+          {
+            "name": "amplitude_scale",
+            "docs": [
+              "Scale factor for amplitude normalization. Default: 1_000_000"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "decoherence_rate",
+            "docs": [
+              "Rate at which deviating paths decohere. Default: 500_000 (0.5)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "minimum_probability",
+            "docs": [
+              "Minimum Born probability below which a path decoheres. Default: 10_000 (1%)",
+              "Independent of path count — always means \"below X% implied probability.\""
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "fee_entry_bps_override",
+            "type": {
+              "option": "u16"
+            }
+          },
+          {
+            "name": "fee_settle_bps_override",
+            "type": {
+              "option": "u16"
+            }
+          },
+          {
+            "name": "leverage_enabled",
+            "type": "bool"
+          },
+          {
+            "name": "max_leverage",
+            "type": "u8"
+          },
+          {
+            "name": "max_leveraged_oi",
+            "type": "u64"
+          },
+          {
+            "name": "current_leveraged_oi",
+            "type": "u64"
+          },
+          {
+            "name": "num_paths",
+            "type": "u8"
+          },
+          {
+            "name": "num_positions",
+            "type": "u32"
+          },
+          {
+            "name": "partial_payouts_distributed",
+            "type": "u64"
+          },
+          {
+            "name": "maturity_duration",
+            "type": "i64"
+          },
+          {
+            "name": "maturity_end_time",
+            "type": "i64"
+          },
+          {
+            "name": "maturity_disputed",
+            "type": "bool"
+          },
+          {
+            "name": "path_max_age",
+            "type": "i64"
+          },
+          {
+            "name": "total_weighted_score",
+            "docs": [
+              "Sum of (composite_score × total_wagered) across all surviving paths.",
+              "Populated by score_path instruction during settling phase."
+            ],
+            "type": "u128"
+          },
+          {
+            "name": "paths_scored",
+            "docs": [
+              "Number of paths that have been scored during settling."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "paths_dissolved",
+            "docs": [
+              "Number of dissolved paths (incremented in check_dissolution)."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MarketState",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Pending"
+          },
+          {
+            "name": "Active"
+          },
+          {
+            "name": "Sampling"
+          },
+          {
+            "name": "Settling"
+          },
+          {
+            "name": "Maturing"
+          },
+          {
+            "name": "Settled"
+          },
+          {
+            "name": "Void"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PathOrigin",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Ai"
+          },
+          {
+            "name": "UserDrawn"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PathOutcome",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "path_index",
+            "type": "u8"
+          },
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "generation_method",
+            "type": {
+              "defined": {
+                "name": "PathOrigin"
+              }
+            }
+          },
+          {
+            "name": "generation_timestamp",
+            "type": "i64"
+          },
+          {
+            "name": "checkpoints_root",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "checkpoints_uri",
+            "type": "string"
+          },
+          {
+            "name": "num_checkpoints",
+            "type": "u16"
+          },
+          {
+            "name": "cumulative_action",
+            "docs": [
+              "Cumulative action S = Σ[α(Δp)² + β(Δv)²] across checkpoints. Lower = better."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "composite_score",
+            "docs": [
+              "Final composite score (0 to 1_000_000). Set during settlement."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "peak_amplitude",
+            "docs": [
+              "Highest amplitude this path reached (for decoherence payout ratio)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "amplitude_at_decoherence",
+            "docs": [
+              "Amplitude when path was marked decohered (0 if still alive)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "dissolved",
+            "type": "bool"
+          },
+          {
+            "name": "dissolved_at_checkpoint",
+            "type": "u16"
+          },
+          {
+            "name": "last_predicted_price",
+            "type": "u64"
+          },
+          {
+            "name": "last_actual_price",
+            "type": "u64"
+          },
+          {
+            "name": "checkpoints_processed",
+            "docs": [
+              "Number of checkpoints processed via check_dissolution (must equal",
+              "total_checkpoints for score_path to accept this path)"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "total_wagered",
+            "type": "u64"
+          },
+          {
+            "name": "total_leveraged_exposure",
+            "type": "u64"
+          },
+          {
+            "name": "lmsr_shares_outstanding",
+            "type": "u64"
+          },
+          {
+            "name": "initial_probability_bps",
+            "type": "u16"
+          },
+          {
+            "name": "current_implied_probability",
+            "type": "u16"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Position",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "path_index",
+            "type": "u8"
+          },
+          {
+            "name": "collateral",
+            "docs": [
+              "Actual USDC deposited (after entry fee)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "leverage",
+            "docs": [
+              "1 for Mode 1; 2-50 for Mode 2"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "notional_exposure",
+            "docs": [
+              "collateral × leverage"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "lmsr_shares",
+            "docs": [
+              "Shares held via LMSR pricing"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "cost_basis",
+            "docs": [
+              "Total USDC paid for shares (for P&L tracking)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "entered_at_checkpoint",
+            "type": "u16"
+          },
+          {
+            "name": "borrowed_amount",
+            "type": "u64"
+          },
+          {
+            "name": "accrued_borrow_fee",
+            "type": "u64"
+          },
+          {
+            "name": "health_factor",
+            "docs": [
+              "Effective collateral / estimated loss (fixed-point 6 dec)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "liquidation_threshold",
+            "docs": [
+              "Health factor below which liquidation triggers (1_100_000 = 1.1)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "last_health_update",
+            "type": "u16"
+          },
+          {
+            "name": "partial_payout_claimed",
+            "type": "u64"
+          },
+          {
+            "name": "final_payout",
+            "type": "u64"
+          },
+          {
+            "name": "total_borrow_fees_paid",
+            "type": "u64"
+          },
+          {
+            "name": "claimed",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PriceSample",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "checkpoint_index",
+            "type": "u16"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          },
+          {
+            "name": "price",
+            "docs": [
+              "Price in quote decimals (USDC = 6 decimals)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "confidence",
+            "docs": [
+              "Pyth confidence interval (normalized to 6 decimals)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "pyth_verified",
+            "docs": [
+              "True — price was verified via Pyth Receiver Program (account owner check).",
+              "The raw Pyth signature is verified upstream by the Pyth receiver; we don't",
+              "store it on-chain (saves 64 bytes per checkpoint)."
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "sampled_by",
+            "docs": [
+              "Keeper address (for reward distribution)"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "sampled_at_slot",
+            "docs": [
+              "Solana slot for ordering verification"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "low_confidence",
+            "docs": [
+              "True if confidence > 2% of price; weighted at 50% in scoring"
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProtocolState",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "treasury",
+            "type": "pubkey"
+          },
+          {
+            "name": "insurance_fund",
+            "type": "pubkey"
+          },
+          {
+            "name": "leverage_enabled",
+            "type": "bool"
+          },
+          {
+            "name": "supported_pairs",
+            "docs": [
+              "Governance-managed pair whitelist"
+            ],
+            "type": {
+              "array": [
+                {
+                  "defined": {
+                    "name": "TokenPair"
+                  }
+                },
+                8
+              ]
+            }
+          },
+          {
+            "name": "num_supported_pairs",
+            "type": "u8"
+          },
+          {
+            "name": "default_fee_entry_bps",
+            "type": "u16"
+          },
+          {
+            "name": "default_fee_settle_bps",
+            "type": "u16"
+          },
+          {
+            "name": "max_fee_cap_bps",
+            "docs": [
+              "Hardcoded ceiling — not governable"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "insurance_allocation_bps",
+            "type": "u16"
+          },
+          {
+            "name": "market_creation_fee",
+            "docs": [
+              "Market creation fee in USDC (6 decimals). Default 10_000_000 (10 USDC)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "season",
+            "type": "u16"
+          },
+          {
+            "name": "total_markets_created",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TokenPair",
+      "docs": [
+        "A whitelisted trading pair."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "base_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "quote_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "pyth_feed_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "active",
+            "type": "bool"
+          }
+        ]
+      }
+    }
+  ]
+}
