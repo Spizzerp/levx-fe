@@ -28,7 +28,7 @@ const REST = LEADERBOARD_DATA.slice(3)
 
 const ROW_GRID = cn(
   'grid items-center gap-4 px-4',
-  'grid-cols-[auto_auto_1fr_auto_auto_auto_auto_auto]',
+  'grid-cols-[48px_140px_120px_100px_1fr]',
 )
 
 const NUM_CELL =
@@ -126,7 +126,6 @@ export function LeaderboardPage() {
             <span className="text-right">SCORE</span>
             <span className="text-right">ACCURACY</span>
             <span className="text-right">MARKETS</span>
-            <span />
           </div>
 
           {/* Rows */}
@@ -149,7 +148,6 @@ export function LeaderboardPage() {
               <span className={NUM_CELL}>{formatUSD(entry.score)}</span>
               <span className={NUM_CELL}>{entry.accuracy.toFixed(1)}%</span>
               <span className={NUM_CELL}>{entry.markets}</span>
-              <span />
             </div>
           ))}
         </div>
