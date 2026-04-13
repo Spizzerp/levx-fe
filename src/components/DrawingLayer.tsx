@@ -361,7 +361,7 @@ export function DrawingLayer({
                 <text
                   x={cx + 6}
                   y={i === maxIdx ? cy - 8 : cy + 14}
-                  className="fill-ink-strong font-mono text-[10px]"
+                  className="fill-ink-strong font-mono text-caption"
                 >
                   {v.toFixed(0)}
                 </text>

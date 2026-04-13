@@ -34,13 +34,13 @@ const COLUMNS: DataTableColumn<LeaderboardEntry>[] = [
   {
     key: 'rank',
     header: 'RANK',
-    cellClassName: 'text-ink-dim font-mono text-sm tracking-[0.05em]',
+    cellClassName: 'text-ink-dim font-mono text-sm tracking-snug',
     render: (entry) => `#${entry.rank}`,
   },
   {
     key: 'user',
     header: 'USER',
-    cellClassName: 'text-ink-strong font-mono text-sm font-bold tracking-[0.08em]',
+    cellClassName: 'text-ink-strong font-mono text-sm font-bold tracking-normal',
     render: (entry) => entry.user,
   },
   {
@@ -74,7 +74,7 @@ export function LeaderboardPage() {
       summaryBar={
         <div className="border-line flex items-center gap-12 border-0 border-b pb-8">
           <div>
-            <div className="text-label text-ink-muted mb-2 font-mono tracking-[0.1em] uppercase">
+            <div className="text-label text-ink-muted mb-2 font-mono uppercase">
               Total Participants
             </div>
             <div className="text-ink-strong font-mono text-3xl font-bold tracking-[0.02em]">
@@ -82,7 +82,7 @@ export function LeaderboardPage() {
             </div>
           </div>
           <div>
-            <div className="text-label text-ink-muted mb-2 font-mono tracking-[0.1em] uppercase">
+            <div className="text-label text-ink-muted mb-2 font-mono uppercase">
               Top Score
             </div>
             <div className="text-ink-strong font-mono text-3xl font-bold tracking-[0.02em]">
@@ -90,7 +90,7 @@ export function LeaderboardPage() {
             </div>
           </div>
           <div>
-            <div className="text-label text-ink-muted mb-2 font-mono tracking-[0.1em] uppercase">
+            <div className="text-label text-ink-muted mb-2 font-mono uppercase">
               Avg Accuracy
             </div>
             <div className="text-ink-strong font-mono text-3xl font-bold tracking-[0.02em]">
@@ -114,13 +114,13 @@ export function LeaderboardPage() {
               key={entry.rank}
               className="flex w-[180px] flex-col items-center"
             >
-              <div className="text-ink-muted mb-3 font-mono text-[10px] tracking-[0.1em] uppercase">
+              <div className="text-ink-muted mb-3 font-mono text-caption uppercase">
                 {rankLabel}
               </div>
-              <div className="text-ink-strong mb-2 font-mono text-sm font-bold tracking-[0.08em]">
+              <div className="text-ink-strong mb-2 font-mono text-sm font-bold tracking-normal">
                 {entry.user}
               </div>
-              <div className="text-ink-muted mb-6 font-mono text-xs tracking-[0.05em]">
+              <div className="text-ink-muted mb-6 font-mono text-xs tracking-snug">
                 {formatUSD(entry.score)}
               </div>
               <div
@@ -130,7 +130,7 @@ export function LeaderboardPage() {
                   'flex items-end justify-center pb-4',
                 )}
               >
-                <span className="text-ink-dim font-mono text-lg font-bold tracking-[0.05em]">
+                <span className="text-ink-dim font-mono text-lg font-bold tracking-snug">
                   {entry.rank}
                 </span>
               </div>

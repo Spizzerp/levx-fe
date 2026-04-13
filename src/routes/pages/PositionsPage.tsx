@@ -81,7 +81,7 @@ const NARROW_HIDE = '[@media(max-width:1200px)]:hidden'
 function PositionStatusDot({ status }: { status: PositionStatus }) {
   const colorClass = STATUS_DOT_COLORS[status]
   return (
-    <span className="text-label text-ink-muted inline-flex items-center gap-2 font-mono tracking-[0.1em] uppercase">
+    <span className="text-label text-ink-muted inline-flex items-center gap-2 font-mono uppercase">
       <span className={cn('h-1.5 w-1.5 rounded-full', colorClass)} aria-hidden />
       {STATUS_LABELS[status]}
     </span>
@@ -101,13 +101,13 @@ export function PositionsPage() {
     {
       key: 'idx',
       header: 'IDX',
-      cellClassName: 'text-ink-dim font-mono text-[11px] tracking-[0.05em]',
+      cellClassName: 'text-ink-dim font-mono text-value',
       render: (_, idx) => `[ ${String(idx + 1).padStart(2, '0')} ]`,
     },
     {
       key: 'market',
       header: 'MARKET',
-      cellClassName: 'text-ink-strong font-mono text-sm font-bold tracking-[0.1em] uppercase',
+      cellClassName: 'text-ink-strong font-mono text-sm font-bold tracking-wide uppercase',
       render: (pos) => pos.pair.replace('/', ' / '),
     },
     {
@@ -116,7 +116,7 @@ export function PositionsPage() {
       render: (pos) => (
         <span className="flex items-center gap-3">
           <PositionStatusDot status={pos.status} />
-          <span className="text-ink-muted font-mono text-[11px] tracking-[0.05em]">
+          <span className="text-ink-muted font-mono text-value">
             {pos.pathName}
           </span>
         </span>
@@ -183,7 +183,7 @@ export function PositionsPage() {
       summaryBar={
         <div className="border-line flex items-center gap-12 border-0 border-b pb-8">
           <div>
-            <div className="text-label text-ink-muted mb-2 font-mono tracking-[0.1em] uppercase">
+            <div className="text-label text-ink-muted mb-2 font-mono uppercase">
               Total Wagered
             </div>
             <div className="text-ink-strong font-mono text-3xl font-bold tracking-[0.02em]">
@@ -191,7 +191,7 @@ export function PositionsPage() {
             </div>
           </div>
           <div>
-            <div className="text-label text-ink-muted mb-2 font-mono tracking-[0.1em] uppercase">
+            <div className="text-label text-ink-muted mb-2 font-mono uppercase">
               Avg Score
             </div>
             <div className="text-ink-strong font-mono text-3xl font-bold tracking-[0.02em]">
@@ -202,7 +202,7 @@ export function PositionsPage() {
             </div>
           </div>
           <div className="ml-auto">
-            <div className="text-ink-dim font-mono text-[10px] tracking-[0.1em] uppercase">
+            <div className="text-ink-dim font-mono text-caption uppercase">
               {MOCK_POSITIONS.length} {MOCK_POSITIONS.length === 1 ? 'POSITION' : 'POSITIONS'}
             </div>
           </div>

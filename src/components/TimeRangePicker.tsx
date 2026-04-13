@@ -39,7 +39,7 @@ export function TimeRangePicker({
     <div
       role="tablist"
       aria-label="Chart candle interval"
-      className={cn('inline-flex gap-1 font-mono text-[11px] tracking-[0.12em] uppercase', className)}
+      className={cn('inline-flex gap-1 font-mono text-tag uppercase', className)}
     >
       {INTERVALS.map((r) => {
         const isActive = r === active

@@ -71,13 +71,13 @@ export function PortfolioPage() {
     {
       key: 'idx',
       header: 'IDX',
-      cellClassName: 'text-ink-dim font-mono text-[11px] tracking-[0.05em]',
+      cellClassName: 'text-ink-dim font-mono text-value',
       render: (_, idx) => `[ ${String(idx + 1).padStart(2, '0')} ]`,
     },
     {
       key: 'market',
       header: 'MARKET',
-      cellClassName: 'text-ink-strong font-mono text-sm font-bold tracking-[0.1em] uppercase',
+      cellClassName: 'text-ink-strong font-mono text-sm font-bold tracking-wide uppercase',
       render: (pos) => pos.pair.replace('/', ' / '),
     },
     {
@@ -88,12 +88,12 @@ export function PortfolioPage() {
         const isProfit = pnl >= 0
         return (
           <span className="flex items-center gap-3">
-            <span className="text-ink-muted font-mono text-[11px] tracking-[0.05em]">
+            <span className="text-ink-muted font-mono text-value">
               {pos.pathName}
             </span>
             <span
               className={cn(
-                'font-mono text-[11px] tracking-[0.05em]',
+                'font-mono text-value',
                 isProfit ? 'text-success' : 'text-accent',
               )}
             >
@@ -137,7 +137,7 @@ export function PortfolioPage() {
       header: '',
       render: (pos) =>
         pos.claimed ? (
-          <span className="text-ink-dim font-mono text-[10px] tracking-[0.1em] uppercase">
+          <span className="text-ink-dim font-mono text-caption uppercase">
             Claimed
           </span>
         ) : (
@@ -159,7 +159,7 @@ export function PortfolioPage() {
       summaryBar={
         <div className="border-line flex items-center gap-12 border-0 border-b pb-8">
           <div>
-            <div className="text-label text-ink-muted mb-2 font-mono tracking-[0.1em] uppercase">
+            <div className="text-label text-ink-muted mb-2 font-mono uppercase">
               Total P&L
             </div>
             <div
@@ -173,7 +173,7 @@ export function PortfolioPage() {
             </div>
           </div>
           <div>
-            <div className="text-label text-ink-muted mb-2 font-mono tracking-[0.1em] uppercase">
+            <div className="text-label text-ink-muted mb-2 font-mono uppercase">
               Win Rate
             </div>
             <div className="text-ink-strong font-mono text-3xl font-bold tracking-[0.02em]">
@@ -181,7 +181,7 @@ export function PortfolioPage() {
             </div>
           </div>
           <div>
-            <div className="text-label text-ink-muted mb-2 font-mono tracking-[0.1em] uppercase">
+            <div className="text-label text-ink-muted mb-2 font-mono uppercase">
               Accuracy
             </div>
             <div className="text-ink-strong font-mono text-3xl font-bold tracking-[0.02em]">
@@ -189,10 +189,10 @@ export function PortfolioPage() {
             </div>
           </div>
           <div className="ml-auto text-right">
-            <div className="text-label text-ink-muted mb-2 font-mono tracking-[0.1em] uppercase">
+            <div className="text-label text-ink-muted mb-2 font-mono uppercase">
               Markets
             </div>
-            <div className="text-ink font-mono text-sm tracking-[0.05em]">
+            <div className="text-ink font-mono text-sm tracking-snug">
               {PERFORMANCE.marketsParticipated} participated · {formatUSD(PERFORMANCE.totalWagered)}{' '}
               wagered
             </div>
@@ -201,7 +201,7 @@ export function PortfolioPage() {
       }
     >
       <div className="border-line mb-8 border-0 border-b pb-4">
-        <h2 className="text-ink-strong font-mono text-xs font-bold tracking-[0.1em] uppercase">
+        <h2 className="text-ink-strong font-mono text-xs font-bold tracking-wide uppercase">
           Settled Positions
         </h2>
       </div>

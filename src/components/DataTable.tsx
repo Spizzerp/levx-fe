@@ -3,7 +3,7 @@ import { type ReactNode } from 'react'
 import { cn } from '@/lib/cn'
 
 export const NUM_CELL =
-  'text-right whitespace-nowrap font-mono text-xs uppercase tracking-[0.08em] text-ink'
+  'text-right whitespace-nowrap font-mono text-xs uppercase tracking-normal text-ink'
 
 export interface DataTableColumn<T> {
   key: string
@@ -50,7 +50,7 @@ export function DataTable<T>({
         className={cn(
           rowGridClass,
           'border-line-strong h-10 border-0 border-b',
-          'text-ink-dim font-mono text-[10px] tracking-[0.12em] uppercase',
+          'text-ink-dim font-mono text-tag uppercase',
         )}
       >
         {columns.map((col) => (
@@ -91,7 +91,7 @@ export function DataTable<T>({
             ),
           )
         : (
-            <div className="text-ink-dim py-24 text-center font-mono text-[11px] tracking-[0.14em] uppercase">
+            <div className="text-ink-dim py-24 text-center font-mono text-label tracking-widest uppercase">
               <span>{emptyMessage}</span>
             </div>
           )}

@@ -57,13 +57,13 @@ const COLUMNS: DataTableColumn<Market>[] = [
   {
     key: 'idx',
     header: 'IDX',
-    cellClassName: 'text-ink-dim font-mono text-[11px] tracking-[0.05em]',
+    cellClassName: 'text-ink-dim font-mono text-value',
     render: (_, idx) => `[ ${String(idx + 1).padStart(2, '0')} ]`,
   },
   {
     key: 'pair',
     header: 'PAIR',
-    cellClassName: 'text-ink-strong font-mono text-sm font-bold tracking-[0.1em] uppercase',
+    cellClassName: 'text-ink-strong font-mono text-sm font-bold tracking-wide uppercase',
     render: (m) => m.pair.replace('/', ' / '),
   },
   {
@@ -139,7 +139,7 @@ export function MarketsPage() {
                 onClick={() => setFilter(f.id)}
                 className={cn(
                   'cursor-pointer rounded-full border px-4 py-2.5',
-                  'font-mono text-[11px] tracking-[0.1em] uppercase',
+                  'font-mono text-label uppercase',
                   'duration-short ease-levx transition-[color,border-color,background]',
                   isActive
                     ? 'border-ink-strong bg-ink-strong text-surface'
@@ -150,7 +150,7 @@ export function MarketsPage() {
               </button>
             )
           })}
-          <div className="text-ink-dim ml-auto font-mono text-[10px] tracking-[0.1em] uppercase">
+          <div className="text-ink-dim ml-auto font-mono text-caption uppercase">
             {visible.length} {visible.length === 1 ? 'MARKET' : 'MARKETS'}
           </div>
         </div>

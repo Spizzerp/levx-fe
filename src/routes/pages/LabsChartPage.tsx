@@ -7,7 +7,7 @@ import { useMarket } from '@/lib/api/hooks'
 
 const CHIP_BASE = cn(
   'cursor-pointer rounded-full border border-line-strong bg-transparent px-4 py-2.5',
-  'font-mono text-[11px] uppercase tracking-[0.1em] text-ink-muted',
+  'font-mono text-label uppercase text-ink-muted',
   'transition-[color,border-color,background] duration-short ease-levx',
   'hover:border-ink hover:text-ink-strong',
 )
@@ -31,10 +31,10 @@ export function LabsChartPage() {
   return (
     <div className="mx-auto flex max-w-[1680px] flex-col px-10 pt-14 pb-12">
       <div className="mb-8 flex items-baseline gap-6">
-        <span className="text-ink-strong font-mono text-[11px] tracking-[0.12em] uppercase">
+        <span className="text-ink-strong font-mono text-tag uppercase">
           LABS / CHART
         </span>
-        <span className="text-ink-dim font-mono text-[11px] tracking-[0.08em] uppercase">
+        <span className="text-ink-dim font-mono text-label tracking-normal uppercase">
           {market.pair} · visx rendering · history + prediction paths + crosshair
         </span>
       </div>
@@ -51,7 +51,7 @@ export function LabsChartPage() {
       </div>
 
       <div className="flex flex-col gap-4">
-        <span className="text-ink-muted font-mono text-[11px] tracking-[0.12em] uppercase">
+        <span className="text-ink-muted font-mono text-tag uppercase">
           SELECT A LINE
         </span>
         <div className="flex flex-wrap gap-2">

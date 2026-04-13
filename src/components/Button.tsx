@@ -24,7 +24,7 @@ const VARIANT_CLASSES: Record<ButtonVariant, string> = {
     'hover:text-ink-strong',
   ),
   dashed: cn(
-    'border border-dashed border-line-strong bg-transparent tracking-[0.12em] text-ink-muted',
+    'border border-dashed border-line-strong bg-transparent tracking-wider text-ink-muted',
     'hover:border-ink hover:text-ink-strong',
   ),
   destructive: cn('border border-accent bg-transparent text-accent', 'hover:bg-accent-subtle'),
@@ -41,7 +41,7 @@ export function Button({
     <button
       className={cn(
         'inline-flex min-h-[44px] items-center justify-center rounded-full px-6 py-[14px]',
-        'font-mono text-[13px] font-bold tracking-[0.1em] uppercase',
+        'font-mono text-[13px] font-bold tracking-wide uppercase',
         'duration-short ease-levx transition-[opacity,background,border-color,color]',
         fullWidth && 'flex w-full',
         VARIANT_CLASSES[variant],
