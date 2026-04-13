@@ -129,7 +129,7 @@ export function MarketsPage() {
       title="Markets"
       subtitle="Predict the path, not the destination. Five AI-generated routes per market."
       headerActions={
-        <div className="border-line flex items-center gap-2 border-0 border-b pb-5">
+        <div className="border-line flex items-center gap-2 border-0 border-b pb-5 text-sm">
           {FILTERS.map((f) => {
             const isActive = filter === f.id
             return (
@@ -139,7 +139,7 @@ export function MarketsPage() {
                 onClick={() => setFilter(f.id)}
                 className={cn(
                   'cursor-pointer rounded-full border px-4 py-2.5',
-                  'font-mono text-label uppercase',
+                  'text-label font-mono uppercase',
                   'duration-short ease-levx transition-[color,border-color,background]',
                   isActive
                     ? 'border-ink-strong bg-ink-strong text-surface'
@@ -150,7 +150,7 @@ export function MarketsPage() {
               </button>
             )
           })}
-          <div className="text-ink-dim ml-auto font-mono text-caption uppercase">
+          <div className="text-ink-dim text-caption ml-auto font-mono uppercase">
             {visible.length} {visible.length === 1 ? 'MARKET' : 'MARKETS'}
           </div>
         </div>
