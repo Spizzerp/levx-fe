@@ -123,6 +123,8 @@ export function DrawingLayer({
   const onPointerDown = useCallback(
     (e: React.PointerEvent<SVGRectElement>) => {
       if (!isActive) return
+      // Middle / right button → let the viewport pan handler (native SVG listener) handle it.
+      if (e.button === 1 || e.button === 2) return
 
       // Convert pointer position to chart-area coords (0..innerWidth) by using
       // the ownerSVGElement's bounding rect.  The overlay <rect> lives inside a

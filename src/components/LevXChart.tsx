@@ -6,7 +6,7 @@ import { ParentSize } from '@visx/responsive'
 import { scaleLinear, scaleTime } from '@visx/scale'
 import { Bar, Circle, Line, LinePath } from '@visx/shape'
 import { bisector } from 'd3-array'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 
 import type { PathTone, PredictionPath, PricePoint } from '@/types/market'
@@ -16,6 +16,8 @@ import { useLatestPrice } from '@/lib/pyth/hooks'
 import { feedIdForPair } from '@/lib/pyth/feedIds'
 import { buildCheckpointXs } from '@/lib/drawing/geometry'
 import { useYAxisFreeze } from '@/lib/drawing/yFreeze'
+import { useChartViewport } from '@/lib/chart/useChartViewport'
+import { computeVisiblePriceDomain } from '@/lib/chart/computeVisiblePriceDomain'
 import { DrawingGrid } from '@/components/DrawingGrid'
 import { ChartMorphLine } from '@/components/ChartMorphLine'
 import { Stub } from '@/components/Stub'
@@ -105,6 +107,7 @@ function ChartInner({
 }: InnerProps) {
   const innerWidth = Math.max(0, width - MARGIN.left - MARGIN.right)
   const innerHeight = Math.max(0, height - MARGIN.top - MARGIN.bottom)
+  const clipId = useId()
 
   /* ── Morph animation state ─────────────────────────────────── */
   const [chartRevealing, setChartRevealing] = useState(!isLoading)
@@ -133,26 +136,7 @@ function ChartInner({
     [market],
   )
 
-  /* ── Price domain: envelope of all data ± padding ────────── */
-  const priceDomainLive = useMemo<[number, number]>(() => {
-    const all: number[] = []
-    mergedHistory.forEach((p) => all.push(p.value))
-    predictions.forEach((path) => path.data.forEach((p) => all.push(p.value)))
-    if (all.length === 0) return [0, 1]
-    const min = Math.min(...all)
-    const max = Math.max(...all)
-    return [min * 0.9, max * 1.05]
-  }, [mergedHistory, predictions])
-
-  /* ── Y-axis freeze: domain held fixed during sweeping phase ── */
-  const { effectiveDomain, freeze, thaw } = useYAxisFreeze(priceDomainLive)
-
-  useEffect(() => {
-    if (drawingPhase === 'sweeping') freeze()
-    else thaw()
-  }, [drawingPhase, freeze, thaw])
-
-  /* ── Time domain ─────────────────────────────────────────── */
+  /* ── Time domain (auto-computed default — all data visible) ── */
   const timeDomain = useMemo<[number, number]>(() => {
     const first = mergedHistory[0]?.time ?? nowTime - 7 * 24 * 60 * 60 * 1000
     const lastData = mergedHistory[mergedHistory.length - 1]?.time ?? nowTime
@@ -174,9 +158,45 @@ function ChartInner({
     return [first, rightEdge]
   }, [mergedHistory, predictions, marketEnd, nowTime])
 
+  const maxSpanMs = useMemo(() => {
+    const totalSpan = timeDomain[1] - timeDomain[0]
+    return Math.max(totalSpan * 3, 7 * 24 * 60 * 60 * 1000) // 3× data span or 7 days
+  }, [timeDomain])
+
+  /* ── Viewport: pan / zoom ────────────────────────────────── */
+  const {
+    effectiveTimeDomain: viewportTimeDomain,
+    // isFollowing available for future use (e.g. reset button visibility)
+    svgRef: viewportSvgRef,
+    pointerHandlers: viewportPointerHandlers,
+    isPanning: viewportIsPanning,
+    resetViewport,
+  } = useChartViewport({
+    defaultTimeDomain: timeDomain,
+    innerWidth,
+    disabled: drawingPhase === 'sweeping',
+    marginLeft: MARGIN.left,
+    minSpanMs: 2 * 60 * 1000,
+    maxSpanMs,
+  })
+
+  /* ── Price domain: envelope of data visible in viewport ──── */
+  const priceDomainLive = useMemo<[number, number]>(
+    () => computeVisiblePriceDomain(mergedHistory, predictions, viewportTimeDomain),
+    [mergedHistory, predictions, viewportTimeDomain],
+  )
+
+  /* ── Y-axis freeze: domain held fixed during sweeping phase ── */
+  const { effectiveDomain, freeze, thaw } = useYAxisFreeze(priceDomainLive)
+
+  useEffect(() => {
+    if (drawingPhase === 'sweeping') freeze()
+    else thaw()
+  }, [drawingPhase, freeze, thaw])
+
   const timeScale = useMemo(
-    () => scaleTime<number>({ domain: timeDomain, range: [0, innerWidth] }),
-    [innerWidth, timeDomain],
+    () => scaleTime<number>({ domain: viewportTimeDomain, range: [0, innerWidth] }),
+    [innerWidth, viewportTimeDomain],
   )
   const priceScale = useMemo(
     () => scaleLinear<number>({ domain: effectiveDomain, range: [innerHeight, 0], nice: true }),
@@ -196,11 +216,11 @@ function ChartInner({
   const [hover, setHover] = useState<{ x: number; time: number; value: number } | null>(null)
 
   const handleMove = useCallback(
-    (evt: React.MouseEvent<SVGRectElement> | React.TouchEvent<SVGRectElement>) => {
+    (evt: React.MouseEvent<SVGRectElement> | React.TouchEvent<SVGRectElement> | React.PointerEvent<SVGRectElement>) => {
       const svg = (evt.currentTarget as SVGRectElement).ownerSVGElement
       if (!svg) return
       const rect = svg.getBoundingClientRect()
-      const clientX = 'touches' in evt ? (evt.touches[0]?.clientX ?? 0) : evt.clientX
+      const clientX = 'touches' in evt ? (evt.touches[0]?.clientX ?? 0) : (evt as React.MouseEvent).clientX
       const xInner = clientX - rect.left - MARGIN.left
       if (xInner < 0 || xInner > innerWidth) {
         setHover(null)
@@ -234,8 +254,23 @@ function ChartInner({
   const marketStartX = timeScale(marketStart)
 
   return (
-    <svg width={width} height={height} className="levx-chart">
+    <svg
+      ref={viewportSvgRef}
+      width={width}
+      height={height}
+      className="levx-chart"
+      style={{ touchAction: 'none' }}
+    >
+      {/* ── Clip path: restricts chart content to the inner area ── */}
+      <defs>
+        <clipPath id={clipId}>
+          <rect x={0} y={0} width={innerWidth} height={innerHeight} />
+        </clipPath>
+      </defs>
+
       <Group left={MARGIN.left} top={MARGIN.top}>
+        {/* ── Clipped chart content (prevents overflow on pan/zoom) ── */}
+        <g clipPath={`url(#${clipId})`}>
         {/* ── Horizontal grid ─────────────────────── */}
         <GridRows
           scale={priceScale}
@@ -369,6 +404,7 @@ function ChartInner({
             </>
           )}
         </g>
+        </g>{/* end clip */}
 
         {/* ── Right Y-axis ────────────────────────── */}
         <AxisRight
@@ -399,7 +435,7 @@ function ChartInner({
           scale={timeScale}
           top={innerHeight}
           numTicks={(() => {
-            const spanHrs = (timeDomain[1] - timeDomain[0]) / (60 * 60 * 1000)
+            const spanHrs = (viewportTimeDomain[1] - viewportTimeDomain[0]) / (60 * 60 * 1000)
             if (spanHrs <= 12) return 6      // HH:MM labels are short
             if (spanHrs <= 72) return 5      // "12 APR 14:00" labels are wider
             return 8
@@ -416,7 +452,7 @@ function ChartInner({
           })}
           tickFormat={(v) => {
             const date = new Date(v as number)
-            const [tStart, tEnd] = timeDomain
+            const [tStart, tEnd] = viewportTimeDomain
             const spanHours = (tEnd - tStart) / (60 * 60 * 1000)
 
             if (spanHours <= 12) {
@@ -459,17 +495,27 @@ function ChartInner({
           </>
         )}
 
-        {/* ── Invisible hit area ──────────────────── */}
+        {/* ── Invisible hit area (pan + crosshair) ── */}
         <Bar
           x={0}
           y={0}
           width={innerWidth}
           height={innerHeight}
           fill="transparent"
-          onMouseMove={isDrawMode ? undefined : handleMove}
-          onMouseLeave={isDrawMode ? undefined : handleLeave}
-          onTouchMove={isDrawMode ? undefined : handleMove}
-          onTouchEnd={isDrawMode ? undefined : handleLeave}
+          style={{ touchAction: 'none' }}
+          onPointerDown={viewportPointerHandlers.onPointerDown}
+          onPointerMove={(e: React.PointerEvent<SVGRectElement>) => {
+            viewportPointerHandlers.onPointerMove(e)
+            if (viewportIsPanning || e.buttons !== 0 || isDrawMode) {
+              setHover(null)
+            } else {
+              handleMove(e)
+            }
+          }}
+          onPointerUp={viewportPointerHandlers.onPointerUp}
+          onPointerCancel={viewportPointerHandlers.onPointerCancel}
+          onPointerLeave={handleLeave}
+          onDoubleClick={resetViewport}
         />
 
         {/* ── Drawing overlay (render prop) ──────────
@@ -485,6 +531,21 @@ function ChartInner({
           marketStart,
           margin: MARGIN,
         })}
+
+        {/* ── X-axis pan area — drag here to pan even during draw mode ── */}
+        <rect
+          x={0}
+          y={innerHeight}
+          width={innerWidth}
+          height={MARGIN.bottom}
+          fill="transparent"
+          style={{ touchAction: 'none', cursor: 'grab' }}
+          onPointerDown={viewportPointerHandlers.onPointerDown}
+          onPointerMove={viewportPointerHandlers.onPointerMove}
+          onPointerUp={viewportPointerHandlers.onPointerUp}
+          onPointerCancel={viewportPointerHandlers.onPointerCancel}
+          onDoubleClick={resetViewport}
+        />
       </Group>
 
       {/* ── Floating readout ────────────────────────── */}
