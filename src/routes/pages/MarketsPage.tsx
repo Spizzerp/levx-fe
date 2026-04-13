@@ -1,6 +1,7 @@
 import { useNavigate } from '@tanstack/react-router'
 import { useMemo, useState } from 'react'
 
+import { DataTable, NUM_CELL, type DataTableColumn } from '@/components/DataTable'
 import { StatusDot } from '@/components/StatusDot'
 import { Stub } from '@/components/Stub'
 import { cn } from '@/lib/cn'
@@ -49,21 +50,66 @@ function endsInLabel(m: Market): string {
   return diff > 0 ? formatCountdown(diff) : 'ENDED'
 }
 
-// Responsive grid: full columns on desktop, collapsed below 1200px.
-// Matches the old .markets__head / .markets__row grid:
-//   desktop: 56px 160px 1fr 200px 200px 160px 120px 24px
-//   narrow:  48px 140px 1fr 160px 160px      —     —   24px
-const ROW_GRID = cn(
-  'grid items-center gap-4 px-4',
-  'grid-cols-[48px_140px_1fr_160px_160px_24px]',
-  '[@media(min-width:1201px)]:grid-cols-[56px_160px_1fr_200px_200px_160px_120px_24px]',
-)
-
-const NUM_CELL =
-  'text-right whitespace-nowrap font-mono text-xs uppercase tracking-[0.08em] text-ink'
-
 // Hidden below 1200px (matches old @media rule that hid columns 6 & 7)
 const NARROW_HIDE = '[@media(max-width:1200px)]:hidden'
+
+const COLUMNS: DataTableColumn<Market>[] = [
+  {
+    key: 'idx',
+    header: 'IDX',
+    cellClassName: 'text-ink-dim font-mono text-[11px] tracking-[0.05em]',
+    render: (_, idx) => `[ ${String(idx + 1).padStart(2, '0')} ]`,
+  },
+  {
+    key: 'pair',
+    header: 'PAIR',
+    cellClassName: 'text-ink-strong font-mono text-sm font-bold tracking-[0.1em] uppercase',
+    render: (m) => m.pair.replace('/', ' / '),
+  },
+  {
+    key: 'state',
+    header: 'STATE',
+    render: (m) => <StatusDot status={m.state}>{STATE_LABELS[m.state]}</StatusDot>,
+  },
+  {
+    key: 'ends',
+    header: 'ENDS',
+    headerClassName: 'text-right',
+    cellClassName: NUM_CELL,
+    render: (m) => endsInLabel(m),
+  },
+  {
+    key: 'pool',
+    header: 'POOL',
+    headerClassName: 'text-right',
+    cellClassName: NUM_CELL,
+    render: (m) => `${formatUSD(m.pool)} USDC`,
+  },
+  {
+    key: 'checkpoints',
+    header: 'CHECKPOINTS',
+    headerClassName: cn('text-right', NARROW_HIDE),
+    cellClassName: cn(NUM_CELL, NARROW_HIDE),
+    render: (m) => `${m.completedCheckpoints} / ${m.totalCheckpoints}`,
+  },
+  {
+    key: 'traders',
+    header: 'TRADERS',
+    headerClassName: cn('text-right', NARROW_HIDE),
+    cellClassName: cn(NUM_CELL, NARROW_HIDE),
+    render: (m) => m.traders.toLocaleString(),
+  },
+  {
+    key: 'arrow',
+    header: '',
+    cellClassName: cn(
+      'text-ink-dim text-right font-mono text-sm',
+      'duration-short ease-levx transition-[color,transform]',
+      'group-hover:text-ink-strong group-hover:translate-x-1',
+    ),
+    render: () => '→',
+  },
+]
 
 export function MarketsPage() {
   const navigate = useNavigate()
@@ -110,69 +156,15 @@ export function MarketsPage() {
         </div>
       }
     >
-      <div className="flex flex-col">
-        <div
-          className={cn(
-            ROW_GRID,
-            'border-line-strong h-10 border-0 border-b',
-            'text-ink-dim font-mono text-[10px] tracking-[0.12em] uppercase',
-          )}
-        >
-          <span>IDX</span>
-          <span>PAIR</span>
-          <span>STATE</span>
-          <span className="text-right">ENDS</span>
-          <span className="text-right">POOL</span>
-          <span className={cn('text-right', NARROW_HIDE)}>CHECKPOINTS</span>
-          <span className={cn('text-right', NARROW_HIDE)}>TRADERS</span>
-          <span />
-        </div>
-
-        {visible.map((m, idx) => (
-          <button
-            key={m.id}
-            type="button"
-            onClick={() => navigate({ to: '/market/$id', params: { id: m.id } })}
-            className={cn(
-              ROW_GRID,
-              'group border-line h-[68px] cursor-pointer border-0 border-b border-l-2 border-l-transparent bg-transparent text-left',
-              'duration-short ease-levx transition-[background,border-left-color]',
-              'hover:border-l-ink-strong hover:bg-white/[0.02]',
-            )}
-          >
-            <span className="text-ink-dim font-mono text-[11px] tracking-[0.05em]">
-              [ {String(idx + 1).padStart(2, '0')} ]
-            </span>
-            <span className="text-ink-strong font-mono text-sm font-bold tracking-[0.1em] uppercase">
-              {m.pair.replace('/', ' / ')}
-            </span>
-            <span>
-              <StatusDot status={m.state}>{STATE_LABELS[m.state]}</StatusDot>
-            </span>
-            <span className={NUM_CELL}>{endsInLabel(m)}</span>
-            <span className={NUM_CELL}>{formatUSD(m.pool)} USDC</span>
-            <span className={cn(NUM_CELL, NARROW_HIDE)}>
-              {m.completedCheckpoints} / {m.totalCheckpoints}
-            </span>
-            <span className={cn(NUM_CELL, NARROW_HIDE)}>{m.traders.toLocaleString()}</span>
-            <span
-              className={cn(
-                'text-ink-dim text-right font-mono text-sm',
-                'duration-short ease-levx transition-[color,transform]',
-                'group-hover:text-ink-strong group-hover:translate-x-1',
-              )}
-            >
-              →
-            </span>
-          </button>
-        ))}
-
-        {visible.length === 0 && (
-          <div className="text-ink-dim py-24 text-center font-mono text-[11px] tracking-[0.14em] uppercase">
-            <span>[ NO MARKETS MATCH FILTER ]</span>
-          </div>
-        )}
-      </div>
+      <DataTable
+        columns={COLUMNS}
+        data={visible}
+        gridCols="grid-cols-[48px_140px_1fr_160px_160px_24px]"
+        gridColsWide="[@media(min-width:1201px)]:grid-cols-[56px_160px_1fr_200px_200px_160px_120px_24px]"
+        keyExtractor={(m) => m.id}
+        onRowClick={(m) => navigate({ to: '/market/$id', params: { id: m.id } })}
+        emptyMessage="[ NO MARKETS MATCH FILTER ]"
+      />
     </PageLayout>
   )
 }
