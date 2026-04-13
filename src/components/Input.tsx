@@ -11,7 +11,7 @@ export function Input({ label, unit, className, ...rest }: InputProps) {
   return (
     <div className={cn('flex flex-col', className)}>
       {label && (
-        <span className="text-label text-ink-muted font-mono tracking-[0.1em] uppercase">
+        <span className="text-label text-ink-muted font-mono uppercase">
           {label}
         </span>
       )}
@@ -24,7 +24,7 @@ export function Input({ label, unit, className, ...rest }: InputProps) {
       >
         <input {...rest} className="text-ink-strong w-0 min-w-0 flex-1 font-mono text-2xl" />
         {unit && (
-          <span className="text-label text-ink-muted font-mono tracking-[0.12em]">{unit}</span>
+          <span className="text-tag text-ink-muted font-mono">{unit}</span>
         )}
       </div>
     </div>

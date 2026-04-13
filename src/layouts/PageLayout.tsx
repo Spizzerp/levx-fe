@@ -30,7 +30,7 @@ export function PageLayout({
           {title}
         </h1>
         {subtitle && (
-          <p className="text-ink-muted font-mono text-xs tracking-[0.08em] uppercase">
+          <p className="text-ink-muted font-mono text-xs tracking-normal uppercase">
             {subtitle}
           </p>
         )}

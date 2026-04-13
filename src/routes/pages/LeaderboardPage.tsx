@@ -1,3 +1,4 @@
+import { DataTable, NUM_CELL, type DataTableColumn } from '@/components/DataTable'
 import { cn } from '@/lib/cn'
 import { formatUSD } from '@/lib/format'
 import { PageLayout } from '@/layouts/PageLayout'
@@ -26,16 +27,44 @@ const LEADERBOARD_DATA: LeaderboardEntry[] = [
 const TOP_3 = LEADERBOARD_DATA.slice(0, 3)
 const REST = LEADERBOARD_DATA.slice(3)
 
-const ROW_GRID = cn(
-  'grid items-center gap-4 px-4',
-  'grid-cols-[auto_auto_1fr_auto_auto_auto_auto_auto]',
-)
-
-const NUM_CELL =
-  'text-right whitespace-nowrap font-mono text-xs uppercase tracking-[0.08em] text-ink'
-
 const PODIUM_HEIGHTS = ['h-[140px]', 'h-[100px]', 'h-[72px]']
 const PODIUM_ORDER = [1, 0, 2]
+
+const COLUMNS: DataTableColumn<LeaderboardEntry>[] = [
+  {
+    key: 'rank',
+    header: 'RANK',
+    cellClassName: 'text-ink-dim font-mono text-sm tracking-snug',
+    render: (entry) => `#${entry.rank}`,
+  },
+  {
+    key: 'user',
+    header: 'USER',
+    cellClassName: 'text-ink-strong font-mono text-sm font-bold tracking-normal',
+    render: (entry) => entry.user,
+  },
+  {
+    key: 'score',
+    header: 'SCORE',
+    headerClassName: 'text-right',
+    cellClassName: NUM_CELL,
+    render: (entry) => formatUSD(entry.score),
+  },
+  {
+    key: 'accuracy',
+    header: 'ACCURACY',
+    headerClassName: 'text-right',
+    cellClassName: NUM_CELL,
+    render: (entry) => `${entry.accuracy.toFixed(1)}%`,
+  },
+  {
+    key: 'markets',
+    header: 'MARKETS',
+    headerClassName: 'text-right',
+    cellClassName: NUM_CELL,
+    render: (entry) => entry.markets,
+  },
+]
 
 export function LeaderboardPage() {
   return (
@@ -45,7 +74,7 @@ export function LeaderboardPage() {
       summaryBar={
         <div className="border-line flex items-center gap-12 border-0 border-b pb-8">
           <div>
-            <div className="text-label text-ink-muted mb-2 font-mono tracking-[0.1em] uppercase">
+            <div className="text-label text-ink-muted mb-2 font-mono uppercase">
               Total Participants
             </div>
             <div className="text-ink-strong font-mono text-3xl font-bold tracking-[0.02em]">
@@ -53,7 +82,7 @@ export function LeaderboardPage() {
             </div>
           </div>
           <div>
-            <div className="text-label text-ink-muted mb-2 font-mono tracking-[0.1em] uppercase">
+            <div className="text-label text-ink-muted mb-2 font-mono uppercase">
               Top Score
             </div>
             <div className="text-ink-strong font-mono text-3xl font-bold tracking-[0.02em]">
@@ -61,7 +90,7 @@ export function LeaderboardPage() {
             </div>
           </div>
           <div>
-            <div className="text-label text-ink-muted mb-2 font-mono tracking-[0.1em] uppercase">
+            <div className="text-label text-ink-muted mb-2 font-mono uppercase">
               Avg Accuracy
             </div>
             <div className="text-ink-strong font-mono text-3xl font-bold tracking-[0.02em]">
@@ -85,23 +114,24 @@ export function LeaderboardPage() {
               key={entry.rank}
               className="flex w-[180px] flex-col items-center"
             >
-              <div className="text-ink-muted mb-3 font-mono text-[10px] tracking-[0.1em] uppercase">
+              <div className="text-ink-muted mb-3 font-mono text-caption uppercase">
                 {rankLabel}
               </div>
-              <div className="text-ink-strong mb-2 font-mono text-sm font-bold tracking-[0.08em]">
+              <div className="text-ink-strong mb-2 font-mono text-sm font-bold tracking-normal">
                 {entry.user}
               </div>
-              <div className="text-ink-muted mb-6 font-mono text-xs tracking-[0.05em]">
+              <div className="text-ink-muted mb-6 font-mono text-xs tracking-snug">
                 {formatUSD(entry.score)}
               </div>
               <div
                 className={cn(
-                  'w-full rounded-t-sm bg-ink-strong/5',
+                  'w-full rounded-t-sm border-t border-line-strong bg-ink-strong/10',
                   PODIUM_HEIGHTS[i],
                   'flex items-end justify-center pb-4',
+                  entry.rank === 1 && 'border-t-ink-muted bg-ink-strong/15',
                 )}
               >
-                <span className="text-ink-dim font-mono text-lg font-bold tracking-[0.05em]">
+                <span className="text-ink-muted font-mono text-lg font-bold tracking-snug">
                   {entry.rank}
                 </span>
               </div>
@@ -112,47 +142,13 @@ export function LeaderboardPage() {
 
       {/* Rest of the list */}
       {REST.length > 0 && (
-        <div className="flex flex-col">
-          {/* Header Row */}
-          <div
-            className={cn(
-              ROW_GRID,
-              'border-line-strong h-10 border-0 border-b',
-              'text-ink-dim font-mono text-[10px] tracking-[0.12em] uppercase',
-            )}
-          >
-            <span>RANK</span>
-            <span>USER</span>
-            <span className="text-right">SCORE</span>
-            <span className="text-right">ACCURACY</span>
-            <span className="text-right">MARKETS</span>
-            <span />
-          </div>
-
-          {/* Rows */}
-          {REST.map((entry) => (
-            <div
-              key={entry.rank}
-              className={cn(
-                ROW_GRID,
-                'group border-line h-[56px] border-0 border-b border-l-2 border-l-transparent',
-                'duration-short ease-levx transition-[background,border-left-color]',
-                'hover:border-l-ink-strong hover:bg-white/[0.02]',
-              )}
-            >
-              <span className="text-ink-dim font-mono text-sm tracking-[0.05em]">
-                #{entry.rank}
-              </span>
-              <span className="text-ink-strong font-mono text-sm font-bold tracking-[0.08em]">
-                {entry.user}
-              </span>
-              <span className={NUM_CELL}>{formatUSD(entry.score)}</span>
-              <span className={NUM_CELL}>{entry.accuracy.toFixed(1)}%</span>
-              <span className={NUM_CELL}>{entry.markets}</span>
-              <span />
-            </div>
-          ))}
-        </div>
+        <DataTable
+          columns={COLUMNS}
+          data={REST}
+          gridCols="grid-cols-[48px_140px_120px_100px_1fr]"
+          rowHeight="h-[56px]"
+          keyExtractor={(entry) => entry.rank}
+        />
       )}
     </PageLayout>
   )

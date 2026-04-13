@@ -50,7 +50,12 @@
   --font-sans: 'Space Grotesk', system-ui, sans-serif;
   --font-mono: 'Space Mono', 'JetBrains Mono', monospace;
 
-  --text-label: 11px;
+  /* ── Letter-spacing (tracking) ─────────────── */
+  --tracking-snug: 0.05em;
+  --tracking-normal: 0.08em;
+  --tracking-wide: 0.1em;
+  --tracking-wider: 0.12em;
+  --tracking-widest: 0.14em;
 
   /* ── Z-index layers ───────────────────────────
       above    — above everything else
@@ -70,4 +75,28 @@
   --duration-micro: 150ms;
   --duration-short: 200ms;
   --duration-medium: 300ms;
+}
+
+/* ── Composite text utilities ───────────────────
+   Size + letter-spacing bundled into a single class.
+   text-caption  — 10px  0.1em   micro labels, captions
+   text-label    — 11px  0.1em   section labels
+   text-value    — 11px  0.05em  inline data values
+   text-tag      — 11px  0.12em  tags, table headers
+*/
+@utility text-caption {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+}
+@utility text-label {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+}
+@utility text-value {
+  font-size: 11px;
+  letter-spacing: 0.05em;
+}
+@utility text-tag {
+  font-size: 11px;
+  letter-spacing: 0.12em;
 }

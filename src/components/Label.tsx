@@ -22,7 +22,7 @@ export function Label({ variant = 'default', className, children, ...rest }: Lab
   return (
     <span
       className={cn(
-        'text-label font-mono tracking-[0.1em] uppercase',
+        'text-label font-mono uppercase',
         VARIANT_CLASSES[variant],
         className,
       )}

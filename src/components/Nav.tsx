@@ -11,7 +11,7 @@ const links = [
 ] as const
 
 const LINK_BASE = cn(
-  'block border-b-2 border-transparent py-1.5 font-mono text-xs uppercase tracking-[0.1em] text-ink-dim',
+  'block border-b-2 border-transparent py-1.5 font-mono text-xs uppercase tracking-wide text-ink-dim',
   'transition-[color,border-color] duration-short ease-levx',
   'hover:text-ink-muted',
 )
@@ -38,7 +38,7 @@ export function Nav() {
       <button
         className={cn(
           'border-line-strong rounded-full border bg-transparent px-[18px] py-2.5',
-          'text-label text-ink font-mono tracking-[0.08em] uppercase',
+          'text-label text-ink font-mono tracking-normal uppercase',
           'duration-short ease-levx transition-[border-color]',
           'hover:border-ink',
         )}

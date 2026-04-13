@@ -173,7 +173,7 @@ export function MarketPage() {
       {/* ── Chart column ─────────────────────────────── */}
       <section>
         <div className="mb-2 flex items-center gap-4">
-          <span className="text-ink-muted font-mono text-xs tracking-[0.14em] uppercase">
+          <span className="text-ink-muted font-mono text-xs tracking-widest uppercase">
             {market.pair.replace('/', ' / ')}
           </span>
           <StatusDot status={STATE_TO_STATUS[market.state]}>{STATE_LABELS[market.state]}</StatusDot>
@@ -188,7 +188,7 @@ export function MarketPage() {
           <span>24H</span>
         </div>
 
-        <div className="text-ink-dim mt-8 flex flex-nowrap items-center gap-2 overflow-hidden font-mono text-[10px] tracking-[0.08em] whitespace-nowrap uppercase">
+        <div className="text-ink-dim mt-8 flex flex-nowrap items-center gap-2 overflow-hidden font-mono text-caption tracking-normal whitespace-nowrap uppercase">
           {market.state === 'pending' ? (
             <>
               <span>MARKET STARTS IN</span>
@@ -260,7 +260,7 @@ export function MarketPage() {
       <aside className="flex flex-col">
         {/* ── Market Duration ─────────────────────── */}
         <Label>Market Duration</Label>
-        <div className="mt-3 inline-flex flex-wrap gap-1 font-mono text-[11px] tracking-[0.12em] uppercase">
+        <div className="mt-3 inline-flex flex-wrap gap-1 font-mono text-tag uppercase">
           {DURATION_OPTIONS.map((d) => (
             <button
               key={d.id}
@@ -280,7 +280,7 @@ export function MarketPage() {
 
         {/* ── Checkpoint Interval ─────────────────── */}
         <Label className="mt-6">Checkpoint Interval</Label>
-        <div className="mt-3 inline-flex flex-wrap gap-1 font-mono text-[11px] tracking-[0.12em] uppercase">
+        <div className="mt-3 inline-flex flex-wrap gap-1 font-mono text-tag uppercase">
           {INTERVAL_OPTIONS.map((i) => (
             <button
               key={i.id}
@@ -297,7 +297,7 @@ export function MarketPage() {
             </button>
           ))}
         </div>
-        <p className="text-ink-dim mt-2 font-mono text-[10px] tracking-[0.06em]">
+        <p className="text-ink-dim mt-2 font-mono text-caption tracking-[0.06em]">
           {marketParamsReady ? `${chartTotalCheckpoints} checkpoints` : 'Select duration & interval'}
         </p>
 
@@ -323,7 +323,7 @@ export function MarketPage() {
           type="button"
           onClick={() => setShowOtherPositions((v) => !v)}
           className={cn(
-            'mt-4 flex w-full items-center gap-2.5 py-2 font-mono text-[11px] tracking-[0.1em] uppercase',
+            'mt-4 flex w-full items-center gap-2.5 py-2 font-mono text-label uppercase',
             'duration-short ease-levx transition-colors',
             showOtherPositions ? 'text-ink-strong' : 'text-ink-dim hover:text-ink-muted',
           )}
@@ -389,7 +389,7 @@ export function MarketPage() {
                 max={leverageCap}
                 onChange={setLeverage}
               />
-              <div className="text-ink-dim mt-2.5 flex justify-between font-mono text-[10px] tracking-[0.1em] uppercase">
+              <div className="text-ink-dim mt-2.5 flex justify-between font-mono text-caption uppercase">
                 <span>1×</span>
                 <span>
                   {leverageCap}× MAX · {formatMarketDurationLabel(market.startTime, market.endTime)}

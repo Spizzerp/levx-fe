@@ -24,11 +24,11 @@ export function PathRow({ index, name, multiplier, wagered, active = false, onCl
         active && 'border-l-ink-strong bg-surface-2',
       )}
     >
-      <span className="text-label text-ink-dim font-mono tracking-[0.05em]">[ {idx} ]</span>
+      <span className="text-label text-ink-dim font-mono tracking-snug">[ {idx} ]</span>
       <div className="flex flex-col gap-0.5">
         <span
           className={cn(
-            'font-mono text-xs tracking-[0.1em] uppercase',
+            'font-mono text-xs tracking-wide uppercase',
             active ? 'text-ink-strong' : 'text-ink',
           )}
         >

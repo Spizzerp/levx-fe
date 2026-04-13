@@ -1,6 +1,7 @@
 import { useState } from 'react'
 
 import { Button } from '@/components/Button'
+import { DataTable, NUM_CELL, type DataTableColumn } from '@/components/DataTable'
 import { cn } from '@/lib/cn'
 import { formatUSD } from '@/lib/format'
 import { PageLayout } from '@/layouts/PageLayout'
@@ -75,22 +76,12 @@ const STATUS_DOT_COLORS: Record<PositionStatus, string> = {
   'at-risk': 'bg-accent',
 }
 
-// Row grid matching MarketsPage pattern
-const ROW_GRID = cn(
-  'grid items-center gap-4 px-4',
-  'grid-cols-[48px_140px_1fr_140px_120px_100px_24px]',
-  '[@media(min-width:1201px)]:grid-cols-[56px_160px_1fr_160px_140px_120px_120px_24px]',
-)
-
-const NUM_CELL =
-  'text-right whitespace-nowrap font-mono text-xs uppercase tracking-[0.08em] text-ink'
-
 const NARROW_HIDE = '[@media(max-width:1200px)]:hidden'
 
 function PositionStatusDot({ status }: { status: PositionStatus }) {
   const colorClass = STATUS_DOT_COLORS[status]
   return (
-    <span className="text-label text-ink-muted inline-flex items-center gap-2 font-mono tracking-[0.1em] uppercase">
+    <span className="text-label text-ink-muted inline-flex items-center gap-2 font-mono uppercase">
       <span className={cn('h-1.5 w-1.5 rounded-full', colorClass)} aria-hidden />
       {STATUS_LABELS[status]}
     </span>
@@ -106,6 +97,85 @@ export function PositionsPage() {
     setTimeout(() => setClosingPosId(null), 1000)
   }
 
+  const columns: DataTableColumn<Position>[] = [
+    {
+      key: 'idx',
+      header: 'IDX',
+      cellClassName: 'text-ink-dim font-mono text-value',
+      render: (_, idx) => `[ ${String(idx + 1).padStart(2, '0')} ]`,
+    },
+    {
+      key: 'market',
+      header: 'MARKET',
+      cellClassName: 'text-ink-strong font-mono text-sm font-bold tracking-wide uppercase',
+      render: (pos) => pos.pair.replace('/', ' / '),
+    },
+    {
+      key: 'path',
+      header: 'PATH',
+      render: (pos) => (
+        <span className="flex items-center gap-3">
+          <PositionStatusDot status={pos.status} />
+          <span className="text-ink-muted font-mono text-value">
+            {pos.pathName}
+          </span>
+        </span>
+      ),
+    },
+    {
+      key: 'wagered',
+      header: 'WAGERED',
+      headerClassName: 'text-right',
+      cellClassName: NUM_CELL,
+      render: (pos) => `${formatUSD(pos.amount)} USDC`,
+    },
+    {
+      key: 'score',
+      header: 'SCORE',
+      headerClassName: 'text-right',
+      cellClassName: NUM_CELL,
+      render: (pos) => pos.currentScore.toFixed(1),
+    },
+    {
+      key: 'health',
+      header: 'HEALTH',
+      headerClassName: cn('text-right', NARROW_HIDE),
+      cellClassName: cn(NUM_CELL, NARROW_HIDE),
+      render: (pos) => (
+        <span
+          className={
+            pos.healthFactor !== undefined && pos.healthFactor < 1.5
+              ? 'text-accent'
+              : 'text-ink'
+          }
+        >
+          {pos.healthFactor?.toFixed(2) ?? '—'}
+        </span>
+      ),
+    },
+    {
+      key: 'leverage',
+      header: 'LEVERAGE',
+      headerClassName: cn('text-right', NARROW_HIDE),
+      cellClassName: cn(NUM_CELL, NARROW_HIDE),
+      render: (pos) => (pos.leverage ? `${pos.leverage}x` : '—'),
+    },
+    {
+      key: 'action',
+      header: '',
+      render: (pos) => (
+        <Button
+          variant="ghost"
+          onClick={() => handleCloseClick(pos.id)}
+          disabled={closingPosId === pos.id}
+          className="min-h-0 h-8 px-3 py-1 text-[10px]"
+        >
+          {closingPosId === pos.id ? 'Closing...' : 'Close'}
+        </Button>
+      ),
+    },
+  ]
+
   return (
     <PageLayout
       title="Positions"
@@ -113,7 +183,7 @@ export function PositionsPage() {
       summaryBar={
         <div className="border-line flex items-center gap-12 border-0 border-b pb-8">
           <div>
-            <div className="text-label text-ink-muted mb-2 font-mono tracking-[0.1em] uppercase">
+            <div className="text-label text-ink-muted mb-2 font-mono uppercase">
               Total Wagered
             </div>
             <div className="text-ink-strong font-mono text-3xl font-bold tracking-[0.02em]">
@@ -121,7 +191,7 @@ export function PositionsPage() {
             </div>
           </div>
           <div>
-            <div className="text-label text-ink-muted mb-2 font-mono tracking-[0.1em] uppercase">
+            <div className="text-label text-ink-muted mb-2 font-mono uppercase">
               Avg Score
             </div>
             <div className="text-ink-strong font-mono text-3xl font-bold tracking-[0.02em]">
@@ -132,92 +202,21 @@ export function PositionsPage() {
             </div>
           </div>
           <div className="ml-auto">
-            <div className="text-ink-dim font-mono text-[10px] tracking-[0.1em] uppercase">
+            <div className="text-ink-dim font-mono text-caption uppercase">
               {MOCK_POSITIONS.length} {MOCK_POSITIONS.length === 1 ? 'POSITION' : 'POSITIONS'}
             </div>
           </div>
         </div>
       }
     >
-      {MOCK_POSITIONS.length > 0 ? (
-        <div className="flex flex-col">
-          {/* Header Row */}
-          <div
-            className={cn(
-              ROW_GRID,
-              'border-line-strong h-10 border-0 border-b',
-              'text-ink-dim font-mono text-[10px] tracking-[0.12em] uppercase',
-            )}
-          >
-            <span>IDX</span>
-            <span>MARKET</span>
-            <span>PATH</span>
-            <span className="text-right">WAGERED</span>
-            <span className="text-right">SCORE</span>
-            <span className={cn('text-right', NARROW_HIDE)}>HEALTH</span>
-            <span className={cn('text-right', NARROW_HIDE)}>LEVERAGE</span>
-            <span />
-          </div>
-
-          {/* Position Rows */}
-          {MOCK_POSITIONS.map((pos, idx) => (
-            <div
-              key={pos.id}
-              className={cn(
-                ROW_GRID,
-                'group border-line h-[68px] border-0 border-b border-l-2 border-l-transparent',
-                'duration-short ease-levx transition-[background,border-left-color]',
-                'hover:border-l-ink-strong hover:bg-white/[0.02]',
-              )}
-            >
-              <span className="text-ink-dim font-mono text-[11px] tracking-[0.05em]">
-                [ {String(idx + 1).padStart(2, '0')} ]
-              </span>
-              <span className="text-ink-strong font-mono text-sm font-bold tracking-[0.1em] uppercase">
-                {pos.pair.replace('/', ' / ')}
-              </span>
-              <span>
-                <div className="flex items-center gap-3">
-                  <PositionStatusDot status={pos.status} />
-                  <span className="text-ink-muted font-mono text-[11px] tracking-[0.05em]">
-                    {pos.pathName}
-                  </span>
-                </div>
-              </span>
-              <span className={NUM_CELL}>{formatUSD(pos.amount)} USDC</span>
-              <span className={NUM_CELL}>{pos.currentScore.toFixed(1)}</span>
-              <span className={cn(NUM_CELL, NARROW_HIDE)}>
-                <span
-                  className={
-                    pos.healthFactor !== undefined && pos.healthFactor < 1.5
-                      ? 'text-accent'
-                      : 'text-ink'
-                  }
-                >
-                  {pos.healthFactor?.toFixed(2) ?? '—'}
-                </span>
-              </span>
-              <span className={cn(NUM_CELL, NARROW_HIDE)}>
-                {pos.leverage ? `${pos.leverage}x` : '—'}
-              </span>
-              <span>
-                <Button
-                  variant="ghost"
-                  onClick={() => handleCloseClick(pos.id)}
-                  disabled={closingPosId === pos.id}
-                  className="min-h-0 h-8 px-3 py-1 text-[10px]"
-                >
-                  {closingPosId === pos.id ? 'Closing...' : 'Close'}
-                </Button>
-              </span>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="text-ink-dim py-24 text-center font-mono text-[11px] tracking-[0.14em] uppercase">
-          <span>[ NO OPEN POSITIONS ]</span>
-        </div>
-      )}
+      <DataTable
+        columns={columns}
+        data={MOCK_POSITIONS}
+        gridCols="grid-cols-[48px_140px_1fr_140px_120px_100px_24px]"
+        gridColsWide="[@media(min-width:1201px)]:grid-cols-[56px_160px_1fr_160px_140px_120px_120px_24px]"
+        keyExtractor={(pos) => pos.id}
+        emptyMessage="[ NO OPEN POSITIONS ]"
+      />
     </PageLayout>
   )
 }

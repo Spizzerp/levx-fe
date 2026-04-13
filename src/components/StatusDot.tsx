@@ -25,7 +25,7 @@ export function StatusDot({ status, children }: StatusDotProps) {
   }
 
   return (
-    <span className="text-label text-ink-muted inline-flex items-center gap-2 font-mono tracking-[0.1em] uppercase">
+    <span className="text-label text-ink-muted inline-flex items-center gap-2 font-mono uppercase">
       <span className="h-1.5 w-1.5 rounded-full" style={dotStyle} aria-hidden />
       {children}
     </span>
