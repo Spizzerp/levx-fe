@@ -11,8 +11,9 @@ import { PathRow } from '@/components/PathRow'
 import { SegmentedSlider } from '@/components/SegmentedSlider'
 import { StatusDot } from '@/components/StatusDot'
 import { Stub } from '@/components/Stub'
+import { UserPositionCard } from '@/components/UserPositionCard'
 import { cn } from '@/lib/cn'
-import { useMarket } from '@/lib/api/hooks'
+import { useMarket, useUserPosition } from '@/lib/api/hooks'
 import { usePythFeed, useLatestPrice } from '@/lib/pyth/hooks'
 import { feedIdForPair } from '@/lib/pyth/feedIds'
 import { useBenchmarksHistory } from '@/lib/pyth/useBenchmarksHistory'
@@ -78,6 +79,7 @@ const META_SEP = <span className="text-line-strong mx-0.5">·</span>
 export function MarketPage() {
   const { id } = useParams({ from: '/market/$id' })
   const { data: market, isLoading, error } = useMarket(id)
+  const { data: userPosition } = useUserPosition(id)
 
   const pair = market?.pair ?? null
   const feedId = pair ? feedIdForPair(pair) : null
@@ -111,17 +113,26 @@ export function MarketPage() {
   // Whether both market params are selected — AI paths require both
   const marketParamsReady = marketDuration != null && checkpointIntervalId != null
 
-  // Derive market schedule from user-selected duration + interval
+  // Derive chart schedule. On Active markets the user picks duration+interval
+  // (the market is being configured client-side until creation); on every
+  // other state the schedule is fixed on-chain, so we read it from `market`.
   const selectedDuration = marketDuration ? DURATION_OPTIONS.find((d) => d.id === marketDuration)! : null
   const selectedInterval = checkpointIntervalId ? INTERVAL_OPTIONS.find((i) => i.id === checkpointIntervalId)! : null
-  const chartMarketStart = latestTick ? latestTick.time : now
-  const chartMarketEnd = chartMarketStart + (selectedDuration?.ms ?? 0)
-  const chartCheckpointInterval = selectedInterval?.sec ?? 3600
-  const chartTotalCheckpoints = selectedDuration
-    ? Math.floor(selectedDuration.ms / 1000 / chartCheckpointInterval)
-    : 0
+  const isActiveConfig = market?.state === 'active'
+  const chartMarketStart = isActiveConfig
+    ? (latestTick ? latestTick.time : now)
+    : (market?.startTime ?? now)
+  const chartMarketEnd = isActiveConfig
+    ? chartMarketStart + (selectedDuration?.ms ?? 0)
+    : (market?.endTime ?? chartMarketStart)
+  const chartCheckpointInterval = isActiveConfig
+    ? (selectedInterval?.sec ?? 3600)
+    : (market?.checkpointInterval ?? 3600)
+  const chartTotalCheckpoints = isActiveConfig
+    ? (selectedDuration ? Math.floor(selectedDuration.ms / 1000 / chartCheckpointInterval) : 0)
+    : (market?.totalCheckpoints ?? 0)
 
-  const durationMs = selectedDuration?.ms ?? 0
+  const durationMs = isActiveConfig ? (selectedDuration?.ms ?? 0) : Math.max(0, chartMarketEnd - chartMarketStart)
   const msRemaining = Math.max(0, chartMarketEnd - now)
   const leverageCap = maxLeverageByDuration(durationMs)
 
@@ -136,7 +147,13 @@ export function MarketPage() {
   // Generate 5 AI prediction paths anchored to current price + market params.
   // When a real backend exists, these come from on-chain PathOutcome accounts.
   const aiPaths = useMemo(() => {
-    if (!marketParamsReady || priceDisplay <= 0) return []
+    // For non-Active states, on-chain paths would come from `market.paths`.
+    // Until the indexer lands, generate fixture paths from the market schedule
+    // so the chart isn't empty.
+    const ready = isActiveConfig
+      ? marketParamsReady && priceDisplay > 0
+      : chartTotalCheckpoints > 0 && priceDisplay > 0
+    if (!ready) return []
     const paths = buildAiPathFixture({
       startTime: chartMarketStart,
       checkpointInterval: chartCheckpointInterval,
@@ -149,7 +166,7 @@ export function MarketPage() {
     paths[1].totalWagered = 12_800 // bull — most popular
     paths[3].totalWagered = 1_900  // bear
     return paths
-  }, [marketParamsReady, chartMarketStart, chartCheckpointInterval, chartTotalCheckpoints, priceDisplay])
+  }, [isActiveConfig, marketParamsReady, chartMarketStart, chartCheckpointInterval, chartTotalCheckpoints, priceDisplay])
 
   // Default selection = the middle (neutral) path on first load
   const activePathId = selectedPathId ?? aiPaths[2]?.id ?? null
@@ -168,8 +185,21 @@ export function MarketPage() {
   if (isLoading) return <Stub title="Loading Market..." />
   if (error || !market) return <Stub title="Market Not Found" subtitle={id} />
 
+  // Only Active markets expose the full draw + wager control rail. Other
+  // states (pending, sampling, settling, maturing, settled, void) show a
+  // chart-dominated layout. If the user holds a position on a non-Active
+  // market, a slim position card occupies the rail in its place.
+  const showWagerRail = market.state === 'active'
+  const showPositionRail = !showWagerRail && !!userPosition
+  const showRail = showWagerRail || showPositionRail
+
   return (
-    <main className="mx-auto grid max-w-[1680px] grid-cols-1 gap-14 px-10 pt-14 pb-12 [@media(min-width:1181px)]:grid-cols-[1fr_400px] [@media(min-width:1181px)]:gap-[72px]">
+    <main
+      className={cn(
+        'mx-auto grid max-w-[1680px] grid-cols-1 gap-14 px-10 pt-14 pb-12',
+        showRail && '[@media(min-width:1181px)]:grid-cols-[1fr_400px] [@media(min-width:1181px)]:gap-[72px]',
+      )}
+    >
       {/* ── Chart column ─────────────────────────────── */}
       <section>
         <div className="mb-2 flex items-center gap-4">
@@ -230,6 +260,7 @@ export function MarketPage() {
             marketStart={chartMarketStart}
             marketEnd={chartMarketEnd}
             selectedPathId={activePathId}
+            selectionInteractive={showWagerRail}
             showOtherPositions={showOtherPositions}
             pair={market.pair}
             isLoading={isBenchmarksLoading}
@@ -256,7 +287,8 @@ export function MarketPage() {
         </div>
       </section>
 
-      {/* ── Right rail ───────────────────────────────── */}
+      {/* ── Right rail (Active markets only) ───────────────────── */}
+      {showWagerRail && (
       <aside className="flex flex-col">
         {/* ── Market Duration ─────────────────────── */}
         <Label>Market Duration</Label>
@@ -414,11 +446,19 @@ export function MarketPage() {
           variant="primary"
           fullWidth
           className="mt-2"
-          disabled={market.state !== 'active' && market.state !== 'sampling'}
+          disabled={market.state !== 'active'}
         >
           Open {isLong ? 'Long' : 'Short'} Position
         </Button>
       </aside>
+      )}
+
+      {/* ── Right rail (non-Active markets with a user position) ── */}
+      {showPositionRail && userPosition && (
+        <aside className="flex flex-col">
+          <UserPositionCard position={userPosition} marketState={market.state} />
+        </aside>
+      )}
     </main>
   )
 }

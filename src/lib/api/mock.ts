@@ -8,11 +8,13 @@
  * Types stay the same; the hooks in ./hooks.ts don't need to change.
  */
 
-import type { CurrentPrice, Market } from '@/types/market'
+import type { CurrentPrice, Market, UserPosition } from '@/types/market'
 
 /* ── Fixture data ───────────────────────────────────────────── */
 
 const DAY = 24 * 60 * 60 * 1000
+const HOUR = 60 * 60 * 1000
+const MINUTE = 60 * 1000
 
 /** Sensible defaults for on-chain fields not yet populated in mock layer. */
 const ON_CHAIN_DEFAULTS: Pick<
@@ -38,8 +40,32 @@ const ON_CHAIN_DEFAULTS: Pick<
   pathsDissolved: 0,
 }
 
+/** Factory to keep fixture rows terse — override per-state fields as needed. */
+function makeMarket(overrides: Partial<Market> & Pick<Market, 'id' | 'marketId' | 'pair' | 'base' | 'quote' | 'state'>): Market {
+  const now = Date.now()
+  return {
+    pool: 100_000,
+    traders: 500,
+    startTime: now - 7 * DAY,
+    endTime: now + 7 * DAY,
+    checkpointInterval: 3600,
+    completedCheckpoints: 0,
+    totalCheckpoints: 336,
+    leverageEnabled: false,
+    maxLeverage: 1,
+    entryFeeBps: 150,
+    history: [],
+    paths: [],
+    ...ON_CHAIN_DEFAULTS,
+    ...overrides,
+  }
+}
+
+const NOW = Date.now()
+
 const MARKETS: Market[] = [
-  {
+  // ── Active ────────────────────────────────────────────────
+  makeMarket({
     id: 'btc',
     marketId: 0,
     pair: 'BTC/USDC',
@@ -48,59 +74,152 @@ const MARKETS: Market[] = [
     state: 'active',
     pool: 248_901,
     traders: 1204,
-    startTime: Date.now() - 7 * DAY,
-    endTime: Date.now() + 7 * DAY,
-    checkpointInterval: 3600,
+    startTime: NOW - 7 * DAY,
+    endTime: NOW + 7 * DAY,
     completedCheckpoints: 168,
-    totalCheckpoints: 336,
-    leverageEnabled: false,
-    maxLeverage: 1,
-    entryFeeBps: 150,
-    history: [],
-    paths: [],
-    ...ON_CHAIN_DEFAULTS,
-  },
-  {
+  }),
+  // ── Sampling (wagers still accepted, checkpoints processing) ──
+  makeMarket({
     id: 'eth',
     marketId: 1,
     pair: 'ETH/USDC',
     base: 'ETH',
     quote: 'USDC',
-    state: 'active',
+    state: 'sampling',
     pool: 142_560,
     traders: 876,
-    startTime: Date.now() - 7 * DAY,
-    endTime: Date.now() + 7 * DAY,
-    checkpointInterval: 3600,
-    completedCheckpoints: 168,
-    totalCheckpoints: 336,
-    leverageEnabled: false,
-    maxLeverage: 1,
-    entryFeeBps: 150,
-    history: [],
-    paths: [],
-    ...ON_CHAIN_DEFAULTS,
-  },
-  {
+    startTime: NOW - 4 * DAY,
+    endTime: NOW + 3 * DAY,
+    completedCheckpoints: 96,
+  }),
+  // ── Pending (paths locking, wagers not yet open) ──────────
+  makeMarket({
     id: 'sol',
     marketId: 2,
     pair: 'SOL/USDC',
     base: 'SOL',
     quote: 'USDC',
-    state: 'active',
-    pool: 89_410,
-    traders: 412,
-    startTime: Date.now() - 7 * DAY,
-    endTime: Date.now() + 7 * DAY,
-    checkpointInterval: 3600,
+    state: 'pending',
+    pool: 0,
+    traders: 0,
+    startTime: NOW + 6 * HOUR,
+    endTime: NOW + 7 * DAY + 6 * HOUR,
+    completedCheckpoints: 0,
+  }),
+  // ── Settling (all checkpoints done, scoring paths) ────────
+  makeMarket({
+    id: 'btc-settling',
+    marketId: 3,
+    pair: 'BTC/USDC',
+    base: 'BTC',
+    quote: 'USDC',
+    state: 'settling',
+    pool: 62_180,
+    traders: 311,
+    startTime: NOW - 7 * DAY,
+    endTime: NOW - 30 * MINUTE,
     completedCheckpoints: 168,
-    totalCheckpoints: 336,
-    leverageEnabled: false,
-    maxLeverage: 1,
-    entryFeeBps: 150,
-    history: [],
-    paths: [],
-    ...ON_CHAIN_DEFAULTS,
+    totalCheckpoints: 168,
+    pathsScored: 3,
+  }),
+  // ── Maturing (dispute window open) ────────────────────────
+  makeMarket({
+    id: 'eth-maturing',
+    marketId: 4,
+    pair: 'ETH/USDC',
+    base: 'ETH',
+    quote: 'USDC',
+    state: 'maturing',
+    pool: 38_420,
+    traders: 184,
+    startTime: NOW - 7 * DAY,
+    endTime: NOW - 2 * HOUR,
+    completedCheckpoints: 168,
+    totalCheckpoints: 168,
+    pathsScored: 5,
+  }),
+  // ── Settled (claims open) ─────────────────────────────────
+  makeMarket({
+    id: 'sol-settled',
+    marketId: 5,
+    pair: 'SOL/USDC',
+    base: 'SOL',
+    quote: 'USDC',
+    state: 'settled',
+    pool: 51_700,
+    traders: 247,
+    startTime: NOW - 14 * DAY,
+    endTime: NOW - 7 * DAY,
+    completedCheckpoints: 168,
+    totalCheckpoints: 168,
+    pathsScored: 5,
+  }),
+  // ── Void (emergency refund) ───────────────────────────────
+  makeMarket({
+    id: 'btc-void',
+    marketId: 6,
+    pair: 'BTC/USDC',
+    base: 'BTC',
+    quote: 'USDC',
+    state: 'void',
+    pool: 12_340,
+    traders: 58,
+    startTime: NOW - 3 * DAY,
+    endTime: NOW - 1 * DAY,
+    completedCheckpoints: 42,
+    totalCheckpoints: 168,
+    pathsDissolved: 4,
+  }),
+]
+
+/* ── Mock user positions ─────────────────────────────────────
+ * Seeded on a few markets so the non-Active rail has something to render
+ * until wallet + indexer integration lands. Path IDs come from
+ * buildAiPathFixture (ai-ultra-bull, ai-bull, ai-neutral, ai-bear, ai-ultra-bear).
+ * ───────────────────────────────────────────────────────────── */
+
+const USER_POSITIONS: UserPosition[] = [
+  {
+    marketId: 'eth',           // sampling
+    pathId: 'ai-bull',
+    pathLabel: 'Bull',
+    pathTone: 'bull',
+    collateral: 250,
+    leverage: 1,
+    exposure: 250,
+    entryMultiplier: 1.85,
+    entryTime: NOW - 2 * DAY,
+    estimatedPayout: 462.5,
+    dissolved: false,
+    claimed: false,
+  },
+  {
+    marketId: 'eth-maturing',  // maturing — awaiting dispute window close
+    pathId: 'ai-neutral',
+    pathLabel: 'Neutral',
+    pathTone: 'neutral',
+    collateral: 100,
+    leverage: 1,
+    exposure: 100,
+    entryMultiplier: 1.65,
+    entryTime: NOW - 6 * DAY,
+    estimatedPayout: 165,
+    dissolved: false,
+    claimed: false,
+  },
+  {
+    marketId: 'sol-settled',   // settled — claim ready
+    pathId: 'ai-ultra-bull',
+    pathLabel: 'Ultra Bull',
+    pathTone: 'ultra-bull',
+    collateral: 50,
+    leverage: 1,
+    exposure: 50,
+    entryMultiplier: 2.15,
+    entryTime: NOW - 13 * DAY,
+    estimatedPayout: 107.5,
+    dissolved: false,
+    claimed: false,
   },
 ]
 
@@ -120,6 +239,10 @@ export async function getMarket(id: string): Promise<Market> {
   const match = MARKETS.find((m) => m.id === id)
   if (!match) throw new Error(`Market not found: ${id}`)
   return delay(match)
+}
+
+export async function getUserPosition(marketId: string): Promise<UserPosition | null> {
+  return delay(USER_POSITIONS.find((p) => p.marketId === marketId) ?? null)
 }
 
 export async function getCurrentPrice(pair: string): Promise<CurrentPrice> {

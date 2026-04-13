@@ -10,7 +10,7 @@ import { formatCountdown, formatUSD } from '@/lib/format'
 import { PageLayout } from '@/layouts/PageLayout'
 import type { Market, MarketState } from '@/types/market'
 
-type StateFilter = 'all' | 'active' | 'pending' | 'settled'
+type StateFilter = 'all' | MarketState
 
 const STATE_LABELS: Record<MarketState, string> = {
   pending: 'Pending',
@@ -24,19 +24,17 @@ const STATE_LABELS: Record<MarketState, string> = {
 
 const FILTERS: { id: StateFilter; label: string }[] = [
   { id: 'all', label: 'All' },
-  { id: 'active', label: 'Active' },
   { id: 'pending', label: 'Pending' },
+  { id: 'active', label: 'Active' },
+  { id: 'sampling', label: 'Sampling' },
+  { id: 'settling', label: 'Settling' },
+  { id: 'maturing', label: 'Maturing' },
   { id: 'settled', label: 'Settled' },
+  { id: 'void', label: 'Void' },
 ]
 
 function matchesFilter(state: MarketState, filter: StateFilter): boolean {
-  if (filter === 'all') return true
-  if (filter === 'active') return state === 'active' || state === 'sampling'
-  if (filter === 'pending') return state === 'pending'
-  if (filter === 'settled') {
-    return state === 'settling' || state === 'maturing' || state === 'settled'
-  }
-  return false
+  return filter === 'all' || state === filter
 }
 
 function endsInLabel(m: Market): string {

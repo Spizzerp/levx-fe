@@ -175,6 +175,37 @@ export interface Market {
   pathsDissolved: number
 }
 
+/* ── User position ─────────────────────────────────────────── */
+
+/**
+ * Frontend representation of a user's wager on a market.
+ * On-chain this would mirror a Position PDA; the indexer joins in path
+ * label/tone for display.
+ */
+export interface UserPosition {
+  marketId: string
+  /** Path the user wagered on */
+  pathId: string
+  pathLabel: string
+  pathTone: PathTone
+  /** USDC committed (collateral) */
+  collateral: number
+  /** Leverage multiplier (1 if leverage disabled on the market) */
+  leverage: number
+  /** Effective exposure = collateral × leverage */
+  exposure: number
+  /** LMSR multiplier locked at entry — payout per USDC if path wins */
+  entryMultiplier: number
+  /** unix ms */
+  entryTime: number
+  /** Live payout estimate (settled = realized; otherwise = mark-to-market) */
+  estimatedPayout: number
+  /** True if path was dissolved → position is worthless */
+  dissolved: boolean
+  /** True once `claim` has been called and funds withdrawn */
+  claimed: boolean
+}
+
 export interface CurrentPrice {
   pair: string
   value: number

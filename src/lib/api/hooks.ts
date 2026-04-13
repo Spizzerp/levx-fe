@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 
-import { getCurrentPrice, getMarket, getMarkets } from '@/lib/api/mock'
+import { getCurrentPrice, getMarket, getMarkets, getUserPosition } from '@/lib/api/mock'
 
 export function useMarkets() {
   return useQuery({
@@ -14,6 +14,14 @@ export function useMarket(id: string | undefined) {
     queryKey: ['market', id],
     queryFn: () => getMarket(id!),
     enabled: !!id,
+  })
+}
+
+export function useUserPosition(marketId: string | undefined) {
+  return useQuery({
+    queryKey: ['userPosition', marketId],
+    queryFn: () => getUserPosition(marketId!),
+    enabled: !!marketId,
   })
 }
 

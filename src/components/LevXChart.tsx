@@ -55,6 +55,13 @@ export interface LevXChartProps {
   marketEnd: number
   /** which prediction path is currently highlighted */
   selectedPathId?: string | null
+  /**
+   * Whether the selected path represents an interactive user choice.
+   * When false (e.g. on non-Active markets where path selection is disabled),
+   * the selected line is rendered as a quiet dotted grey preview instead of
+   * the confident solid-white overlay, so it doesn't conflict with the price line.
+   */
+  selectionInteractive?: boolean
   /** when true, show paths that other users have wagered on at low opacity */
   showOtherPositions?: boolean
   /** override fixed height; if omitted, fills parent */
@@ -99,6 +106,7 @@ function ChartInner({
   marketStart,
   marketEnd,
   selectedPathId,
+  selectionInteractive = true,
   showOtherPositions,
   pair,
   market,
@@ -343,17 +351,32 @@ function ChartInner({
 
           {/* ── Selected prediction overlay ─────────── */}
           {selected && (
-            <LinePath<PricePoint>
-              data={selected.data}
-              x={(d) => timeScale(d.time)}
-              y={(d) => priceScale(d.value)}
-              stroke="#FFFFFF"
-              strokeWidth={2.5}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              curve={CATMULL_ROM_ALPHA_05}
-              style={{ filter: 'drop-shadow(0 0 4px rgba(255,255,255,0.4))' }}
-            />
+            selectionInteractive ? (
+              <LinePath<PricePoint>
+                data={selected.data}
+                x={(d) => timeScale(d.time)}
+                y={(d) => priceScale(d.value)}
+                stroke="#FFFFFF"
+                strokeWidth={2.5}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                curve={CATMULL_ROM_ALPHA_05}
+                style={{ filter: 'drop-shadow(0 0 4px rgba(255,255,255,0.4))' }}
+              />
+            ) : (
+              <LinePath<PricePoint>
+                data={selected.data}
+                x={(d) => timeScale(d.time)}
+                y={(d) => priceScale(d.value)}
+                stroke="#999999"
+                strokeWidth={1.5}
+                strokeDasharray="2 4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                opacity={0.65}
+                curve={CATMULL_ROM_ALPHA_05}
+              />
+            )
           )}
 
           {/* ── Historical price line ───────────────── */}
