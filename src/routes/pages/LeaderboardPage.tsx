@@ -125,12 +125,13 @@ export function LeaderboardPage() {
               </div>
               <div
                 className={cn(
-                  'w-full rounded-t-sm bg-ink-strong/5',
+                  'w-full rounded-t-sm border-t border-line-strong bg-ink-strong/10',
                   PODIUM_HEIGHTS[i],
                   'flex items-end justify-center pb-4',
+                  entry.rank === 1 && 'border-t-ink-muted bg-ink-strong/15',
                 )}
               >
-                <span className="text-ink-dim font-mono text-lg font-bold tracking-snug">
+                <span className="text-ink-muted font-mono text-lg font-bold tracking-snug">
                   {entry.rank}
                 </span>
               </div>
