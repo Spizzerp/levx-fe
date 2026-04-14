@@ -72,30 +72,33 @@ export function WalletSync() {
     if (lastKeyRef.current && lastKeyRef.current.equals(publicKey)) return
     lastKeyRef.current = publicKey
 
+    // Immediately reflect connection while genesis hash check runs in background.
+    setWallet({
+      publicKey,
+      connected: true,
+      connecting: false,
+      wrongNetwork: false,
+      cluster: env.APP_NETWORK,
+    })
+
     let cancelled = false
     connection
       .getGenesisHash()
       .then((hash) => {
         if (cancelled) return
         const expected = env.APP_NETWORK === 'mainnet' ? MAINNET_GENESIS : DEVNET_GENESIS
-        setWallet({
-          publicKey,
-          connected: true,
-          connecting: false,
-          wrongNetwork: hash !== expected,
-          cluster: env.APP_NETWORK,
-        })
+        if (hash !== expected) {
+          setWallet({
+            publicKey,
+            connected: true,
+            connecting: false,
+            wrongNetwork: true,
+            cluster: env.APP_NETWORK,
+          })
+        }
       })
       .catch(() => {
-        if (cancelled) return
-        // On RPC failure we still surface the connection — treat network as unknown, not wrong.
-        setWallet({
-          publicKey,
-          connected: true,
-          connecting: false,
-          wrongNetwork: false,
-          cluster: env.APP_NETWORK,
-        })
+        // RPC failure — already set connected above, nothing to do.
       })
 
     return () => {
