@@ -2,18 +2,22 @@ import { useParams } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
 
 import { Button } from '@/components/Button'
+import { ConnectGate } from '@/components/ConnectGate'
 import { DrawingLayer } from '@/components/DrawingLayer'
 import { Input } from '@/components/Input'
 import { Label } from '@/components/Label'
 import { LevXChart } from '@/components/LevXChart'
+import { MarketMetaPanel } from '@/components/MarketMetaPanel'
+import { MarketStateBadge } from '@/components/MarketStateBadge'
+import { MaturityCountdownCard } from '@/components/MaturityCountdownCard'
+import { QueryErrorState } from '@/components/QueryErrorState'
 import { TimeRangePicker, type CandleInterval } from '@/components/TimeRangePicker'
 import { PathRow } from '@/components/PathRow'
 import { SegmentedSlider } from '@/components/SegmentedSlider'
-import { StatusDot } from '@/components/StatusDot'
 import { Stub } from '@/components/Stub'
 import { UserPositionCard } from '@/components/UserPositionCard'
 import { cn } from '@/lib/cn'
-import { useMarket, useUserPosition } from '@/lib/api/hooks'
+import { useMarket, useUserPosition } from '@/lib/chain'
 import { usePythFeed, useLatestPrice } from '@/lib/pyth/hooks'
 import { feedIdForPair } from '@/lib/pyth/feedIds'
 import { useBenchmarksHistory } from '@/lib/pyth/useBenchmarksHistory'
@@ -27,7 +31,7 @@ import {
   formatUSD,
   maxLeverageByDuration,
 } from '@/lib/format'
-import type { MarketState } from '@/types/market'
+import type { Market } from '@/types/market'
 
 /* ── Market duration options ─────────────────────────────── */
 
@@ -54,31 +58,34 @@ const INTERVAL_OPTIONS: { id: IntervalOption; label: string; sec: number }[] = [
   { id: '4h', label: '4 Hours', sec: 4 * 60 * 60 },
 ]
 
-const STATE_TO_STATUS: Record<MarketState, MarketState> = {
-  pending: 'pending',
-  active: 'active',
-  sampling: 'sampling',
-  settling: 'settling',
-  maturing: 'maturing',
-  settled: 'settled',
-  void: 'void',
-}
-
-const STATE_LABELS: Record<MarketState, string> = {
-  pending: 'Pending',
-  active: 'Active',
-  sampling: 'Active · Sampling',
-  settling: 'Settling',
-  maturing: 'Maturing',
-  settled: 'Settled',
-  void: 'Void',
-}
-
 const META_SEP = <span className="text-line-strong mx-0.5">·</span>
+
+/**
+ * Placeholder claim action surfaced during Settled state. The real claim
+ * transaction lands in Phase 5 (CLAIM-01); Phase 2 just ensures the button is
+ * present, state-gated, and wallet-gated via ConnectGate.
+ */
+function ClaimButton({ market: _market }: { market: Market }) {
+  return (
+    <div className="border-line flex flex-col gap-3 border p-6">
+      <p className="text-ink-strong font-mono text-label tracking-wide uppercase">
+        Claim available
+      </p>
+      <p className="text-ink-muted font-mono text-sm leading-relaxed">
+        Market has settled. Claim your payout below.
+      </p>
+      <ConnectGate>
+        <Button variant="primary" fullWidth>
+          Claim
+        </Button>
+      </ConnectGate>
+    </div>
+  )
+}
 
 export function MarketPage() {
   const { id } = useParams({ from: '/market/$id' })
-  const { data: market, isLoading, error } = useMarket(id)
+  const { data: market, isLoading, isError, refetch } = useMarket(id)
   const { data: userPosition } = useUserPosition(id)
 
   const pair = market?.pair ?? null
@@ -183,15 +190,31 @@ export function MarketPage() {
 
   /* ── Early returns AFTER all hooks ─────────────────────────── */
   if (isLoading) return <Stub title="Loading Market..." />
-  if (error || !market) return <Stub title="Market Not Found" subtitle={id} />
+  if (isError || !market) {
+    return (
+      <main className="mx-auto max-w-[1680px] px-10 pt-14 pb-12">
+        <QueryErrorState
+          title="Market unavailable"
+          message="We could not load this market. Please try again."
+          onRetry={() => void refetch()}
+        />
+      </main>
+    )
+  }
 
-  // Only Active markets expose the full draw + wager control rail. Other
-  // states (pending, sampling, settling, maturing, settled, void) show a
-  // chart-dominated layout. If the user holds a position on a non-Active
-  // market, a slim position card occupies the rail in its place.
-  const showWagerRail = market.state === 'active'
+  /* ── State-gated right-rail content ──────────────────────────
+   *   active / sampling → WagerPanel (renders inline below)
+   *   maturing         → MaturityCountdownCard
+   *   settled          → ClaimButton (ConnectGate-wrapped)
+   *   pending / settling / void → empty rail
+   *   Non-active states with a user position also show the position card.
+   */
+  const showWagerRail = market.state === 'active' || market.state === 'sampling'
+  const showMaturityCard = market.state === 'maturing'
+  const showClaimCard = market.state === 'settled'
   const showPositionRail = !showWagerRail && !!userPosition
-  const showRail = showWagerRail || showPositionRail
+  const showRail =
+    showWagerRail || showMaturityCard || showClaimCard || showPositionRail
 
   return (
     <main
@@ -202,11 +225,11 @@ export function MarketPage() {
     >
       {/* ── Chart column ─────────────────────────────── */}
       <section>
-        <div className="mb-2 flex items-center gap-4">
+        <div className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1">
           <span className="text-ink-muted font-mono text-xs tracking-widest uppercase">
             {market.pair.replace('/', ' / ')}
           </span>
-          <StatusDot status={STATE_TO_STATUS[market.state]}>{STATE_LABELS[market.state]}</StatusDot>
+          <MarketStateBadge market={market} />
         </div>
 
         <h1 className="font-display text-ink-strong my-[6px] mb-[10px] text-[56px] leading-none font-medium tracking-[-0.01em] [font-variation-settings:'ROND'_100]">
@@ -442,23 +465,50 @@ export function MarketPage() {
           className="mb-8"
         />
 
-        <Button
-          variant="primary"
-          fullWidth
-          className="mt-2"
-          disabled={market.state !== 'active'}
-        >
-          Open {isLong ? 'Long' : 'Short'} Position
-        </Button>
+        <ConnectGate>
+          <Button
+            variant="primary"
+            fullWidth
+            className="mt-2"
+            disabled={market.state !== 'active'}
+          >
+            Open {isLong ? 'Long' : 'Short'} Position
+          </Button>
+        </ConnectGate>
       </aside>
       )}
 
+      {/* ── Right rail (Maturing) — countdown card in wager-slot position ── */}
+      {showMaturityCard && (
+        <aside className="flex flex-col gap-6">
+          <MaturityCountdownCard market={market} />
+          {userPosition && (
+            <UserPositionCard position={userPosition} marketState={market.state} />
+          )}
+        </aside>
+      )}
+
+      {/* ── Right rail (Settled) — claim button (ConnectGate-wrapped) ── */}
+      {showClaimCard && (
+        <aside className="flex flex-col gap-6">
+          <ClaimButton market={market} />
+          {userPosition && (
+            <UserPositionCard position={userPosition} marketState={market.state} />
+          )}
+        </aside>
+      )}
+
       {/* ── Right rail (non-Active markets with a user position) ── */}
-      {showPositionRail && userPosition && (
+      {showPositionRail && !showMaturityCard && !showClaimCard && userPosition && (
         <aside className="flex flex-col">
           <UserPositionCard position={userPosition} marketState={market.state} />
         </aside>
       )}
+
+      {/* ── Market details (collapsible) — spans full width below chart/rail ── */}
+      <div className="[@media(min-width:1181px)]:col-span-full">
+        <MarketMetaPanel market={market} />
+      </div>
     </main>
   )
 }

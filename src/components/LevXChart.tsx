@@ -616,6 +616,9 @@ function LevXChartOuter(props: LevXChartProps) {
 
   return (
     <div className="levx-chart-wrap" style={height ? { height } : undefined}>
+      {isLoading && (
+        <span className="sr-only" aria-label="Loading chart">Loading chart...</span>
+      )}
       <ParentSize>
         {({ width, height: parentHeight }) => (
           <ChartInner {...props} width={width} height={parentHeight} />

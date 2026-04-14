@@ -1,7 +1,7 @@
 import { Link } from '@tanstack/react-router'
-import { WalletMultiButton } from '@solana/wallet-adapter-react-ui'
 
 import { cn } from '@/lib/cn'
+import { WalletButton } from '@/components/WalletButton'
 
 const links = [
   { to: '/markets', label: 'Markets' },
@@ -36,7 +36,7 @@ export function Nav() {
           </li>
         ))}
       </ul>
-      <WalletMultiButton />
+      <WalletButton />
     </nav>
   )
 }

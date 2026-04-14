@@ -2,10 +2,11 @@ import { useNavigate } from '@tanstack/react-router'
 import { useMemo, useState } from 'react'
 
 import { DataTable, NUM_CELL, type DataTableColumn } from '@/components/DataTable'
+import { MarketsTableSkeleton } from '@/components/MarketsTableSkeleton'
+import { QueryErrorState } from '@/components/QueryErrorState'
 import { StatusDot } from '@/components/StatusDot'
-import { Stub } from '@/components/Stub'
 import { cn } from '@/lib/cn'
-import { useMarkets } from '@/lib/api/hooks'
+import { useMarkets } from '@/lib/chain'
 import { formatCountdown, formatUSD } from '@/lib/format'
 import { PageLayout } from '@/layouts/PageLayout'
 import type { Market, MarketState } from '@/types/market'
@@ -20,6 +21,20 @@ const STATE_LABELS: Record<MarketState, string> = {
   maturing: 'Maturing',
   settled: 'Settled',
   void: 'Void',
+}
+
+/**
+ * Display order for the markets table — active trading first, then
+ * in-flight lifecycle states, settled/void last. Locked per Phase 2 CONTEXT.
+ */
+const STATE_ORDER: Record<MarketState, number> = {
+  active: 0,
+  sampling: 1,
+  pending: 2,
+  settling: 3,
+  maturing: 4,
+  settled: 5,
+  void: 6,
 }
 
 const FILTERS: { id: StateFilter; label: string }[] = [
@@ -84,6 +99,13 @@ const COLUMNS: DataTableColumn<Market>[] = [
     render: (m) => `${formatUSD(m.pool)} USDC`,
   },
   {
+    key: 'paths',
+    header: 'PATHS',
+    headerClassName: 'text-right',
+    cellClassName: NUM_CELL,
+    render: (m) => (m.paths.length > 0 ? String(m.paths.length) : '—'),
+  },
+  {
     key: 'checkpoints',
     header: 'CHECKPOINTS',
     headerClassName: cn('text-right', NARROW_HIDE),
@@ -111,16 +133,58 @@ const COLUMNS: DataTableColumn<Market>[] = [
 
 export function MarketsPage() {
   const navigate = useNavigate()
-  const { data: markets, isLoading, error } = useMarkets()
+  const { data: markets, isLoading, isError, refetch } = useMarkets()
   const [filter, setFilter] = useState<StateFilter>('all')
 
   const visible = useMemo(
-    () => (markets ?? []).filter((m) => matchesFilter(m.state, filter)),
+    () =>
+      (markets ?? [])
+        .filter((m) => matchesFilter(m.state, filter))
+        .sort((a, b) => STATE_ORDER[a.state] - STATE_ORDER[b.state]),
     [markets, filter],
   )
 
-  if (isLoading) return <Stub title="Loading Markets…" />
-  if (error) return <Stub title="Error Loading Markets" />
+  if (isLoading) {
+    return (
+      <PageLayout
+        title="Markets"
+        subtitle="Predict the path, not the destination. Five AI-generated routes per market."
+      >
+        <MarketsTableSkeleton />
+      </PageLayout>
+    )
+  }
+
+  if (isError) {
+    return (
+      <PageLayout
+        title="Markets"
+        subtitle="Predict the path, not the destination. Five AI-generated routes per market."
+      >
+        <QueryErrorState
+          title="We couldn't load markets"
+          message="The feed hiccupped. Try again."
+          onRetry={() => void refetch()}
+        />
+      </PageLayout>
+    )
+  }
+
+  const hasAnyMarkets = (markets?.length ?? 0) > 0
+
+  // True empty state — no markets exist at all.
+  if (!hasAnyMarkets) {
+    return (
+      <PageLayout
+        title="Markets"
+        subtitle="Predict the path, not the destination. Five AI-generated routes per market."
+      >
+        <div className="text-ink-dim border-line border border-dashed py-24 text-center font-mono text-label tracking-widest uppercase">
+          [ NO ACTIVE MARKETS ]
+        </div>
+      </PageLayout>
+    )
+  }
 
   return (
     <PageLayout
@@ -157,8 +221,8 @@ export function MarketsPage() {
       <DataTable
         columns={COLUMNS}
         data={visible}
-        gridCols="grid-cols-[48px_140px_1fr_160px_160px_24px]"
-        gridColsWide="[@media(min-width:1201px)]:grid-cols-[56px_160px_1fr_200px_200px_160px_120px_24px]"
+        gridCols="grid-cols-[48px_140px_1fr_160px_160px_80px_24px]"
+        gridColsWide="[@media(min-width:1201px)]:grid-cols-[56px_160px_1fr_200px_200px_120px_160px_120px_24px]"
         keyExtractor={(m) => m.id}
         onRowClick={(m) => navigate({ to: '/market/$id', params: { id: m.id } })}
         emptyMessage="[ NO MARKETS MATCH FILTER ]"
