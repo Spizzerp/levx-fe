@@ -4,6 +4,8 @@
  *   --color-foo    → bg-foo / text-foo / border-foo / etc
  *   --font-foo     → font-foo
  *   --text-foo     → text-foo (font-size)
+ *   --spacing-foo  → p-foo / m-foo / gap-foo / etc
+ *   --radius-foo   → rounded-foo
  *   --duration-foo → duration-foo
  *   --ease-foo     → ease-foo
  *
@@ -11,18 +13,22 @@
  */
 
 @theme {
+  /* ════════════════════════════════════════════════
+     COLOR SYSTEM
+     ════════════════════════════════════════════════ */
+
   /* ── Surfaces (backgrounds) ─────────────────────
-     surface   — page / root
-     surface-1 — default card
-     surface-2 — raised card (hover, selected)
+     surface   — page / root (#000)
+     surface-1 — default card (#111)
+     surface-2 — raised card / hover (#1A1A1A)
   */
   --color-surface: #000000;
   --color-surface-1: #111111;
   --color-surface-2: #1a1a1a;
 
   /* ── Ink (foreground / text) ───────────────────
-     ink-strong — display / emphasized (#fff)
-     ink        — default body text (#e8e8e8)
+     ink-strong — display / emphasized (#FFF)
+     ink        — default body text (#E8E8E8)
      ink-muted  — secondary text (#999)
      ink-dim    — disabled / captions (#666)
   */
@@ -42,61 +48,265 @@
   --color-warning: #d4a843;
   --color-interactive: #5b9bf6;
 
-  /* ── Typography ───────────────────────────────
-     Inherits Tailwind's default text sizes (text-xs … text-9xl).
-     Only custom sizes need to be declared here.
+  /* ════════════════════════════════════════════════
+     TYPOGRAPHY
+     ════════════════════════════════════════════════ */
+
+  /* ── Font families ─────────────────────────────
+     display — Doto (hero, large numbers)
+     sans    — Space Grotesk (body, UI)
+     mono    — Space Mono (labels, data)
   */
   --font-display: 'Doto', 'Space Mono', monospace;
   --font-sans: 'Space Grotesk', system-ui, sans-serif;
   --font-mono: 'Space Mono', 'JetBrains Mono', monospace;
 
+  /* ── Type scale (based on tokens.md) ───────────
+     Use --fs-* prefix to avoid collision with Tailwind's text-* utilities.
+     Custom text-* utilities are defined below for backwards compatibility.
+
+     display-xl — 72px, hero moments
+     display-lg — 48px, section hero values
+     display-md — 36px, page titles
+     heading    — 24px, section headings
+     body       — 16px, primary copy
+     body-sm    — 14px, supporting copy
+     caption    — 12px, timestamps
+     label      — 11px, uppercase mono metadata
+     micro      — 10px, small captions
+  */
+  --fs-display-xl: 72px;
+  --fs-display-lg: 48px;
+  --fs-display-md: 36px;
+  --fs-heading: 24px;
+  --fs-body: 16px;
+  --fs-body-sm: 14px;
+  --fs-caption: 12px;
+  --fs-label: 11px;
+  --fs-micro: 10px;
+
+  /* ── Line heights ─────────────────────────────
+     tight  — display text, headings
+     normal — body text
+     relaxed — longer form content
+  */
+  --leading-tight: 1.1;
+  --leading-snug: 1.2;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.6;
+
   /* ── Letter-spacing (tracking) ─────────────── */
+  --tracking-tighter: -0.01em;
+  --tracking-tight: 0;
   --tracking-snug: 0.05em;
   --tracking-normal: 0.08em;
   --tracking-wide: 0.1em;
   --tracking-wider: 0.12em;
   --tracking-widest: 0.14em;
 
+  /* ════════════════════════════════════════════════
+     SPACING
+     Based on 4px grid from tokens.md
+     ════════════════════════════════════════════════ */
+  --spacing-0: 0px;
+  --spacing-1: 4px;   /* optical/tight joins */
+  --spacing-2: 8px;   /* inside controls */
+  --spacing-3: 12px;  /* compact gaps */
+  --spacing-4: 16px;  /* normal element gaps */
+  --spacing-5: 20px;  /* medium gaps */
+  --spacing-6: 24px;  /* group separation */
+  --spacing-8: 32px;  /* section rhythm */
+  --spacing-10: 40px; /* larger gaps */
+  --spacing-12: 48px; /* large section breaks */
+  --spacing-16: 64px; /* page-level breathing */
+  --spacing-24: 96px; /* hero spacing */
+
+  /* ════════════════════════════════════════════════
+     BORDER RADIUS
+     ════════════════════════════════════════════════ */
+  --radius-none: 0px;
+  --radius-sm: 4px;   /* small elements */
+  --radius-md: 8px;   /* buttons, inputs */
+  --radius-lg: 12px;  /* cards, dropdowns */
+  --radius-xl: 16px;  /* modals, large cards */
+  --radius-2xl: 24px; /* hero elements */
+  --radius-full: 9999px; /* pills, avatars */
+
+  /* ════════════════════════════════════════════════
+     LAYOUT
+     ════════════════════════════════════════════════ */
+
   /* ── Z-index layers ───────────────────────────
-      above    — above everything else
-      nav      — sticky top navigation
-     overlay  — modals / dropdowns
-     toast    — floating notifications
+     base    — default stacking
+     above   — above siblings
+     nav     — sticky top navigation
+     overlay — modals / dropdowns
+     toast   — floating notifications
   */
+  --z-base: 0;
   --z-above: 10;
   --z-nav: 100;
   --z-overlay: 200;
   --z-toast: 300;
 
-  /* ── Motion ───────────────────────────────────
-     Extends Tailwind's default duration/ease scales.
+  /* ── Sizes (common dimensions) ───────────────
+     For buttons, inputs, icons
+  */
+  --size-icon-sm: 14px;
+  --size-icon-md: 20px;
+  --size-icon-lg: 28px;
+  --size-control-sm: 32px;
+  --size-control-md: 40px;
+  --size-control-lg: 48px;
+  --size-control-xl: 56px;
+
+  /* ════════════════════════════════════════════════
+     MOTION
+     ════════════════════════════════════════════════ */
+
+  /* ── Easing ───────────────────────────────────
+     levx — standard Nothing-style easing
   */
   --ease-levx: cubic-bezier(0.25, 0.1, 0.25, 1);
+
+  /* ── Duration ─────────────────────────────────
+     micro  — 150ms, instant feedback
+     short  — 200ms, quick transitions
+     medium — 300ms, standard animations
+  */
   --duration-micro: 150ms;
   --duration-short: 200ms;
   --duration-medium: 300ms;
 }
 
-/* ── Composite text utilities ───────────────────
+/* ════════════════════════════════════════════════
+   COMPOSITE TEXT UTILITIES
    Size + letter-spacing bundled into a single class.
+   Maintains backwards compatibility with existing code.
+   ════════════════════════════════════════════════ */
+
+/* ── Legacy utilities (backwards compatible) ─────
    text-caption  — 10px  0.1em   micro labels, captions
    text-label    — 11px  0.1em   section labels
    text-value    — 11px  0.05em  inline data values
    text-tag      — 11px  0.12em  tags, table headers
 */
 @utility text-caption {
-  font-size: 10px;
-  letter-spacing: 0.1em;
+  font-size: var(--fs-micro);
+  letter-spacing: var(--tracking-wide);
 }
 @utility text-label {
-  font-size: 11px;
-  letter-spacing: 0.1em;
+  font-size: var(--fs-label);
+  letter-spacing: var(--tracking-wide);
 }
 @utility text-value {
-  font-size: 11px;
-  letter-spacing: 0.05em;
+  font-size: var(--fs-label);
+  letter-spacing: var(--tracking-snug);
 }
 @utility text-tag {
-  font-size: 11px;
-  letter-spacing: 0.12em;
+  font-size: var(--fs-label);
+  letter-spacing: var(--tracking-wider);
+}
+
+/* ── Display text (Doto font, hero moments) ───── */
+@utility type-display-xl {
+  font-family: var(--font-display);
+  font-size: var(--fs-display-xl);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tighter);
+}
+@utility type-display-lg {
+  font-family: var(--font-display);
+  font-size: var(--fs-display-lg);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tighter);
+}
+@utility type-display-md {
+  font-family: var(--font-display);
+  font-size: var(--fs-display-md);
+  line-height: var(--leading-snug);
+  letter-spacing: var(--tracking-tighter);
+}
+
+/* ── Headings (Space Grotesk) ─────────────────── */
+@utility type-heading {
+  font-family: var(--font-sans);
+  font-size: var(--fs-heading);
+  line-height: var(--leading-snug);
+  letter-spacing: var(--tracking-tight);
+}
+
+/* ── Body text (Space Grotesk) ────────────────── */
+@utility type-body {
+  font-family: var(--font-sans);
+  font-size: var(--fs-body);
+  line-height: var(--leading-normal);
+  letter-spacing: var(--tracking-tight);
+}
+@utility type-body-sm {
+  font-family: var(--font-sans);
+  font-size: var(--fs-body-sm);
+  line-height: var(--leading-normal);
+  letter-spacing: var(--tracking-tight);
+}
+
+/* ── Mono text (Space Mono, data/labels) ──────── */
+@utility type-label {
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  line-height: var(--leading-normal);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+@utility type-caption {
+  font-family: var(--font-mono);
+  font-size: var(--fs-caption);
+  line-height: var(--leading-normal);
+  letter-spacing: var(--tracking-normal);
+}
+@utility type-micro {
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+  line-height: var(--leading-normal);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+/* ── Data values (mono, no uppercase) ─────────── */
+@utility type-value {
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  line-height: var(--leading-normal);
+  letter-spacing: var(--tracking-snug);
+}
+@utility type-tag {
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  line-height: var(--leading-normal);
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+}
+
+/* ════════════════════════════════════════════════
+   TRANSITION UTILITIES
+   ════════════════════════════════════════════════ */
+@utility transition-colors-fast {
+  transition-property: color, background-color, border-color, fill, stroke;
+  transition-duration: var(--duration-micro);
+  transition-timing-function: var(--ease-levx);
+}
+@utility transition-colors {
+  transition-property: color, background-color, border-color, fill, stroke;
+  transition-duration: var(--duration-short);
+  transition-timing-function: var(--ease-levx);
+}
+@utility transition-opacity {
+  transition-property: opacity;
+  transition-duration: var(--duration-micro);
+  transition-timing-function: var(--ease-levx);
+}
+@utility transition-transform {
+  transition-property: transform;
+  transition-duration: var(--duration-micro);
+  transition-timing-function: var(--ease-levx);
 }
