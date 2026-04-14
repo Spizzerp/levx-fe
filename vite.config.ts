@@ -7,6 +7,10 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   envPrefix: 'APP_',
   plugins: [react(), tailwindcss()],
+  define: {
+    'process.env': {},
+    global: 'globalThis',
+  },
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),

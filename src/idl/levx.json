@@ -231,27 +231,7 @@
           "signer": true
         }
       ],
-      "args": [
-        {
-          "name": "checkpoint_leaf",
-          "type": {
-            "defined": {
-              "name": "CheckpointLeaf"
-            }
-          }
-        },
-        {
-          "name": "merkle_proof",
-          "type": {
-            "vec": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          }
-        }
-      ]
+      "args": []
     },
     {
       "name": "claim",
@@ -1136,12 +1116,7 @@
           "signer": true
         }
       ],
-      "args": [
-        {
-          "name": "max_action",
-          "type": "u64"
-        }
-      ]
+      "args": []
     },
     {
       "name": "settle_market",
@@ -1718,17 +1693,10 @@
         "kind": "struct",
         "fields": [
           {
-            "name": "checkpoints_root",
+            "name": "predicted_prices",
             "type": {
-              "array": [
-                "u8",
-                32
-              ]
+              "vec": "u64"
             }
-          },
-          {
-            "name": "checkpoints_uri",
-            "type": "string"
           },
           {
             "name": "num_checkpoints",
@@ -1749,33 +1717,6 @@
           {
             "name": "generation_timestamp",
             "type": "i64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "CheckpointLeaf",
-      "docs": [
-        "A single predicted checkpoint leaf."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "checkpoint_index",
-            "type": "u16"
-          },
-          {
-            "name": "predicted_price",
-            "type": "u64"
-          },
-          {
-            "name": "upper_tolerance",
-            "type": "u64"
-          },
-          {
-            "name": "lower_tolerance",
-            "type": "u64"
           }
         ]
       }
@@ -1839,6 +1780,35 @@
             "docs": [
               "Quantum coupling strength (0 = no correlation, reduces to LMSR pricing)."
             ],
+            "type": "u64"
+          },
+          {
+            "name": "reference_action",
+            "docs": [
+              "Expected action of a random-walk path over the market duration.",
+              "Used by exponential scoring: score = exp(-action / reference_action).",
+              "Keeper computes off-chain from historical volatility."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "weight_qv",
+            "docs": [
+              "Multi-feature scoring weights (fixed-point 6 dec, sum ≈ SCALE).",
+              "Features modulate action score as penalties."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "weight_dd",
+            "type": "u64"
+          },
+          {
+            "name": "weight_endpoint",
+            "type": "u64"
+          },
+          {
+            "name": "weight_displacement",
             "type": "u64"
           }
         ]
@@ -1907,6 +1877,33 @@
               "Keeper checks this flag and resubmits full eigendecomp when set."
             ],
             "type": "bool"
+          },
+          {
+            "name": "cached_prices",
+            "docs": [
+              "Quantum prices at checkpoint time: p_i = Σ_k |Q[i][k]|² × exp(λ_k) / Tr(exp(M))"
+            ],
+            "type": {
+              "vec": "u64"
+            }
+          },
+          {
+            "name": "lipschitz_constant",
+            "docs": [
+              "Lipschitz constant L = SCALE² / b for the quadratic payment rule.",
+              "Between checkpoints: cost = p_eff × s + (L/2) × s² where p_eff = cached_p + L × Δq."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "checkpoint_quantities",
+            "docs": [
+              "Share quantities when this eigendecomp was computed.",
+              "Delta from checkpoint: Δq_i = market.lmsr_share_quantities[i] - checkpoint_quantities[i]"
+            ],
+            "type": {
+              "vec": "i64"
+            }
           },
           {
             "name": "bump",
@@ -2269,10 +2266,27 @@
             "type": "i64"
           },
           {
-            "name": "total_weighted_score",
+            "name": "reference_score",
             "docs": [
-              "Sum of (composite_score × total_wagered) across all surviving paths.",
-              "Populated by score_path instruction during settling phase."
+              "ELF reference score. Set to 0 for standard parimutuel behavior.",
+              "When > 0, paths scoring below this threshold get zero payout (ELF mechanism).",
+              "Governance can raise this once real market data calibrates reference_action."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "total_weighted_excess",
+            "docs": [
+              "Sum of (max(0, score - reference_score) × total_wagered) for surviving paths.",
+              "When reference_score = 0, this equals the old total_weighted_score."
+            ],
+            "type": "u128"
+          },
+          {
+            "name": "total_weighted_fallback",
+            "docs": [
+              "Sum of (score × total_wagered) for surviving paths — fallback denominator",
+              "used when all paths score below reference_score (total_weighted_excess = 0)."
             ],
             "type": "u128"
           },
@@ -2289,6 +2303,44 @@
               "Number of dissolved paths (incremented in check_dissolution)."
             ],
             "type": "u8"
+          },
+          {
+            "name": "reference_action",
+            "docs": [
+              "Expected action of a random-walk path over the market duration.",
+              "Used by exponential scoring: score = exp(-action / reference_action).",
+              "Set at market creation from historical volatility. Eliminates the",
+              "keeper-supplied max_action parameter and its griefing vector."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "weight_qv",
+            "docs": [
+              "QV error weight. Default: 375_000 (37.5% of feature budget)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "weight_dd",
+            "docs": [
+              "Max drawdown error weight. Default: 375_000 (37.5% of feature budget)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "weight_endpoint",
+            "docs": [
+              "Endpoint error weight. Default: 125_000 (12.5% of feature budget)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "weight_displacement",
+            "docs": [
+              "Displacement error weight. Default: 125_000 (12.5% of feature budget)"
+            ],
+            "type": "u64"
           },
           {
             "name": "bump",
@@ -2370,17 +2422,15 @@
             "type": "i64"
           },
           {
-            "name": "checkpoints_root",
+            "name": "predicted_prices",
+            "docs": [
+              "Predicted checkpoint prices stored on-chain (fixed-point u64, 6 decimals).",
+              "Populated at path creation via add_path. Immutable after creation.",
+              "Keepers read directly via index — no Merkle proofs needed."
+            ],
             "type": {
-              "array": [
-                "u8",
-                32
-              ]
+              "vec": "u64"
             }
-          },
-          {
-            "name": "checkpoints_uri",
-            "type": "string"
           },
           {
             "name": "num_checkpoints",
@@ -2457,6 +2507,62 @@
           {
             "name": "current_implied_probability",
             "type": "u16"
+          },
+          {
+            "name": "pred_quadratic_variation",
+            "docs": [
+              "Predicted quadratic variation: Σ(pred_return_i²). Measures predicted path roughness."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "actual_quadratic_variation",
+            "docs": [
+              "Actual quadratic variation: Σ(actual_return_i²). Ground truth path roughness."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "pred_peak_price",
+            "docs": [
+              "Running peak of predicted prices (for drawdown tracking)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "pred_max_drawdown",
+            "docs": [
+              "Max drawdown of predicted path: max(peak - trough) / peak, fixed-point."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "actual_peak_price",
+            "docs": [
+              "Running peak of actual prices (for drawdown tracking)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "actual_max_drawdown",
+            "docs": [
+              "Max drawdown of actual path: max(peak - trough) / peak, fixed-point."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "first_predicted_price",
+            "docs": [
+              "First checkpoint's predicted price (for displacement feature)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "first_actual_price",
+            "docs": [
+              "First checkpoint's actual price (for displacement feature)."
+            ],
+            "type": "u64"
           },
           {
             "name": "bump",

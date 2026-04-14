@@ -36,8 +36,6 @@ const TONE_SLOPES: Record<PathTone, number> = {
 
 /** Defaults for on-chain PathOutcome fields in test fixtures. */
 const PATH_OUTCOME_DEFAULTS = {
-  checkpointsRoot: '0'.repeat(64),
-  checkpointsUri: '',
   creator: '11111111111111111111111111111111',
   cumulativeAction: 0,
   compositeScore: 0,
@@ -75,6 +73,7 @@ export function buildAiPathFixture(args: BuildAiPathFixtureArgs): PredictionPath
       multiplier: MULTIPLIERS[tone],
       data,
       pathIndex: toneIdx,
+      predictedPrices: data.map((d) => d.value),
       numCheckpoints: totalCheckpoints,
       initialProbabilityBps: Math.round(10_000 / TONES.length),
       generationTimestamp: startTime,

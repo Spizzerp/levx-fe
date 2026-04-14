@@ -59,12 +59,18 @@ importers:
       '@visx/text':
         specifier: ^3.12.0
         version: 3.12.0(react@19.2.5)
+      buffer:
+        specifier: ^6.0.3
+        version: 6.0.3
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
       d3-array:
         specifier: ^3.2.4
         version: 3.2.4
+      process:
+        specifier: ^0.11.10
+        version: 0.11.10
       react:
         specifier: ^19.2.4
         version: 19.2.5
