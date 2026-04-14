@@ -137,6 +137,14 @@ beforeEach(async () => {
   })
 })
 
+async function selectMarketParams(user: ReturnType<typeof userEvent.setup>) {
+  // Select a market duration (1 Day) and a checkpoint interval (1 Hour)
+  const durationBtn = screen.getByRole('button', { name: /1 day/i })
+  await user.click(durationBtn)
+  const intervalBtn = screen.getByRole('button', { name: /1 hour/i })
+  await user.click(intervalBtn)
+}
+
 async function setMarketState(
   state:
     | 'pending'
@@ -178,6 +186,7 @@ describe('MarketPage', () => {
   it('wires the "+ Draw Custom Path" button to drawingStore.enterDrawMode', async () => {
     const user = userEvent.setup()
     renderMarketPage()
+    await selectMarketParams(user)
     const btn = screen.getByRole('button', { name: /draw custom path/i })
     await user.click(btn)
     expect(useDrawingStore.getState().state.phase).toBe('drawMode')
@@ -186,6 +195,7 @@ describe('MarketPage', () => {
   it('changes the button label to Cancel Drawing after entering draw mode', async () => {
     const user = userEvent.setup()
     renderMarketPage()
+    await selectMarketParams(user)
     await user.click(screen.getByRole('button', { name: /draw custom path/i }))
     expect(screen.getByRole('button', { name: /cancel drawing/i })).toBeInTheDocument()
   })
@@ -193,6 +203,7 @@ describe('MarketPage', () => {
   it('exits draw mode when Cancel Drawing is clicked', async () => {
     const user = userEvent.setup()
     renderMarketPage()
+    await selectMarketParams(user)
     await user.click(screen.getByRole('button', { name: /draw custom path/i }))
     await user.click(screen.getByRole('button', { name: /cancel drawing/i }))
     expect(useDrawingStore.getState().state.phase).toBe('idle')
