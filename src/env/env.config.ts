@@ -10,6 +10,7 @@ export type AppEnv = {
   APP_HERMES_URL: string
   APP_RPC_URL: string
   APP_NETWORK: 'devnet' | 'mainnet'
+  APP_PROGRAM_ID: string
 }
 
 export const env: AppEnv = {
@@ -18,4 +19,5 @@ export const env: AppEnv = {
   APP_HERMES_URL: requireEnv('APP_HERMES_URL'),
   APP_RPC_URL: requireEnv('APP_RPC_URL'),
   APP_NETWORK: requireEnv('APP_NETWORK') as AppEnv['APP_NETWORK'],
+  APP_PROGRAM_ID: requireEnv('APP_PROGRAM_ID'),
 }

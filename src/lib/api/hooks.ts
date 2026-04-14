@@ -1,18 +1,27 @@
 import { useQuery } from '@tanstack/react-query'
 
-import { getCurrentPrice, getMarket, getMarkets, getUserPosition } from '@/lib/api/mock'
+import * as mock from '@/lib/api/mock'
+import * as onchain from '@/lib/api/onchain'
+
+/**
+ * When true, all data hooks use the mock layer instead of on-chain RPC.
+ * Set APP_USE_MOCK=true in your .env to enable during development.
+ */
+const USE_MOCK = import.meta.env.APP_USE_MOCK === 'true'
+
+const api = USE_MOCK ? mock : onchain
 
 export function useMarkets() {
   return useQuery({
     queryKey: ['markets'],
-    queryFn: getMarkets,
+    queryFn: api.getMarkets,
   })
 }
 
 export function useMarket(id: string | undefined) {
   return useQuery({
     queryKey: ['market', id],
-    queryFn: () => getMarket(id!),
+    queryFn: () => api.getMarket(id!),
     enabled: !!id,
   })
 }
@@ -20,7 +29,7 @@ export function useMarket(id: string | undefined) {
 export function useUserPosition(marketId: string | undefined) {
   return useQuery({
     queryKey: ['userPosition', marketId],
-    queryFn: () => getUserPosition(marketId!),
+    queryFn: () => api.getUserPosition(marketId!),
     enabled: !!marketId,
   })
 }
@@ -32,7 +41,7 @@ export function useUserPosition(marketId: string | undefined) {
 export function useCurrentPrice(pair: string | undefined) {
   return useQuery({
     queryKey: ['price', pair],
-    queryFn: () => getCurrentPrice(pair!),
+    queryFn: () => mock.getCurrentPrice(pair!),
     enabled: !!pair,
     refetchInterval: 5000,
   })

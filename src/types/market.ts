@@ -35,24 +35,6 @@ export interface PricePoint {
   time: number
   /** price in quote units (e.g. USDC) */
   value: number
-  /** optional upper tolerance band (from CheckpointLeaf.upper_tolerance) */
-  upperTolerance?: number
-  /** optional lower tolerance band (from CheckpointLeaf.lower_tolerance) */
-  lowerTolerance?: number
-}
-
-/**
- * A single predicted checkpoint leaf — mirrors on-chain CheckpointLeaf.
- * These are the leaves of the Merkle tree whose root is stored on-chain.
- */
-export interface CheckpointLeaf {
-  checkpointIndex: number
-  /** predicted price in quote decimals */
-  predictedPrice: number
-  /** upper tolerance band */
-  upperTolerance: number
-  /** lower tolerance band */
-  lowerTolerance: number
 }
 
 /* ── Prediction paths ──────────────────────────────────────── */
@@ -71,17 +53,15 @@ export interface PredictionPath {
   origin: PathOrigin
   /** LMSR price multiplier — payout per USDC wagered (derived from shares) */
   multiplier: number
-  /** Resolved checkpoint data (fetched from checkpointsUri) */
+  /** Resolved price trajectory for chart rendering */
   data: PricePoint[]
 
   /* ── On-chain PathOutcome fields ─────────────────────────── */
 
   /** on-chain path_index (0..15) */
   pathIndex: number
-  /** Merkle root of checkpoint leaves (hex-encoded [u8;32]) */
-  checkpointsRoot: string
-  /** Off-chain URI where full checkpoint data lives (e.g. Arweave) */
-  checkpointsUri: string
+  /** On-chain predicted prices (fixed-point u64 / 1M). One per checkpoint. */
+  predictedPrices: number[]
   /** Number of checkpoints in this path */
   numCheckpoints: number
   /** Initial probability in basis points (e.g. 2000 = 20%) */
