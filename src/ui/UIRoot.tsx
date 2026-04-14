@@ -6,7 +6,7 @@ import { clusterApiUrl } from '@solana/web3.js'
 import { env, toSolanaCluster } from '@/env'
 import { AnchorProgramProvider } from '@/lib/chain'
 import { WalletSync } from '@/stores/walletStore'
-import '@solana/wallet-adapter-react-ui/styles.css'
+import '@/style/wallet.css'
 
 // Wallet Standard auto-detects Phantom/Backpack. Solflare needs explicit adapter
 // due to WalletAccountError in StandardWalletAdapter._connect (known issue).
