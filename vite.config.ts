@@ -3,11 +3,14 @@ import { resolve } from 'node:path'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
-import { nodePolyfills } from 'vite-plugin-node-polyfills'
 
 export default defineConfig({
   envPrefix: 'APP_',
-  plugins: [react(), tailwindcss(), nodePolyfills()],
+  plugins: [react(), tailwindcss()],
+  define: {
+    'process.env': {},
+    global: 'globalThis',
+  },
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),

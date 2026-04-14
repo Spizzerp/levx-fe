@@ -8,7 +8,7 @@ import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adap
 
 import { env } from '@/env/env.config'
 
-import '@solana/wallet-adapter-react-ui/styles.css'
+import '@/style/wallet.css'
 
 export function SolanaProviders({ children }: PropsWithChildren) {
   const network =
