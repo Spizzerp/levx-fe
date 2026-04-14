@@ -2,3 +2,29 @@
 @import 'tailwindcss';
 @import './customVariants.css';
 @import './global.css';
+
+/* ── Wallet adapter modal theme overrides ──────────────────────
+   Scoped to .wallet-adapter-* — theming only (no layout / animation).
+   Token substitutions from plan example → actual token names:
+     --color-bg              → --color-surface
+     --color-fg              → --color-ink
+     --color-surface         → --color-surface-1
+     --color-border          → --color-line
+     --color-surface-hover   → --color-surface-2
+*/
+.wallet-adapter-modal {
+  background: var(--color-surface);
+  color: var(--color-ink);
+}
+.wallet-adapter-modal-wrapper {
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-line);
+}
+.wallet-adapter-button {
+  background: transparent;
+  color: var(--color-ink);
+  border: 1px solid var(--color-line);
+}
+.wallet-adapter-button:hover {
+  background: var(--color-surface-2);
+}

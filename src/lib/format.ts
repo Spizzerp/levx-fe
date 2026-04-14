@@ -41,3 +41,14 @@ export function maxLeverageByDuration(durationMs: number): number {
   if (days <= 30) return 10
   return 5
 }
+
+/** Truncate a base58 address for display — "first4···last4". */
+export function formatAddress(base58: string): string {
+  return `${base58.slice(0, 4)}···${base58.slice(-4)}`
+}
+
+/** Build a Solana explorer URL for an address. */
+export function explorerAddressUrl(base58: string, cluster: string): string {
+  const clusterParam = cluster === 'mainnet' ? 'mainnet-beta' : cluster
+  return `https://explorer.solana.com/address/${base58}?cluster=${clusterParam}`
+}
