@@ -1,0 +1,23 @@
+.chart-frame-glow {
+  box-shadow:
+    0 0 20px rgba(255, 255, 255, 0.08),
+    0 0 60px rgba(255, 255, 255, 0.04);
+}
+
+.chart-frame-glow::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 80% 40% at 50% 0%,
+    rgba(255, 255, 255, 0.08) 0%,
+    transparent 100%
+  );
+  mask-image: url("data:image/svg+xml,%3Csvg width='4' height='4' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='1' height='1' fill='white'/%3E%3C/svg%3E");
+  mask-size: 4px 4px;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg width='4' height='4' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='1' height='1' fill='white'/%3E%3C/svg%3E");
+  -webkit-mask-size: 4px 4px;
+}

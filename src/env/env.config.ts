@@ -11,6 +11,7 @@ export type AppEnv = {
   APP_RPC_URL: string
   APP_NETWORK: 'devnet' | 'mainnet'
   APP_PROGRAM_ID: string
+  APP_ADMIN_WALLETS: string[]
 }
 
 export const env: AppEnv = {
@@ -20,4 +21,5 @@ export const env: AppEnv = {
   APP_RPC_URL: requireEnv('APP_RPC_URL'),
   APP_NETWORK: requireEnv('APP_NETWORK') as AppEnv['APP_NETWORK'],
   APP_PROGRAM_ID: requireEnv('APP_PROGRAM_ID'),
+  APP_ADMIN_WALLETS: (import.meta.env.APP_ADMIN_WALLETS ?? '').split(',').map((s: string) => s.trim()).filter(Boolean),
 }

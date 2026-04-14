@@ -402,6 +402,36 @@ function ChartInner({
           {lastHistoryPoint && (
             <Circle cx={nowX} cy={priceScale(lastHistoryPoint.value)} r={5} fill="#FFFFFF" />
           )}
+          {showMarketStartMarker && (
+            <>
+              <text
+                x={nowX - 6}
+                y={innerHeight - 6}
+                fontFamily="Space Mono, monospace"
+                fontSize="9"
+                letterSpacing="0.12em"
+                fill="#FFFFFF"
+                opacity={0.5}
+                textAnchor="end"
+              >
+                [ NOW ]
+              </text>
+              {/* Horizontal connector from NOW dot to OPENS line */}
+              {lastHistoryPoint && (
+                <>
+                  <Line
+                    from={{ x: nowX, y: priceScale(lastHistoryPoint.value) }}
+                    to={{ x: marketStartX, y: priceScale(lastHistoryPoint.value) }}
+                    stroke="#FFFFFF"
+                    strokeWidth={1}
+                    strokeDasharray="4 4"
+                    opacity={0.3}
+                  />
+                  <Circle cx={marketStartX} cy={priceScale(lastHistoryPoint.value)} r={4} fill="#999999" />
+                </>
+              )}
+            </>
+          )}
 
           {/* ── Market opens marker (pending state) ─── */}
           {showMarketStartMarker && (

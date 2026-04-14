@@ -18,6 +18,7 @@ import { Stub } from '@/components/Stub'
 import { UserPositionCard } from '@/components/UserPositionCard'
 import { cn } from '@/lib/cn'
 import { useMarket, useUserPosition } from '@/lib/chain'
+import { usePlaceWager, useClaim } from '@/lib/solana/transactions'
 import { usePythFeed, useLatestPrice } from '@/lib/pyth/hooks'
 import { feedIdForPair } from '@/lib/pyth/feedIds'
 import { useBenchmarksHistory } from '@/lib/pyth/useBenchmarksHistory'
@@ -65,7 +66,10 @@ const META_SEP = <span className="text-line-strong mx-0.5">·</span>
  * transaction lands in Phase 5 (CLAIM-01); Phase 2 just ensures the button is
  * present, state-gated, and wallet-gated via ConnectGate.
  */
-function ClaimButton({ market: _market }: { market: Market }) {
+function ClaimButton({ market, pathIndex }: { market: Market; pathIndex?: number }) {
+  const claim = useClaim()
+  const idx = pathIndex ?? 0
+
   return (
     <div className="border-line flex flex-col gap-3 border p-6">
       <p className="text-ink-strong font-mono text-label tracking-wide uppercase">
@@ -75,10 +79,20 @@ function ClaimButton({ market: _market }: { market: Market }) {
         Market has settled. Claim your payout below.
       </p>
       <ConnectGate>
-        <Button variant="primary" fullWidth>
-          Claim
+        <Button
+          variant="primary"
+          fullWidth
+          disabled={claim.isPending}
+          onClick={() => claim.mutate({ marketId: market.marketId, pathIndex: idx })}
+        >
+          {claim.isPending ? 'Confirming…' : 'Claim'}
         </Button>
       </ConnectGate>
+      {claim.isError && (
+        <p className="text-accent font-mono text-caption mt-1">
+          {(claim.error as Error).message}
+        </p>
+      )}
     </div>
   )
 }
@@ -99,6 +113,8 @@ export function MarketPage() {
     pair,
     interval: candleInterval,
   })
+
+  const placeWager = usePlaceWager()
 
   const drawingPhase = useDrawingStore((s) => s.state.phase)
   const enterDrawMode = useDrawingStore((s) => s.enterDrawMode)
@@ -470,11 +486,24 @@ export function MarketPage() {
             variant="primary"
             fullWidth
             className="mt-2"
-            disabled={market.state !== 'active'}
+            disabled={market.state !== 'active' || !selectedPath || placeWager.isPending}
+            onClick={() => {
+              if (!selectedPath) return
+              placeWager.mutate({
+                marketId: market.marketId,
+                pathIndex: selectedPath.pathIndex,
+                amount: parseFloat(collateral) || 0,
+              })
+            }}
           >
-            Open {isLong ? 'Long' : 'Short'} Position
+            {placeWager.isPending ? 'Confirming…' : `Open ${isLong ? 'Long' : 'Short'} Position`}
           </Button>
         </ConnectGate>
+        {placeWager.isError && (
+          <p className="text-accent font-mono text-caption mt-2">
+            {(placeWager.error as Error).message}
+          </p>
+        )}
       </aside>
       )}
 
@@ -491,7 +520,7 @@ export function MarketPage() {
       {/* ── Right rail (Settled) — claim button (ConnectGate-wrapped) ── */}
       {showClaimCard && (
         <aside className="flex flex-col gap-6">
-          <ClaimButton market={market} />
+          <ClaimButton market={market} pathIndex={userPosition ? parseInt(userPosition.pathId.replace('path-', ''), 10) : undefined} />
           {userPosition && (
             <UserPositionCard position={userPosition} marketState={market.state} />
           )}

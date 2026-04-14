@@ -44,18 +44,32 @@ function deriveTone(predictedPrices: number[]): 'ultra-bull' | 'bull' | 'neutral
 
 export async function getMarkets(): Promise<Market[]> {
   const program = getReadOnlyProgram()
-  const allMarkets = await (program.account as any).market.all()
+  let allMarkets: any[]
+  try {
+    allMarkets = await (program.account as any).market.all()
+  } catch (err) {
+    // IDL/account layout mismatch — deployed program may be newer than IDL.
+    // Return empty rather than crashing the whole page.
+    console.warn('[onchain] Failed to fetch markets — IDL may be stale:', (err as Error).message)
+    return []
+  }
 
-  return allMarkets.map((acc: any) => {
-    const raw = acc.account
-    const marketId = raw.marketId.toNumber()
-    const market = anchorMarketToFE(raw, String(marketId))
-    const pairInfo = resolvePairLabel(raw.baseMint)
-    market.pair = pairInfo.pair
-    market.base = pairInfo.base
-    market.quote = pairInfo.quote
-    return market
-  })
+  const markets: Market[] = []
+  for (const acc of allMarkets) {
+    try {
+      const raw = acc.account
+      const marketId = raw.marketId.toNumber()
+      const market = anchorMarketToFE(raw, String(marketId))
+      const pairInfo = resolvePairLabel(raw.baseMint)
+      market.pair = pairInfo.pair
+      market.base = pairInfo.base
+      market.quote = pairInfo.quote
+      markets.push(market)
+    } catch {
+      // Skip accounts that can't be deserialized (layout mismatch)
+    }
+  }
+  return markets
 }
 
 export async function getMarket(id: string): Promise<Market> {

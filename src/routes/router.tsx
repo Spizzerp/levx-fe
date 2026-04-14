@@ -1,5 +1,7 @@
 import { createRootRoute, createRoute, createRouter, redirect } from '@tanstack/react-router'
 
+import { AdminPage } from '@/routes/pages/AdminPage'
+import { AdminMarketsPage } from '@/routes/pages/AdminMarketsPage'
 import { LabsChartPage } from '@/routes/pages/LabsChartPage'
 import { LeaderboardPage } from '@/routes/pages/LeaderboardPage'
 import { MarketPage } from '@/routes/pages/MarketPage'
@@ -59,6 +61,18 @@ const leaderboardRoute = createRoute({
   component: LeaderboardPage,
 })
 
+const adminRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/admin',
+  component: AdminMarketsPage,
+})
+
+const adminCreateRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/admin/create',
+  component: AdminPage,
+})
+
 const labsChartRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/labs/chart',
@@ -73,6 +87,8 @@ const routeTree = rootRoute.addChildren([
   vaultRoute,
   portfolioRoute,
   leaderboardRoute,
+  adminRoute,
+  adminCreateRoute,
   labsChartRoute,
 ])
 

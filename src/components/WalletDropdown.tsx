@@ -1,7 +1,9 @@
 import { useEffect, useRef } from 'react'
 import type { PublicKey } from '@solana/web3.js'
 import { useWallet } from '@solana/wallet-adapter-react'
+import { useNavigate } from '@tanstack/react-router'
 
+import { env } from '@/env/env.config'
 import { explorerAddressUrl } from '@/lib/format'
 import { cn } from '@/lib/cn'
 
@@ -28,6 +30,8 @@ export function WalletDropdown({
 }: WalletDropdownProps) {
   const panelRef = useRef<HTMLDivElement | null>(null)
   const { disconnect } = useWallet()
+  const navigate = useNavigate()
+  const isAdmin = env.APP_ADMIN_WALLETS.includes(publicKey.toBase58())
 
   useEffect(() => {
     if (!open) return
@@ -61,6 +65,22 @@ export function WalletDropdown({
         'min-w-[200px] overflow-hidden rounded-md border',
       )}
     >
+      {isAdmin && (
+        <>
+          <button
+            type="button"
+            role="menuitem"
+            className={MENU_ITEM}
+            onClick={() => {
+              onClose()
+              void navigate({ to: '/admin' })
+            }}
+          >
+            Manage markets
+          </button>
+          <hr className="border-line mx-2 my-1" />
+        </>
+      )}
       <button
         type="button"
         role="menuitem"

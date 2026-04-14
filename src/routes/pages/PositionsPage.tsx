@@ -1,9 +1,11 @@
 import { useState } from 'react'
 
 import { Button } from '@/components/Button'
+import { ConnectGate } from '@/components/ConnectGate'
 import { DataTable, NUM_CELL, type DataTableColumn } from '@/components/DataTable'
 import { cn } from '@/lib/cn'
 import { formatUSD } from '@/lib/format'
+import { useExitPosition, useClaim } from '@/lib/solana/transactions'
 import { PageLayout } from '@/layouts/PageLayout'
 
 type PositionStatus = 'active' | 'sampling' | 'at-risk'
@@ -11,6 +13,9 @@ type PositionStatus = 'active' | 'sampling' | 'at-risk'
 interface Position {
   id: string
   marketId: string
+  /** Numeric on-chain market_id for transaction building */
+  marketIdNum: number
+  pathIndex: number
   pair: string
   pathName: string
   pathTone: string
@@ -27,6 +32,8 @@ const MOCK_POSITIONS: Position[] = [
   {
     id: 'pos-1',
     marketId: 'market-1',
+    marketIdNum: 0,
+    pathIndex: 1,
     pair: 'SOL/USDC',
     pathName: 'Steady Bull',
     pathTone: 'bull',
@@ -40,6 +47,8 @@ const MOCK_POSITIONS: Position[] = [
   {
     id: 'pos-2',
     marketId: 'market-2',
+    marketIdNum: 1,
+    pathIndex: 2,
     pair: 'ETH/USDC',
     pathName: 'Neutral Drift',
     pathTone: 'neutral',
@@ -52,6 +61,8 @@ const MOCK_POSITIONS: Position[] = [
   {
     id: 'pos-3',
     marketId: 'market-3',
+    marketIdNum: 2,
+    pathIndex: 3,
     pair: 'BTC/USDC',
     pathName: 'Aggressive Bear',
     pathTone: 'bear',
@@ -89,12 +100,15 @@ function PositionStatusDot({ status }: { status: PositionStatus }) {
 }
 
 export function PositionsPage() {
+  const exitPosition = useExitPosition()
   const [closingPosId, setClosingPosId] = useState<string | null>(null)
 
-  const handleCloseClick = (posId: string) => {
-    setClosingPosId(posId)
-    // TODO: Implement close position logic
-    setTimeout(() => setClosingPosId(null), 1000)
+  const handleCloseClick = (pos: Position) => {
+    setClosingPosId(pos.id)
+    exitPosition.mutate(
+      { marketId: pos.marketIdNum, pathIndex: pos.pathIndex },
+      { onSettled: () => setClosingPosId(null) },
+    )
   }
 
   const columns: DataTableColumn<Position>[] = [
@@ -164,14 +178,16 @@ export function PositionsPage() {
       key: 'action',
       header: '',
       render: (pos) => (
-        <Button
-          variant="ghost"
-          onClick={() => handleCloseClick(pos.id)}
-          disabled={closingPosId === pos.id}
-          className="text-micro min-h-0 h-8 px-3 py-1"
-        >
-          {closingPosId === pos.id ? 'Closing...' : 'Close'}
-        </Button>
+        <ConnectGate>
+          <Button
+            variant="ghost"
+            onClick={() => handleCloseClick(pos)}
+            disabled={closingPosId === pos.id}
+            className="text-micro min-h-0 h-8 px-3 py-1"
+          >
+            {closingPosId === pos.id ? 'Closing…' : 'Close'}
+          </Button>
+        </ConnectGate>
       ),
     },
   ]
