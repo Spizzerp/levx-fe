@@ -188,3 +188,30 @@ describe('MarketPage', () => {
     expect(notice.className).not.toMatch(/md:hidden/)
   })
 })
+
+describe('MarketPage state-gated controls', () => {
+  it.todo('mounts the wager panel when market.state is Active (MARKET-04)')
+  it.todo('mounts the wager panel when market.state is Sampling (MARKET-04)')
+  it.todo('does NOT mount the wager panel when market.state is Pending (MARKET-04)')
+  it.todo('does NOT mount the wager panel when market.state is Settling (MARKET-04)')
+  it.todo('does NOT mount the wager panel when market.state is Maturing (MARKET-04)')
+  it.todo('does NOT mount the wager panel when market.state is Settled (MARKET-04)')
+  it.todo('does NOT mount the wager panel when market.state is Void (MARKET-04)')
+  it.todo('mounts the claim button only when market.state is Settled (MARKET-04)')
+  it.todo('mounts the maturity countdown card only when market.state is Maturing (MARKET-04)')
+  it.todo('renders the MarketStateBadge with the market state prose')
+  it.todo(
+    'renders a collapsible metadata section with checkpoint schedule, scoring weights, fee rate, pool composition (MARKET-05)',
+  )
+  it.todo('metadata section toggles open/closed on trigger click (MARKET-05)')
+})
+
+describe('MarketPage wallet gating', () => {
+  it.todo(
+    'submit button slot shows "Connect wallet to continue" when walletStore.connected=false (WALLET-04)',
+  )
+  it.todo(
+    'wager panel remains fully visible and interactive when disconnected (only submit slot is gated) (WALLET-04)',
+  )
+  it.todo('renders MarketPage without crashing when wallet is disconnected (WALLET-03)')
+})
