@@ -16,6 +16,10 @@ vi.mock('@solana/wallet-adapter-react', () => ({
   useWallet: () => ({ disconnect }),
 }))
 
+vi.mock('@/env', () => ({
+  env: { APP_NETWORK: 'devnet' },
+}))
+
 const SYSTEM_KEY = new PublicKey('11111111111111111111111111111111')
 
 function resetStore() {
