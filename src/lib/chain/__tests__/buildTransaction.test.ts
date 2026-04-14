@@ -6,8 +6,8 @@ function makeIx(): TransactionInstruction {
   return {
     keys: [],
     programId: new PublicKey('11111111111111111111111111111111'),
-    data: Buffer.from([]),
-  } as TransactionInstruction
+    data: new Uint8Array(),
+  } as unknown as TransactionInstruction
 }
 
 describe('buildTransaction', () => {
