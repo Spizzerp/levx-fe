@@ -1,6 +1,7 @@
 import { Link } from '@tanstack/react-router'
 
 import { cn } from '@/lib/cn'
+import { WalletButton } from '@/components/WalletButton'
 
 const links = [
   { to: '/markets', label: 'Markets' },
@@ -35,16 +36,7 @@ export function Nav() {
           </li>
         ))}
       </ul>
-      <button
-        className={cn(
-          'border-line-strong rounded-full border bg-transparent px-[18px] py-2.5',
-          'text-label text-ink font-mono tracking-normal uppercase',
-          'duration-short ease-levx transition-[border-color]',
-          'hover:border-ink',
-        )}
-      >
-        7K4D ··· 9XQ2
-      </button>
+      <WalletButton />
     </nav>
   )
 }
