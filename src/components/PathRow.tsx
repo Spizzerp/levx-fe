@@ -18,9 +18,9 @@ export function PathRow({ index, name, multiplier, wagered, active = false, onCl
       type="button"
       onClick={onClick}
       className={cn(
-        'border-line grid h-14 w-full grid-cols-[44px_1fr_auto] items-center gap-4 border-0 border-b border-l-2 border-l-transparent bg-transparent pr-[18px] pl-4 text-left',
+        'border-line grid h-14 w-full grid-cols-[44px_1fr_auto] items-center gap-4 border-0 border-b border-l-2 border-l-transparent bg-transparent pr-5 pl-4 text-left',
         'duration-short ease-levx transition-[background]',
-        'hover:bg-white/[0.02]',
+        'hover:bg-white/2',
         active && 'border-l-ink-strong bg-surface-2',
       )}
     >
@@ -35,12 +35,12 @@ export function PathRow({ index, name, multiplier, wagered, active = false, onCl
           {name}
         </span>
         {wagered != null && wagered > 0 && (
-          <span className="text-ink-dim font-mono text-[9px] tracking-[0.06em]">
+          <span className="text-ink-dim text-nano font-mono tracking-wide">
             {formatUSD(wagered)} wagered
           </span>
         )}
       </div>
-      <span className="text-ink-strong font-mono text-[13px]">{multiplier}</span>
+      <span className="text-ink-strong text-caption font-mono">{multiplier}</span>
     </button>
   )
 }

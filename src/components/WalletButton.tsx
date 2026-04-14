@@ -6,10 +6,10 @@ import { formatAddress } from '@/lib/format'
 import { cn } from '@/lib/cn'
 import { WalletDropdown } from '@/components/WalletDropdown'
 
-// Pill styling copied verbatim from the removed hardcoded button in Nav.tsx:38.
+// Pill styling for wallet button
 const PILL = cn(
   'border-line-strong rounded-full border bg-transparent px-3 py-1.5',
-  'text-[10px] text-ink font-mono tracking-wide uppercase',
+  'text-micro text-ink font-mono tracking-wide uppercase',
   'duration-short ease-levx transition-[border-color]',
   'hover:border-ink',
 )

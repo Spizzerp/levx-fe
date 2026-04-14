@@ -232,11 +232,11 @@ export function MarketPage() {
           <MarketStateBadge market={market} />
         </div>
 
-        <h1 className="font-display text-ink-strong my-[6px] mb-[10px] text-[56px] leading-none font-medium tracking-[-0.01em] [font-variation-settings:'ROND'_100]">
+        <h1 className="font-display text-ink-strong text-display-lg my-1.5 mb-2.5 leading-none font-medium tracking-tighter [font-variation-settings:'ROND'_100]">
           {formatUSD(priceDisplay)}
         </h1>
 
-        <div className="text-ink-muted flex items-baseline gap-3 font-mono text-[13px]">
+        <div className="text-ink-muted text-caption flex items-baseline gap-3 font-mono">
           <span className={cn('font-bold', deltaColor)}>{formatDeltaBps(deltaDisplay)}</span>
           <span>24H</span>
         </div>
@@ -433,9 +433,9 @@ export function MarketPage() {
             <hr className="bg-line my-9 mb-8 h-px border-0" />
 
             <div className="mb-8">
-              <div className="mb-[14px] flex items-baseline justify-between">
+              <div className="mb-3.5 flex items-baseline justify-between">
                 <Label>Leverage</Label>
-                <span className="text-ink-strong font-mono text-[15px] font-bold">
+                <span className="text-ink-strong text-body-sm font-mono font-bold">
                   {Math.min(leverage, leverageCap)}×
                 </span>
               </div>

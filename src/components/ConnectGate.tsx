@@ -24,8 +24,8 @@ export function ConnectGate({ children }: PropsWithChildren) {
   const { setVisible } = useWalletModal()
 
   const baseSlot = cn(
-    'inline-flex min-h-[44px] w-full items-center justify-center rounded-full px-6 py-[14px]',
-    'font-mono text-[13px] font-bold tracking-wide uppercase',
+    'inline-flex min-h-11 w-full items-center justify-center rounded-full px-6 py-3.5',
+    'text-caption font-mono font-bold tracking-wide uppercase',
     'duration-short ease-levx transition-[opacity,background,border-color,color]',
   )
 

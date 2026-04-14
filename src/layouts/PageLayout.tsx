@@ -26,7 +26,7 @@ export function PageLayout({
   return (
     <main className={cn('mx-auto max-w-[1680px] px-10 pt-14 pb-12', className)}>
       <header className="mb-12">
-        <h1 className="font-display text-ink-strong mb-4 text-[56px] leading-none font-medium tracking-[-0.01em] [font-variation-settings:'ROND'_100]">
+        <h1 className="font-display text-ink-strong text-display-lg mb-4 leading-none font-medium tracking-tighter [font-variation-settings:'ROND'_100]">
           {title}
         </h1>
         {subtitle && (

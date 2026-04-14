@@ -17,7 +17,7 @@ export function Input({ label, unit, className, ...rest }: InputProps) {
       )}
       <div
         className={cn(
-          'border-line-strong mt-3 flex items-baseline gap-[10px] border-b py-[10px]',
+          'border-line-strong mt-3 flex items-baseline gap-2.5 border-b py-2.5',
           'duration-short ease-levx transition-[border-color]',
           'focus-within:border-ink-strong',
         )}

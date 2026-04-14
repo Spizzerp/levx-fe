@@ -29,7 +29,7 @@ export function MaturityCountdownCard({ market }: MaturityCountdownCardProps) {
       <p className="text-ink-muted font-mono text-sm leading-relaxed">
         Market is in the maturity review window.
       </p>
-      <p className="text-ink-strong font-mono text-[15px] font-bold">
+      <p className="text-ink-strong text-body-sm font-mono font-bold">
         Claims open in {formatCountdown(remaining)}
       </p>
     </div>

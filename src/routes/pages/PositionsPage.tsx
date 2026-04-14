@@ -168,7 +168,7 @@ export function PositionsPage() {
           variant="ghost"
           onClick={() => handleCloseClick(pos.id)}
           disabled={closingPosId === pos.id}
-          className="min-h-0 h-8 px-3 py-1 text-[10px]"
+          className="text-micro min-h-0 h-8 px-3 py-1"
         >
           {closingPosId === pos.id ? 'Closing...' : 'Close'}
         </Button>

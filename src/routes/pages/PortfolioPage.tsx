@@ -144,7 +144,7 @@ export function PortfolioPage() {
           <Button
             variant="ghost"
             onClick={() => handleClaim(pos.id)}
-            className="h-8 min-h-0 px-3 py-1 text-[10px]"
+            className="text-micro h-8 min-h-0 px-3 py-1"
           >
             Claim
           </Button>

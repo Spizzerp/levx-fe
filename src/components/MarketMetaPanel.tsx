@@ -75,7 +75,7 @@ function MetaRow({ label, value }: { label: string; value: string }) {
       <span className="text-ink-dim font-mono text-caption tracking-wide uppercase">
         {label}
       </span>
-      <span className="text-ink-strong font-mono text-[13px]">{value}</span>
+      <span className="text-ink-strong text-caption font-mono">{value}</span>
     </div>
   )
 }

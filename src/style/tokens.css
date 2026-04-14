@@ -65,25 +65,33 @@
      Use --fs-* prefix to avoid collision with Tailwind's text-* utilities.
      Custom text-* utilities are defined below for backwards compatibility.
 
-     display-xl — 72px, hero moments
-     display-lg — 48px, section hero values
-     display-md — 36px, page titles
-     heading    — 24px, section headings
-     body       — 16px, primary copy
-     body-sm    — 14px, supporting copy
-     caption    — 12px, timestamps
-     label      — 11px, uppercase mono metadata
-     micro      — 10px, small captions
+     display-xl  — 72px, hero moments
+     display-lg  — 56px, page titles
+     display-md  — 48px, section hero values
+     display-sm  — 36px, large headings
+     heading     — 24px, section headings
+     body-lg     — 18px, emphasized body
+     body        — 16px, primary copy
+     body-sm     — 15px, secondary copy
+     ui          — 14px, UI elements
+     caption     — 13px, button text
+     label       — 11px, uppercase mono metadata
+     micro       — 10px, small captions
+     nano        — 9px, tiny labels
   */
   --fs-display-xl: 72px;
-  --fs-display-lg: 48px;
-  --fs-display-md: 36px;
+  --fs-display-lg: 56px;
+  --fs-display-md: 48px;
+  --fs-display-sm: 36px;
   --fs-heading: 24px;
+  --fs-body-lg: 18px;
   --fs-body: 16px;
-  --fs-body-sm: 14px;
-  --fs-caption: 12px;
+  --fs-body-sm: 15px;
+  --fs-ui: 14px;
+  --fs-caption: 13px;
   --fs-label: 11px;
   --fs-micro: 10px;
+  --fs-nano: 9px;
 
   /* ── Line heights ─────────────────────────────
      tight  — display text, headings
@@ -185,20 +193,53 @@
    Maintains backwards compatibility with existing code.
    ════════════════════════════════════════════════ */
 
-/* ── Legacy utilities (backwards compatible) ─────
-   text-caption  — 10px  0.1em   micro labels, captions
-   text-label    — 11px  0.1em   section labels
-   text-value    — 11px  0.05em  inline data values
-   text-tag      — 11px  0.12em  tags, table headers
+/* ── Font size utilities ─────────────────────────
+   Maps to --fs-* tokens for consistent sizing
 */
+@utility text-display-xl {
+  font-size: var(--fs-display-xl);
+}
+@utility text-display-lg {
+  font-size: var(--fs-display-lg);
+}
+@utility text-display-md {
+  font-size: var(--fs-display-md);
+}
+@utility text-display-sm {
+  font-size: var(--fs-display-sm);
+}
+@utility text-heading {
+  font-size: var(--fs-heading);
+}
+@utility text-body-lg {
+  font-size: var(--fs-body-lg);
+}
+@utility text-body {
+  font-size: var(--fs-body);
+}
+@utility text-body-sm {
+  font-size: var(--fs-body-sm);
+}
+@utility text-ui {
+  font-size: var(--fs-ui);
+}
 @utility text-caption {
-  font-size: var(--fs-micro);
-  letter-spacing: var(--tracking-wide);
+  font-size: var(--fs-caption);
 }
 @utility text-label {
   font-size: var(--fs-label);
-  letter-spacing: var(--tracking-wide);
 }
+@utility text-micro {
+  font-size: var(--fs-micro);
+}
+@utility text-nano {
+  font-size: var(--fs-nano);
+}
+
+/* ── Legacy composite utilities (backwards compatible) ─────
+   text-value — 11px 0.05em  inline data values
+   text-tag   — 11px 0.12em  tags, table headers
+*/
 @utility text-value {
   font-size: var(--fs-label);
   letter-spacing: var(--tracking-snug);
