@@ -8,7 +8,7 @@ export function CommonLayout({ children }: PropsWithChildren) {
     <>
       <Nav />
       <WrongNetworkBanner />
-      {children}
+      <div style={{ isolation: 'isolate' }}>{children}</div>
     </>
   )
 }

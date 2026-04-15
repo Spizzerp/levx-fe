@@ -10,6 +10,7 @@ import { ChartFrame } from '@/components/ChartFrame'
 import { Input } from '@/components/Input'
 import { Label } from '@/components/Label'
 import { LevXChart } from '@/components/LevXChart'
+import { PageLayout } from '@/layouts/PageLayout'
 import { cn } from '@/lib/cn'
 import type { PathTone, PredictionPath, PricePoint } from '@/types/market'
 import { env } from '@/env/env.config'
@@ -252,6 +253,21 @@ function InfoTip({ text }: { text: string }) {
   )
 }
 
+/** Linearly interpolate between two hex colors. t=0 returns a, t=1 returns b. */
+function lerpColor(a: string, b: string, t: number): string {
+  const parse = (hex: string) => [
+    parseInt(hex.slice(1, 3), 16),
+    parseInt(hex.slice(3, 5), 16),
+    parseInt(hex.slice(5, 7), 16),
+  ]
+  const [r1, g1, b1] = parse(a)
+  const [r2, g2, b2] = parse(b)
+  const r = Math.round(r1 + (r2 - r1) * t)
+  const g = Math.round(g1 + (g2 - g1) * t)
+  const bl = Math.round(b1 + (b2 - b1) * t)
+  return `rgb(${r},${g},${bl})`
+}
+
 /** Format a unix-ms timestamp as a local yyyy-MM-ddTHH:mm string for datetime-local inputs. */
 function toLocalDatetime(ms: number): string {
   const d = new Date(ms)
@@ -335,14 +351,7 @@ export function AdminPage() {
 
   if (!isAdmin) {
     return (
-      <main className="px-10 pt-6 pb-12">
-        <h1 className="font-display text-ink-strong mb-4 text-[56px] leading-none font-medium tracking-[-0.01em] [font-variation-settings:'ROND'_100]">
-          Admin
-        </h1>
-        <p className="text-ink-muted font-mono text-xs tracking-normal uppercase">
-          Connect an admin wallet to access this page.
-        </p>
-      </main>
+      <PageLayout title="Admin" subtitle="Connect an admin wallet to access this page." />
     )
   }
 
@@ -412,15 +421,7 @@ export function AdminPage() {
   }
 
   return (
-    <main className="px-10 pt-6 pb-12">
-      <header className="mb-12">
-        <h1 className="font-display text-ink-strong mb-4 text-[56px] leading-none font-medium tracking-[-0.01em] [font-variation-settings:'ROND'_100]">
-          Admin
-        </h1>
-        <p className="text-ink-muted font-mono text-xs tracking-normal uppercase">
-          Create and manage markets
-        </p>
-      </header>
+    <PageLayout title="Create" subtitle="Set market details and create" className="max-w-none">
 
       {/* ── Pair selection (above chart) ───────────────────── */}
       <div className="mb-4 flex gap-2">
@@ -500,14 +501,7 @@ export function AdminPage() {
                 </span>
                 <span
                   className="h-2 w-2 shrink-0 rounded-full"
-                  style={{
-                    backgroundColor:
-                      path.tone === 'ultra-bull' ? '#1BE6B3' :
-                      path.tone === 'bull' ? '#4a9e5c' :
-                      path.tone === 'neutral' ? '#999999' :
-                      path.tone === 'bear' ? '#d4a843' :
-                      '#d71921',
-                  }}
+                  style={{ background: 'linear-gradient(135deg, #F4FA4D, #5CF78B)' }}
                 />
                 <ProviderSelect
                   value={pathProviders[idx] ?? AI_PROVIDERS[0].id}
@@ -527,7 +521,7 @@ export function AdminPage() {
       <div>
         {/* Start time */}
         <Label className="mb-3">Market start</Label>
-        <div className="mb-8 flex items-end gap-3">
+        <div className="mb-12 flex items-end gap-3">
           <input
             type="datetime-local"
             value={startTimeInput}
@@ -550,7 +544,7 @@ export function AdminPage() {
 
         {/* Duration */}
         <Label className="mb-3">Market duration</Label>
-        <div className="mb-8 flex items-end gap-3">
+        <div className="mb-12 flex items-end gap-3">
           <input
             type="number"
             min={1}
@@ -582,8 +576,8 @@ export function AdminPage() {
         </div>
 
         {/* Checkpoint interval */}
-        <Label className="mb-3">Checkpoint interval</Label>
-        <div className="mb-8 flex gap-2">
+        <Label>Checkpoint interval</Label>
+        <div className="mt-3 mb-12 flex gap-2">
           {INTERVAL_PRESETS.map((p) => (
             <button
               key={p.sec}
@@ -598,7 +592,7 @@ export function AdminPage() {
 
         {/* Protocol params */}
         <Label className="mb-3">Protocol parameters</Label>
-        <div className="mb-8 grid grid-cols-2 gap-x-6 gap-y-4">
+        <div className="mb-12 grid grid-cols-2 gap-x-6 gap-y-4">
           <div>
             <span className="text-label text-ink-muted font-mono uppercase flex items-center">
               Lambda
@@ -630,14 +624,20 @@ export function AdminPage() {
         </div>
 
         {/* Submit */}
-        <Button
-          variant="primary"
-          fullWidth
+        <button
           disabled={isPending || !program}
           onClick={handleCreateMarket}
+          className={cn(
+            'flex w-full min-h-[44px] items-center justify-center rounded-full px-6 py-[14px]',
+            'font-mono text-[13px] font-bold tracking-wide uppercase',
+            'text-surface bg-gradient-to-r from-[#F4FA4D] to-[#5CF78B]',
+            'duration-short ease-levx transition-[opacity,box-shadow]',
+            'hover:shadow-[0_0_20px_rgba(160,248,120,0.35),0_0_60px_rgba(160,248,120,0.15)]',
+            'disabled:opacity-40 disabled:cursor-not-allowed',
+          )}
         >
           {isPending ? 'Creating…' : 'Create Market'}
-        </Button>
+        </button>
 
         {txResult && (
           <div className="border-line mt-6 border p-4">
@@ -661,6 +661,6 @@ export function AdminPage() {
         )}
       </div>
       </div>
-    </main>
+    </PageLayout>
   )
 }

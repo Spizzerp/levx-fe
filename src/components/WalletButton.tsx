@@ -8,8 +8,8 @@ import { WalletDropdown } from '@/components/WalletDropdown'
 
 // Pill styling for wallet button
 const PILL = cn(
-  'border-line-strong rounded-full border bg-transparent px-3 py-1.5',
-  'text-micro text-ink font-mono tracking-wide uppercase',
+  'border-line-strong rounded-full border bg-transparent px-4 py-2',
+  'text-[12px] text-ink font-mono tracking-wide uppercase leading-none',
   'duration-short ease-levx transition-[border-color]',
   'hover:border-ink',
 )
