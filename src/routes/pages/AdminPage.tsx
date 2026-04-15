@@ -584,8 +584,8 @@ export function AdminPage() {
         </div>
 
         {/* Protocol params */}
-        <Label className="mb-3">Protocol parameters</Label>
-        <div className="mb-12 grid grid-cols-2 gap-x-6 gap-y-4">
+        <Label className="block mb-3">Protocol parameters</Label>
+        <div className="mb-12 grid grid-cols-2 gap-x-6 gap-y-8">
           <div>
             <span className="text-label text-ink-muted font-mono uppercase flex items-center">
               Lambda
