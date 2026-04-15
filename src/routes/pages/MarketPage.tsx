@@ -233,7 +233,7 @@ export function MarketPage() {
 
   // Default selection = the middle (neutral) path on first load
   // For chart highlight, use first selected or default to middle path
-  const activePathId = selectedPathIds.size > 0 ? [...selectedPathIds][0] : (aiPaths[2]?.id ?? null)
+  const activePathId = selectedPathIds.size > 0 ? [...selectedPathIds][0] : null
   const selectedPath = allPaths.find((p) => p.id === activePathId)
   const lastPoint = selectedPath?.data[selectedPath.data.length - 1]
   const firstPoint = selectedPath?.data[0]
@@ -337,6 +337,7 @@ export function MarketPage() {
             marketStart={chartMarketStart}
             marketEnd={chartMarketEnd}
             selectedPathId={hoveredPathId ?? activePathId}
+            selectedPathIds={selectedPathIds}
             selectionInteractive={showWagerRail}
             showOtherPositions={showOtherPositions}
             pair={market.pair}

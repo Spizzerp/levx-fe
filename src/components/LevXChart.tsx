@@ -32,13 +32,21 @@ const CATMULL_ROM_ALPHA_05 = curveCatmullRom.alpha(0.5)
 const TONE_STYLES: Record<PathTone, { stroke: string; dash: string; opacity: number }> = {
   'ultra-bull': { stroke: '#5CF78B', dash: '5 4', opacity: 0.95 },
   bull: { stroke: '#5CF78B', dash: '4 4', opacity: 0.45 },
-  neutral: { stroke: '#999999', dash: '2 4', opacity: 0.65 },
+  neutral: { stroke: '#F6CE48', dash: '2 4', opacity: 0.65 },
   bear: { stroke: '#FF483B', dash: '4 4', opacity: 0.45 },
   'ultra-bear': { stroke: '#FF483B', dash: '5 4', opacity: 0.95 },
   custom: { stroke: '#5B9BF6', dash: '3 3', opacity: 0.85 },
 }
 
 const MARGIN = { top: 32, right: 80, bottom: 40, left: 16 }
+
+/** Theme-aware colors — resolved from CSS custom properties at render time. */
+const C = {
+  line: 'var(--chart-line, #FFFFFF)',
+  muted: 'var(--chart-muted, #999999)',
+  grid: 'var(--chart-grid, #222222)',
+  marker: 'var(--chart-marker, #999999)',
+}
 
 const bisectTime = bisector<PricePoint, number>((d) => d.time).left
 
@@ -53,8 +61,10 @@ export interface LevXChartProps {
   marketStart: number
   /** unix ms — when the market ends (final checkpoint) */
   marketEnd: number
-  /** which prediction path is currently highlighted */
+  /** which prediction path is currently highlighted (primary) */
   selectedPathId?: string | null
+  /** all selected path IDs — rendered as solid lines */
+  selectedPathIds?: Set<string>
   /**
    * Whether the selected path represents an interactive user choice.
    * When false (e.g. on non-Active markets where path selection is disabled),
@@ -106,6 +116,7 @@ function ChartInner({
   marketStart,
   marketEnd,
   selectedPathId,
+  selectedPathIds,
   selectionInteractive = true,
   showOtherPositions,
   pair,
@@ -285,7 +296,7 @@ function ChartInner({
         <GridRows
           scale={priceScale}
           width={innerWidth}
-          stroke="#222222"
+          stroke={C.grid}
           strokeWidth={1}
           numTicks={6}
         />
@@ -314,7 +325,7 @@ function ChartInner({
           {/* ── Prediction paths ────────────────────── */}
           {predictions.map((path) => {
             const style = TONE_STYLES[path.tone]
-            const isSelected = selectedPathId === path.id
+            const isSelected = selectedPathId === path.id || selectedPathIds?.has(path.id)
             return (
               <LinePath<PricePoint>
                 key={path.id}
@@ -342,7 +353,7 @@ function ChartInner({
                   data={path.data}
                   x={(d) => timeScale(d.time)}
                   y={(d) => priceScale(d.value)}
-                  stroke="#FFFFFF"
+                  stroke={C.line}
                   strokeWidth={2}
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -351,34 +362,37 @@ function ChartInner({
                 />
               ))}
 
-          {/* ── Selected prediction overlay ─────────── */}
-          {selected && (
-            selectionInteractive ? (
+          {/* ── Selected prediction overlays — solid line for each selected path ── */}
+          {selectionInteractive && predictions
+            .filter((p) => selectedPathIds?.has(p.id) || p.id === selectedPathId)
+            .map((path) => (
               <LinePath<PricePoint>
-                data={selected.data}
+                key={`sel-${path.id}`}
+                data={path.data}
                 x={(d) => timeScale(d.time)}
                 y={(d) => priceScale(d.value)}
-                stroke="#FFFFFF"
+                stroke={C.line}
                 strokeWidth={2.5}
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 curve={CATMULL_ROM_ALPHA_05}
-                style={{ filter: 'drop-shadow(0 0 4px rgba(255,255,255,0.4))' }}
               />
-            ) : (
-              <LinePath<PricePoint>
-                data={selected.data}
-                x={(d) => timeScale(d.time)}
-                y={(d) => priceScale(d.value)}
-                stroke="#999999"
-                strokeWidth={1.5}
-                strokeDasharray="2 4"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                opacity={0.65}
-                curve={CATMULL_ROM_ALPHA_05}
-              />
-            )
+            ))}
+
+          {/* ── Non-interactive selected overlay (quiet dotted preview) ── */}
+          {selected && !selectionInteractive && (
+            <LinePath<PricePoint>
+              data={selected.data}
+              x={(d) => timeScale(d.time)}
+              y={(d) => priceScale(d.value)}
+              stroke={C.muted}
+              strokeWidth={1.5}
+              strokeDasharray="2 4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              opacity={0.65}
+              curve={CATMULL_ROM_ALPHA_05}
+            />
           )}
 
           {/* ── Historical price line ───────────────── */}
@@ -386,7 +400,7 @@ function ChartInner({
             data={mergedHistory}
             x={(d) => timeScale(d.time)}
             y={(d) => priceScale(d.value)}
-            stroke="#FFFFFF"
+            stroke={C.line}
             strokeWidth={2}
             strokeLinejoin="round"
             curve={curveMonotoneX}
@@ -396,13 +410,13 @@ function ChartInner({
           <Line
             from={{ x: nowX, y: 0 }}
             to={{ x: nowX, y: innerHeight }}
-            stroke="#FFFFFF"
+            stroke={C.line}
             strokeWidth={1}
             strokeDasharray="2 4"
             opacity={0.4}
           />
           {lastHistoryPoint && (
-            <Circle cx={nowX} cy={priceScale(lastHistoryPoint.value)} r={5} fill="#FFFFFF" />
+            <Circle cx={nowX} cy={priceScale(lastHistoryPoint.value)} r={5} fill={C.line} />
           )}
           {showMarketStartMarker && (
             <>
@@ -412,7 +426,7 @@ function ChartInner({
                 fontFamily="Space Mono, monospace"
                 fontSize="9"
                 letterSpacing="0.12em"
-                fill="#FFFFFF"
+                fill={C.line}
                 opacity={0.5}
                 textAnchor="end"
               >
@@ -424,12 +438,12 @@ function ChartInner({
                   <Line
                     from={{ x: nowX, y: priceScale(lastHistoryPoint.value) }}
                     to={{ x: marketStartX, y: priceScale(lastHistoryPoint.value) }}
-                    stroke="#FFFFFF"
+                    stroke={C.line}
                     strokeWidth={1}
                     strokeDasharray="4 4"
                     opacity={0.3}
                   />
-                  <Circle cx={marketStartX} cy={priceScale(lastHistoryPoint.value)} r={4} fill="#999999" />
+                  <Circle cx={marketStartX} cy={priceScale(lastHistoryPoint.value)} r={4} fill={C.muted} />
                 </>
               )}
             </>
@@ -439,7 +453,7 @@ function ChartInner({
           <Line
             from={{ x: marketStartX, y: 0 }}
             to={{ x: marketStartX, y: innerHeight }}
-            stroke="#999999"
+            stroke={C.muted}
             strokeWidth={1}
             strokeDasharray="4 4"
             opacity={0.4}
@@ -450,7 +464,7 @@ function ChartInner({
             fontFamily="Space Mono, monospace"
             fontSize="9"
             letterSpacing="0.12em"
-            fill="#999999"
+            fill={C.muted}
             textAnchor="end"
           >
             {showMarketStartMarker ? '[ OPENS ]' : '[ START ]'}
@@ -462,7 +476,7 @@ function ChartInner({
               <Line
                 from={{ x: marketEndX, y: 0 }}
                 to={{ x: marketEndX, y: innerHeight }}
-                stroke="#999999"
+                stroke={C.muted}
                 strokeWidth={1}
                 strokeDasharray="4 4"
                 opacity={0.5}
@@ -473,7 +487,7 @@ function ChartInner({
                 fontFamily="Space Mono, monospace"
                 fontSize="9"
                 letterSpacing="0.12em"
-                fill="#999999"
+                fill={C.muted}
                 textAnchor="end"
               >
                 [ ENDS ]
@@ -491,7 +505,7 @@ function ChartInner({
           stroke="transparent"
           tickStroke="transparent"
           tickLabelProps={() => ({
-            fill: '#666666',
+            fill: 'var(--chart-muted, #666666)',
             fontFamily: 'Space Mono, monospace',
             fontSize: 10,
             letterSpacing: '0.08em',
@@ -520,7 +534,7 @@ function ChartInner({
           stroke="transparent"
           tickStroke="transparent"
           tickLabelProps={() => ({
-            fill: '#666666',
+            fill: 'var(--chart-muted, #666666)',
             fontFamily: 'Space Mono, monospace',
             fontSize: 10,
             letterSpacing: '0.12em',
@@ -562,13 +576,13 @@ function ChartInner({
             <Line
               from={{ x: hover.x, y: 0 }}
               to={{ x: hover.x, y: innerHeight }}
-              stroke="#FFFFFF"
+              stroke={C.line}
               strokeWidth={1}
               strokeDasharray="1 3"
               opacity={0.5}
               pointerEvents="none"
             />
-            <Circle cx={hover.x} cy={priceScale(hover.value)} r={3} fill="#FFFFFF" />
+            <Circle cx={hover.x} cy={priceScale(hover.value)} r={3} fill={C.line} />
           </>
         )}
 
@@ -632,7 +646,7 @@ function ChartInner({
             fontFamily="Space Mono, monospace"
             fontSize="10"
             letterSpacing="0.08em"
-            fill="#999999"
+            fill={C.muted}
           >
             {new Date(hover.time)
               .toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
@@ -643,7 +657,7 @@ function ChartInner({
             fontFamily="Space Mono, monospace"
             fontSize="10"
             letterSpacing="0.08em"
-            fill="#FFFFFF"
+            fill={C.line}
           >
             {hover.value.toLocaleString('en-US', { maximumFractionDigits: 0 })}
           </text>
