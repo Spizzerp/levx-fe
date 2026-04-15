@@ -220,10 +220,13 @@ export function MarketsPage() {
                   <motion.div
                     key="expanded"
                     className="flex items-center px-2"
-                    initial={{ opacity: 0, width: 0 }}
-                    animate={{ opacity: 1, width: 'auto' }}
+                    initial={{ width: 0 }}
+                    animate={{ width: 'auto' }}
                     exit={{ opacity: 0, width: 0 }}
-                    transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
+                    transition={{
+                      width: { duration: 0.3, ease: [0.25, 0.1, 0.25, 1] },
+                      opacity: { duration: 0.15 },
+                    }}
                   >
                     {[
                       FILTERS.find((f) => f.id === filter)!,
@@ -232,9 +235,9 @@ export function MarketsPage() {
                       <motion.button
                         key={f.id}
                         type="button"
-                        initial={{ opacity: 0, x: -6 }}
+                        initial={{ opacity: 0, x: -8 }}
                         animate={{ opacity: 1, x: 0 }}
-                        transition={{ duration: 0.15, delay: i * 0.02 }}
+                        transition={{ duration: 0.2, delay: 0.1 + i * 0.03 }}
                         onClick={() => handleFilterSelect(f.id)}
                         className={cn(
                           'whitespace-nowrap px-3 py-1 font-mono text-[10px] uppercase tracking-wider',
