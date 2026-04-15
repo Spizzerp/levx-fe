@@ -30,11 +30,11 @@ const CATMULL_ROM_ALPHA_05 = curveCatmullRom.alpha(0.5)
 /* ── Visual config — derived from Nothing tokens ────────────────── */
 
 const TONE_STYLES: Record<PathTone, { stroke: string; dash: string; opacity: number }> = {
-  'ultra-bull': { stroke: '#4A9E5C', dash: '5 4', opacity: 0.95 },
-  bull: { stroke: '#4A9E5C', dash: '4 4', opacity: 0.45 },
+  'ultra-bull': { stroke: '#5CF78B', dash: '5 4', opacity: 0.95 },
+  bull: { stroke: '#5CF78B', dash: '4 4', opacity: 0.45 },
   neutral: { stroke: '#999999', dash: '2 4', opacity: 0.65 },
-  bear: { stroke: '#D71921', dash: '4 4', opacity: 0.45 },
-  'ultra-bear': { stroke: '#D71921', dash: '5 4', opacity: 0.95 },
+  bear: { stroke: '#FF483B', dash: '4 4', opacity: 0.45 },
+  'ultra-bear': { stroke: '#FF483B', dash: '5 4', opacity: 0.95 },
   custom: { stroke: '#5B9BF6', dash: '3 3', opacity: 0.85 },
 }
 

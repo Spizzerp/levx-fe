@@ -4,6 +4,7 @@ import { Button } from '@/components/Button'
 import { ConnectGate } from '@/components/ConnectGate'
 import { DataTable, NUM_CELL, type DataTableColumn } from '@/components/DataTable'
 import { cn } from '@/lib/cn'
+import { DOT_GRADIENT } from '@/lib/constants'
 import { formatUSD } from '@/lib/format'
 import { useExitPosition, useClaim } from '@/lib/solana/transactions'
 import { PageLayout } from '@/layouts/PageLayout'
@@ -81,19 +82,18 @@ const STATUS_LABELS: Record<PositionStatus, string> = {
   'at-risk': 'At Risk',
 }
 
-const STATUS_DOT_COLORS: Record<PositionStatus, string> = {
-  active: 'bg-success',
-  sampling: 'bg-warning',
-  'at-risk': 'bg-accent',
+const STATUS_DOT_BG: Record<PositionStatus, string> = {
+  active: DOT_GRADIENT.positive,
+  sampling: 'var(--color-warning)',
+  'at-risk': DOT_GRADIENT.negative,
 }
 
 const NARROW_HIDE = '[@media(max-width:1200px)]:hidden'
 
 function PositionStatusDot({ status }: { status: PositionStatus }) {
-  const colorClass = STATUS_DOT_COLORS[status]
   return (
     <span className="text-label text-ink-muted inline-flex items-center gap-2 font-mono uppercase">
-      <span className={cn('h-1.5 w-1.5 rounded-full', colorClass)} aria-hidden />
+      <span className="h-1.5 w-1.5 rounded-full" style={{ background: STATUS_DOT_BG[status] }} aria-hidden />
       {STATUS_LABELS[status]}
     </span>
   )

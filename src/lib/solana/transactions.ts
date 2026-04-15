@@ -16,6 +16,7 @@ import { SystemProgram } from '@solana/web3.js'
 
 import { useProgram } from './program'
 import { SCALE } from '@/lib/constants'
+import { toast } from '@/stores/toastStore'
 import { deriveMarketPda, derivePathPda, derivePositionPda, deriveProtocolPda } from './pda'
 
 interface PlaceWagerInput {
@@ -77,10 +78,14 @@ export function usePlaceWager() {
 
       return sig as string
     },
-    onSuccess: (_sig, { marketId }) => {
+    onSuccess: (sig, { marketId }) => {
       queryClient.invalidateQueries({ queryKey: ['market', String(marketId)] })
       queryClient.invalidateQueries({ queryKey: ['userPosition', String(marketId)] })
       queryClient.invalidateQueries({ queryKey: ['markets'] })
+      toast.success('Position opened', { txSig: sig })
+    },
+    onError: (err) => {
+      toast.error('Failed to open position', { message: (err as Error).message })
     },
   })
 }
@@ -118,10 +123,14 @@ export function useExitPosition() {
 
       return sig as string
     },
-    onSuccess: (_sig, { marketId }) => {
+    onSuccess: (sig, { marketId }) => {
       queryClient.invalidateQueries({ queryKey: ['market', String(marketId)] })
       queryClient.invalidateQueries({ queryKey: ['userPosition', String(marketId)] })
       queryClient.invalidateQueries({ queryKey: ['markets'] })
+      toast.success('Position closed', { txSig: sig })
+    },
+    onError: (err) => {
+      toast.error('Failed to close position', { message: (err as Error).message })
     },
   })
 }
@@ -169,10 +178,14 @@ export function useClaim() {
 
       return sig as string
     },
-    onSuccess: (_sig, { marketId }) => {
+    onSuccess: (sig, { marketId }) => {
       queryClient.invalidateQueries({ queryKey: ['market', String(marketId)] })
       queryClient.invalidateQueries({ queryKey: ['userPosition', String(marketId)] })
       queryClient.invalidateQueries({ queryKey: ['markets'] })
+      toast.success('Payout claimed', { txSig: sig })
+    },
+    onError: (err) => {
+      toast.error('Failed to claim', { message: (err as Error).message })
     },
   })
 }

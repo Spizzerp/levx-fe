@@ -3,7 +3,6 @@ import { Link } from '@tanstack/react-router'
 import { cn } from '@/lib/cn'
 import { WalletButton } from '@/components/WalletButton'
 
-import '@/components/ChartFrame.css'
 
 const links = [
   { to: '/markets', label: 'Markets' },

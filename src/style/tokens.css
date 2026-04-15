@@ -42,9 +42,12 @@
   --color-line-strong: #333333;
 
   /* ── Accent + semantic ──────────────────────── */
-  --color-accent: #d71921;
-  --color-accent-subtle: rgba(215, 25, 33, 0.15);
-  --color-success: #4a9e5c;
+  --color-accent: #FF483B;
+  --color-accent-subtle: rgba(255, 72, 59, 0.15);
+  --color-success: #5CF78B;
+  --color-success-dim: #4a9e5c;
+  --color-brand-from: #F4FA4D;
+  --color-brand-to: #5CF78B;
   --color-warning: #d4a843;
   --color-interactive: #5b9bf6;
 
@@ -326,6 +329,16 @@
   line-height: var(--leading-normal);
   letter-spacing: var(--tracking-wider);
   text-transform: uppercase;
+}
+
+/* ════════════════════════════════════════════════
+   BRAND GRADIENT TEXT
+   ════════════════════════════════════════════════ */
+@utility text-brand-gradient {
+  background: linear-gradient(90deg, var(--color-brand-from), var(--color-brand-to));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 /* ════════════════════════════════════════════════

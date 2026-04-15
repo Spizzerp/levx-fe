@@ -2,7 +2,6 @@ import type { PropsWithChildren } from 'react'
 
 import { cn } from '@/lib/cn'
 
-import './ChartFrame.css'
 
 interface ChartFrameProps extends PropsWithChildren {
   /** Enable the subtle dithered glow border effect */
@@ -18,7 +17,7 @@ export function ChartFrame({ glow = false, className, children }: ChartFrameProp
   return (
     <div
       className={cn(
-        'relative overflow-hidden rounded-2xl border-2 border-[#2a2a2a] bg-[#101112]/50',
+        'relative overflow-hidden rounded-2xl border border-line-strong bg-surface',
         glow && 'chart-frame-glow',
         className,
       )}

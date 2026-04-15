@@ -16,6 +16,7 @@ import type { PathTone, PredictionPath, PricePoint } from '@/types/market'
 import { useIsAdmin } from '@/lib/hooks/useIsAdmin'
 import { useProgram } from '@/lib/solana/program'
 import { deriveMarketPda, deriveProtocolPda } from '@/lib/solana/pda'
+import { toast } from '@/stores/toastStore'
 import { useWalletStore } from '@/stores/walletStore'
 import { PYTH_FEED_IDS, type SupportedPair } from '@/lib/pyth/feedIds'
 import { usePythFeed, useLatestPrice } from '@/lib/pyth/hooks'
@@ -304,8 +305,6 @@ export function AdminPage() {
 
   // Tx state
   const [isPending, setIsPending] = useState(false)
-  const [txResult, setTxResult] = useState<string | null>(null)
-  const [txError, setTxError] = useState<string | null>(null)
 
   const pair = PAIRS[selectedPair]
   const pairLabel = pair.label
@@ -351,8 +350,6 @@ export function AdminPage() {
   async function handleCreateMarket() {
     if (!program || !publicKey) return
     setIsPending(true)
-    setTxResult(null)
-    setTxError(null)
 
     try {
       const [protocolPda] = deriveProtocolPda()
@@ -405,9 +402,9 @@ export function AdminPage() {
         .signers([vaultKeypair])
         .rpc()
 
-      setTxResult(sig)
+      toast.success('Market created', { txSig: sig })
     } catch (err) {
-      setTxError((err as Error).message)
+      toast.error('Failed to create market', { message: (err as Error).message })
     } finally {
       setIsPending(false)
     }
@@ -617,41 +614,15 @@ export function AdminPage() {
         </div>
 
         {/* Submit */}
-        <button
+        <Button
+          variant="primary"
+          fullWidth
           disabled={isPending || !program}
           onClick={handleCreateMarket}
-          className={cn(
-            'flex w-full min-h-[44px] items-center justify-center rounded-full px-6 py-[14px]',
-            'font-mono text-[13px] font-bold tracking-wide uppercase',
-            `text-surface ${GRADIENT.tw}`,
-            'duration-short ease-levx transition-[opacity,box-shadow]',
-            `hover:shadow-[${GRADIENT.glowHover}]`,
-            'disabled:opacity-40 disabled:cursor-not-allowed',
-          )}
         >
           {isPending ? 'Creating…' : 'Create Market'}
-        </button>
+        </Button>
 
-        {txResult && (
-          <div className="border-line mt-6 border p-4">
-            <p className="text-success font-mono text-label uppercase">Market created</p>
-            <a
-              href={`https://explorer.solana.com/tx/${txResult}?cluster=devnet`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-interactive font-mono text-caption mt-1 block break-all"
-            >
-              {txResult}
-            </a>
-          </div>
-        )}
-
-        {txError && (
-          <div className="border-accent mt-6 border p-4">
-            <p className="text-accent font-mono text-label uppercase">Failed</p>
-            <p className="text-ink-muted font-mono text-caption mt-1 break-all">{txError}</p>
-          </div>
-        )}
       </div>
       </div>
     </PageLayout>

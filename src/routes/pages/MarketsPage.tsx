@@ -144,53 +144,13 @@ export function MarketsPage() {
     [markets, filter],
   )
 
-  if (isLoading) {
-    return (
-      <PageLayout
-        title="Markets"
-        subtitle="Predict the path, not the destination. Five AI-generated routes per market."
-      >
-        <MarketsTableSkeleton />
-      </PageLayout>
-    )
-  }
-
-  if (isError) {
-    return (
-      <PageLayout
-        title="Markets"
-        subtitle="Predict the path, not the destination. Five AI-generated routes per market."
-      >
-        <QueryErrorState
-          title="We couldn't load markets"
-          message="The feed hiccupped. Try again."
-          onRetry={() => void refetch()}
-        />
-      </PageLayout>
-    )
-  }
-
-  const hasAnyMarkets = (markets?.length ?? 0) > 0
-
-  // True empty state — no markets exist at all.
-  if (!hasAnyMarkets) {
-    return (
-      <PageLayout
-        title="Markets"
-        subtitle="Predict the path, not the destination. Five AI-generated routes per market."
-      >
-        <div className="text-ink-dim border-line border border-dashed py-24 text-center font-mono text-label tracking-widest uppercase">
-          [ NO ACTIVE MARKETS ]
-        </div>
-      </PageLayout>
-    )
-  }
+  const hasAnyMarkets = !isLoading && !isError && (markets?.length ?? 0) > 0
 
   return (
     <PageLayout
       title="Markets"
-      subtitle="Predict the path, not the destination. Five AI-generated routes per market."
-      headerActions={
+      subtitle="Predict the path, not the destination."
+      headerActions={hasAnyMarkets ? (
         <div className="border-line flex items-center gap-2 border-0 border-b pb-5 text-sm">
           {FILTERS.map((f) => {
             const isActive = filter === f.id
@@ -216,17 +176,37 @@ export function MarketsPage() {
             {visible.length} {visible.length === 1 ? 'MARKET' : 'MARKETS'}
           </div>
         </div>
-      }
+      ) : undefined}
     >
-      <DataTable
-        columns={COLUMNS}
-        data={visible}
-        gridCols="grid-cols-[48px_140px_1fr_160px_160px_80px_24px]"
-        gridColsWide="[@media(min-width:1201px)]:grid-cols-[56px_160px_1fr_200px_200px_120px_160px_120px_24px]"
-        keyExtractor={(m) => m.id}
-        onRowClick={(m) => navigate({ to: '/market/$id', params: { id: m.id } })}
-        emptyMessage="[ NO MARKETS MATCH FILTER ]"
-      />
+      {isLoading && <MarketsTableSkeleton />}
+
+      {isError && (
+        <QueryErrorState
+          title="We couldn't load markets"
+          message="The feed hiccupped. Try again."
+          onRetry={() => void refetch()}
+        />
+      )}
+
+      {!isLoading && !isError && !hasAnyMarkets && (
+        <div className="flex flex-col items-center justify-center gap-4 py-24 border border-dashed border-line-strong rounded-2xl">
+          <p className="text-ink-muted font-mono text-label uppercase">
+            [ No active markets ]
+          </p>
+        </div>
+      )}
+
+      {hasAnyMarkets && (
+        <DataTable
+          columns={COLUMNS}
+          data={visible}
+          gridCols="grid-cols-[48px_140px_1fr_160px_160px_80px_24px]"
+          gridColsWide="[@media(min-width:1201px)]:grid-cols-[56px_160px_1fr_200px_200px_120px_160px_120px_24px]"
+          keyExtractor={(m) => m.id}
+          onRowClick={(m) => navigate({ to: '/market/$id', params: { id: m.id } })}
+          emptyMessage="[ NO MARKETS MATCH FILTER ]"
+        />
+      )}
     </PageLayout>
   )
 }
