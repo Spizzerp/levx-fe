@@ -3,6 +3,7 @@ import type { PublicKey } from '@solana/web3.js'
 import { useWallet } from '@solana/wallet-adapter-react'
 import { useNavigate } from '@tanstack/react-router'
 
+import { cn } from '@/lib/cn'
 import { explorerAddressUrl } from '@/lib/format'
 import { useIsAdmin } from '@/lib/hooks/useIsAdmin'
 import { MENU_ITEM } from '@/components/styles'
