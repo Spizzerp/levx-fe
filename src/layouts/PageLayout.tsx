@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 
 import { cn } from '@/lib/cn'
+import { HyperText } from '@/components/HyperText'
 
 interface PageLayoutProps {
   children: ReactNode
@@ -28,11 +29,11 @@ export function PageLayout({
 }: PageLayoutProps) {
   return (
     <main className={cn('mx-auto max-w-[1680px] px-10 pt-6 pb-12', className)}>
-      <header className="mb-12">
+      <header className="mb-3">
         {subtitleInline && subtitle ? (
           <div className="flex items-baseline gap-6 mb-4">
             <h1 className="font-display text-ink-strong text-[42px] leading-none font-medium tracking-tighter [font-variation-settings:'ROND'_100]">
-              {title}
+              <HyperText>{title}</HyperText>
             </h1>
             <p className="text-ink-muted font-mono text-xs tracking-normal uppercase">
               {subtitle}
@@ -41,7 +42,7 @@ export function PageLayout({
         ) : (
           <>
             <h1 className="font-display text-ink-strong text-[42px] mb-4 leading-none font-medium tracking-tighter [font-variation-settings:'ROND'_100]">
-              {title}
+              <HyperText>{title}</HyperText>
             </h1>
             {subtitle && (
               <p className="text-ink-muted font-mono text-xs tracking-normal uppercase">

@@ -1,9 +1,11 @@
 import { useNavigate } from '@tanstack/react-router'
 import { Filter } from 'lucide-react'
-import { AnimatePresence, motion } from 'motion/react'
-import { useCallback, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 
+import { ChartFrame } from '@/components/ChartFrame'
+import { TokenPairIcon } from '@/components/TokenPairIcon'
 import { DataTable, NUM_CELL, type DataTableColumn } from '@/components/DataTable'
+import { ExpandPill } from '@/components/ExpandPill'
 import { MarketsTableSkeleton } from '@/components/MarketsTableSkeleton'
 import { QueryErrorState } from '@/components/QueryErrorState'
 import { StatusDot } from '@/components/StatusDot'
@@ -70,16 +72,16 @@ const NARROW_HIDE = '[@media(max-width:1200px)]:hidden'
 
 const COLUMNS: DataTableColumn<Market>[] = [
   {
-    key: 'idx',
-    header: 'IDX',
-    cellClassName: 'text-ink-dim font-mono text-value',
-    render: (_, idx) => `[ ${String(idx + 1).padStart(2, '0')} ]`,
-  },
-  {
     key: 'pair',
-    header: 'PAIR',
-    cellClassName: 'text-ink-strong font-mono text-sm font-bold tracking-wide uppercase',
-    render: (m) => m.pair.replace('/', ' / '),
+    header: 'MARKET',
+    headerClassName: 'pl-6',
+    cellClassName: 'pl-6',
+    render: (m) => (
+      <span className="flex items-center gap-3">
+        <span className="text-ink-strong font-mono text-sm font-bold tracking-wide uppercase">{m.base}</span>
+        <TokenPairIcon base={m.base} quote={m.quote} size={32} />
+      </span>
+    ),
   },
   {
     key: 'state',
@@ -88,7 +90,7 @@ const COLUMNS: DataTableColumn<Market>[] = [
   },
   {
     key: 'ends',
-    header: 'ENDS',
+    header: 'EXPIRES',
     headerClassName: 'text-right',
     cellClassName: NUM_CELL,
     render: (m) => endsInLabel(m),
@@ -109,10 +111,28 @@ const COLUMNS: DataTableColumn<Market>[] = [
   },
   {
     key: 'checkpoints',
-    header: 'CHECKPOINTS',
+    header: 'PROGRESS',
     headerClassName: cn('text-right', NARROW_HIDE),
-    cellClassName: cn(NUM_CELL, NARROW_HIDE),
-    render: (m) => `${m.completedCheckpoints} / ${m.totalCheckpoints}`,
+    cellClassName: cn(NARROW_HIDE, 'flex items-center justify-end gap-2'),
+    render: (m) => {
+      const pct = m.totalCheckpoints > 0 ? (m.completedCheckpoints / m.totalCheckpoints) * 100 : 0
+      return (
+        <span className="flex items-center gap-2">
+          <span className="relative h-1.5 w-16 overflow-hidden rounded-full bg-line-strong">
+            <span
+              className="absolute inset-y-0 left-0 rounded-full"
+              style={{
+                width: `${pct}%`,
+                background: 'linear-gradient(90deg, #F4FA4D, #5CF78B)',
+              }}
+            />
+          </span>
+          <span className="font-mono text-value text-ink-muted">
+            {m.completedCheckpoints}/{m.totalCheckpoints}
+          </span>
+        </span>
+      )
+    },
   },
   {
     key: 'traders',
@@ -137,12 +157,8 @@ export function MarketsPage() {
   const navigate = useNavigate()
   const { data: markets, isLoading, isError, refetch } = useMarkets()
   const [filter, setFilter] = useState<StateFilter>('all')
-  const [filterOpen, setFilterOpen] = useState(false)
-
-  const handleFilterSelect = useCallback((id: StateFilter) => {
-    setFilter(id)
-    setFilterOpen(false)
-  }, [])
+  const [page, setPage] = useState(0)
+  const PAGE_SIZE = 10
 
   const visible = useMemo(
     () =>
@@ -152,6 +168,15 @@ export function MarketsPage() {
     [markets, filter],
   )
 
+  const totalPages = Math.ceil(visible.length / PAGE_SIZE)
+  const paged = visible.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+
+  // Reset page when filter changes
+  const handleFilterChange = (id: StateFilter) => {
+    setFilter(id)
+    setPage(0)
+  }
+
   const hasAnyMarkets = !isLoading && !isError && (markets?.length ?? 0) > 0
 
   return (
@@ -160,18 +185,18 @@ export function MarketsPage() {
       subtitle="Predict the path, not the destination."
       subtitleInline
       headerActions={hasAnyMarkets ? (
-        <div className="flex items-center gap-4 pt-6 pb-5">
+        <div className="flex items-end gap-4 pt-6 pb-5">
           {/* Stats */}
           <div className="flex items-center gap-12">
             <div>
               <div className="text-label text-ink-dim mb-1 font-mono uppercase">Volume</div>
-              <div className="text-ink-strong font-mono text-2xl font-bold tracking-snug">
+              <div className="text-ink-strong font-mono text-4xl font-bold tracking-snug">
                 {formatUSD(markets?.reduce((s, m) => s + m.pool, 0) ?? 0)}
               </div>
             </div>
             <div>
               <div className="text-label text-ink-dim mb-1 font-mono uppercase">Active</div>
-              <div className="text-ink-strong font-mono text-2xl font-bold tracking-snug flex items-center gap-2">
+              <div className="text-ink-strong font-mono text-4xl font-bold tracking-snug flex items-center gap-2">
                 {markets?.filter((m) => m.state === 'active').length ?? 0}
                 <span className="inline-flex items-center gap-1">
                   <span className="h-2 w-2 rounded-full bg-success animate-pulse" />
@@ -181,79 +206,25 @@ export function MarketsPage() {
             </div>
             <div>
               <div className="text-label text-ink-dim mb-1 font-mono uppercase">Markets</div>
-              <div className="text-ink-strong font-mono text-2xl font-bold tracking-snug">
+              <div className="text-ink-strong font-mono text-4xl font-bold tracking-snug">
                 {markets?.length ?? 0}
               </div>
             </div>
             <div>
               <div className="text-label text-ink-dim mb-1 font-mono uppercase">Traders</div>
-              <div className="text-ink-strong font-mono text-2xl font-bold tracking-snug">
+              <div className="text-ink-strong font-mono text-4xl font-bold tracking-snug">
                 {(markets?.reduce((s, m) => s + m.traders, 0) ?? 0).toLocaleString()}
               </div>
             </div>
           </div>
 
-          {/* Filter toggle — anchored right, expands left */}
-          <div className="ml-auto">
-            <div
-              className="inline-flex h-9 items-center rounded-full border border-line-strong bg-surface"
-              style={{ overflow: 'clip' }}
-            >
-              <AnimatePresence mode="wait" initial={false}>
-                {!filterOpen ? (
-                  <motion.button
-                    key="collapsed"
-                    type="button"
-                    onClick={() => setFilterOpen(true)}
-                    className="flex items-center gap-2 px-4 py-2 text-ink-muted hover:text-ink-strong"
-                    initial={{ opacity: 0, width: 0 }}
-                    animate={{ opacity: 1, width: 'auto' }}
-                    exit={{ opacity: 0, width: 0 }}
-                    transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
-                  >
-                    <Filter size={14} strokeWidth={1.5} className="shrink-0" />
-                    <span className="font-mono text-label uppercase whitespace-nowrap">
-                      {FILTERS.find((f) => f.id === filter)?.label.toUpperCase()}
-                    </span>
-                  </motion.button>
-                ) : (
-                  <motion.div
-                    key="expanded"
-                    className="flex items-center px-2"
-                    initial={{ width: 0 }}
-                    animate={{ width: 'auto' }}
-                    exit={{ opacity: 0, width: 0 }}
-                    transition={{
-                      width: { duration: 0.3, ease: [0.25, 0.1, 0.25, 1] },
-                      opacity: { duration: 0.15 },
-                    }}
-                  >
-                    {[
-                      FILTERS.find((f) => f.id === filter)!,
-                      ...FILTERS.filter((f) => f.id !== filter),
-                    ].map((f, i) => (
-                      <motion.button
-                        key={f.id}
-                        type="button"
-                        initial={{ opacity: 0, x: -8 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ duration: 0.2, delay: 0.1 + i * 0.03 }}
-                        onClick={() => handleFilterSelect(f.id)}
-                        className={cn(
-                          'whitespace-nowrap px-3 py-1 font-mono text-[10px] uppercase tracking-wider',
-                          f.id === filter
-                            ? 'text-ink-strong'
-                            : 'text-ink-dim hover:text-ink-muted',
-                        )}
-                      >
-                        {f.label.toUpperCase()}
-                      </motion.button>
-                    ))}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          </div>
+          <ExpandPill
+            options={FILTERS}
+            value={filter}
+            onChange={handleFilterChange}
+            icon={<Filter size={14} strokeWidth={1.5} />}
+            className="ml-auto"
+          />
 
         </div>
       ) : undefined}
@@ -277,15 +248,48 @@ export function MarketsPage() {
       )}
 
       {hasAnyMarkets && (
-        <DataTable
-          columns={COLUMNS}
-          data={visible}
-          gridCols="grid-cols-[48px_140px_1fr_160px_160px_80px_24px]"
-          gridColsWide="[@media(min-width:1201px)]:grid-cols-[56px_160px_1fr_200px_200px_120px_160px_120px_24px]"
-          keyExtractor={(m) => m.id}
-          onRowClick={(m) => navigate({ to: '/market/$id', params: { id: m.id } })}
-          emptyMessage="[ NO MARKETS MATCH FILTER ]"
-        />
+        <ChartFrame glow>
+          <DataTable
+            columns={COLUMNS}
+            data={paged}
+            gridCols="grid-cols-[160px_1fr_160px_160px_80px_24px]"
+            gridColsWide="[@media(min-width:1201px)]:grid-cols-[200px_1fr_200px_200px_120px_160px_120px_24px]"
+            keyExtractor={(m) => m.id}
+            onRowClick={(m) => navigate({ to: '/market/$id', params: { id: m.id } })}
+            emptyMessage="[ NO MARKETS MATCH FILTER ]"
+          />
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-3 border-t border-line bg-surface-1 px-4 py-3 rounded-b-2xl">
+              <button
+                type="button"
+                disabled={page === 0}
+                onClick={() => setPage((p) => p - 1)}
+                className={cn(
+                  'font-mono text-[10px] uppercase tracking-wider px-3 py-1 rounded-full border border-line-strong',
+                  'duration-short ease-levx transition-colors',
+                  page === 0 ? 'text-ink-dim cursor-not-allowed' : 'text-ink-muted hover:text-ink-strong hover:border-ink',
+                )}
+              >
+                Prev
+              </button>
+              <span className="font-mono text-[10px] text-ink-muted uppercase tracking-wider">
+                {page + 1} / {totalPages}
+              </span>
+              <button
+                type="button"
+                disabled={page >= totalPages - 1}
+                onClick={() => setPage((p) => p + 1)}
+                className={cn(
+                  'font-mono text-[10px] uppercase tracking-wider px-3 py-1 rounded-full border border-line-strong',
+                  'duration-short ease-levx transition-colors',
+                  page >= totalPages - 1 ? 'text-ink-dim cursor-not-allowed' : 'text-ink-muted hover:text-ink-strong hover:border-ink',
+                )}
+              >
+                Next
+              </button>
+            </div>
+          )}
+        </ChartFrame>
       )}
     </PageLayout>
   )
