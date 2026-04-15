@@ -2,6 +2,7 @@ import { useParams } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
 
 import { Button } from '@/components/Button'
+import { ChartFrame } from '@/components/ChartFrame'
 import { ConnectGate } from '@/components/ConnectGate'
 import { DrawingLayer } from '@/components/DrawingLayer'
 import { Input } from '@/components/Input'
@@ -32,7 +33,7 @@ import {
   formatUSD,
   maxLeverageByDuration,
 } from '@/lib/format'
-import type { Market } from '@/types/market'
+import type { Market, PredictionPath, PricePoint } from '@/types/market'
 
 /* ── Market duration options ─────────────────────────────── */
 
@@ -116,16 +117,17 @@ export function MarketPage() {
 
   const placeWager = usePlaceWager()
 
-  const drawingPhase = useDrawingStore((s) => s.state.phase)
+  const drawingState = useDrawingStore((s) => s.state)
+  const drawingPhase = drawingState.phase
   const enterDrawMode = useDrawingStore((s) => s.enterDrawMode)
   const exitDrawMode = useDrawingStore((s) => s.exitDrawMode)
 
-  const [selectedPathId, setSelectedPathId] = useState<string | null>(null)
+  const [selectedPathIds, setSelectedPathIds] = useState<Set<string>>(new Set())
+  const [userPaths, setUserPaths] = useState<PredictionPath[]>([])
+  const [hoveredPathId, setHoveredPathId] = useState<string | null>(null)
   const [leverage, setLeverage] = useState(22)
   const [collateral, setCollateral] = useState('25.00')
   const [mountTime] = useState(() => Date.now())
-  const [marketDuration, setMarketDuration] = useState<DurationOption | null>(null)
-  const [checkpointIntervalId, setCheckpointIntervalId] = useState<IntervalOption | null>(null)
   const [showOtherPositions, setShowOtherPositions] = useState(false)
 
   // Exit draw mode on unmount so a user navigating away doesn't leave the store in sweeping state.
@@ -133,29 +135,13 @@ export function MarketPage() {
 
   const now = mountTime
 
-  // Whether both market params are selected — AI paths require both
-  const marketParamsReady = marketDuration != null && checkpointIntervalId != null
+  // Chart schedule from on-chain market params
+  const chartMarketStart = market?.startTime ?? now
+  const chartMarketEnd = market?.endTime ?? now
+  const chartCheckpointInterval = market?.checkpointInterval ?? 3600
+  const chartTotalCheckpoints = market?.totalCheckpoints ?? 0
 
-  // Derive chart schedule. On Active markets the user picks duration+interval
-  // (the market is being configured client-side until creation); on every
-  // other state the schedule is fixed on-chain, so we read it from `market`.
-  const selectedDuration = marketDuration ? DURATION_OPTIONS.find((d) => d.id === marketDuration)! : null
-  const selectedInterval = checkpointIntervalId ? INTERVAL_OPTIONS.find((i) => i.id === checkpointIntervalId)! : null
-  const isActiveConfig = market?.state === 'active'
-  const chartMarketStart = isActiveConfig
-    ? (latestTick ? latestTick.time : now)
-    : (market?.startTime ?? now)
-  const chartMarketEnd = isActiveConfig
-    ? chartMarketStart + (selectedDuration?.ms ?? 0)
-    : (market?.endTime ?? chartMarketStart)
-  const chartCheckpointInterval = isActiveConfig
-    ? (selectedInterval?.sec ?? 3600)
-    : (market?.checkpointInterval ?? 3600)
-  const chartTotalCheckpoints = isActiveConfig
-    ? (selectedDuration ? Math.floor(selectedDuration.ms / 1000 / chartCheckpointInterval) : 0)
-    : (market?.totalCheckpoints ?? 0)
-
-  const durationMs = isActiveConfig ? (selectedDuration?.ms ?? 0) : Math.max(0, chartMarketEnd - chartMarketStart)
+  const durationMs = Math.max(0, chartMarketEnd - chartMarketStart)
   const msRemaining = Math.max(0, chartMarketEnd - now)
   const leverageCap = maxLeverageByDuration(durationMs)
 
@@ -167,33 +153,88 @@ export function MarketPage() {
   const priceDisplay =
     latestTick?.value ?? chartHistory[chartHistory.length - 1]?.value ?? 0
 
-  // Generate 5 AI prediction paths anchored to current price + market params.
-  // When a real backend exists, these come from on-chain PathOutcome accounts.
+  // Use on-chain paths when available (active markets always have AI paths assigned).
+  // Fall back to fixture paths for display when market.paths is empty (mock mode).
   const aiPaths = useMemo(() => {
-    // For non-Active states, on-chain paths would come from `market.paths`.
-    // Until the indexer lands, generate fixture paths from the market schedule
-    // so the chart isn't empty.
-    const ready = isActiveConfig
-      ? marketParamsReady && priceDisplay > 0
-      : chartTotalCheckpoints > 0 && priceDisplay > 0
-    if (!ready) return []
+    if (market?.paths?.length > 0) return market.paths
+
+    // Fallback: generate fixture paths for mock/demo
+    // Paths span from market start to market end, anchored at the price
+    // where the history line crosses the START marker
+    if (chartTotalCheckpoints <= 0 || priceDisplay <= 0) return []
+
+    // Find the price closest to marketStart from history
+    let startPrice = priceDisplay
+    if (chartHistory.length > 0) {
+      let closest = chartHistory[0]
+      let closestDist = Math.abs(closest.time - chartMarketStart)
+      for (const pt of chartHistory) {
+        const dist = Math.abs(pt.time - chartMarketStart)
+        if (dist < closestDist) {
+          closest = pt
+          closestDist = dist
+        }
+      }
+      startPrice = closest.value
+    }
+
     const paths = buildAiPathFixture({
       startTime: chartMarketStart,
       checkpointInterval: chartCheckpointInterval,
       totalCheckpoints: chartTotalCheckpoints,
-      basePrice: priceDisplay,
+      basePrice: startPrice,
     })
-    // Mock opponent wagers on a few paths so the "Show Other Positions" toggle
-    // has something to render. Remove this when real on-chain data flows in.
-    paths[0].totalWagered = 4_250  // ultra-bull
-    paths[1].totalWagered = 12_800 // bull — most popular
-    paths[3].totalWagered = 1_900  // bear
+    paths[0].totalWagered = 4_250
+    paths[1].totalWagered = 12_800
+    paths[3].totalWagered = 1_900
     return paths
-  }, [isActiveConfig, marketParamsReady, chartMarketStart, chartCheckpointInterval, chartTotalCheckpoints, priceDisplay])
+  }, [market?.paths, chartHistory, chartMarketStart, chartCheckpointInterval, chartTotalCheckpoints, priceDisplay])
+
+  // Combine AI paths + user-drawn paths for chart
+  const allPaths = useMemo(() => [...aiPaths, ...userPaths], [aiPaths, userPaths])
+
+  const handleConfirmDrawing = () => {
+    if (drawingState.phase !== 'ready') return
+    const values = drawingState.values
+    const intervalMs = chartCheckpointInterval * 1000
+    const data: PricePoint[] = values.map((v, i) => ({
+      time: chartMarketStart + i * intervalMs,
+      value: v,
+    }))
+    const userPath: PredictionPath = {
+      id: `user-${Date.now()}`,
+      label: 'Your Path',
+      tone: 'custom',
+      origin: 'user',
+      multiplier: 0,
+      data,
+      pathIndex: allPaths.length,
+      predictedPrices: values,
+      numCheckpoints: values.length,
+      initialProbabilityBps: 0,
+      generationTimestamp: Date.now(),
+      creator: '',
+      cumulativeAction: 0,
+      compositeScore: 0,
+      peakAmplitude: 0,
+      amplitudeAtDecoherence: 0,
+      dissolved: false,
+      dissolvedAtCheckpoint: 0,
+      checkpointsProcessed: 0,
+      totalWagered: 0,
+      totalLeveragedExposure: 0,
+      lmsrSharesOutstanding: 0,
+      currentImpliedProbability: 0,
+    }
+    setUserPaths((prev) => [...prev, userPath])
+    setSelectedPathIds((prev) => new Set([...prev, userPath.id]))
+    exitDrawMode()
+  }
 
   // Default selection = the middle (neutral) path on first load
-  const activePathId = selectedPathId ?? aiPaths[2]?.id ?? null
-  const selectedPath = aiPaths.find((p) => p.id === activePathId)
+  // For chart highlight, use first selected or default to middle path
+  const activePathId = selectedPathIds.size > 0 ? [...selectedPathIds][0] : (aiPaths[2]?.id ?? null)
+  const selectedPath = allPaths.find((p) => p.id === activePathId)
   const lastPoint = selectedPath?.data[selectedPath.data.length - 1]
   const firstPoint = selectedPath?.data[0]
   const isLong = lastPoint && firstPoint ? lastPoint.value >= firstPoint.value : true
@@ -235,7 +276,7 @@ export function MarketPage() {
   return (
     <main
       className={cn(
-        'mx-auto grid max-w-[1680px] grid-cols-1 gap-14 px-10 pt-14 pb-12',
+        'mx-auto grid max-w-[1680px] grid-cols-1 items-start gap-14 px-10 pt-6 pb-12',
         showRail && '[@media(min-width:1181px)]:grid-cols-[1fr_400px] [@media(min-width:1181px)]:gap-[72px]',
       )}
     >
@@ -287,18 +328,15 @@ export function MarketPage() {
           <span className="text-ink-muted ml-1">{(market.entryFeeBps / 100).toFixed(1)}%</span>
         </div>
 
-        <div className="mt-8">
-          <TimeRangePicker value={candleInterval} onChange={setCandleInterval} />
-        </div>
-
-        <div className="mt-4 h-[420px] [@media(min-width:1181px)]:h-[520px]">
+        <ChartFrame glow className="mt-8">
           <LevXChart
+            height={520}
             history={chartHistory}
-            predictions={aiPaths}
+            predictions={allPaths}
             nowTime={latestTick ? latestTick.time : now}
             marketStart={chartMarketStart}
             marketEnd={chartMarketEnd}
-            selectedPathId={activePathId}
+            selectedPathId={hoveredPathId ?? activePathId}
             selectionInteractive={showWagerRail}
             showOtherPositions={showOtherPositions}
             pair={market.pair}
@@ -323,96 +361,38 @@ export function MarketPage() {
               />
             )}
           />
+        </ChartFrame>
+
+        <div className="mt-4">
+          <TimeRangePicker value={candleInterval} onChange={setCandleInterval} />
         </div>
       </section>
 
       {/* ── Right rail (Active markets only) ───────────────────── */}
       {showWagerRail && (
-      <aside className="flex flex-col">
-        {/* ── Market Duration ─────────────────────── */}
-        <Label>Market Duration</Label>
-        <div className="mt-3 inline-flex flex-wrap gap-1 font-mono text-tag uppercase">
-          {DURATION_OPTIONS.map((d) => (
-            <button
-              key={d.id}
-              type="button"
-              onClick={() => setMarketDuration(d.id)}
-              className={cn(
-                'border px-3 py-1 transition-opacity',
-                marketDuration === d.id
-                  ? 'border-line-strong text-ink-strong'
-                  : 'border-line text-ink-muted hover:text-ink-strong',
-              )}
-            >
-              {d.label}
-            </button>
-          ))}
-        </div>
-
-        {/* ── Checkpoint Interval ─────────────────── */}
-        <Label className="mt-6">Checkpoint Interval</Label>
-        <div className="mt-3 inline-flex flex-wrap gap-1 font-mono text-tag uppercase">
-          {INTERVAL_OPTIONS.map((i) => (
-            <button
-              key={i.id}
-              type="button"
-              onClick={() => setCheckpointIntervalId(i.id)}
-              className={cn(
-                'border px-3 py-1 transition-opacity',
-                checkpointIntervalId === i.id
-                  ? 'border-line-strong text-ink-strong'
-                  : 'border-line text-ink-muted hover:text-ink-strong',
-              )}
-            >
-              {i.label}
-            </button>
-          ))}
-        </div>
-        <p className="text-ink-dim mt-2 font-mono text-caption tracking-[0.06em]">
-          {marketParamsReady ? `${chartTotalCheckpoints} checkpoints` : 'Select duration & interval'}
-        </p>
-
-        <hr className="bg-line my-7 h-px border-0" />
-
-        <Label>Select A Line</Label>
+      <aside className="mt-[180px] flex flex-col">
+        <Label>Select Paths</Label>
 
         <div className="border-line mt-5 border-0 border-t">
-          {aiPaths.map((p, idx) => (
+          {allPaths.map((p, idx) => (
             <PathRow
               key={p.id}
               index={idx + 1}
               name={p.label}
               multiplier={`${p.multiplier.toFixed(2)}×`}
               wagered={p.totalWagered}
-              active={activePathId === p.id}
-              onClick={() => setSelectedPathId(p.id)}
+              active={selectedPathIds.has(p.id)}
+              onMouseEnter={() => setHoveredPathId(p.id)}
+              onMouseLeave={() => setHoveredPathId(null)}
+              onClick={() => setSelectedPathIds((prev) => {
+                const next = new Set(prev)
+                if (next.has(p.id)) next.delete(p.id)
+                else next.add(p.id)
+                return next
+              })}
             />
           ))}
         </div>
-
-        <button
-          type="button"
-          onClick={() => setShowOtherPositions((v) => !v)}
-          className={cn(
-            'mt-4 flex w-full items-center gap-2.5 py-2 font-mono text-label uppercase',
-            'duration-short ease-levx transition-colors',
-            showOtherPositions ? 'text-ink-strong' : 'text-ink-dim hover:text-ink-muted',
-          )}
-        >
-          <span
-            className={cn(
-              'flex h-3.5 w-3.5 items-center justify-center border',
-              showOtherPositions ? 'border-ink-strong bg-ink-strong' : 'border-line-strong bg-transparent',
-            )}
-          >
-            {showOtherPositions && (
-              <svg width="8" height="6" viewBox="0 0 8 6" fill="none">
-                <path d="M1 3L3 5L7 1" stroke="var(--color-surface, #000)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            )}
-          </span>
-          Show Other Positions
-        </button>
 
         {/*
           ── Draw button — desktop only (mobile gate: pure Tailwind CSS) ──
@@ -421,21 +401,34 @@ export function MarketPage() {
           and `md:` variants override on viewports ≤1024px.
         */}
         <div data-testid="draw-button-wrapper" className="block md:hidden">
-          <Button
-            variant={isInDrawMode ? 'primary' : 'dashed'}
-            fullWidth
-            className="mt-5"
-            disabled={!marketParamsReady && !isInDrawMode}
-            onClick={() => {
-              if (drawingPhase === 'idle') {
-                enterDrawMode(chartTotalCheckpoints)
-              } else {
-                exitDrawMode()
-              }
-            }}
-          >
-            {isInDrawMode ? 'Cancel Drawing' : '+ Draw Custom Path'}
-          </Button>
+          {isInDrawMode ? (
+            <div className="mt-5 flex gap-3">
+              <Button
+                variant="secondary"
+                fullWidth
+                onClick={() => exitDrawMode()}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                fullWidth
+                onClick={handleConfirmDrawing}
+              >
+                Confirm
+              </Button>
+            </div>
+          ) : (
+            <Button
+              variant="dashed"
+              fullWidth
+              className="mt-5"
+              disabled={chartTotalCheckpoints <= 0}
+              onClick={() => enterDrawMode(chartTotalCheckpoints)}
+            >
+              + Draw Custom Path
+            </Button>
+          )}
         </div>
         <div
           data-testid="drawing-desktop-notice"

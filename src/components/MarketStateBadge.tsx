@@ -50,9 +50,6 @@ export function MarketStateBadge({ market }: MarketStateBadgeProps) {
   return (
     <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
       <StatusDot status={market.state}>{STATE_LABELS[market.state]}</StatusDot>
-      <span className="text-ink-dim font-mono text-label tracking-wide uppercase">
-        {STATE_PROSE[market.state](market)}
-      </span>
     </div>
   )
 }

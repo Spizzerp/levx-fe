@@ -1,8 +1,5 @@
 /** Test fixture factory for AI candidate paths.
- *  Used by LevXChart and MarketPage tests.
- *  Populated in Plan 01-03 (TimeRangePicker + fixture factory plan).
- *
- *  PATHS-05 on-chain half is deferred to Phase 3.
+ *  Generates realistic random-walk price trajectories per tone.
  */
 import type { PredictionPath, PathTone, PricePoint } from '@/types/market'
 
@@ -15,6 +12,8 @@ export interface BuildAiPathFixtureArgs {
 
 const TONES: readonly PathTone[] = ['ultra-bull', 'bull', 'neutral', 'bear', 'ultra-bear']
 
+const PROVIDER_NAMES: readonly string[] = ['Chronos-2', 'TimesFM', 'GJR-GARCH', 'Merton JD', 'Monte Carlo']
+
 const MULTIPLIERS: Record<PathTone, number> = {
   'ultra-bull': 1.5,
   bull: 1.8,
@@ -24,17 +23,44 @@ const MULTIPLIERS: Record<PathTone, number> = {
   custom: 1.0,
 }
 
-/** Deterministic slope per tone, as fractional price change across the full range. */
-const TONE_SLOPES: Record<PathTone, number> = {
-  'ultra-bull': 0.2,
-  bull: 0.08,
+/** Drift per step as fraction of price. Positive = bullish. */
+const TONE_DRIFT: Record<PathTone, number> = {
+  'ultra-bull': 0.0012,
+  bull: 0.0005,
   neutral: 0.0,
-  bear: -0.08,
-  'ultra-bear': -0.2,
+  bear: -0.0005,
+  'ultra-bear': -0.0012,
   custom: 0,
 }
 
-/** Defaults for on-chain PathOutcome fields in test fixtures. */
+/** Volatility per step as fraction of price. */
+const TONE_VOL: Record<PathTone, number> = {
+  'ultra-bull': 0.008,
+  bull: 0.006,
+  neutral: 0.005,
+  bear: 0.006,
+  'ultra-bear': 0.008,
+  custom: 0.005,
+}
+
+/** Seeded pseudo-random number generator (mulberry32). Deterministic per seed. */
+function mulberry32(seed: number) {
+  return () => {
+    seed |= 0
+    seed = (seed + 0x6d2b79f5) | 0
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+/** Box-Muller transform: uniform [0,1) → normal distribution. */
+function normalRandom(rng: () => number): number {
+  const u1 = rng()
+  const u2 = rng()
+  return Math.sqrt(-2 * Math.log(u1 || 1e-10)) * Math.cos(2 * Math.PI * u2)
+}
+
 const PATH_OUTCOME_DEFAULTS = {
   creator: '11111111111111111111111111111111',
   cumulativeAction: 0,
@@ -47,27 +73,37 @@ const PATH_OUTCOME_DEFAULTS = {
   totalWagered: 0,
   totalLeveragedExposure: 0,
   lmsrSharesOutstanding: 0,
-  currentImpliedProbability: 2000, // 20%
+  currentImpliedProbability: 2000,
 } as const
 
-/** Build a deterministic, test-friendly set of 5 AI candidate paths. */
+/** Build a deterministic set of 5 AI candidate paths with realistic random-walk trajectories. */
 export function buildAiPathFixture(args: BuildAiPathFixtureArgs): PredictionPath[] {
   const { startTime, checkpointInterval, totalCheckpoints, basePrice } = args
   const intervalMs = checkpointInterval * 1000
+
   return TONES.map((tone, toneIdx) => {
-    const slope = TONE_SLOPES[tone]
+    const drift = TONE_DRIFT[tone]
+    const vol = TONE_VOL[tone]
+    // Deterministic seed per tone so paths are stable across re-renders
+    const rng = mulberry32(toneIdx * 7919 + 42)
+
+    let price = basePrice
     const data: PricePoint[] = Array.from({ length: totalCheckpoints }, (_, i) => {
-      const t = i / Math.max(1, totalCheckpoints - 1) // 0..1
-      // Small deterministic wiggle so paths aren't perfectly linear
-      const wiggle = Math.sin((i + toneIdx) * 0.35) * basePrice * 0.01
+      if (i > 0) {
+        // Geometric random walk: price * (1 + drift + vol * Z)
+        const z = normalRandom(rng)
+        const ret = drift + vol * z
+        price = price * (1 + ret)
+      }
       return {
         time: startTime + i * intervalMs,
-        value: basePrice * (1 + slope * t) + wiggle,
+        value: price,
       }
     })
+
     return {
       id: `ai-${tone}`,
-      label: `Path ${String.fromCharCode(65 + toneIdx)}`, // A..E
+      label: `${PROVIDER_NAMES[toneIdx % PROVIDER_NAMES.length]} Path`,
       tone,
       origin: 'ai' as const,
       multiplier: MULTIPLIERS[tone],

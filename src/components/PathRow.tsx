@@ -9,18 +9,22 @@ interface PathRowProps {
   wagered?: number
   active?: boolean
   onClick?: () => void
+  onMouseEnter?: () => void
+  onMouseLeave?: () => void
 }
 
-export function PathRow({ index, name, multiplier, wagered, active = false, onClick }: PathRowProps) {
+export function PathRow({ index, name, multiplier, wagered, active = false, onClick, onMouseEnter, onMouseLeave }: PathRowProps) {
   const idx = String(index).padStart(2, '0')
   return (
     <button
       type="button"
       onClick={onClick}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
       className={cn(
         'border-line grid h-14 w-full grid-cols-[44px_1fr_auto] items-center gap-4 border-0 border-b border-l-2 border-l-transparent bg-transparent pr-5 pl-4 text-left',
-        'duration-short ease-levx transition-[background]',
-        'hover:bg-white/2',
+        'duration-short ease-levx transition-[background,border-color]',
+        'hover:bg-white/2 hover:border-l-ink-muted',
         active && 'border-l-ink-strong bg-surface-2',
       )}
     >

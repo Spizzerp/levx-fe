@@ -260,6 +260,8 @@ function ChartInner({
   const lastHistoryPoint = mergedHistory[mergedHistory.length - 1]
   const showMarketStartMarker = marketStart > nowTime
   const marketStartX = timeScale(marketStart)
+  const showMarketEndMarker = marketEnd > nowTime
+  const marketEndX = timeScale(marketEnd)
 
   return (
     <svg
@@ -433,26 +435,48 @@ function ChartInner({
             </>
           )}
 
-          {/* ── Market opens marker (pending state) ─── */}
-          {showMarketStartMarker && (
+          {/* ── Market start marker ────────────────── */}
+          <Line
+            from={{ x: marketStartX, y: 0 }}
+            to={{ x: marketStartX, y: innerHeight }}
+            stroke="#999999"
+            strokeWidth={1}
+            strokeDasharray="4 4"
+            opacity={0.4}
+          />
+          <text
+            x={marketStartX - 6}
+            y={12}
+            fontFamily="Space Mono, monospace"
+            fontSize="9"
+            letterSpacing="0.12em"
+            fill="#999999"
+            textAnchor="end"
+          >
+            {showMarketStartMarker ? '[ OPENS ]' : '[ START ]'}
+          </text>
+
+          {/* ── Market end marker ─────────────────── */}
+          {showMarketEndMarker && (
             <>
               <Line
-                from={{ x: marketStartX, y: 0 }}
-                to={{ x: marketStartX, y: innerHeight }}
+                from={{ x: marketEndX, y: 0 }}
+                to={{ x: marketEndX, y: innerHeight }}
                 stroke="#999999"
                 strokeWidth={1}
                 strokeDasharray="4 4"
                 opacity={0.5}
               />
               <text
-                x={marketStartX + 6}
+                x={marketEndX - 6}
                 y={12}
                 fontFamily="Space Mono, monospace"
                 fontSize="9"
                 letterSpacing="0.12em"
                 fill="#999999"
+                textAnchor="end"
               >
-                [ OPENS ]
+                [ ENDS ]
               </text>
             </>
           )}
