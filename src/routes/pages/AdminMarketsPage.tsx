@@ -2,16 +2,13 @@ import { useNavigate } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
 
 import { Button } from '@/components/Button'
-import { Label } from '@/components/Label'
 import { cn } from '@/lib/cn'
-import { env } from '@/env/env.config'
-import { useWalletStore } from '@/stores/walletStore'
+import { useIsAdmin } from '@/lib/hooks/useIsAdmin'
 import { useMarkets } from '@/lib/api/hooks'
 import { formatUSD } from '@/lib/format'
 
 export function AdminMarketsPage() {
-  const publicKey = useWalletStore((s) => s.publicKey)
-  const isAdmin = publicKey ? env.APP_ADMIN_WALLETS.includes(publicKey.toBase58()) : false
+  const isAdmin = useIsAdmin()
   const navigate = useNavigate()
   const { data: markets, isLoading } = useMarkets()
 

@@ -15,9 +15,8 @@ import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress } from '@solana/spl-token'
 import { SystemProgram } from '@solana/web3.js'
 
 import { useProgram } from './program'
+import { SCALE } from '@/lib/constants'
 import { deriveMarketPda, derivePathPda, derivePositionPda, deriveProtocolPda } from './pda'
-
-const SCALE = 1_000_000
 
 interface PlaceWagerInput {
   marketId: number

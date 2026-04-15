@@ -17,8 +17,7 @@ import type {
   PricePoint,
   UserPosition,
 } from '@/types/market'
-
-const SCALE = 1_000_000
+import { SCALE } from '@/lib/constants'
 
 /** Convert Anchor BN to number, optionally dividing by SCALE for fixed-point fields. */
 function bn(v: BN, scaled = false): number {

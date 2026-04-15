@@ -13,7 +13,7 @@ import { LevXChart } from '@/components/LevXChart'
 import { PageLayout } from '@/layouts/PageLayout'
 import { cn } from '@/lib/cn'
 import type { PathTone, PredictionPath, PricePoint } from '@/types/market'
-import { env } from '@/env/env.config'
+import { useIsAdmin } from '@/lib/hooks/useIsAdmin'
 import { useProgram } from '@/lib/solana/program'
 import { deriveMarketPda, deriveProtocolPda } from '@/lib/solana/pda'
 import { useWalletStore } from '@/stores/walletStore'
@@ -275,23 +275,16 @@ function toLocalDatetime(ms: number): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-const SCALE = 1_000_000
+import { GRADIENT, SCALE } from '@/lib/constants'
 
-const CHIP = cn(
-  'border-line-strong rounded-full border px-3 py-1.5',
-  'font-mono text-[10px] uppercase tracking-wide',
-  'duration-short ease-levx transition-[border-color,color]',
-  'cursor-pointer',
-)
-const CHIP_ACTIVE = 'border-ink-strong text-ink-strong'
-const CHIP_INACTIVE = 'text-ink-muted hover:border-ink hover:text-ink'
+import { CHIP, CHIP_ACTIVE, CHIP_INACTIVE } from '@/components/styles'
 
 /* ── Page ────────────────────────────────────────────────── */
 
 export function AdminPage() {
   const program = useProgram()
   const publicKey = useWalletStore((s) => s.publicKey)
-  const isAdmin = publicKey ? env.APP_ADMIN_WALLETS.includes(publicKey.toBase58()) : false
+  const isAdmin = useIsAdmin()
 
   // Form state
   const [selectedPair, setSelectedPair] = useState(0)
@@ -501,7 +494,7 @@ export function AdminPage() {
                 </span>
                 <span
                   className="h-2 w-2 shrink-0 rounded-full"
-                  style={{ background: 'linear-gradient(135deg, #F4FA4D, #5CF78B)' }}
+                  style={{ background: GRADIENT.css }}
                 />
                 <ProviderSelect
                   value={pathProviders[idx] ?? AI_PROVIDERS[0].id}
@@ -630,9 +623,9 @@ export function AdminPage() {
           className={cn(
             'flex w-full min-h-[44px] items-center justify-center rounded-full px-6 py-[14px]',
             'font-mono text-[13px] font-bold tracking-wide uppercase',
-            'text-surface bg-gradient-to-r from-[#F4FA4D] to-[#5CF78B]',
+            `text-surface ${GRADIENT.tw}`,
             'duration-short ease-levx transition-[opacity,box-shadow]',
-            'hover:shadow-[0_0_20px_rgba(160,248,120,0.35),0_0_60px_rgba(160,248,120,0.15)]',
+            `hover:shadow-[${GRADIENT.glowHover}]`,
             'disabled:opacity-40 disabled:cursor-not-allowed',
           )}
         >
