@@ -1,5 +1,7 @@
 import { useState } from 'react'
 
+import { Lock } from 'lucide-react'
+
 import { Button } from '@/components/Button'
 import { ConnectGate } from '@/components/ConnectGate'
 import { DataTable, NUM_CELL, type DataTableColumn } from '@/components/DataTable'
@@ -8,6 +10,7 @@ import { DOT_GRADIENT } from '@/lib/constants'
 import { formatUSD } from '@/lib/format'
 import { useExitPosition, useClaim } from '@/lib/solana/transactions'
 import { PageLayout } from '@/layouts/PageLayout'
+import { useWalletStore } from '@/stores/walletStore'
 
 type PositionStatus = 'active' | 'sampling' | 'at-risk'
 
@@ -100,6 +103,7 @@ function PositionStatusDot({ status }: { status: PositionStatus }) {
 }
 
 export function PositionsPage() {
+  const connected = useWalletStore((s) => s.connected)
   const exitPosition = useExitPosition()
   const [closingPosId, setClosingPosId] = useState<string | null>(null)
 
@@ -191,6 +195,19 @@ export function PositionsPage() {
       ),
     },
   ]
+
+  if (!connected) {
+    return (
+      <PageLayout title="Positions" subtitle="Track your active positions and real-time performance">
+        <div className="flex flex-col items-center justify-center gap-4 py-24 border border-dashed border-line-strong rounded-2xl">
+          <Lock size={32} strokeWidth={1.5} className="text-ink-dim" />
+          <p className="text-ink-muted font-mono text-label uppercase">
+            [ Please connect your wallet to view page content ]
+          </p>
+        </div>
+      </PageLayout>
+    )
+  }
 
   return (
     <PageLayout

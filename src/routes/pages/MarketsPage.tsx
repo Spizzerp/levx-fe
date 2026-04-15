@@ -1,5 +1,7 @@
 import { useNavigate } from '@tanstack/react-router'
-import { useMemo, useState } from 'react'
+import { Filter } from 'lucide-react'
+import { AnimatePresence, motion } from 'motion/react'
+import { useCallback, useMemo, useState } from 'react'
 
 import { DataTable, NUM_CELL, type DataTableColumn } from '@/components/DataTable'
 import { MarketsTableSkeleton } from '@/components/MarketsTableSkeleton'
@@ -135,6 +137,12 @@ export function MarketsPage() {
   const navigate = useNavigate()
   const { data: markets, isLoading, isError, refetch } = useMarkets()
   const [filter, setFilter] = useState<StateFilter>('all')
+  const [filterOpen, setFilterOpen] = useState(false)
+
+  const handleFilterSelect = useCallback((id: StateFilter) => {
+    setFilter(id)
+    setFilterOpen(false)
+  }, [])
 
   const visible = useMemo(
     () =>
@@ -150,31 +158,100 @@ export function MarketsPage() {
     <PageLayout
       title="Markets"
       subtitle="Predict the path, not the destination."
+      subtitleInline
       headerActions={hasAnyMarkets ? (
-        <div className="border-line flex items-center gap-2 border-0 border-b pb-5 text-sm">
-          {FILTERS.map((f) => {
-            const isActive = filter === f.id
-            return (
-              <button
-                key={f.id}
-                type="button"
-                onClick={() => setFilter(f.id)}
-                className={cn(
-                  'cursor-pointer rounded-full border px-4 py-2.5',
-                  'text-label font-mono uppercase',
-                  'duration-short ease-levx transition-[color,border-color,background]',
-                  isActive
-                    ? 'border-ink-strong bg-ink-strong text-surface'
-                    : 'border-line-strong text-ink-muted hover:border-ink hover:text-ink-strong bg-transparent',
-                )}
-              >
-                [ {f.label.toUpperCase()} ]
-              </button>
-            )
-          })}
-          <div className="text-ink-dim text-caption ml-auto font-mono uppercase">
-            {visible.length} {visible.length === 1 ? 'MARKET' : 'MARKETS'}
+        <div className="flex items-center gap-4 pt-6 pb-5">
+          {/* Stats */}
+          <div className="flex items-center gap-12">
+            <div>
+              <div className="text-label text-ink-dim mb-1 font-mono uppercase">Volume</div>
+              <div className="text-ink-strong font-mono text-2xl font-bold tracking-snug">
+                {formatUSD(markets?.reduce((s, m) => s + m.pool, 0) ?? 0)}
+              </div>
+            </div>
+            <div>
+              <div className="text-label text-ink-dim mb-1 font-mono uppercase">Active</div>
+              <div className="text-ink-strong font-mono text-2xl font-bold tracking-snug flex items-center gap-2">
+                {markets?.filter((m) => m.state === 'active').length ?? 0}
+                <span className="inline-flex items-center gap-1">
+                  <span className="h-2 w-2 rounded-full bg-success animate-pulse" />
+                  <span className="text-success text-[10px] font-normal tracking-wide">Live</span>
+                </span>
+              </div>
+            </div>
+            <div>
+              <div className="text-label text-ink-dim mb-1 font-mono uppercase">Markets</div>
+              <div className="text-ink-strong font-mono text-2xl font-bold tracking-snug">
+                {markets?.length ?? 0}
+              </div>
+            </div>
+            <div>
+              <div className="text-label text-ink-dim mb-1 font-mono uppercase">Traders</div>
+              <div className="text-ink-strong font-mono text-2xl font-bold tracking-snug">
+                {(markets?.reduce((s, m) => s + m.traders, 0) ?? 0).toLocaleString()}
+              </div>
+            </div>
           </div>
+
+          {/* Filter toggle — anchored right, expands left */}
+          <div className="ml-auto">
+            <div
+              className="inline-flex h-9 items-center rounded-full border border-line-strong bg-surface"
+              style={{ overflow: 'clip' }}
+            >
+              <AnimatePresence mode="wait" initial={false}>
+                {!filterOpen ? (
+                  <motion.button
+                    key="collapsed"
+                    type="button"
+                    onClick={() => setFilterOpen(true)}
+                    className="flex items-center gap-2 px-4 py-2 text-ink-muted hover:text-ink-strong"
+                    initial={{ opacity: 0, width: 0 }}
+                    animate={{ opacity: 1, width: 'auto' }}
+                    exit={{ opacity: 0, width: 0 }}
+                    transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
+                  >
+                    <Filter size={14} strokeWidth={1.5} className="shrink-0" />
+                    <span className="font-mono text-label uppercase whitespace-nowrap">
+                      {FILTERS.find((f) => f.id === filter)?.label.toUpperCase()}
+                    </span>
+                  </motion.button>
+                ) : (
+                  <motion.div
+                    key="expanded"
+                    className="flex items-center px-2"
+                    initial={{ opacity: 0, width: 0 }}
+                    animate={{ opacity: 1, width: 'auto' }}
+                    exit={{ opacity: 0, width: 0 }}
+                    transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
+                  >
+                    {[
+                      FILTERS.find((f) => f.id === filter)!,
+                      ...FILTERS.filter((f) => f.id !== filter),
+                    ].map((f, i) => (
+                      <motion.button
+                        key={f.id}
+                        type="button"
+                        initial={{ opacity: 0, x: -6 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.15, delay: i * 0.02 }}
+                        onClick={() => handleFilterSelect(f.id)}
+                        className={cn(
+                          'whitespace-nowrap px-3 py-1 font-mono text-[10px] uppercase tracking-wider',
+                          f.id === filter
+                            ? 'text-ink-strong'
+                            : 'text-ink-dim hover:text-ink-muted',
+                        )}
+                      >
+                        {f.label.toUpperCase()}
+                      </motion.button>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
+
         </div>
       ) : undefined}
     >

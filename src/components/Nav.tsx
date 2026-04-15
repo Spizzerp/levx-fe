@@ -13,7 +13,7 @@ const links = [
 ] as const
 
 const LINK_BASE = cn(
-  'group relative block py-1.5 font-mono text-xs uppercase tracking-wide text-ink-dim',
+  'group relative block py-1.5 font-mono text-xs uppercase tracking-wide text-ink-muted',
   'transition-colors duration-short ease-levx',
   'hover:text-ink-muted',
 )

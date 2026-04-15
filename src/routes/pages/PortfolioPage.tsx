@@ -1,8 +1,11 @@
+import { Lock } from 'lucide-react'
+
 import { Button } from '@/components/Button'
 import { DataTable, NUM_CELL, type DataTableColumn } from '@/components/DataTable'
 import { cn } from '@/lib/cn'
 import { formatUSD } from '@/lib/format'
 import { PageLayout } from '@/layouts/PageLayout'
+import { useWalletStore } from '@/stores/walletStore'
 
 interface SettledPosition {
   id: string
@@ -62,6 +65,21 @@ const PERFORMANCE = {
 }
 
 export function PortfolioPage() {
+  const connected = useWalletStore((s) => s.connected)
+
+  if (!connected) {
+    return (
+      <PageLayout title="Portfolio" subtitle="Settled positions and historical performance">
+        <div className="flex flex-col items-center justify-center gap-4 py-24 border border-dashed border-line-strong rounded-2xl">
+          <Lock size={32} strokeWidth={1.5} className="text-ink-dim" />
+          <p className="text-ink-muted font-mono text-label uppercase">
+            [ Please connect your wallet to view page content ]
+          </p>
+        </div>
+      </PageLayout>
+    )
+  }
+
   const handleClaim = (posId: string) => {
     // TODO: Implement claim logic
     console.log('Claiming position:', posId)

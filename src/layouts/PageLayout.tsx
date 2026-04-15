@@ -8,6 +8,8 @@ interface PageLayoutProps {
   title: string
   /** Optional subtitle below the title */
   subtitle?: string
+  /** Place subtitle inline (right of title) instead of below */
+  subtitleInline?: boolean
   /** Optional summary bar content rendered below the header */
   summaryBar?: ReactNode
   /** Extra header actions (e.g., filters, buttons) */
@@ -18,21 +20,35 @@ interface PageLayoutProps {
 export function PageLayout({
   title,
   subtitle,
+  subtitleInline = false,
   summaryBar,
   headerActions,
   children,
   className,
 }: PageLayoutProps) {
   return (
-    <main className={cn('mx-auto max-w-[1680px] px-10 pt-2 pb-12', className)}>
+    <main className={cn('mx-auto max-w-[1680px] px-10 pt-6 pb-12', className)}>
       <header className="mb-12">
-        <h1 className="font-display text-ink-strong text-display-lg mb-4 leading-none font-medium tracking-tighter [font-variation-settings:'ROND'_100]">
-          {title}
-        </h1>
-        {subtitle && (
-          <p className="text-ink-muted font-mono text-xs tracking-normal uppercase">
-            {subtitle}
-          </p>
+        {subtitleInline && subtitle ? (
+          <div className="flex items-baseline gap-6 mb-4">
+            <h1 className="font-display text-ink-strong text-[42px] leading-none font-medium tracking-tighter [font-variation-settings:'ROND'_100]">
+              {title}
+            </h1>
+            <p className="text-ink-muted font-mono text-xs tracking-normal uppercase">
+              {subtitle}
+            </p>
+          </div>
+        ) : (
+          <>
+            <h1 className="font-display text-ink-strong text-[42px] mb-4 leading-none font-medium tracking-tighter [font-variation-settings:'ROND'_100]">
+              {title}
+            </h1>
+            {subtitle && (
+              <p className="text-ink-muted font-mono text-xs tracking-normal uppercase">
+                {subtitle}
+              </p>
+            )}
+          </>
         )}
         {headerActions && <div className="mt-6">{headerActions}</div>}
       </header>
