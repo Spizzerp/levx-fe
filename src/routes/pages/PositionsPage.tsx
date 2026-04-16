@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Lock } from 'lucide-react'
 
 import { Button } from '@/components/Button'
+import { ChartFrame } from '@/components/ChartFrame'
 import { ConnectGate } from '@/components/ConnectGate'
 import { DataTable, NUM_CELL, type DataTableColumn } from '@/components/DataTable'
 import { cn } from '@/lib/cn'
@@ -214,7 +215,7 @@ export function PositionsPage() {
       title="Positions"
       subtitle="Track your active positions and real-time performance"
       summaryBar={
-        <div className="border-line flex items-center gap-12 border-0 border-b pb-8">
+        <div className="flex items-center gap-12 pb-8">
           <div>
             <div className="text-label text-ink-muted mb-2 font-mono uppercase">
               Total Wagered
@@ -242,14 +243,16 @@ export function PositionsPage() {
         </div>
       }
     >
-      <DataTable
-        columns={columns}
-        data={MOCK_POSITIONS}
-        gridCols="grid-cols-[48px_140px_1fr_140px_120px_100px_24px]"
-        gridColsWide="[@media(min-width:1201px)]:grid-cols-[56px_160px_1fr_160px_140px_120px_120px_24px]"
-        keyExtractor={(pos) => pos.id}
-        emptyMessage="[ NO OPEN POSITIONS ]"
-      />
+      <ChartFrame glow>
+        <DataTable
+          columns={columns}
+          data={MOCK_POSITIONS}
+          gridCols="grid-cols-[48px_140px_1fr_140px_120px_100px_24px]"
+          gridColsWide="[@media(min-width:1201px)]:grid-cols-[56px_160px_1fr_160px_140px_120px_120px_24px]"
+          keyExtractor={(pos) => pos.id}
+          emptyMessage="[ NO OPEN POSITIONS ]"
+        />
+      </ChartFrame>
     </PageLayout>
   )
 }

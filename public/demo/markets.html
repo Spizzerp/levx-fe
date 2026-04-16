@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LevX — Markets Demo</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Space+Grotesk:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Reset ─────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ── Theme tokens ─────────────────────────────── */
+    :root.dark {
+      --surface: #000000;
+      --surface-1: #111111;
+      --surface-2: #1a1a1a;
+      --ink-strong: #ffffff;
+      --ink: #e8e8e8;
+      --ink-muted: #999999;
+      --ink-dim: #666666;
+      --line: #222222;
+      --line-strong: #333333;
+      --success: #5CF78B;
+      --accent: #FF483B;
+      --warning: #d4a843;
+    }
+
+    body {
+      background: var(--surface);
+      color: var(--ink);
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      min-height: 100vh;
+    }
+
+    /* ── Dither glow ──────────────────────────────── */
+    .chart-frame-glow {
+      box-shadow: 0 0 20px rgba(255,255,255,0.08), 0 0 60px rgba(255,255,255,0.04);
+      position: relative;
+    }
+    .chart-frame-glow::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      z-index: 10;
+      border-radius: inherit;
+      pointer-events: none;
+      background: radial-gradient(ellipse 80% 40% at 50% 0%, rgba(255,255,255,0.08) 0%, transparent 100%);
+      mask-image: url("data:image/svg+xml,%3Csvg width='4' height='4' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='1' height='1' fill='white'/%3E%3C/svg%3E");
+      mask-size: 4px 4px;
+      -webkit-mask-image: url("data:image/svg+xml,%3Csvg width='4' height='4' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='1' height='1' fill='white'/%3E%3C/svg%3E");
+      -webkit-mask-size: 4px 4px;
+    }
+
+    .pill-glow {
+      box-shadow: 0 0 20px rgba(255,255,255,0.08), 0 0 60px rgba(255,255,255,0.04);
+      position: relative;
+    }
+    .pill-glow::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      border-radius: inherit;
+      pointer-events: none;
+      background: radial-gradient(ellipse 100% 200% at 50% 0%, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.06) 40%, transparent 100%);
+      mask-image: url("data:image/svg+xml,%3Csvg width='4' height='4' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='1' height='1' fill='white'/%3E%3C/svg%3E");
+      mask-size: 4px 4px;
+      -webkit-mask-image: url("data:image/svg+xml,%3Csvg width='4' height='4' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='1' height='1' fill='white'/%3E%3C/svg%3E");
+      -webkit-mask-size: 4px 4px;
+    }
+
+    /* ── Nav ───────────────────────────────────────── */
+    .nav-wrap {
+      position: sticky; top: 0; z-index: 9999; width: 100%;
+      background: linear-gradient(to bottom, var(--surface) 60%, transparent);
+      padding: 12px 24px 12px;
+    }
+    .nav-pill {
+      display: flex; align-items: center; justify-content: center;
+      max-width: 1400px; margin: 0 auto;
+      border-radius: 9999px; border: 1px solid var(--line-strong);
+      background: var(--surface); padding: 12px 24px;
+      position: relative;
+    }
+    .nav-logo { height: 48px; width: auto; position: relative; z-index: 10; }
+    .nav-links {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center; gap: 36px;
+      font-family: 'Space Mono', monospace; font-size: 12px;
+      text-transform: uppercase; letter-spacing: 0.1em;
+    }
+    .nav-links a { color: var(--ink-muted); text-decoration: none; padding: 6px 0; border-bottom: 2px solid transparent; }
+    .nav-links a.active { color: var(--ink-strong); border-bottom-color: var(--ink-strong); }
+    .nav-right { position: relative; z-index: 10; margin-left: auto; display: flex; align-items: center; gap: 12px; }
+    .wallet-btn {
+      border: 1px solid var(--line-strong); border-radius: 9999px; background: transparent;
+      color: var(--ink); font-family: 'Space Mono', monospace; font-size: 12px;
+      text-transform: uppercase; letter-spacing: 0.1em; padding: 8px 16px; cursor: pointer;
+    }
+
+    /* ── Page layout ──────────────────────────────── */
+    .page { max-width: 1680px; margin: 0 auto; padding: 24px 40px 48px; }
+    .header { margin-bottom: 32px; }
+    .header-row { display: flex; align-items: baseline; gap: 24px; margin-bottom: 16px; }
+    .title {
+      font-family: 'JetBrains Mono', monospace; font-size: 42px; font-weight: 500;
+      color: var(--ink-strong); letter-spacing: -0.01em; line-height: 1;
+    }
+    .subtitle { font-family: 'Space Mono', monospace; font-size: 12px; color: var(--ink-muted); text-transform: uppercase; letter-spacing: 0.08em; }
+
+    /* ── Stats ─────────────────────────────────────── */
+    .stats-row { display: flex; align-items: end; gap: 16px; padding: 16px 0 20px; }
+    .stats { display: flex; align-items: center; gap: 48px; }
+    .stat-label { font-family: 'Space Mono', monospace; font-size: 11px; color: var(--ink-dim); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 4px; }
+    .stat-value { font-family: 'Space Mono', monospace; font-size: 36px; font-weight: 700; color: var(--ink-strong); letter-spacing: 0.05em; }
+    .stat-live { display: inline-flex; align-items: center; gap: 4px; margin-left: 8px; }
+    .stat-live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); animation: pulse 2s infinite; }
+    .stat-live-text { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--success); font-weight: 400; letter-spacing: 0.1em; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+    .filter-pill {
+      margin-left: auto;
+      display: inline-flex; align-items: center; height: 36px;
+      border-radius: 9999px; border: 1px solid var(--line-strong); background: var(--surface);
+      padding: 0 16px; gap: 8px;
+      font-family: 'Space Mono', monospace; font-size: 11px; text-transform: uppercase;
+      letter-spacing: 0.1em; color: var(--ink-muted); cursor: pointer;
+    }
+    .filter-icon { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.5; }
+
+    /* ── Table ─────────────────────────────────────── */
+    .table-frame { border-radius: 16px; border: 1px solid var(--line-strong); background: var(--surface); overflow: hidden; }
+    .table-header {
+      display: grid; grid-template-columns: 100px 60px 1fr 200px 200px 180px 120px;
+      align-items: center; height: 40px; background: var(--surface-1);
+      border-bottom: 1px solid var(--line-strong);
+      font-family: 'Space Mono', monospace; font-size: 11px; text-transform: uppercase;
+      letter-spacing: 0.12em; color: var(--ink-dim); padding: 0 16px;
+    }
+    .table-header span:nth-child(n+4) { text-align: right; }
+    .table-row {
+      display: grid; grid-template-columns: 100px 60px 1fr 200px 200px 180px 120px;
+      align-items: center; min-height: 64px;
+      border-bottom: 1px solid var(--line); padding: 0 16px;
+      transition: background 200ms;
+    }
+    .table-row:hover { background: rgba(255,255,255,0.02); }
+    .table-row:last-child { border-bottom: none; }
+
+    .cell-market {
+      font-family: 'Space Mono', monospace; font-size: 14px; font-weight: 700;
+      color: var(--ink-strong); text-transform: uppercase; letter-spacing: 0.1em;
+      padding-left: 8px;
+    }
+    .cell-pair { display: flex; align-items: center; }
+    .token-pair { display: flex; align-items: center; }
+    .token-img { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--surface); object-fit: cover; }
+    .token-img:nth-child(2) { margin-left: -10px; }
+    .cell-state { display: flex; align-items: center; gap: 8px; }
+    .state-dot { width: 6px; height: 6px; border-radius: 50%; }
+    .state-dot.active { background: var(--success); }
+    .state-dot.sampling { background: var(--success); }
+    .state-dot.pending { background: var(--ink-muted); }
+    .state-dot.settling { background: var(--warning); }
+    .state-dot.maturing { background: var(--warning); }
+    .state-dot.settled { background: var(--ink-dim); }
+    .state-dot.void { background: var(--accent); }
+    .state-label { font-family: 'Space Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-muted); }
+    .cell-right { text-align: right; font-family: 'Space Mono', monospace; font-size: 11px; color: var(--ink); letter-spacing: 0.05em; }
+    .cell-arrow { text-align: right; color: var(--ink-dim); font-size: 14px; }
+
+    /* ── Progress bar ─────────────────────────────── */
+    .progress-cell { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+    .progress-bar { width: 64px; height: 6px; border-radius: 9999px; background: var(--line-strong); overflow: hidden; }
+    .progress-fill { height: 100%; border-radius: 9999px; background: linear-gradient(90deg, #F4FA4D, #5CF78B); }
+    .progress-text { font-family: 'Space Mono', monospace; font-size: 11px; color: var(--ink-muted); letter-spacing: 0.05em; }
+
+    /* ── Footer ────────────────────────────────────── */
+    .footer { display: flex; justify-content: center; gap: 16px; padding: 32px 0; margin-top: auto; }
+    .footer a { color: var(--ink-dim); transition: color 200ms; }
+    .footer a:hover { color: var(--ink-strong); }
+
+    /* ── Page nav (pagination) ─────────────────────── */
+    .pagination {
+      display: flex; align-items: center; justify-content: center; gap: 12px;
+      border-top: 1px solid var(--line); background: var(--surface-1);
+      padding: 12px; border-radius: 0 0 16px 16px;
+    }
+    .page-btn {
+      font-family: 'Space Mono', monospace; font-size: 10px; text-transform: uppercase;
+      letter-spacing: 0.12em; padding: 4px 12px; border-radius: 9999px;
+      border: 1px solid var(--line-strong); background: transparent;
+      color: var(--ink-muted); cursor: pointer;
+    }
+    .page-btn:hover { color: var(--ink-strong); border-color: var(--ink); }
+    .page-info { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--ink-muted); text-transform: uppercase; letter-spacing: 0.12em; }
+  </style>
+</head>
+<body>
+  <!-- Nav -->
+  <div class="nav-wrap">
+    <nav class="nav-pill pill-glow">
+      <img src="/logo_color.png" alt="LevX" class="nav-logo" />
+      <div class="nav-links">
+        <a href="#" class="active">Markets</a>
+        <a href="#">Positions</a>
+        <a href="#">Vault</a>
+        <a href="#">Portfolio</a>
+        <a href="#">Leaderboard</a>
+      </div>
+      <div class="nav-right">
+        <button class="wallet-btn">FdQN···1gci</button>
+      </div>
+    </nav>
+  </div>
+
+  <!-- Page -->
+  <div class="page">
+    <div class="header">
+      <div class="header-row">
+        <div class="title">Markets</div>
+        <div class="subtitle">Predict the path, not the destination.</div>
+      </div>
+    </div>
+
+    <div class="stats-row">
+      <div class="stats">
+        <div>
+          <div class="stat-label">Volume</div>
+          <div class="stat-value">1,559,501</div>
+        </div>
+        <div>
+          <div class="stat-label">Active</div>
+          <div class="stat-value">4 <span class="stat-live"><span class="stat-live-dot"></span><span class="stat-live-text">Live</span></span></div>
+        </div>
+        <div>
+          <div class="stat-label">Markets</div>
+          <div class="stat-value">15</div>
+        </div>
+        <div>
+          <div class="stat-label">Traders</div>
+          <div class="stat-value">7,895</div>
+        </div>
+      </div>
+      <div class="filter-pill">
+        <svg class="filter-icon" viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+        ALL
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="table-frame chart-frame-glow">
+      <div class="table-header">
+        <span style="padding-left:8px">Market</span>
+        <span></span>
+        <span>State</span>
+        <span>Expires</span>
+        <span>Pool</span>
+        <span>Progress</span>
+        <span>Traders</span>
+      </div>
+
+      <div class="table-row">
+        <div class="cell-market" style="padding-left:8px">BTC</div>
+        <div class="cell-pair"><div class="token-pair"><img class="token-img" src="https://assets.coingecko.com/coins/images/1/standard/bitcoin.png" /><img class="token-img" src="https://assets.coingecko.com/coins/images/6319/standard/usdc.png" /></div></div>
+        <div class="cell-state"><span class="state-dot active"></span><span class="state-label">Active</span></div>
+        <div class="cell-right">6D · 22:34:54</div>
+        <div class="cell-right">248,901 USDC</div>
+        <div class="progress-cell"><span class="progress-bar"><span class="progress-fill" style="width:50%"></span></span><span class="progress-text">168/336</span></div>
+        <div class="cell-right">1,204</div>
+      </div>
+
+      <div class="table-row">
+        <div class="cell-market" style="padding-left:8px">ETH</div>
+        <div class="cell-pair"><div class="token-pair"><img class="token-img" src="https://assets.coingecko.com/coins/images/279/standard/ethereum.png" /><img class="token-img" src="https://assets.coingecko.com/coins/images/6319/standard/usdc.png" /></div></div>
+        <div class="cell-state"><span class="state-dot sampling"></span><span class="state-label">Sampling</span></div>
+        <div class="cell-right">2D · 22:34:54</div>
+        <div class="cell-right">142,560 USDC</div>
+        <div class="progress-cell"><span class="progress-bar"><span class="progress-fill" style="width:29%"></span></span><span class="progress-text">96/336</span></div>
+        <div class="cell-right">876</div>
+      </div>
+
+      <div class="table-row">
+        <div class="cell-market" style="padding-left:8px">SOL</div>
+        <div class="cell-pair"><div class="token-pair"><img class="token-img" src="https://assets.coingecko.com/coins/images/4128/standard/solana.png" /><img class="token-img" src="https://assets.coingecko.com/coins/images/6319/standard/usdc.png" /></div></div>
+        <div class="cell-state"><span class="state-dot pending"></span><span class="state-label">Pending</span></div>
+        <div class="cell-right">Starts in 0D · 04:34:54</div>
+        <div class="cell-right">0 USDC</div>
+        <div class="progress-cell"><span class="progress-bar"><span class="progress-fill" style="width:0%"></span></span><span class="progress-text">0/336</span></div>
+        <div class="cell-right">0</div>
+      </div>
+
+      <div class="table-row">
+        <div class="cell-market" style="padding-left:8px">BTC</div>
+        <div class="cell-pair"><div class="token-pair"><img class="token-img" src="https://assets.coingecko.com/coins/images/1/standard/bitcoin.png" /><img class="token-img" src="https://assets.coingecko.com/coins/images/6319/standard/usdc.png" /></div></div>
+        <div class="cell-state"><span class="state-dot settling"></span><span class="state-label">Settling</span></div>
+        <div class="cell-right">Ended</div>
+        <div class="cell-right">62,180 USDC</div>
+        <div class="progress-cell"><span class="progress-bar"><span class="progress-fill" style="width:100%"></span></span><span class="progress-text">168/168</span></div>
+        <div class="cell-right">311</div>
+      </div>
+
+      <div class="table-row">
+        <div class="cell-market" style="padding-left:8px">ETH</div>
+        <div class="cell-pair"><div class="token-pair"><img class="token-img" src="https://assets.coingecko.com/coins/images/279/standard/ethereum.png" /><img class="token-img" src="https://assets.coingecko.com/coins/images/6319/standard/usdc.png" /></div></div>
+        <div class="cell-state"><span class="state-dot maturing"></span><span class="state-label">Maturing</span></div>
+        <div class="cell-right">Ended</div>
+        <div class="cell-right">38,420 USDC</div>
+        <div class="progress-cell"><span class="progress-bar"><span class="progress-fill" style="width:100%"></span></span><span class="progress-text">168/168</span></div>
+        <div class="cell-right">184</div>
+      </div>
+
+      <div class="table-row">
+        <div class="cell-market" style="padding-left:8px">SOL</div>
+        <div class="cell-pair"><div class="token-pair"><img class="token-img" src="https://assets.coingecko.com/coins/images/4128/standard/solana.png" /><img class="token-img" src="https://assets.coingecko.com/coins/images/6319/standard/usdc.png" /></div></div>
+        <div class="cell-state"><span class="state-dot settled"></span><span class="state-label">Settled</span></div>
+        <div class="cell-right">Settled</div>
+        <div class="cell-right">51,700 USDC</div>
+        <div class="progress-cell"><span class="progress-bar"><span class="progress-fill" style="width:100%"></span></span><span class="progress-text">168/168</span></div>
+        <div class="cell-right">247</div>
+      </div>
+
+      <div class="table-row">
+        <div class="cell-market" style="padding-left:8px">ETH</div>
+        <div class="cell-pair"><div class="token-pair"><img class="token-img" src="https://assets.coingecko.com/coins/images/279/standard/ethereum.png" /><img class="token-img" src="https://assets.coingecko.com/coins/images/6319/standard/usdc.png" /></div></div>
+        <div class="cell-state"><span class="state-dot active"></span><span class="state-label">Active</span></div>
+        <div class="cell-right">1D · 18:20:00</div>
+        <div class="cell-right">89,200 USDC</div>
+        <div class="progress-cell"><span class="progress-bar"><span class="progress-fill" style="width:36%"></span></span><span class="progress-text">120/336</span></div>
+        <div class="cell-right">421</div>
+      </div>
+
+      <div class="table-row">
+        <div class="cell-market" style="padding-left:8px">SOL</div>
+        <div class="cell-pair"><div class="token-pair"><img class="token-img" src="https://assets.coingecko.com/coins/images/4128/standard/solana.png" /><img class="token-img" src="https://assets.coingecko.com/coins/images/6319/standard/usdc.png" /></div></div>
+        <div class="cell-state"><span class="state-dot active"></span><span class="state-label">Active</span></div>
+        <div class="cell-right">3D · 12:45:00</div>
+        <div class="cell-right">176,400 USDC</div>
+        <div class="progress-cell"><span class="progress-bar"><span class="progress-fill" style="width:21%"></span></span><span class="progress-text">72/336</span></div>
+        <div class="cell-right">932</div>
+      </div>
+
+      <div class="table-row">
+        <div class="cell-market" style="padding-left:8px">BTC</div>
+        <div class="cell-pair"><div class="token-pair"><img class="token-img" src="https://assets.coingecko.com/coins/images/1/standard/bitcoin.png" /><img class="token-img" src="https://assets.coingecko.com/coins/images/6319/standard/usdc.png" /></div></div>
+        <div class="cell-state"><span class="state-dot sampling"></span><span class="state-label">Sampling</span></div>
+        <div class="cell-right">0D · 23:55:06</div>
+        <div class="cell-right">310,000 USDC</div>
+        <div class="progress-cell"><span class="progress-bar"><span class="progress-fill" style="width:43%"></span></span><span class="progress-text">144/336</span></div>
+        <div class="cell-right">1,580</div>
+      </div>
+
+      <div class="table-row">
+        <div class="cell-market" style="padding-left:8px">BTC</div>
+        <div class="cell-pair"><div class="token-pair"><img class="token-img" src="https://assets.coingecko.com/coins/images/1/standard/bitcoin.png" /><img class="token-img" src="https://assets.coingecko.com/coins/images/6319/standard/usdc.png" /></div></div>
+        <div class="cell-state"><span class="state-dot settled"></span><span class="state-label">Settled</span></div>
+        <div class="cell-right">Settled</div>
+        <div class="cell-right">220,100 USDC</div>
+        <div class="progress-cell"><span class="progress-bar"><span class="progress-fill" style="width:100%"></span></span><span class="progress-text">168/168</span></div>
+        <div class="cell-right">1,102</div>
+      </div>
+
+      <!-- Pagination -->
+      <div class="pagination">
+        <button class="page-btn" style="opacity:0.4;cursor:not-allowed">Prev</button>
+        <span class="page-info">1 / 2</span>
+        <button class="page-btn">Next</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <a href="https://x.com/LevXtrade" target="_blank">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+    </a>
+    <a href="#" target="_blank">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 13H8"/><path d="M16 17H8"/><path d="M16 13h-2"/></svg>
+    </a>
+  </div>
+</body>
+</html>

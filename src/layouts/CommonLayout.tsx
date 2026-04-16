@@ -21,7 +21,7 @@ export function CommonLayout({ children }: PropsWithChildren) {
       <div style={{ isolation: 'isolate' }} className="flex-1">{children}</div>
       <div className="mt-auto flex items-center justify-center gap-4 py-8">
         <a
-          href="https://x.com"
+          href="https://x.com/LevXtrade"
           target="_blank"
           rel="noopener noreferrer"
           className="text-ink-dim hover:text-ink-strong duration-short ease-levx transition-colors"

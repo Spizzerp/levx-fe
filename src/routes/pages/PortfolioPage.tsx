@@ -1,6 +1,7 @@
 import { Lock } from 'lucide-react'
 
 import { Button } from '@/components/Button'
+import { ChartFrame } from '@/components/ChartFrame'
 import { DataTable, NUM_CELL, type DataTableColumn } from '@/components/DataTable'
 import { cn } from '@/lib/cn'
 import { formatUSD } from '@/lib/format'
@@ -175,7 +176,7 @@ export function PortfolioPage() {
       title="Portfolio"
       subtitle="P&L · Claims · Season Points"
       summaryBar={
-        <div className="border-line flex items-center gap-12 border-0 border-b pb-8">
+        <div className="flex items-center gap-12 pb-8">
           <div>
             <div className="text-label text-ink-muted mb-2 font-mono uppercase">
               Total P&L
@@ -218,20 +219,22 @@ export function PortfolioPage() {
         </div>
       }
     >
-      <div className="border-line mb-8 border-0 border-b pb-4">
+      <div className="mb-8 pb-4">
         <h2 className="text-ink-strong font-mono text-xs font-bold tracking-wide uppercase">
           Settled Positions
         </h2>
       </div>
 
-      <DataTable
-        columns={columns}
-        data={SETTLED_POSITIONS}
-        gridCols="grid-cols-[48px_140px_1fr_140px_120px_100px_72px]"
-        gridColsWide="[@media(min-width:1201px)]:grid-cols-[56px_160px_1fr_160px_140px_120px_72px]"
-        keyExtractor={(pos) => pos.id}
-        emptyMessage="[ NO SETTLED POSITIONS ]"
-      />
+      <ChartFrame glow>
+        <DataTable
+          columns={columns}
+          data={SETTLED_POSITIONS}
+          gridCols="grid-cols-[48px_140px_1fr_140px_120px_100px_72px]"
+          gridColsWide="[@media(min-width:1201px)]:grid-cols-[56px_160px_1fr_160px_140px_120px_72px]"
+          keyExtractor={(pos) => pos.id}
+          emptyMessage="[ NO SETTLED POSITIONS ]"
+        />
+      </ChartFrame>
     </PageLayout>
   )
 }

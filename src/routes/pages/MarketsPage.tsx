@@ -184,8 +184,8 @@ export function MarketsPage() {
       title="Markets"
       subtitle="Predict the path, not the destination."
       subtitleInline
-      headerActions={hasAnyMarkets ? (
-        <div className="flex items-end gap-4 pt-6 pb-5">
+      summaryBar={hasAnyMarkets ? (
+        <div className="flex items-end gap-4 pb-5">
           {/* Stats */}
           <div className="flex items-center gap-12">
             <div>

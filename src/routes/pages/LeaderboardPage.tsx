@@ -1,3 +1,4 @@
+import { ChartFrame } from '@/components/ChartFrame'
 import { DataTable, NUM_CELL, type DataTableColumn } from '@/components/DataTable'
 import { cn } from '@/lib/cn'
 import { formatUSD } from '@/lib/format'
@@ -142,13 +143,15 @@ export function LeaderboardPage() {
 
       {/* Rest of the list */}
       {REST.length > 0 && (
-        <DataTable
-          columns={COLUMNS}
-          data={REST}
-          gridCols="grid-cols-[48px_140px_120px_100px_1fr]"
-          rowHeight="h-[56px]"
-          keyExtractor={(entry) => entry.rank}
-        />
+        <ChartFrame glow>
+          <DataTable
+            columns={COLUMNS}
+            data={REST}
+            gridCols="grid-cols-[48px_140px_120px_100px_1fr]"
+            rowHeight="h-[56px]"
+            keyExtractor={(entry) => entry.rank}
+          />
+        </ChartFrame>
       )}
     </PageLayout>
   )
