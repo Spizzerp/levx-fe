@@ -19,7 +19,7 @@ import { Stub } from '@/components/Stub'
 import { UserPositionCard } from '@/components/UserPositionCard'
 import { cn } from '@/lib/cn'
 import { useMarket, useUserPosition } from '@/lib/chain'
-import { usePlaceWager, useClaim } from '@/lib/solana/transactions'
+import { useAddPath, usePlaceBatchWager, useClaim } from '@/lib/solana/transactions'
 import { usePythFeed, useLatestPrice } from '@/lib/pyth/hooks'
 import { feedIdForPair } from '@/lib/pyth/feedIds'
 import { useBenchmarksHistory } from '@/lib/pyth/useBenchmarksHistory'
@@ -115,12 +115,16 @@ export function MarketPage() {
     interval: candleInterval,
   })
 
-  const placeWager = usePlaceWager()
+  const addPath = useAddPath()
+  const placeBatchWager = usePlaceBatchWager()
 
   const drawingState = useDrawingStore((s) => s.state)
   const drawingPhase = drawingState.phase
   const enterDrawMode = useDrawingStore((s) => s.enterDrawMode)
   const exitDrawMode = useDrawingStore((s) => s.exitDrawMode)
+  const confirmDrawing = useDrawingStore((s) => s.confirm)
+  const onTxSuccess = useDrawingStore((s) => s.onTxSuccess)
+  const onTxError = useDrawingStore((s) => s.onTxError)
 
   const [selectedPathIds, setSelectedPathIds] = useState<Set<string>>(new Set())
   const [userPaths, setUserPaths] = useState<PredictionPath[]>([])
@@ -193,51 +197,73 @@ export function MarketPage() {
   // Combine AI paths + user-drawn paths for chart
   const allPaths = useMemo(() => [...aiPaths, ...userPaths], [aiPaths, userPaths])
 
-  const handleConfirmDrawing = () => {
-    if (drawingState.phase !== 'ready') return
+  const handleConfirmDrawing = async () => {
+    if (drawingState.phase !== 'ready' || !market) return
     const values = drawingState.values
-    const intervalMs = chartCheckpointInterval * 1000
-    const data: PricePoint[] = values.map((v, i) => ({
-      time: chartMarketStart + i * intervalMs,
-      value: v,
-    }))
-    const userPath: PredictionPath = {
-      id: `user-${Date.now()}`,
-      label: 'Your Path',
-      tone: 'custom',
-      origin: 'user',
-      multiplier: 0,
-      data,
-      pathIndex: allPaths.length,
-      predictedPrices: values,
-      numCheckpoints: values.length,
-      initialProbabilityBps: 0,
-      generationTimestamp: Date.now(),
-      creator: '',
-      cumulativeAction: 0,
-      compositeScore: 0,
-      peakAmplitude: 0,
-      amplitudeAtDecoherence: 0,
-      dissolved: false,
-      dissolvedAtCheckpoint: 0,
-      checkpointsProcessed: 0,
-      totalWagered: 0,
-      totalLeveragedExposure: 0,
-      lmsrSharesOutstanding: 0,
-      currentImpliedProbability: 0,
+    confirmDrawing()
+
+    try {
+      const { sig, pathIndex } = await addPath.mutateAsync({
+        marketId: market.marketId,
+        predictedPrices: values,
+        numCheckpoints: values.length,
+      })
+
+      const intervalMs = chartCheckpointInterval * 1000
+      const data: PricePoint[] = values.map((v, i) => ({
+        time: chartMarketStart + i * intervalMs,
+        value: v,
+      }))
+      const userPath: PredictionPath = {
+        id: `user-${Date.now()}`,
+        label: 'Your Path',
+        tone: 'custom',
+        origin: 'user',
+        multiplier: 0,
+        data,
+        pathIndex,
+        predictedPrices: values,
+        numCheckpoints: values.length,
+        initialProbabilityBps: 0,
+        generationTimestamp: Date.now(),
+        creator: '',
+        cumulativeAction: 0,
+        compositeScore: 0,
+        peakAmplitude: 0,
+        amplitudeAtDecoherence: 0,
+        dissolved: false,
+        dissolvedAtCheckpoint: 0,
+        checkpointsProcessed: 0,
+        totalWagered: 0,
+        totalLeveragedExposure: 0,
+        lmsrSharesOutstanding: 0,
+        currentImpliedProbability: 0,
+        onChainStatus: 'confirmed',
+      }
+      setUserPaths((prev) => [...prev, userPath])
+      setSelectedPathIds((prev) => new Set([...prev, userPath.id]))
+      onTxSuccess(sig)
+    } catch (err) {
+      onTxError((err as Error).message)
     }
-    setUserPaths((prev) => [...prev, userPath])
-    setSelectedPathIds((prev) => new Set([...prev, userPath.id]))
-    exitDrawMode()
   }
 
-  // Default selection = the middle (neutral) path on first load
-  // For chart highlight, use first selected or default to middle path
-  const activePathId = selectedPathIds.size > 0 ? [...selectedPathIds][0] : null
+  // All selected paths and the subset eligible for wagering
+  const selectedPaths = allPaths.filter((p) => selectedPathIds.has(p.id))
+  const wagerablePaths = selectedPaths.filter((p) => p.onChainStatus !== 'pending')
+  const numWagerable = wagerablePaths.length
+
+  // Chart highlight: last-added path in the set (most recent click)
+  const activePathId = selectedPathIds.size > 0 ? [...selectedPathIds].at(-1)! : null
   const selectedPath = allPaths.find((p) => p.id === activePathId)
-  const lastPoint = selectedPath?.data[selectedPath.data.length - 1]
-  const firstPoint = selectedPath?.data[0]
-  const isLong = lastPoint && firstPoint ? lastPoint.value >= firstPoint.value : true
+
+  const isPathLong = (p?: PredictionPath) => {
+    if (!p) return true
+    const last = p.data.at(-1)
+    const first = p.data[0]
+    return last && first ? last.value >= first.value : true
+  }
+  const isLong = isPathLong(selectedPath)
 
   // Delta is only available from the mock layer (not from live Pyth ticks in Phase 1)
   const deltaDisplay = 0
@@ -383,6 +409,7 @@ export function MarketPage() {
               multiplier={`${p.multiplier.toFixed(2)}×`}
               wagered={p.totalWagered}
               active={selectedPathIds.has(p.id)}
+              pending={p.origin === 'user' && p.onChainStatus === 'pending'}
               onMouseEnter={() => setHoveredPathId(p.id)}
               onMouseLeave={() => setHoveredPathId(null)}
               onClick={() => setSelectedPathIds((prev) => {
@@ -393,6 +420,11 @@ export function MarketPage() {
               })}
             />
           ))}
+          {selectedPathIds.size > 4 && (
+            <p className="text-accent font-mono text-caption px-4 py-2">
+              Max 4 paths per transaction. Deselect some paths.
+            </p>
+          )}
         </div>
 
         {/*
@@ -474,28 +506,42 @@ export function MarketPage() {
           inputMode="decimal"
           className="mb-8"
         />
+        {numWagerable > 1 && (
+          <p className="text-ink-muted font-mono text-caption -mt-6 mb-6">
+            Total: {formatUSD((parseFloat(collateral) || 0) * numWagerable)} USDC across {numWagerable} paths
+          </p>
+        )}
 
         <ConnectGate>
           <Button
             variant="primary"
             fullWidth
             className="mt-2"
-            disabled={market.state !== 'active' || !selectedPath || placeWager.isPending}
+            disabled={
+              market.state !== 'active' ||
+              numWagerable === 0 ||
+              numWagerable > 4 ||
+              placeBatchWager.isPending
+            }
             onClick={() => {
-              if (!selectedPath) return
-              placeWager.mutate({
+              if (numWagerable === 0) return
+              placeBatchWager.mutate({
                 marketId: market.marketId,
-                pathIndex: selectedPath.pathIndex,
+                pathIndices: wagerablePaths.map((p) => p.pathIndex),
                 amount: parseFloat(collateral) || 0,
               })
             }}
           >
-            {placeWager.isPending ? 'Confirming…' : `Open ${isLong ? 'Long' : 'Short'} Position`}
+            {placeBatchWager.isPending
+              ? 'Confirming…'
+              : numWagerable <= 1
+                ? `Open ${isPathLong(wagerablePaths[0]) ? 'Long' : 'Short'} Position`
+                : `Open ${numWagerable} Positions`}
           </Button>
         </ConnectGate>
-        {placeWager.isError && (
+        {placeBatchWager.isError && (
           <p className="text-accent font-mono text-caption mt-2">
-            {(placeWager.error as Error).message}
+            {(placeBatchWager.error as Error).message}
           </p>
         )}
       </aside>

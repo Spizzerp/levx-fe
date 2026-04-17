@@ -98,6 +98,11 @@ export interface PredictionPath {
   lmsrSharesOutstanding: number
   /** Current implied probability in basis points */
   currentImpliedProbability: number
+
+  /* ── Client-only ────────────────────────────────────────── */
+
+  /** Tracks on-chain persistence for user-drawn paths. Undefined = confirmed. */
+  onChainStatus?: 'pending' | 'confirmed'
 }
 
 /* ── Market ────────────────────────────────────────────────── */

@@ -29,7 +29,7 @@ export function TokenPairIcon({ base, quote, size = 28, className }: TokenPairIc
       style={{ height: size }}
     >
       <motion.div
-        className="relative z-[2] rounded-full border-2 border-surface bg-surface-1 overflow-hidden shrink-0"
+        className="relative z-[2] rounded-full border border-line-strong bg-surface-1 overflow-hidden shrink-0"
         style={{ width: size, height: size }}
         animate={{ x: 0 }}
         transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
@@ -44,7 +44,7 @@ export function TokenPairIcon({ base, quote, size = 28, className }: TokenPairIc
       </motion.div>
 
       <motion.div
-        className="relative z-[1] rounded-full border-2 border-surface bg-surface-1 overflow-hidden shrink-0"
+        className="relative z-[1] rounded-full border border-line-strong bg-surface-1 overflow-hidden shrink-0"
         style={{ width: size, height: size }}
         animate={{ x: hovered ? 4 : -overlap }}
         transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
