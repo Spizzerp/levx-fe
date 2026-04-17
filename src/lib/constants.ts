@@ -1,6 +1,18 @@
 /** Fixed-point scale factor used across on-chain arithmetic. All u64 values ÷ SCALE for display. */
 export const SCALE = 1_000_000
 
+/** Per-instruction compute-unit budgets. Static; could be replaced with simulate-derived values later. */
+export const CU_LIMITS = {
+  addPath: 100_000,
+  placeWager: 200_000,
+  exitPosition: 120_000,
+  claim: 120_000,
+  createMarket: 250_000,
+} as const
+
+/** Solana's hard cap on per-transaction compute units. */
+export const MAX_CU_PER_TX = 1_400_000
+
 /** Brand gradient endpoints (yellow → green). Matches --color-brand-from/to in tokens.css. */
 export const BRAND = {
   from: '#F4FA4D',

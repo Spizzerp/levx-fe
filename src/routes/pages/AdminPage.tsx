@@ -1,7 +1,10 @@
 import { useEffect, useRef, useMemo, useState } from 'react'
-import { BN } from '@coral-xyz/anchor'
-import { PublicKey, Keypair, SystemProgram } from '@solana/web3.js'
+import { AnchorProvider, BN } from '@coral-xyz/anchor'
+import { PublicKey, Keypair, SystemProgram, Transaction } from '@solana/web3.js'
 import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress } from '@solana/spl-token'
+
+import { buildTransaction } from '@/lib/chain/buildTransaction'
+import { getPriorityFee } from '@/lib/chain/priorityFee'
 
 import { ChevronDown, Info } from 'lucide-react'
 
@@ -276,7 +279,7 @@ function toLocalDatetime(ms: number): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-import { GRADIENT, SCALE } from '@/lib/constants'
+import { CU_LIMITS, GRADIENT, SCALE } from '@/lib/constants'
 
 import { CHIP, CHIP_ACTIVE, CHIP_INACTIVE } from '@/components/styles'
 
@@ -388,7 +391,7 @@ export function AdminPage() {
         weightDisplacement: new BN(Math.round(0.25 * SCALE)),
       }
 
-      const sig = await program.methods
+      const ix = await program.methods
         .createMarket(params)
         .accounts({
           protocolState: protocolPda,
@@ -401,8 +404,17 @@ export function AdminPage() {
           systemProgram: SystemProgram.programId,
           tokenProgram: TOKEN_PROGRAM_ID,
         })
-        .signers([vaultKeypair])
-        .rpc()
+        .instruction()
+
+      const provider = program.provider as AnchorProvider
+      const priorityFeeMicroLamports = await getPriorityFee(provider.connection)
+      const finalIxs = await buildTransaction({
+        instructions: [ix],
+        computeUnitLimit: CU_LIMITS.createMarket,
+        priorityFeeMicroLamports,
+      })
+      const tx = new Transaction().add(...finalIxs)
+      const sig = await provider.sendAndConfirm(tx, [vaultKeypair])
 
       toast.success('Market created', { txSig: sig })
     } catch (err) {

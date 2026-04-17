@@ -6,21 +6,24 @@
  *   - exit_position()
  *   - claim()
  *
- * Each returns a TanStack Query useMutation with typed inputs.
- * Account addresses (vault, treasury, insurance) are fetched from on-chain
- * state at call time — no hardcoded addresses.
+ * Every mutation builds instructions manually, routes through
+ * buildTransaction (compute-unit limit + dynamic priority fee), and
+ * sends via AnchorProvider.sendAndConfirm. Account addresses (vault,
+ * treasury, insurance) are fetched from on-chain state at call time —
+ * no hardcoded addresses.
  */
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { AnchorProvider, BN } from '@coral-xyz/anchor'
 import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress } from '@solana/spl-token'
-import { SystemProgram, Transaction } from '@solana/web3.js'
+import { SystemProgram, Transaction, type TransactionInstruction } from '@solana/web3.js'
 
 import { useProgram } from './program'
-import { SCALE } from '@/lib/constants'
+import { CU_LIMITS, MAX_CU_PER_TX, SCALE } from '@/lib/constants'
 import { toast } from '@/stores/toastStore'
 import { deriveMarketPda, derivePathPda, derivePositionPda, deriveProtocolPda } from './pda'
 import { buildTransaction } from '@/lib/chain/buildTransaction'
+import { getPriorityFee } from '@/lib/chain/priorityFee'
 
 const MAX_BATCH_SIZE = 4
 
@@ -48,6 +51,25 @@ interface PositionInput {
   pathIndex: number
 }
 
+type ProgramWithProvider = { provider: AnchorProvider }
+
+/** Builds + signs + confirms a single transaction with compute-budget prefix. */
+async function sendInstructions(
+  program: ProgramWithProvider,
+  instructions: TransactionInstruction[],
+  computeUnitLimit: number,
+): Promise<string> {
+  const provider = program.provider
+  const priorityFeeMicroLamports = await getPriorityFee(provider.connection)
+  const finalIxs = await buildTransaction({
+    instructions,
+    computeUnitLimit,
+    priorityFeeMicroLamports,
+  })
+  const tx = new Transaction().add(...finalIxs)
+  return provider.sendAndConfirm(tx)
+}
+
 export function useAddPath() {
   const program = useProgram()
   const queryClient = useQueryClient()
@@ -72,7 +94,7 @@ export function useAddPath() {
         generationTimestamp: new BN(Math.floor(Date.now() / 1000)),
       }
 
-      const sig = await program.methods
+      const ix = await program.methods
         .addPath(params)
         .accounts({
           market: marketPda,
@@ -80,11 +102,12 @@ export function useAddPath() {
           creator: user,
           systemProgram: SystemProgram.programId,
         })
-        .rpc()
+        .instruction()
 
-      return { sig: sig as string, pathIndex }
+      const sig = await sendInstructions(program, [ix], CU_LIMITS.addPath)
+      return { sig, pathIndex }
     },
-    onSuccess: ({ sig, pathIndex: _ }, { marketId }) => {
+    onSuccess: ({ sig }, { marketId }) => {
       queryClient.invalidateQueries({ queryKey: ['market', String(marketId)] })
       queryClient.invalidateQueries({ queryKey: ['markets'] })
       toast.success('Path created on-chain', { txSig: sig })
@@ -111,7 +134,6 @@ export function usePlaceWager() {
       const [pathPda] = derivePathPda(marketId, pathIndex)
       const [positionPda] = derivePositionPda(marketId, user, pathIndex)
 
-      // Fetch on-chain accounts for vault/treasury/insurance addresses
       const [marketAcc, protocolAcc] = await Promise.all([
         program.account.market.fetch(marketPda),
         program.account.protocolState.fetch(protocolPda),
@@ -123,7 +145,7 @@ export function usePlaceWager() {
       const insuranceFund = protocolAcc.insuranceFund
       const userTokenAccount = await getAssociatedTokenAddress(quoteMint, user)
 
-      const sig = await program.methods
+      const ix = await program.methods
         .placeWager(pathIndex, scaledAmount)
         .accounts({
           protocolState: protocolPda,
@@ -138,9 +160,9 @@ export function usePlaceWager() {
           tokenProgram: TOKEN_PROGRAM_ID,
           systemProgram: SystemProgram.programId,
         })
-        .rpc()
+        .instruction()
 
-      return sig as string
+      return sendInstructions(program, [ix], CU_LIMITS.placeWager)
     },
     onSuccess: (sig, { marketId }) => {
       queryClient.invalidateQueries({ queryKey: ['market', String(marketId)] })
@@ -206,11 +228,8 @@ export function usePlaceBatchWager() {
         }),
       )
 
-      const finalIxs = await buildTransaction({ instructions: ixs })
-      const tx = new Transaction().add(...finalIxs)
-      const sig = await (program.provider as AnchorProvider).sendAndConfirm(tx)
-
-      return sig as string
+      const computeUnitLimit = Math.min(CU_LIMITS.placeWager * pathIndices.length, MAX_CU_PER_TX)
+      return sendInstructions(program, ixs, computeUnitLimit)
     },
     onSuccess: (sig, { marketId, pathIndices }) => {
       queryClient.invalidateQueries({ queryKey: ['market', String(marketId)] })
@@ -243,7 +262,7 @@ export function useExitPosition() {
       const quoteMint = marketAcc.quoteMint
       const userTokenAccount = await getAssociatedTokenAddress(quoteMint, user)
 
-      const sig = await program.methods
+      const ix = await program.methods
         .exitPosition()
         .accounts({
           market: marketPda,
@@ -254,9 +273,9 @@ export function useExitPosition() {
           user,
           tokenProgram: TOKEN_PROGRAM_ID,
         })
-        .rpc()
+        .instruction()
 
-      return sig as string
+      return sendInstructions(program, [ix], CU_LIMITS.exitPosition)
     },
     onSuccess: (sig, { marketId }) => {
       queryClient.invalidateQueries({ queryKey: ['market', String(marketId)] })
@@ -295,7 +314,7 @@ export function useClaim() {
       const insuranceFund = protocolAcc.insuranceFund
       const userTokenAccount = await getAssociatedTokenAddress(quoteMint, user)
 
-      const sig = await program.methods
+      const ix = await program.methods
         .claim()
         .accounts({
           protocolState: protocolPda,
@@ -309,9 +328,9 @@ export function useClaim() {
           user,
           tokenProgram: TOKEN_PROGRAM_ID,
         })
-        .rpc()
+        .instruction()
 
-      return sig as string
+      return sendInstructions(program, [ix], CU_LIMITS.claim)
     },
     onSuccess: (sig, { marketId }) => {
       queryClient.invalidateQueries({ queryKey: ['market', String(marketId)] })
