@@ -79,6 +79,7 @@ export function anchorMarketToFE(raw: any, id: string): Market {
     lambda: bn(raw.lambda, true),
     decoherenceRate: bn(raw.decoherenceRate, true),
     minimumProbability: bn(raw.minimumProbability, true),
+    nudgeRate: bn(raw.nudgeRate, true),
     pathMaxAge: i64(raw.pathMaxAge),
     pathsScored: raw.pathsScored,
     pathsDissolved: raw.pathsDissolved,
@@ -117,6 +118,7 @@ export function anchorPathToFE(raw: any, marketStartTime: number, checkpointInte
     totalWagered: bn(raw.totalWagered, true),
     totalLeveragedExposure: bn(raw.totalLeveragedExposure, true),
     lmsrSharesOutstanding: bn(raw.lmsrSharesOutstanding, true),
+    totalTimeWeightedExposure: bn(raw.totalTimeWeightedExposure, true),
     currentImpliedProbability: raw.currentImpliedProbability,
   }
 }

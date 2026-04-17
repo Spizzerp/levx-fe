@@ -61,6 +61,7 @@ function makeMarket(overrides: Partial<Market> & Pick<Market, 'id' | 'pair' | 's
     lambda: 0,
     decoherenceRate: 500_000,
     minimumProbability: 10_000,
+    nudgeRate: 50_000,
     pathMaxAge: 3600,
     pathsScored: 0,
     pathsDissolved: 0,
@@ -100,6 +101,7 @@ function makeMarketsAcrossStates(): Market[] {
           totalWagered: 0,
           totalLeveragedExposure: 0,
           lmsrSharesOutstanding: 0,
+          totalTimeWeightedExposure: 0,
           currentImpliedProbability: 0,
         }) satisfies Market['paths'][number],
     )

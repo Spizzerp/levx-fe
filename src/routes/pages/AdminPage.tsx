@@ -297,6 +297,7 @@ export function AdminPage() {
   const [lambda, setLambda] = useState('0')
   const [decoherenceRate, setDecoherenceRate] = useState('0.5')
   const [minimumProbability, setMinimumProbability] = useState('0.01')
+  const [nudgeRate, setNudgeRate] = useState('0.05')
   const [pathMaxAge, setPathMaxAge] = useState('1800')
   const [numPaths, setNumPaths] = useState(5)
   const [pathProviders, setPathProviders] = useState<string[]>(() =>
@@ -377,6 +378,7 @@ export function AdminPage() {
         actionBeta: new BN(Math.round(0.3 * SCALE)),
         decoherenceRate: new BN(Math.round(parseFloat(decoherenceRate) * SCALE)),
         minimumProbability: new BN(Math.round(parseFloat(minimumProbability) * SCALE)),
+        nudgeRate: new BN(Math.round(parseFloat(nudgeRate) * SCALE)),
         pathMaxAge: new BN(parseInt(pathMaxAge)),
         lambda: new BN(Math.round(parseFloat(lambda) * SCALE)),
         referenceAction: new BN(1 * SCALE),
@@ -610,6 +612,13 @@ export function AdminPage() {
               <InfoTip text="Seconds. AI paths must be submitted within this window of market start to be accepted. 1800 = 30 min. Prevents stale predictions." />
             </span>
             <Input value={pathMaxAge} onChange={(e) => setPathMaxAge(e.target.value)} />
+          </div>
+          <div>
+            <span className="text-label text-ink-muted font-mono uppercase flex items-center">
+              Nudge rate
+              <InfoTip text="LMSR oracle nudge fraction per checkpoint (0.05 = 5%). Zero-sum adjustment that rewards accurate paths and penalises deviating ones." />
+            </span>
+            <Input value={nudgeRate} onChange={(e) => setNudgeRate(e.target.value)} />
           </div>
         </div>
 

@@ -237,6 +237,7 @@ export function MarketPage() {
         totalWagered: 0,
         totalLeveragedExposure: 0,
         lmsrSharesOutstanding: 0,
+        totalTimeWeightedExposure: 0,
         currentImpliedProbability: 0,
         onChainStatus: 'confirmed',
       }

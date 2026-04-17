@@ -73,6 +73,7 @@ const PATH_OUTCOME_DEFAULTS = {
   totalWagered: 0,
   totalLeveragedExposure: 0,
   lmsrSharesOutstanding: 0,
+  totalTimeWeightedExposure: 0,
   currentImpliedProbability: 2000,
 } as const
 

@@ -101,6 +101,7 @@ const TEST_MARKET = {
   lambda: 0.1,
   decoherenceRate: 0.01,
   minimumProbability: 0,
+  nudgeRate: 0.05,
   pathMaxAge: 0,
   pathsScored: 0,
   pathsDissolved: 0,

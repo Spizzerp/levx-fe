@@ -25,6 +25,7 @@ const ON_CHAIN_DEFAULTS: Pick<
   | 'lambda'
   | 'decoherenceRate'
   | 'minimumProbability'
+  | 'nudgeRate'
   | 'pathMaxAge'
   | 'pathsScored'
   | 'pathsDissolved'
@@ -35,6 +36,7 @@ const ON_CHAIN_DEFAULTS: Pick<
   lambda: 0,
   decoherenceRate: 500_000,
   minimumProbability: 10_000,
+  nudgeRate: 50_000,
   pathMaxAge: 3600,
   pathsScored: 0,
   pathsDissolved: 0,
