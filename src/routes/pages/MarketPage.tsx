@@ -19,6 +19,8 @@ import { Stub } from '@/components/Stub'
 import { UserPositionCard } from '@/components/UserPositionCard'
 import { cn } from '@/lib/cn'
 import { useMarket, useUserPosition } from '@/lib/chain'
+import { useProgram } from '@/lib/solana/program'
+import { deriveMarketPda } from '@/lib/solana/pda'
 import { useAddPath, usePlaceBatchWager, useClaim } from '@/lib/solana/transactions'
 import { usePythFeed, useLatestPrice } from '@/lib/pyth/hooks'
 import { feedIdForPair } from '@/lib/pyth/feedIds'
@@ -115,6 +117,7 @@ export function MarketPage() {
     interval: candleInterval,
   })
 
+  const program = useProgram()
   const addPath = useAddPath()
   const placeBatchWager = usePlaceBatchWager()
 
@@ -198,53 +201,80 @@ export function MarketPage() {
   const allPaths = useMemo(() => [...aiPaths, ...userPaths], [aiPaths, userPaths])
 
   const handleConfirmDrawing = async () => {
-    if (drawingState.phase !== 'ready' || !market) return
+    if (drawingState.phase !== 'ready' || !market || !program) return
     const values = drawingState.values
     confirmDrawing()
 
+    // Pre-fetch pathIndex so the pending row has a real index.
+    // useAddPath re-reads this at submit time; the program's init
+    // constraint catches any race and we roll back in the catch below.
+    const [marketPda] = deriveMarketPda(market.marketId)
+    let pathIndex: number
     try {
-      const { sig, pathIndex } = await addPath.mutateAsync({
+      const marketAcc = await (program.account as any).market.fetch(marketPda)
+      pathIndex = marketAcc.numPaths
+    } catch (err) {
+      onTxError((err as Error).message)
+      return
+    }
+
+    const tempId = `user-${Date.now()}`
+    const intervalMs = chartCheckpointInterval * 1000
+    const data: PricePoint[] = values.map((v, i) => ({
+      time: chartMarketStart + i * intervalMs,
+      value: v,
+    }))
+    const pendingPath: PredictionPath = {
+      id: tempId,
+      label: 'Your Path',
+      tone: 'custom',
+      origin: 'user',
+      multiplier: 0,
+      data,
+      pathIndex,
+      predictedPrices: values,
+      numCheckpoints: values.length,
+      initialProbabilityBps: 0,
+      generationTimestamp: Date.now(),
+      creator: '',
+      cumulativeAction: 0,
+      compositeScore: 0,
+      peakAmplitude: 0,
+      amplitudeAtDecoherence: 0,
+      dissolved: false,
+      dissolvedAtCheckpoint: 0,
+      checkpointsProcessed: 0,
+      totalWagered: 0,
+      totalLeveragedExposure: 0,
+      lmsrSharesOutstanding: 0,
+      totalTimeWeightedExposure: 0,
+      currentImpliedProbability: 0,
+      onChainStatus: 'pending',
+    }
+    setUserPaths((prev) => [...prev, pendingPath])
+    setSelectedPathIds((prev) => new Set([...prev, tempId]))
+
+    try {
+      const { sig, pathIndex: confirmedIndex } = await addPath.mutateAsync({
         marketId: market.marketId,
         predictedPrices: values,
         numCheckpoints: values.length,
       })
-
-      const intervalMs = chartCheckpointInterval * 1000
-      const data: PricePoint[] = values.map((v, i) => ({
-        time: chartMarketStart + i * intervalMs,
-        value: v,
-      }))
-      const userPath: PredictionPath = {
-        id: `user-${Date.now()}`,
-        label: 'Your Path',
-        tone: 'custom',
-        origin: 'user',
-        multiplier: 0,
-        data,
-        pathIndex,
-        predictedPrices: values,
-        numCheckpoints: values.length,
-        initialProbabilityBps: 0,
-        generationTimestamp: Date.now(),
-        creator: '',
-        cumulativeAction: 0,
-        compositeScore: 0,
-        peakAmplitude: 0,
-        amplitudeAtDecoherence: 0,
-        dissolved: false,
-        dissolvedAtCheckpoint: 0,
-        checkpointsProcessed: 0,
-        totalWagered: 0,
-        totalLeveragedExposure: 0,
-        lmsrSharesOutstanding: 0,
-        totalTimeWeightedExposure: 0,
-        currentImpliedProbability: 0,
-        onChainStatus: 'confirmed',
-      }
-      setUserPaths((prev) => [...prev, userPath])
-      setSelectedPathIds((prev) => new Set([...prev, userPath.id]))
+      setUserPaths((prev) =>
+        prev.map((p) =>
+          p.id === tempId
+            ? { ...p, onChainStatus: 'confirmed' as const, pathIndex: confirmedIndex }
+            : p,
+        ),
+      )
       onTxSuccess(sig)
     } catch (err) {
+      setUserPaths((prev) => prev.filter((p) => p.id !== tempId))
+      setSelectedPathIds((prev) => {
+        const next = new Set(prev)
+        next.delete(tempId)
+        return next
+      })
       onTxError((err as Error).message)
     }
   }
