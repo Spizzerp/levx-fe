@@ -64,6 +64,11 @@ declare
   last_at              timestamptz;
   hourly_count         int;
 begin
+  -- service_role bypasses all per-wallet checks (used by tests/admin scripts).
+  if auth.role() = 'service_role' then
+    return new;
+  end if;
+
   if (auth.jwt() ->> 'wallet') is null then
     raise exception 'unauthenticated' using errcode = '42501';
   end if;

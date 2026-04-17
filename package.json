@@ -18,6 +18,7 @@
     "types": "tsc -b",
     "test": "vitest",
     "test:run": "vitest run",
+    "test:rls": "vitest run --config vitest.rls.config.ts",
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
@@ -29,6 +30,7 @@
     "@solana/wallet-adapter-react-ui": "0.9.39",
     "@solana/wallet-adapter-wallets": "^0.19.38",
     "@solana/web3.js": "^1.98.4",
+    "@supabase/supabase-js": "^2.103.3",
     "@tanstack/react-query": "^5.90.21",
     "@tanstack/react-router": "^1.157.16",
     "@visx/axis": "^3.12.0",
