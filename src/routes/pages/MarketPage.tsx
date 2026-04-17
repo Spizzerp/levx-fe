@@ -37,31 +37,6 @@ import {
 } from '@/lib/format'
 import type { Market, PredictionPath, PricePoint } from '@/types/market'
 
-/* ── Market duration options ─────────────────────────────── */
-
-type DurationOption = '1d' | '3d' | '7d' | '30d' | '90d'
-
-const DURATION_OPTIONS: { id: DurationOption; label: string; ms: number }[] = [
-  { id: '1d', label: '1 Day', ms: 1 * 24 * 60 * 60 * 1000 },
-  { id: '3d', label: '3 Days', ms: 3 * 24 * 60 * 60 * 1000 },
-  { id: '7d', label: '7 Days', ms: 7 * 24 * 60 * 60 * 1000 },
-  { id: '30d', label: '30 Days', ms: 30 * 24 * 60 * 60 * 1000 },
-  { id: '90d', label: '90 Days', ms: 90 * 24 * 60 * 60 * 1000 },
-]
-
-/* ── Checkpoint interval options (seconds) ───────────────── */
-
-type IntervalOption = '5m' | '15m' | '30m' | '1h' | '2h' | '4h'
-
-const INTERVAL_OPTIONS: { id: IntervalOption; label: string; sec: number }[] = [
-  { id: '5m', label: '5 Min', sec: 5 * 60 },
-  { id: '15m', label: '15 Min', sec: 15 * 60 },
-  { id: '30m', label: '30 Min', sec: 30 * 60 },
-  { id: '1h', label: '1 Hour', sec: 60 * 60 },
-  { id: '2h', label: '2 Hours', sec: 2 * 60 * 60 },
-  { id: '4h', label: '4 Hours', sec: 4 * 60 * 60 },
-]
-
 const META_SEP = <span className="text-line-strong mx-0.5">·</span>
 
 /**
@@ -135,7 +110,7 @@ export function MarketPage() {
   const [leverage, setLeverage] = useState(22)
   const [collateral, setCollateral] = useState('25.00')
   const [mountTime] = useState(() => Date.now())
-  const [showOtherPositions, setShowOtherPositions] = useState(false)
+  const [showOtherPositions] = useState(false)
 
   // Exit draw mode on unmount so a user navigating away doesn't leave the store in sweeping state.
   useEffect(() => () => exitDrawMode(), [exitDrawMode])
@@ -286,7 +261,6 @@ export function MarketPage() {
 
   // Chart highlight: last-added path in the set (most recent click)
   const activePathId = selectedPathIds.size > 0 ? [...selectedPathIds].at(-1)! : null
-  const selectedPath = allPaths.find((p) => p.id === activePathId)
 
   const isPathLong = (p?: PredictionPath) => {
     if (!p) return true
@@ -294,7 +268,6 @@ export function MarketPage() {
     const first = p.data[0]
     return last && first ? last.value >= first.value : true
   }
-  const isLong = isPathLong(selectedPath)
 
   // Delta is only available from the mock layer (not from live Pyth ticks in Phase 1)
   const deltaDisplay = 0

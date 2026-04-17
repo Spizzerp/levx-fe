@@ -14,7 +14,7 @@ const PILL = cn(
   'hover:border-ink',
 )
 
-export function WalletButton({ className }: { className?: string }) {
+export function WalletButton() {
   const connected = useWalletStore((s) => s.connected)
   const publicKey = useWalletStore((s) => s.publicKey)
   const cluster = useWalletStore((s) => s.cluster)

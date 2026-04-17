@@ -20,6 +20,14 @@ export default defineConfig([
       ecmaVersion: 2020,
       globals: globals.browser,
     },
+    rules: {
+      // Allow underscore-prefixed identifiers to opt out of "unused" errors —
+      // conventional for intentionally-ignored params and destructured values.
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' },
+      ],
+    },
   },
   eslintConfigPrettier,
 ])

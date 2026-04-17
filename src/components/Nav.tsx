@@ -26,7 +26,6 @@ const UNDERLINE = cn(
 )
 
 const LINK_ACTIVE = 'text-ink-strong'
-const UNDERLINE_ACTIVE = 'scale-x-100'
 
 export function Nav() {
   return (
