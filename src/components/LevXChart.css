@@ -12,3 +12,17 @@
 .levx-chart text {
   user-select: none;
 }
+
+/* Theme-aware chart colors */
+:root.dark .levx-chart-wrap {
+  --chart-line: #FFFFFF;
+  --chart-muted: #999999;
+  --chart-grid: #222222;
+  --chart-marker: #999999;
+}
+:root:not(.dark) .levx-chart-wrap {
+  --chart-line: #1a1a1a;
+  --chart-muted: #888888;
+  --chart-grid: #e0e0e0;
+  --chart-marker: #999999;
+}

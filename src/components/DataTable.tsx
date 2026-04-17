@@ -49,7 +49,7 @@ export function DataTable<T>({
       <div
         className={cn(
           rowGridClass,
-          'border-line-strong h-10 border-0 border-b',
+          'border-line-strong h-10 border-0 border-b bg-surface-1 rounded-t-2xl',
           'text-ink-dim font-mono text-tag uppercase',
         )}
       >

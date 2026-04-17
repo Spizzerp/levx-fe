@@ -11,9 +11,9 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const VARIANT_CLASSES: Record<ButtonVariant, string> = {
   primary: cn(
-    'border-0 bg-ink-strong text-surface',
-    'hover:opacity-[0.88]',
-    'disabled:cursor-not-allowed disabled:border disabled:border-line-strong disabled:bg-transparent disabled:text-ink-dim',
+    'border-0 bg-gradient-to-r from-brand-from to-brand-to text-surface',
+    'btn-gradient-glow',
+    'disabled:cursor-not-allowed disabled:opacity-40',
   ),
   secondary: cn(
     'border border-line-strong bg-transparent text-ink',

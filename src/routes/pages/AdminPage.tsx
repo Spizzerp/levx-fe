@@ -10,11 +10,13 @@ import { ChartFrame } from '@/components/ChartFrame'
 import { Input } from '@/components/Input'
 import { Label } from '@/components/Label'
 import { LevXChart } from '@/components/LevXChart'
+import { PageLayout } from '@/layouts/PageLayout'
 import { cn } from '@/lib/cn'
 import type { PathTone, PredictionPath, PricePoint } from '@/types/market'
-import { env } from '@/env/env.config'
+import { useIsAdmin } from '@/lib/hooks/useIsAdmin'
 import { useProgram } from '@/lib/solana/program'
 import { deriveMarketPda, deriveProtocolPda } from '@/lib/solana/pda'
+import { toast } from '@/stores/toastStore'
 import { useWalletStore } from '@/stores/walletStore'
 import { PYTH_FEED_IDS, type SupportedPair } from '@/lib/pyth/feedIds'
 import { usePythFeed, useLatestPrice } from '@/lib/pyth/hooks'
@@ -252,6 +254,21 @@ function InfoTip({ text }: { text: string }) {
   )
 }
 
+/** Linearly interpolate between two hex colors. t=0 returns a, t=1 returns b. */
+function lerpColor(a: string, b: string, t: number): string {
+  const parse = (hex: string) => [
+    parseInt(hex.slice(1, 3), 16),
+    parseInt(hex.slice(3, 5), 16),
+    parseInt(hex.slice(5, 7), 16),
+  ]
+  const [r1, g1, b1] = parse(a)
+  const [r2, g2, b2] = parse(b)
+  const r = Math.round(r1 + (r2 - r1) * t)
+  const g = Math.round(g1 + (g2 - g1) * t)
+  const bl = Math.round(b1 + (b2 - b1) * t)
+  return `rgb(${r},${g},${bl})`
+}
+
 /** Format a unix-ms timestamp as a local yyyy-MM-ddTHH:mm string for datetime-local inputs. */
 function toLocalDatetime(ms: number): string {
   const d = new Date(ms)
@@ -259,23 +276,16 @@ function toLocalDatetime(ms: number): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-const SCALE = 1_000_000
+import { GRADIENT, SCALE } from '@/lib/constants'
 
-const CHIP = cn(
-  'border-line-strong rounded-full border px-3 py-1.5',
-  'font-mono text-[10px] uppercase tracking-wide',
-  'duration-short ease-levx transition-[border-color,color]',
-  'cursor-pointer',
-)
-const CHIP_ACTIVE = 'border-ink-strong text-ink-strong'
-const CHIP_INACTIVE = 'text-ink-muted hover:border-ink hover:text-ink'
+import { CHIP, CHIP_ACTIVE, CHIP_INACTIVE } from '@/components/styles'
 
 /* ── Page ────────────────────────────────────────────────── */
 
 export function AdminPage() {
   const program = useProgram()
   const publicKey = useWalletStore((s) => s.publicKey)
-  const isAdmin = publicKey ? env.APP_ADMIN_WALLETS.includes(publicKey.toBase58()) : false
+  const isAdmin = useIsAdmin()
 
   // Form state
   const [selectedPair, setSelectedPair] = useState(0)
@@ -287,6 +297,7 @@ export function AdminPage() {
   const [lambda, setLambda] = useState('0')
   const [decoherenceRate, setDecoherenceRate] = useState('0.5')
   const [minimumProbability, setMinimumProbability] = useState('0.01')
+  const [nudgeRate, setNudgeRate] = useState('0.05')
   const [pathMaxAge, setPathMaxAge] = useState('1800')
   const [numPaths, setNumPaths] = useState(5)
   const [pathProviders, setPathProviders] = useState<string[]>(() =>
@@ -295,8 +306,6 @@ export function AdminPage() {
 
   // Tx state
   const [isPending, setIsPending] = useState(false)
-  const [txResult, setTxResult] = useState<string | null>(null)
-  const [txError, setTxError] = useState<string | null>(null)
 
   const pair = PAIRS[selectedPair]
   const pairLabel = pair.label
@@ -335,22 +344,13 @@ export function AdminPage() {
 
   if (!isAdmin) {
     return (
-      <main className="px-10 pt-6 pb-12">
-        <h1 className="font-display text-ink-strong mb-4 text-[56px] leading-none font-medium tracking-[-0.01em] [font-variation-settings:'ROND'_100]">
-          Admin
-        </h1>
-        <p className="text-ink-muted font-mono text-xs tracking-normal uppercase">
-          Connect an admin wallet to access this page.
-        </p>
-      </main>
+      <PageLayout title="Admin" subtitle="Connect an admin wallet to access this page." />
     )
   }
 
   async function handleCreateMarket() {
     if (!program || !publicKey) return
     setIsPending(true)
-    setTxResult(null)
-    setTxError(null)
 
     try {
       const [protocolPda] = deriveProtocolPda()
@@ -378,6 +378,7 @@ export function AdminPage() {
         actionBeta: new BN(Math.round(0.3 * SCALE)),
         decoherenceRate: new BN(Math.round(parseFloat(decoherenceRate) * SCALE)),
         minimumProbability: new BN(Math.round(parseFloat(minimumProbability) * SCALE)),
+        nudgeRate: new BN(Math.round(parseFloat(nudgeRate) * SCALE)),
         pathMaxAge: new BN(parseInt(pathMaxAge)),
         lambda: new BN(Math.round(parseFloat(lambda) * SCALE)),
         referenceAction: new BN(1 * SCALE),
@@ -403,24 +404,16 @@ export function AdminPage() {
         .signers([vaultKeypair])
         .rpc()
 
-      setTxResult(sig)
+      toast.success('Market created', { txSig: sig })
     } catch (err) {
-      setTxError((err as Error).message)
+      toast.error('Failed to create market', { message: (err as Error).message })
     } finally {
       setIsPending(false)
     }
   }
 
   return (
-    <main className="px-10 pt-6 pb-12">
-      <header className="mb-12">
-        <h1 className="font-display text-ink-strong mb-4 text-[56px] leading-none font-medium tracking-[-0.01em] [font-variation-settings:'ROND'_100]">
-          Admin
-        </h1>
-        <p className="text-ink-muted font-mono text-xs tracking-normal uppercase">
-          Create and manage markets
-        </p>
-      </header>
+    <PageLayout title="Create" subtitle="Set market details and create" className="max-w-none">
 
       {/* ── Pair selection (above chart) ───────────────────── */}
       <div className="mb-4 flex gap-2">
@@ -500,14 +493,7 @@ export function AdminPage() {
                 </span>
                 <span
                   className="h-2 w-2 shrink-0 rounded-full"
-                  style={{
-                    backgroundColor:
-                      path.tone === 'ultra-bull' ? '#1BE6B3' :
-                      path.tone === 'bull' ? '#4a9e5c' :
-                      path.tone === 'neutral' ? '#999999' :
-                      path.tone === 'bear' ? '#d4a843' :
-                      '#d71921',
-                  }}
+                  style={{ background: GRADIENT.css }}
                 />
                 <ProviderSelect
                   value={pathProviders[idx] ?? AI_PROVIDERS[0].id}
@@ -527,7 +513,7 @@ export function AdminPage() {
       <div>
         {/* Start time */}
         <Label className="mb-3">Market start</Label>
-        <div className="mb-8 flex items-end gap-3">
+        <div className="mb-12 flex items-end gap-3">
           <input
             type="datetime-local"
             value={startTimeInput}
@@ -550,7 +536,7 @@ export function AdminPage() {
 
         {/* Duration */}
         <Label className="mb-3">Market duration</Label>
-        <div className="mb-8 flex items-end gap-3">
+        <div className="mb-12 flex items-end gap-3">
           <input
             type="number"
             min={1}
@@ -582,8 +568,8 @@ export function AdminPage() {
         </div>
 
         {/* Checkpoint interval */}
-        <Label className="mb-3">Checkpoint interval</Label>
-        <div className="mb-8 flex gap-2">
+        <Label>Checkpoint interval</Label>
+        <div className="mt-3 mb-12 flex gap-2">
           {INTERVAL_PRESETS.map((p) => (
             <button
               key={p.sec}
@@ -597,8 +583,8 @@ export function AdminPage() {
         </div>
 
         {/* Protocol params */}
-        <Label className="mb-3">Protocol parameters</Label>
-        <div className="mb-8 grid grid-cols-2 gap-x-6 gap-y-4">
+        <Label className="block mb-3">Protocol parameters</Label>
+        <div className="mb-12 grid grid-cols-2 gap-x-6 gap-y-8">
           <div>
             <span className="text-label text-ink-muted font-mono uppercase flex items-center">
               Lambda
@@ -627,6 +613,13 @@ export function AdminPage() {
             </span>
             <Input value={pathMaxAge} onChange={(e) => setPathMaxAge(e.target.value)} />
           </div>
+          <div>
+            <span className="text-label text-ink-muted font-mono uppercase flex items-center">
+              Nudge rate
+              <InfoTip text="LMSR oracle nudge fraction per checkpoint (0.05 = 5%). Zero-sum adjustment that rewards accurate paths and penalises deviating ones." />
+            </span>
+            <Input value={nudgeRate} onChange={(e) => setNudgeRate(e.target.value)} />
+          </div>
         </div>
 
         {/* Submit */}
@@ -639,28 +632,8 @@ export function AdminPage() {
           {isPending ? 'Creating…' : 'Create Market'}
         </Button>
 
-        {txResult && (
-          <div className="border-line mt-6 border p-4">
-            <p className="text-success font-mono text-label uppercase">Market created</p>
-            <a
-              href={`https://explorer.solana.com/tx/${txResult}?cluster=devnet`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-interactive font-mono text-caption mt-1 block break-all"
-            >
-              {txResult}
-            </a>
-          </div>
-        )}
-
-        {txError && (
-          <div className="border-accent mt-6 border p-4">
-            <p className="text-accent font-mono text-label uppercase">Failed</p>
-            <p className="text-ink-muted font-mono text-caption mt-1 break-all">{txError}</p>
-          </div>
-        )}
       </div>
       </div>
-    </main>
+    </PageLayout>
   )
 }

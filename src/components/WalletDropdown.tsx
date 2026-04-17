@@ -3,9 +3,10 @@ import type { PublicKey } from '@solana/web3.js'
 import { useWallet } from '@solana/wallet-adapter-react'
 import { useNavigate } from '@tanstack/react-router'
 
-import { env } from '@/env/env.config'
-import { explorerAddressUrl } from '@/lib/format'
 import { cn } from '@/lib/cn'
+import { explorerAddressUrl } from '@/lib/format'
+import { useIsAdmin } from '@/lib/hooks/useIsAdmin'
+import { MENU_ITEM } from '@/components/styles'
 
 interface WalletDropdownProps {
   publicKey: PublicKey
@@ -14,12 +15,6 @@ interface WalletDropdownProps {
   open: boolean
   onClose: () => void
 }
-
-const MENU_ITEM = cn(
-  'block w-full px-4 py-2.5 text-left font-mono text-xs uppercase tracking-wide text-ink',
-  'duration-short ease-levx transition-[background-color,color]',
-  'hover:bg-surface-2 hover:text-ink-strong',
-)
 
 export function WalletDropdown({
   publicKey,
@@ -31,7 +26,7 @@ export function WalletDropdown({
   const panelRef = useRef<HTMLDivElement | null>(null)
   const { disconnect } = useWallet()
   const navigate = useNavigate()
-  const isAdmin = env.APP_ADMIN_WALLETS.includes(publicKey.toBase58())
+  const isAdmin = useIsAdmin()
 
   useEffect(() => {
     if (!open) return

@@ -25,6 +25,7 @@ const ON_CHAIN_DEFAULTS: Pick<
   | 'lambda'
   | 'decoherenceRate'
   | 'minimumProbability'
+  | 'nudgeRate'
   | 'pathMaxAge'
   | 'pathsScored'
   | 'pathsDissolved'
@@ -35,6 +36,7 @@ const ON_CHAIN_DEFAULTS: Pick<
   lambda: 0,
   decoherenceRate: 500_000,
   minimumProbability: 10_000,
+  nudgeRate: 50_000,
   pathMaxAge: 3600,
   pathsScored: 0,
   pathsDissolved: 0,
@@ -170,6 +172,15 @@ const MARKETS: Market[] = [
     totalCheckpoints: 168,
     pathsDissolved: 4,
   }),
+  // ── Additional markets for pagination ────────────────────
+  makeMarket({ id: 'eth-active-2', marketId: 7, pair: 'ETH/USDC', base: 'ETH', quote: 'USDC', state: 'active', pool: 89_200, traders: 421, startTime: NOW - 5 * DAY, endTime: NOW + 2 * DAY, completedCheckpoints: 120 }),
+  makeMarket({ id: 'sol-active', marketId: 8, pair: 'SOL/USDC', base: 'SOL', quote: 'USDC', state: 'active', pool: 176_400, traders: 932, startTime: NOW - 3 * DAY, endTime: NOW + 4 * DAY, completedCheckpoints: 72 }),
+  makeMarket({ id: 'btc-sampling-2', marketId: 9, pair: 'BTC/USDC', base: 'BTC', quote: 'USDC', state: 'sampling', pool: 310_000, traders: 1580, startTime: NOW - 6 * DAY, endTime: NOW + 1 * DAY, completedCheckpoints: 144 }),
+  makeMarket({ id: 'eth-pending', marketId: 10, pair: 'ETH/USDC', base: 'ETH', quote: 'USDC', state: 'pending', pool: 0, traders: 0, startTime: NOW + 12 * HOUR, endTime: NOW + 7 * DAY + 12 * HOUR, completedCheckpoints: 0 }),
+  makeMarket({ id: 'sol-settling', marketId: 11, pair: 'SOL/USDC', base: 'SOL', quote: 'USDC', state: 'settling', pool: 95_600, traders: 467, startTime: NOW - 7 * DAY, endTime: NOW - 1 * HOUR, completedCheckpoints: 168, totalCheckpoints: 168, pathsScored: 4 }),
+  makeMarket({ id: 'btc-settled-2', marketId: 12, pair: 'BTC/USDC', base: 'BTC', quote: 'USDC', state: 'settled', pool: 220_100, traders: 1102, startTime: NOW - 14 * DAY, endTime: NOW - 7 * DAY, completedCheckpoints: 168, totalCheckpoints: 168, pathsScored: 5 }),
+  makeMarket({ id: 'eth-active-3', marketId: 13, pair: 'ETH/USDC', base: 'ETH', quote: 'USDC', state: 'active', pool: 64_300, traders: 298, startTime: NOW - 2 * DAY, endTime: NOW + 5 * DAY, completedCheckpoints: 48 }),
+  makeMarket({ id: 'sol-maturing-2', marketId: 14, pair: 'SOL/USDC', base: 'SOL', quote: 'USDC', state: 'maturing', pool: 47_800, traders: 215, startTime: NOW - 7 * DAY, endTime: NOW - 3 * HOUR, completedCheckpoints: 168, totalCheckpoints: 168, pathsScored: 5 }),
 ]
 
 /* ── Mock user positions ─────────────────────────────────────

@@ -52,3 +52,9 @@ export function explorerAddressUrl(base58: string, cluster: string): string {
   const clusterParam = cluster === 'mainnet' ? 'mainnet-beta' : cluster
   return `https://explorer.solana.com/address/${base58}?cluster=${clusterParam}`
 }
+
+/** Build a Solana explorer URL for a transaction. */
+export function explorerTxUrl(txSig: string, network?: string): string {
+  const cluster = (network ?? 'devnet') === 'mainnet' ? '' : '?cluster=devnet'
+  return `https://explorer.solana.com/tx/${txSig}${cluster}`
+}

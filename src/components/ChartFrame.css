@@ -1,7 +1,32 @@
-.chart-frame-glow {
+/* ── Chart frame glow ─────────────────────────────────── */
+
+/* Dark mode: white glow + white dither */
+:root.dark .chart-frame-glow {
   box-shadow:
     0 0 20px rgba(255, 255, 255, 0.08),
     0 0 60px rgba(255, 255, 255, 0.04);
+}
+:root.dark .chart-frame-glow::after {
+  background: radial-gradient(
+    ellipse 80% 40% at 50% 0%,
+    rgba(255, 255, 255, 0.08) 0%,
+    transparent 100%
+  );
+}
+
+/* Light mode: dark shadow + dark dither */
+:root:not(.dark) .chart-frame-glow {
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.06),
+    0 8px 30px rgba(0, 0, 0, 0.08),
+    0 20px 60px rgba(0, 0, 0, 0.04);
+}
+:root:not(.dark) .chart-frame-glow::after {
+  background: radial-gradient(
+    ellipse 80% 40% at 50% 0%,
+    rgba(0, 0, 0, 0.04) 0%,
+    transparent 100%
+  );
 }
 
 .chart-frame-glow::after {
@@ -11,13 +36,108 @@
   z-index: 10;
   border-radius: inherit;
   pointer-events: none;
-  background: radial-gradient(
-    ellipse 80% 40% at 50% 0%,
-    rgba(255, 255, 255, 0.08) 0%,
-    transparent 100%
-  );
   mask-image: url("data:image/svg+xml,%3Csvg width='4' height='4' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='1' height='1' fill='white'/%3E%3C/svg%3E");
   mask-size: 4px 4px;
   -webkit-mask-image: url("data:image/svg+xml,%3Csvg width='4' height='4' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='1' height='1' fill='white'/%3E%3C/svg%3E");
   -webkit-mask-size: 4px 4px;
+}
+
+/* ── Pill glow (nav bar, toasts) ─────────────────────── */
+
+:root.dark .pill-glow {
+  box-shadow:
+    0 0 20px rgba(255, 255, 255, 0.08),
+    0 0 60px rgba(255, 255, 255, 0.04);
+}
+:root.dark .pill-glow::after {
+  background: radial-gradient(
+    ellipse 100% 200% at 50% 0%,
+    rgba(255, 255, 255, 0.15) 0%,
+    rgba(255, 255, 255, 0.06) 40%,
+    transparent 100%
+  );
+}
+
+:root:not(.dark) .pill-glow {
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.06),
+    0 8px 24px rgba(0, 0, 0, 0.06),
+    0 16px 48px rgba(0, 0, 0, 0.03);
+}
+:root:not(.dark) .pill-glow::after {
+  background: radial-gradient(
+    ellipse 100% 200% at 50% 0%,
+    rgba(0, 0, 0, 0.06) 0%,
+    rgba(0, 0, 0, 0.02) 40%,
+    transparent 100%
+  );
+}
+
+.pill-glow::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  mask-image: url("data:image/svg+xml,%3Csvg width='4' height='4' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='1' height='1' fill='white'/%3E%3C/svg%3E");
+  mask-size: 4px 4px;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg width='4' height='4' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='1' height='1' fill='white'/%3E%3C/svg%3E");
+  -webkit-mask-size: 4px 4px;
+}
+
+/* ── Gradient button dither glow ─────────────────────── */
+
+.btn-gradient-glow {
+  position: relative;
+  overflow: visible;
+  transition: box-shadow 250ms cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+.btn-gradient-glow:hover {
+  box-shadow:
+    0 0 8px rgba(92, 247, 139, 0.20),
+    0 0 20px rgba(92, 247, 139, 0.12),
+    0 0 45px rgba(160, 248, 120, 0.08),
+    0 0 80px rgba(160, 248, 120, 0.04),
+    0 0 120px rgba(244, 250, 77, 0.02);
+}
+
+.btn-gradient-glow::after {
+  content: '';
+  position: absolute;
+  inset: -60px -100px;
+  z-index: -1;
+  border-radius: 9999px;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(
+    ellipse 100% 80% at 50% 50%,
+    rgba(92, 247, 139, 0.50) 0%,
+    rgba(160, 248, 120, 0.30) 25%,
+    rgba(244, 250, 77, 0.12) 45%,
+    transparent 65%
+  );
+  mask-image:
+    radial-gradient(ellipse 100% 80% at 50% 50%, black 0%, rgba(0,0,0,0.6) 20%, rgba(0,0,0,0.2) 45%, transparent 65%),
+    url("data:image/svg+xml,%3Csvg width='3' height='3' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='1' height='1' fill='white'/%3E%3C/svg%3E");
+  mask-size: 100% 100%, 3px 3px;
+  mask-composite: intersect;
+  -webkit-mask-image:
+    radial-gradient(ellipse 100% 80% at 50% 50%, black 0%, rgba(0,0,0,0.6) 20%, rgba(0,0,0,0.2) 45%, transparent 65%),
+    url("data:image/svg+xml,%3Csvg width='3' height='3' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='1' height='1' fill='white'/%3E%3C/svg%3E");
+  -webkit-mask-size: 100% 100%, 3px 3px;
+  -webkit-mask-composite: source-in;
+  transition: opacity 250ms cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+.btn-gradient-glow:hover::after {
+  opacity: 1;
+}
+
+.btn-gradient-glow:disabled {
+  box-shadow: none !important;
+}
+.btn-gradient-glow:disabled::after {
+  display: none;
 }

@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LevX — BTC/USDC Market Demo</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Space+Grotesk:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root.dark {
+      --surface: #000000; --surface-1: #111111; --surface-2: #1a1a1a;
+      --ink-strong: #ffffff; --ink: #e8e8e8; --ink-muted: #999999; --ink-dim: #666666;
+      --line: #222222; --line-strong: #333333;
+      --success: #5CF78B; --accent: #FF483B; --warning: #F6CE48;
+      --chart-line: #FFFFFF; --chart-muted: #999999; --chart-grid: #222222;
+    }
+
+    body {
+      background: var(--surface); color: var(--ink);
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased; min-height: 100vh;
+      display: flex; flex-direction: column;
+    }
+
+    /* ── Dither glow ──────────────────────────────── */
+    .chart-frame-glow { box-shadow: 0 0 20px rgba(255,255,255,0.08), 0 0 60px rgba(255,255,255,0.04); position: relative; }
+    .chart-frame-glow::after { content: ''; position: absolute; inset: 0; z-index: 10; border-radius: inherit; pointer-events: none; background: radial-gradient(ellipse 80% 40% at 50% 0%, rgba(255,255,255,0.08) 0%, transparent 100%); mask-image: url("data:image/svg+xml,%3Csvg width='4' height='4' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='1' height='1' fill='white'/%3E%3C/svg%3E"); mask-size: 4px 4px; -webkit-mask-image: url("data:image/svg+xml,%3Csvg width='4' height='4' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='1' height='1' fill='white'/%3E%3C/svg%3E"); -webkit-mask-size: 4px 4px; }
+    .pill-glow { box-shadow: 0 0 20px rgba(255,255,255,0.08), 0 0 60px rgba(255,255,255,0.04); position: relative; }
+    .pill-glow::after { content: ''; position: absolute; inset: 0; z-index: 0; border-radius: inherit; pointer-events: none; background: radial-gradient(ellipse 100% 200% at 50% 0%, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.06) 40%, transparent 100%); mask-image: url("data:image/svg+xml,%3Csvg width='4' height='4' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='1' height='1' fill='white'/%3E%3C/svg%3E"); mask-size: 4px 4px; -webkit-mask-image: url("data:image/svg+xml,%3Csvg width='4' height='4' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='1' height='1' fill='white'/%3E%3C/svg%3E"); -webkit-mask-size: 4px 4px; }
+
+    /* ── Nav ───────────────────────────────────────── */
+    .nav-wrap { position: sticky; top: 0; z-index: 9999; width: 100%; background: linear-gradient(to bottom, var(--surface) 60%, transparent); padding: 12px 24px 12px; }
+    .nav-pill { display: flex; align-items: center; justify-content: center; max-width: 1400px; margin: 0 auto; border-radius: 9999px; border: 1px solid var(--line-strong); background: var(--surface); padding: 12px 24px; position: relative; }
+    .nav-logo { height: 48px; width: auto; position: relative; z-index: 10; }
+    .nav-links { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 36px; font-family: 'Space Mono', monospace; font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; }
+    .nav-links a { color: var(--ink-muted); text-decoration: none; padding: 6px 0; }
+    .nav-links a.active { color: var(--ink-strong); border-bottom: 2px solid var(--ink-strong); }
+    .nav-right { position: relative; z-index: 10; margin-left: auto; display: flex; align-items: center; gap: 12px; }
+    .wallet-btn { border: 1px solid var(--line-strong); border-radius: 9999px; background: transparent; color: var(--ink); font-family: 'Space Mono', monospace; font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; padding: 8px 16px; cursor: pointer; }
+
+    /* ── Page grid ─────────────────────────────────── */
+    .page { max-width: 1680px; margin: 0 auto; padding: 24px 40px 48px; display: grid; grid-template-columns: 1fr 400px; gap: 72px; align-items: start; flex: 1; }
+
+    /* ── Market header ─────────────────────────────── */
+    .pair-row { display: flex; align-items: center; gap: 16px; margin-bottom: 8px; }
+    .pair-label { font-family: 'Space Mono', monospace; font-size: 12px; color: var(--ink-muted); text-transform: uppercase; letter-spacing: 0.14em; }
+    .state-badge { display: inline-flex; align-items: center; gap: 6px; }
+    .state-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success); }
+    .state-label { font-family: 'Space Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-muted); }
+    .price { font-family: 'JetBrains Mono', monospace; font-size: 56px; font-weight: 500; color: var(--ink-strong); letter-spacing: -0.01em; line-height: 1; margin-bottom: 8px; }
+    .delta { font-family: 'Space Mono', monospace; font-size: 13px; display: flex; align-items: baseline; gap: 12px; margin-bottom: 32px; }
+    .delta-value { color: var(--success); font-weight: 700; }
+    .delta-period { color: var(--ink-muted); }
+    .meta-row { display: flex; flex-wrap: nowrap; align-items: center; gap: 8px; font-family: 'Space Mono', monospace; font-size: 10px; color: var(--ink-dim); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 32px; white-space: nowrap; overflow: hidden; }
+    .meta-row .val { color: var(--ink-muted); margin-left: 4px; }
+    .meta-sep { color: var(--line-strong); margin: 0 2px; }
+
+    /* ── Chart container ───────────────────────────── */
+    .chart-wrap { border-radius: 16px; border: 1px solid var(--line-strong); background: var(--surface); overflow: hidden; margin-bottom: 16px; }
+    .chart-area { position: relative; height: 520px; padding: 32px 80px 40px 16px; }
+
+    /* ── Fake chart ────────────────────────────────── */
+    .chart-svg { width: 100%; height: 100%; }
+    .grid-line { stroke: var(--chart-grid); stroke-width: 1; }
+    .price-line { fill: none; stroke: var(--chart-line); stroke-width: 1.5; }
+    .prediction-line { fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-dasharray: 5 4; }
+    .prediction-line.bull { stroke: var(--success); opacity: 0.9; }
+    .prediction-line.bull2 { stroke: var(--success); opacity: 0.45; stroke-dasharray: 4 4; }
+    .prediction-line.neutral { stroke: var(--warning); opacity: 0.65; stroke-dasharray: 2 4; }
+    .prediction-line.bear { stroke: var(--accent); opacity: 0.45; stroke-dasharray: 4 4; }
+    .prediction-line.bear2 { stroke: var(--accent); opacity: 0.9; }
+    .selected-line { fill: none; stroke: var(--chart-line); stroke-width: 2.5; stroke-linecap: round; }
+    .marker-line { stroke: var(--chart-muted); stroke-width: 1; stroke-dasharray: 4 4; opacity: 0.4; }
+    .now-line { stroke: var(--chart-line); stroke-width: 1; stroke-dasharray: 2 4; opacity: 0.4; }
+    .now-dot { fill: var(--chart-line); }
+    .marker-text { font-family: 'Space Mono', monospace; font-size: 9px; fill: var(--chart-muted); letter-spacing: 0.12em; }
+    .axis-text { font-family: 'Space Mono', monospace; font-size: 10px; fill: var(--ink-dim); letter-spacing: 0.08em; }
+    .axis-date { font-family: 'Space Mono', monospace; font-size: 10px; fill: var(--ink-dim); letter-spacing: 0.08em; text-transform: uppercase; }
+
+    /* ── Timeframe picker ──────────────────────────── */
+    .timeframe { display: flex; gap: 4px; }
+    .tf-btn { font-family: 'Space Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; padding: 6px 12px; border: 1px solid var(--line-strong); background: transparent; color: var(--ink-muted); cursor: pointer; }
+    .tf-btn.active { border-color: var(--ink-strong); color: var(--ink-strong); background: var(--ink-strong); color: var(--surface); }
+
+    /* ── Right rail ────────────────────────────────── */
+    .rail { margin-top: 180px; }
+    .rail-label { font-family: 'Space Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-muted); margin-bottom: 20px; }
+
+    /* ── Path rows ─────────────────────────────────── */
+    .path-list { border-top: 1px solid var(--line); }
+    .path-row { display: grid; grid-template-columns: 44px 1fr auto; align-items: center; gap: 16px; height: 56px; border-bottom: 1px solid var(--line); border-left: 2px solid transparent; padding: 0 20px 0 16px; cursor: pointer; transition: background 200ms, border-color 200ms; }
+    .path-row:hover { background: rgba(255,255,255,0.02); border-left-color: var(--ink-muted); }
+    .path-row.selected { background: var(--surface-2); border-left-color: var(--ink-strong); }
+    .path-idx { font-family: 'Space Mono', monospace; font-size: 11px; color: var(--ink-dim); letter-spacing: 0.05em; }
+    .path-info { display: flex; flex-direction: column; gap: 2px; }
+    .path-name { font-family: 'Space Mono', monospace; font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink); }
+    .path-row.selected .path-name { color: var(--ink-strong); }
+    .path-wagered { font-family: 'Space Mono', monospace; font-size: 9px; color: var(--ink-dim); letter-spacing: 0.1em; }
+    .path-mult { font-family: 'Space Mono', monospace; font-size: 13px; color: var(--ink-strong); }
+
+    /* ── Draw button ───────────────────────────────── */
+    .draw-btn { width: 100%; margin-top: 20px; padding: 14px; border-radius: 9999px; border: 1px dashed var(--line-strong); background: transparent; font-family: 'Space Mono', monospace; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-muted); cursor: pointer; }
+    .draw-btn:hover { border-color: var(--ink); color: var(--ink-strong); }
+
+    /* ── Collateral + submit ───────────────────────── */
+    .divider { height: 1px; background: var(--line); margin: 28px 0 32px; }
+    .input-label { font-family: 'Space Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-muted); margin-bottom: 12px; }
+    .input-row { display: flex; align-items: baseline; gap: 10px; border-bottom: 1px solid var(--line-strong); padding-bottom: 10px; margin-bottom: 32px; }
+    .input-value { font-family: 'Space Mono', monospace; font-size: 24px; color: var(--ink-strong); flex: 1; background: none; border: none; outline: none; }
+    .input-unit { font-family: 'Space Mono', monospace; font-size: 11px; color: var(--ink-muted); text-transform: uppercase; letter-spacing: 0.12em; }
+    .submit-btn { width: 100%; padding: 14px; border-radius: 9999px; border: none; background: linear-gradient(90deg, #F4FA4D, #5CF78B); font-family: 'Space Mono', monospace; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--surface); cursor: pointer; }
+
+    /* ── Footer ────────────────────────────────────── */
+    .footer { display: flex; justify-content: center; gap: 16px; padding: 32px 0; margin-top: auto; }
+    .footer a { color: var(--ink-dim); transition: color 200ms; text-decoration: none; }
+    .footer a:hover { color: var(--ink-strong); }
+  </style>
+</head>
+<body>
+  <!-- Nav -->
+  <div class="nav-wrap">
+    <nav class="nav-pill pill-glow">
+      <img src="/logo_color.png" alt="LevX" class="nav-logo" />
+      <div class="nav-links">
+        <a href="/demo/markets.html" class="active">Markets</a>
+        <a href="#">Positions</a>
+        <a href="#">Vault</a>
+        <a href="#">Portfolio</a>
+        <a href="#">Leaderboard</a>
+      </div>
+      <div class="nav-right">
+        <button class="wallet-btn">FdQN···1gci</button>
+      </div>
+    </nav>
+  </div>
+
+  <!-- Page -->
+  <div class="page">
+    <!-- Left column: chart -->
+    <section>
+      <div class="pair-row">
+        <span class="pair-label">BTC / USDC</span>
+        <div class="state-badge"><span class="state-dot"></span><span class="state-label">Active</span></div>
+      </div>
+      <div class="price">74,912</div>
+      <div class="delta">
+        <span class="delta-value">+2.34%</span>
+        <span class="delta-period">24H</span>
+      </div>
+      <div class="meta-row">
+        <span>Market ends</span><span class="val">6D · 14:22:08</span>
+        <span class="meta-sep">·</span>
+        <span>Pool</span><span class="val">248,901 USDC</span>
+        <span class="meta-sep">·</span>
+        <span>Checkpoints</span><span class="val">168 / 336</span>
+        <span class="meta-sep">·</span>
+        <span>Traders</span><span class="val">1,204</span>
+        <span class="meta-sep">·</span>
+        <span>Entry Fee</span><span class="val">1.5%</span>
+      </div>
+
+      <!-- Chart -->
+      <div class="chart-wrap chart-frame-glow">
+        <div class="chart-area">
+          <svg class="chart-svg" viewBox="0 0 900 440" preserveAspectRatio="none">
+            <!-- Grid -->
+            <line class="grid-line" x1="0" y1="73" x2="900" y2="73" />
+            <line class="grid-line" x1="0" y1="147" x2="900" y2="147" />
+            <line class="grid-line" x1="0" y1="220" x2="900" y2="220" />
+            <line class="grid-line" x1="0" y1="293" x2="900" y2="293" />
+            <line class="grid-line" x1="0" y1="367" x2="900" y2="367" />
+
+            <!-- START marker -->
+            <line class="marker-line" x1="420" y1="0" x2="420" y2="440" />
+            <text class="marker-text" x="414" y="12" text-anchor="end">[ START ]</text>
+
+            <!-- END marker -->
+            <line class="marker-line" x1="820" y1="0" x2="820" y2="440" />
+            <text class="marker-text" x="814" y="12" text-anchor="end">[ ENDS ]</text>
+
+            <!-- Price continuation (START to NOW) -->
+            <polyline class="price-line" points="420,227.5 426,226.9 432,225.0 438,228.5 444,222.3 450,220.1 456,216.8 462,218.4 468,214.9 474,217.2 480,213.1 486,215.8 492,219.0 498,216.4 504,213.2 510,210.8 516,213.5 522,211.6 528,209.8 534,212.0 540,211.5" />
+
+            <!-- NOW marker -->
+            <line class="now-line" x1="540" y1="0" x2="540" y2="440" />
+            <circle class="now-dot" cx="540" cy="211.5" r="4" />
+
+            <!-- Price history line -->
+            <polyline class="price-line" points="0,205.8 5,199.7 11,204.2 16,199.6 21,199.3 26,194.4 32,196.5 37,198.9 42,192.9 47,184.0 53,191.0 58,190.1 63,190.3 68,187.8 74,179.2 79,182.6 84,187.7 89,188.4 95,189.4 100,193.5 105,197.8 110,193.0 116,200.4 121,186.3 126,177.9 131,175.6 137,181.4 142,186.4 147,189.1 152,195.6 158,195.3 163,201.4 168,208.8 173,213.5 179,216.9 184,222.5 189,229.5 194,233.4 200,240.1 205,232.4 210,242.1 215,248.3 221,250.9 226,246.4 231,243.7 236,247.3 241,248.9 247,251.5 252,251.3 257,247.3 263,238.2 268,231.6 273,234.2 278,239.4 284,233.5 289,226.3 294,222.9 299,220.9 305,215.1 310,212.5 315,216.9 320,208.3 326,205.0 331,205.6 336,204.9 341,200.6 347,202.2 352,207.2 357,194.4 362,200.3 368,197.6 373,194.2 378,196.3 383,201.1 389,201.0 394,213.6 399,222.0 404,223.4 410,226.2 415,229.1 420,227.5" />
+
+            <!-- Prediction paths (after START) -->
+            <polyline class="prediction-line bull" points="420,227.5 427,225.5 433,233.9 440,232.1 447,236.1 453,243.0 460,241.8 467,238.2 473,242.5 480,239.6 487,236.8 493,231.3 500,224.8 507,218.0 513,219.8 520,218.4 527,221.3 533,223.5 540,227.4 547,219.6 553,223.3 560,232.1 567,230.6 573,225.4 580,221.1 587,218.9 593,218.5 600,215.5 607,214.4 613,214.8 620,209.5 627,213.0 633,209.5 640,209.1 647,204.0 653,202.9 660,197.9 667,187.9 673,195.7 680,192.0 687,197.0 693,193.0 700,202.1 707,206.8 713,214.8 720,215.1 727,209.3 733,207.9 740,207.5 747,212.0 753,205.2 760,203.4 767,202.3 773,207.3 780,208.6 787,205.2 793,194.2 800,190.4 807,194.2 813,192.3 820,187.8" />
+            <polyline class="prediction-line bull2" points="420,227.5 427,232.3 433,230.4 440,225.4 447,218.8 453,208.5 460,202.2 467,203.8 473,198.8 480,196.4 487,200.4 493,198.6 500,206.0 507,200.8 513,201.6 520,199.9 527,202.4 533,202.2 540,204.1 547,200.1 553,203.6 560,189.7 567,186.6 573,176.7 580,175.4 587,172.7 593,179.6 600,172.3 607,165.4 613,159.4 620,163.2 627,155.4 633,155.2 640,155.5 647,151.9 653,148.7 660,150.0 667,148.3 673,148.7 680,145.7 687,141.9 693,135.9 700,137.4 707,130.5 713,129.8 720,126.5 727,127.6 733,124.2 740,134.7 747,123.1 753,126.2 760,125.0 767,121.3 773,123.2 780,114.7 787,111.8 793,117.8 800,117.5 807,118.6 813,118.4 820,122.5" />
+            <polyline class="prediction-line neutral" points="420,227.5 427,233.7 433,238.6 440,244.5 447,246.6 453,242.1 460,243.8 467,246.0 473,248.9 480,247.5 487,248.8 493,244.6 500,247.5 507,245.5 513,246.2 520,248.4 527,244.7 533,251.7 540,252.6 547,253.0 553,257.4 560,258.4 567,255.1 573,254.6 580,258.5 587,261.1 593,257.7 600,253.3 607,259.5 613,256.3 620,265.1 627,262.6 633,260.1 640,266.0 647,267.0 653,264.5 660,259.6 667,259.4 673,257.4 680,263.5 687,265.3 693,267.9 700,267.3 707,273.9 713,279.7 720,280.1 727,279.5 733,279.9 740,280.7 747,280.8 753,284.8 760,283.9 767,279.2 773,284.1 780,287.0 787,286.7 793,289.7 800,289.2 807,289.5 813,289.6 820,293.5" />
+            <polyline class="prediction-line bear" points="420,227.5 427,221.0 433,218.2 440,224.9 447,229.9 453,233.4 460,230.9 467,230.3 473,229.9 480,228.0 487,231.5 493,235.7 500,235.0 507,241.8 513,243.6 520,245.1 527,248.8 533,256.3 540,257.4 547,263.8 553,266.4 560,274.0 567,277.0 573,283.4 580,282.3 587,285.8 593,293.3 600,292.7 607,292.8 613,291.8 620,298.3 627,296.5 633,298.9 640,300.2 647,304.9 653,301.2 660,305.4 667,308.7 673,308.3 680,313.1 687,314.1 693,317.5 700,320.0 707,323.6 713,328.2 720,328.1 727,326.2 733,325.9 740,327.8 747,326.7 753,324.9 760,330.9 767,335.0 773,337.6 780,343.4 787,341.6 793,338.6 800,335.7 807,334.2 813,335.5 820,334.6" />
+            <polyline class="prediction-line bear2" points="420,227.5 427,224.9 433,220.9 440,228.8 447,232.1 453,232.7 460,229.8 467,224.7 473,230.5 480,232.8 487,229.8 493,233.4 500,228.5 507,236.1 513,235.3 520,233.8 527,231.1 533,231.5 540,235.4 547,235.2 553,237.3 560,248.1 567,245.5 573,252.9 580,248.1 587,253.7 593,253.3 600,264.0 607,263.9 613,266.3 620,272.0 627,274.7 633,274.7 640,270.2 647,273.4 653,267.1 660,268.9 667,269.6 673,275.9 680,274.7 687,272.5 693,271.5 700,271.9 707,273.6 713,274.6 720,274.2 727,277.5 733,279.6 740,288.1 747,293.4 753,293.3 760,293.4 767,299.5 773,291.3 780,299.5 787,293.5 793,293.7 800,298.1 807,302.2 813,297.5 820,295.6" />
+
+            <!-- Selected path overlay (Chronos-2 = bull2, the strong bull) -->
+            <polyline class="selected-line" points="420,227.5 427,232.3 433,230.4 440,225.4 447,218.8 453,208.5 460,202.2 467,203.8 473,198.8 480,196.4 487,200.4 493,198.6 500,206.0 507,200.8 513,201.6 520,199.9 527,202.4 533,202.2 540,204.1 547,200.1 553,203.6 560,189.7 567,186.6 573,176.7 580,175.4 587,172.7 593,179.6 600,172.3 607,165.4 613,159.4 620,163.2 627,155.4 633,155.2 640,155.5 647,151.9 653,148.7 660,150.0 667,148.3 673,148.7 680,145.7 687,141.9 693,135.9 700,137.4 707,130.5 713,129.8 720,126.5 727,127.6 733,124.2 740,134.7 747,123.1 753,126.2 760,125.0 767,121.3 773,123.2 780,114.7 787,111.8 793,117.8 800,117.5 807,118.6 813,118.4 820,122.5" />
+
+            <!-- Y-axis labels -->
+            <text class="axis-text" x="870" y="77" text-anchor="start">90K</text>
+            <text class="axis-text" x="870" y="150" text-anchor="start">82K</text>
+            <text class="axis-text" x="870" y="224" text-anchor="start">74K</text>
+            <text class="axis-text" x="870" y="297" text-anchor="start">66K</text>
+            <text class="axis-text" x="870" y="371" text-anchor="start">58K</text>
+
+            <!-- X-axis labels -->
+            <text class="axis-date" x="80" y="435">Apr 8</text>
+            <text class="axis-date" x="230" y="435">Apr 10</text>
+            <text class="axis-date" x="380" y="435">Apr 12</text>
+            <text class="axis-date" x="530" y="435">Apr 14</text>
+            <text class="axis-date" x="680" y="435">Apr 16</text>
+            <text class="axis-date" x="830" y="435">Apr 18</text>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Timeframe -->
+      <div class="timeframe">
+        <button class="tf-btn">1M</button>
+        <button class="tf-btn">5M</button>
+        <button class="tf-btn">15M</button>
+        <button class="tf-btn active">1H</button>
+        <button class="tf-btn">1D</button>
+      </div>
+    </section>
+
+    <!-- Right rail -->
+    <aside class="rail">
+      <div class="rail-label">Select Paths</div>
+      <div class="path-list">
+        <div class="path-row selected">
+          <span class="path-idx">[ 01 ]</span>
+          <div class="path-info">
+            <span class="path-name">Chronos-2 Path</span>
+            <span class="path-wagered">4,250 wagered</span>
+          </div>
+          <span class="path-mult">1.50×</span>
+        </div>
+        <div class="path-row">
+          <span class="path-idx">[ 02 ]</span>
+          <div class="path-info">
+            <span class="path-name">TimesFM Path</span>
+            <span class="path-wagered">12,800 wagered</span>
+          </div>
+          <span class="path-mult">1.80×</span>
+        </div>
+        <div class="path-row">
+          <span class="path-idx">[ 03 ]</span>
+          <div class="path-info">
+            <span class="path-name">GJR-GARCH Path</span>
+          </div>
+          <span class="path-mult">2.20×</span>
+        </div>
+        <div class="path-row">
+          <span class="path-idx">[ 04 ]</span>
+          <div class="path-info">
+            <span class="path-name">Merton JD Path</span>
+            <span class="path-wagered">1,900 wagered</span>
+          </div>
+          <span class="path-mult">1.80×</span>
+        </div>
+        <div class="path-row">
+          <span class="path-idx">[ 05 ]</span>
+          <div class="path-info">
+            <span class="path-name">Monte Carlo Path</span>
+          </div>
+          <span class="path-mult">1.50×</span>
+        </div>
+      </div>
+
+      <button class="draw-btn">+ Draw Custom Path</button>
+
+      <div class="divider"></div>
+
+      <div class="input-label">Collateral</div>
+      <div class="input-row">
+        <span class="input-value">25.00</span>
+        <span class="input-unit">USDC</span>
+      </div>
+
+      <button class="submit-btn">Open Long Position</button>
+    </aside>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <a href="https://x.com/LevXtrade" target="_blank">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+    </a>
+    <a href="#" target="_blank">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 13H8"/><path d="M16 17H8"/><path d="M16 13h-2"/></svg>
+    </a>
+  </div>
+</body>
+</html>

@@ -8,20 +8,26 @@ interface PathRowProps {
   /** Total USDC wagered on this path by all users */
   wagered?: number
   active?: boolean
+  pending?: boolean
   onClick?: () => void
+  onMouseEnter?: () => void
+  onMouseLeave?: () => void
 }
 
-export function PathRow({ index, name, multiplier, wagered, active = false, onClick }: PathRowProps) {
+export function PathRow({ index, name, multiplier, wagered, active = false, pending = false, onClick, onMouseEnter, onMouseLeave }: PathRowProps) {
   const idx = String(index).padStart(2, '0')
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={pending ? undefined : onClick}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
       className={cn(
         'border-line grid h-14 w-full grid-cols-[44px_1fr_auto] items-center gap-4 border-0 border-b border-l-2 border-l-transparent bg-transparent pr-5 pl-4 text-left',
-        'duration-short ease-levx transition-[background]',
-        'hover:bg-white/2',
+        'duration-short ease-levx transition-[background,border-color]',
+        'hover:bg-white/2 hover:border-l-ink-muted',
         active && 'border-l-ink-strong bg-surface-2',
+        pending && 'opacity-50 pointer-events-none',
       )}
     >
       <span className="text-label text-ink-dim font-mono tracking-snug">[ {idx} ]</span>
@@ -32,7 +38,7 @@ export function PathRow({ index, name, multiplier, wagered, active = false, onCl
             active ? 'text-ink-strong' : 'text-ink',
           )}
         >
-          {name}
+          {pending ? `${name} — confirming…` : name}
         </span>
         {wagered != null && wagered > 0 && (
           <span className="text-ink-dim text-nano font-mono tracking-wide">

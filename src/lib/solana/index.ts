@@ -9,4 +9,4 @@ export {
   deriveProtocolPda,
   deriveEigenCachePda,
 } from './pda'
-export { usePlaceWager, useExitPosition, useClaim } from './transactions'
+export { useAddPath, usePlaceWager, usePlaceBatchWager, useExitPosition, useClaim } from './transactions'

@@ -12,39 +12,59 @@
  * Dark mode only for v0. Light mode will be added as a separate pass.
  */
 
+/* ════════════════════════════════════════════════
+   THEME-AWARE COLOR PRIMITIVES
+   Dark = default. Light activates when .dark is removed.
+   ════════════════════════════════════════════════ */
+
+:root {
+  --surface: #ffffff;
+  --surface-1: #f0f0f0;
+  --surface-2: #e4e4e4;
+  --ink-strong: #000000;
+  --ink: #1a1a1a;
+  --ink-muted: #666666;
+  --ink-dim: #999999;
+  --line: #e8e8e8;
+  --line-strong: #cccccc;
+}
+
+:root.dark {
+  --surface: #000000;
+  --surface-1: #111111;
+  --surface-2: #1a1a1a;
+  --ink-strong: #ffffff;
+  --ink: #e8e8e8;
+  --ink-muted: #999999;
+  --ink-dim: #666666;
+  --line: #222222;
+  --line-strong: #333333;
+}
+
 @theme {
   /* ════════════════════════════════════════════════
-     COLOR SYSTEM
+     COLOR SYSTEM — references theme-aware primitives
      ════════════════════════════════════════════════ */
 
-  /* ── Surfaces (backgrounds) ─────────────────────
-     surface   — page / root (#000)
-     surface-1 — default card (#111)
-     surface-2 — raised card / hover (#1A1A1A)
-  */
-  --color-surface: #000000;
-  --color-surface-1: #111111;
-  --color-surface-2: #1a1a1a;
+  --color-surface: var(--surface);
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
 
-  /* ── Ink (foreground / text) ───────────────────
-     ink-strong — display / emphasized (#FFF)
-     ink        — default body text (#E8E8E8)
-     ink-muted  — secondary text (#999)
-     ink-dim    — disabled / captions (#666)
-  */
-  --color-ink-strong: #ffffff;
-  --color-ink: #e8e8e8;
-  --color-ink-muted: #999999;
-  --color-ink-dim: #666666;
+  --color-ink-strong: var(--ink-strong);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-dim: var(--ink-dim);
 
-  /* ── Lines (borders) ────────────────────────── */
-  --color-line: #222222;
-  --color-line-strong: #333333;
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
 
-  /* ── Accent + semantic ──────────────────────── */
-  --color-accent: #d71921;
-  --color-accent-subtle: rgba(215, 25, 33, 0.15);
-  --color-success: #4a9e5c;
+  /* ── Accent + semantic (same in both themes) ── */
+  --color-accent: #FF483B;
+  --color-accent-subtle: rgba(255, 72, 59, 0.15);
+  --color-success: #5CF78B;
+  --color-success-dim: #4a9e5c;
+  --color-brand-from: #F4FA4D;
+  --color-brand-to: #5CF78B;
   --color-warning: #d4a843;
   --color-interactive: #5b9bf6;
 
@@ -53,11 +73,11 @@
      ════════════════════════════════════════════════ */
 
   /* ── Font families ─────────────────────────────
-     display — Doto (hero, large numbers)
+     display — JetBrains Mono (hero, page titles)
      sans    — Space Grotesk (body, UI)
      mono    — Space Mono (labels, data)
   */
-  --font-display: 'Doto', 'Space Mono', monospace;
+  --font-display: 'JetBrains Mono', 'Space Mono', monospace;
   --font-sans: 'Space Grotesk', system-ui, sans-serif;
   --font-mono: 'Space Mono', 'JetBrains Mono', monospace;
 
@@ -326,6 +346,16 @@
   line-height: var(--leading-normal);
   letter-spacing: var(--tracking-wider);
   text-transform: uppercase;
+}
+
+/* ════════════════════════════════════════════════
+   BRAND GRADIENT TEXT
+   ════════════════════════════════════════════════ */
+@utility text-brand-gradient {
+  background: linear-gradient(90deg, var(--color-brand-from), var(--color-brand-to));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 /* ════════════════════════════════════════════════

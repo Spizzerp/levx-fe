@@ -96,8 +96,15 @@ export interface PredictionPath {
   totalLeveragedExposure: number
   /** Outstanding LMSR shares */
   lmsrSharesOutstanding: number
+  /** Time-weighted exposure accumulator for settlement scoring */
+  totalTimeWeightedExposure: number
   /** Current implied probability in basis points */
   currentImpliedProbability: number
+
+  /* ── Client-only ────────────────────────────────────────── */
+
+  /** Tracks on-chain persistence for user-drawn paths. Undefined = confirmed. */
+  onChainStatus?: 'pending' | 'confirmed'
 }
 
 /* ── Market ────────────────────────────────────────────────── */
@@ -144,6 +151,8 @@ export interface Market {
   decoherenceRate: number
   /** Minimum Born probability below which a path decoheres (fixed-point) */
   minimumProbability: number
+  /** LMSR oracle nudge rate (fixed-point fraction, e.g. 0.05 = 5%) */
+  nudgeRate: number
   /** Max age (seconds) for AI paths at activation time */
   pathMaxAge: number
 

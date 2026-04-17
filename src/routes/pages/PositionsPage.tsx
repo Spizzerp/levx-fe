@@ -1,12 +1,17 @@
 import { useState } from 'react'
 
+import { Lock } from 'lucide-react'
+
 import { Button } from '@/components/Button'
+import { ChartFrame } from '@/components/ChartFrame'
 import { ConnectGate } from '@/components/ConnectGate'
 import { DataTable, NUM_CELL, type DataTableColumn } from '@/components/DataTable'
 import { cn } from '@/lib/cn'
+import { DOT_GRADIENT } from '@/lib/constants'
 import { formatUSD } from '@/lib/format'
 import { useExitPosition, useClaim } from '@/lib/solana/transactions'
 import { PageLayout } from '@/layouts/PageLayout'
+import { useWalletStore } from '@/stores/walletStore'
 
 type PositionStatus = 'active' | 'sampling' | 'at-risk'
 
@@ -81,25 +86,25 @@ const STATUS_LABELS: Record<PositionStatus, string> = {
   'at-risk': 'At Risk',
 }
 
-const STATUS_DOT_COLORS: Record<PositionStatus, string> = {
-  active: 'bg-success',
-  sampling: 'bg-warning',
-  'at-risk': 'bg-accent',
+const STATUS_DOT_BG: Record<PositionStatus, string> = {
+  active: DOT_GRADIENT.positive,
+  sampling: 'var(--color-warning)',
+  'at-risk': DOT_GRADIENT.negative,
 }
 
 const NARROW_HIDE = '[@media(max-width:1200px)]:hidden'
 
 function PositionStatusDot({ status }: { status: PositionStatus }) {
-  const colorClass = STATUS_DOT_COLORS[status]
   return (
     <span className="text-label text-ink-muted inline-flex items-center gap-2 font-mono uppercase">
-      <span className={cn('h-1.5 w-1.5 rounded-full', colorClass)} aria-hidden />
+      <span className="h-1.5 w-1.5 rounded-full" style={{ background: STATUS_DOT_BG[status] }} aria-hidden />
       {STATUS_LABELS[status]}
     </span>
   )
 }
 
 export function PositionsPage() {
+  const connected = useWalletStore((s) => s.connected)
   const exitPosition = useExitPosition()
   const [closingPosId, setClosingPosId] = useState<string | null>(null)
 
@@ -192,12 +197,25 @@ export function PositionsPage() {
     },
   ]
 
+  if (!connected) {
+    return (
+      <PageLayout title="Positions" subtitle="Track your active positions and real-time performance">
+        <div className="flex flex-col items-center justify-center gap-4 py-24 border border-dashed border-line-strong rounded-2xl">
+          <Lock size={32} strokeWidth={1.5} className="text-ink-dim" />
+          <p className="text-ink-muted font-mono text-label uppercase">
+            [ Please connect your wallet to view page content ]
+          </p>
+        </div>
+      </PageLayout>
+    )
+  }
+
   return (
     <PageLayout
       title="Positions"
       subtitle="Track your active positions and real-time performance"
       summaryBar={
-        <div className="border-line flex items-center gap-12 border-0 border-b pb-8">
+        <div className="flex items-center gap-12 pb-8">
           <div>
             <div className="text-label text-ink-muted mb-2 font-mono uppercase">
               Total Wagered
@@ -225,14 +243,16 @@ export function PositionsPage() {
         </div>
       }
     >
-      <DataTable
-        columns={columns}
-        data={MOCK_POSITIONS}
-        gridCols="grid-cols-[48px_140px_1fr_140px_120px_100px_24px]"
-        gridColsWide="[@media(min-width:1201px)]:grid-cols-[56px_160px_1fr_160px_140px_120px_120px_24px]"
-        keyExtractor={(pos) => pos.id}
-        emptyMessage="[ NO OPEN POSITIONS ]"
-      />
+      <ChartFrame glow>
+        <DataTable
+          columns={columns}
+          data={MOCK_POSITIONS}
+          gridCols="grid-cols-[48px_140px_1fr_140px_120px_100px_24px]"
+          gridColsWide="[@media(min-width:1201px)]:grid-cols-[56px_160px_1fr_160px_140px_120px_120px_24px]"
+          keyExtractor={(pos) => pos.id}
+          emptyMessage="[ NO OPEN POSITIONS ]"
+        />
+      </ChartFrame>
     </PageLayout>
   )
 }
