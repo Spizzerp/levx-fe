@@ -1,3 +1,7 @@
+// @vitest-environment node
+// ComputeBudgetProgram encodes instruction data via @solana/buffer-layout,
+// which rejects jsdom's Buffer (not a Uint8Array). Run this file in node.
+
 import { describe, it, expect } from 'vitest'
 import { ComputeBudgetProgram, PublicKey, type TransactionInstruction } from '@solana/web3.js'
 import { buildTransaction } from '@/lib/chain/buildTransaction'

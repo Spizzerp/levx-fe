@@ -10,7 +10,12 @@ import '@testing-library/jest-dom/vitest'
 // Polyfill PointerEvent — jsdom 26 does not implement PointerEvent natively.
 // Without this, fireEvent.pointerDown/Move/Up create generic Events that lack
 // clientX, clientY, and pointerId properties, causing NaN in coordinate math.
-if (typeof globalThis.PointerEvent === 'undefined') {
+// Skip in node environment (no DOM, no MouseEvent) — tests opting into
+// `// @vitest-environment node` do not need pointer polyfills.
+if (
+  typeof globalThis.MouseEvent !== 'undefined' &&
+  typeof globalThis.PointerEvent === 'undefined'
+) {
   class PointerEvent extends MouseEvent {
     pointerId: number
     width: number
