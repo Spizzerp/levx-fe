@@ -14,10 +14,17 @@
  */
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { AnchorProvider, BN } from '@coral-xyz/anchor'
+import {
+  AnchorProvider,
+  BN,
+  parseIdlErrors,
+  Program,
+  translateError,
+} from '@coral-xyz/anchor'
 import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress } from '@solana/spl-token'
 import { SystemProgram, Transaction, type TransactionInstruction } from '@solana/web3.js'
 
+import type { Levx } from '@/idl/levx'
 import { useProgram } from './program'
 import { CU_LIMITS, MAX_CU_PER_TX, SCALE } from '@/lib/constants'
 import { toast } from '@/stores/toastStore'
@@ -31,6 +38,12 @@ interface AddPathInput {
   marketId: number
   predictedPrices: number[]
   numCheckpoints: number
+  /**
+   * Optional pre-fetched path index. When the caller has already read
+   * `market.numPaths` (e.g. to show an optimistic pending row), passing
+   * it here avoids a second RPC hop inside the mutation.
+   */
+  pathIndex?: number
 }
 
 interface PlaceWagerInput {
@@ -51,15 +64,18 @@ interface PositionInput {
   pathIndex: number
 }
 
-type ProgramWithProvider = { provider: AnchorProvider }
-
-/** Builds + signs + confirms a single transaction with compute-budget prefix. */
+/**
+ * Builds + signs + confirms a single transaction with the compute-budget
+ * prefix. Replicates Anchor's `.rpc()` error-translation path so IDL-defined
+ * program errors (ConstraintInit, custom codes, etc.) keep surfacing as
+ * decoded messages instead of raw "Simulation failed: 0x…" strings.
+ */
 async function sendInstructions(
-  program: ProgramWithProvider,
+  program: Program<Levx>,
   instructions: TransactionInstruction[],
   computeUnitLimit: number,
 ): Promise<string> {
-  const provider = program.provider
+  const provider = program.provider as AnchorProvider
   const priorityFeeMicroLamports = await getPriorityFee(provider.connection)
   const finalIxs = await buildTransaction({
     instructions,
@@ -67,7 +83,11 @@ async function sendInstructions(
     priorityFeeMicroLamports,
   })
   const tx = new Transaction().add(...finalIxs)
-  return provider.sendAndConfirm(tx)
+  try {
+    return await provider.sendAndConfirm(tx)
+  } catch (err) {
+    throw translateError(err, parseIdlErrors(program.idl))
+  }
 }
 
 export function useAddPath() {
@@ -75,14 +95,24 @@ export function useAddPath() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ marketId, predictedPrices, numCheckpoints }: AddPathInput) => {
+    mutationFn: async ({
+      marketId,
+      predictedPrices,
+      numCheckpoints,
+      pathIndex: prefetchedIndex,
+    }: AddPathInput) => {
       if (!program) throw new Error('Wallet not connected')
 
       const user = program.provider.publicKey!
       const [marketPda] = deriveMarketPda(marketId)
 
-      const marketAcc = await program.account.market.fetch(marketPda)
-      const pathIndex: number = marketAcc.numPaths
+      let pathIndex: number
+      if (prefetchedIndex !== undefined) {
+        pathIndex = prefetchedIndex
+      } else {
+        const marketAcc = await program.account.market.fetch(marketPda)
+        pathIndex = marketAcc.numPaths
+      }
 
       const [pathOutcomePda] = derivePathPda(marketId, pathIndex)
 

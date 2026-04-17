@@ -234,6 +234,7 @@ export function MarketPage() {
         marketId: market.marketId,
         predictedPrices: values,
         numCheckpoints: values.length,
+        pathIndex,
       })
       setUserPaths((prev) =>
         prev.map((p) =>

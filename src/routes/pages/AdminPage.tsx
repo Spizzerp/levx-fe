@@ -1,5 +1,5 @@
 import { useEffect, useRef, useMemo, useState } from 'react'
-import { AnchorProvider, BN } from '@coral-xyz/anchor'
+import { AnchorProvider, BN, parseIdlErrors, translateError } from '@coral-xyz/anchor'
 import { PublicKey, Keypair, SystemProgram, Transaction } from '@solana/web3.js'
 import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress } from '@solana/spl-token'
 
@@ -397,7 +397,12 @@ export function AdminPage() {
         priorityFeeMicroLamports,
       })
       const tx = new Transaction().add(...finalIxs)
-      const sig = await provider.sendAndConfirm(tx, [vaultKeypair])
+      let sig: string
+      try {
+        sig = await provider.sendAndConfirm(tx, [vaultKeypair])
+      } catch (sendErr) {
+        throw translateError(sendErr, parseIdlErrors(program.idl))
+      }
 
       toast.success('Market created', { txSig: sig })
     } catch (err) {
