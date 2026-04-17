@@ -6,21 +6,31 @@
  *   - exit_position()
  *   - claim()
  *
- * Each returns a TanStack Query useMutation with typed inputs.
- * Account addresses (vault, treasury, insurance) are fetched from on-chain
- * state at call time — no hardcoded addresses.
+ * Every mutation builds instructions manually, routes through
+ * buildTransaction (compute-unit limit + dynamic priority fee), and
+ * sends via AnchorProvider.sendAndConfirm. Account addresses (vault,
+ * treasury, insurance) are fetched from on-chain state at call time —
+ * no hardcoded addresses.
  */
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { BN } from '@coral-xyz/anchor'
+import {
+  AnchorProvider,
+  BN,
+  parseIdlErrors,
+  Program,
+  translateError,
+} from '@coral-xyz/anchor'
 import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress } from '@solana/spl-token'
-import { SystemProgram, Transaction } from '@solana/web3.js'
+import { SystemProgram, Transaction, type TransactionInstruction } from '@solana/web3.js'
 
+import type { Levx } from '@/idl/levx'
 import { useProgram } from './program'
-import { SCALE } from '@/lib/constants'
+import { CU_LIMITS, MAX_CU_PER_TX, SCALE } from '@/lib/constants'
 import { toast } from '@/stores/toastStore'
 import { deriveMarketPda, derivePathPda, derivePositionPda, deriveProtocolPda } from './pda'
 import { buildTransaction } from '@/lib/chain/buildTransaction'
+import { getPriorityFee } from '@/lib/chain/priorityFee'
 
 const MAX_BATCH_SIZE = 4
 
@@ -28,6 +38,12 @@ interface AddPathInput {
   marketId: number
   predictedPrices: number[]
   numCheckpoints: number
+  /**
+   * Optional pre-fetched path index. When the caller has already read
+   * `market.numPaths` (e.g. to show an optimistic pending row), passing
+   * it here avoids a second RPC hop inside the mutation.
+   */
+  pathIndex?: number
 }
 
 interface PlaceWagerInput {
@@ -48,19 +64,55 @@ interface PositionInput {
   pathIndex: number
 }
 
+/**
+ * Builds + signs + confirms a single transaction with the compute-budget
+ * prefix. Replicates Anchor's `.rpc()` error-translation path so IDL-defined
+ * program errors (ConstraintInit, custom codes, etc.) keep surfacing as
+ * decoded messages instead of raw "Simulation failed: 0x…" strings.
+ */
+async function sendInstructions(
+  program: Program<Levx>,
+  instructions: TransactionInstruction[],
+  computeUnitLimit: number,
+): Promise<string> {
+  const provider = program.provider as AnchorProvider
+  const priorityFeeMicroLamports = await getPriorityFee(provider.connection)
+  const finalIxs = await buildTransaction({
+    instructions,
+    computeUnitLimit,
+    priorityFeeMicroLamports,
+  })
+  const tx = new Transaction().add(...finalIxs)
+  try {
+    return await provider.sendAndConfirm(tx)
+  } catch (err) {
+    throw translateError(err, parseIdlErrors(program.idl))
+  }
+}
+
 export function useAddPath() {
   const program = useProgram()
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ marketId, predictedPrices, numCheckpoints }: AddPathInput) => {
+    mutationFn: async ({
+      marketId,
+      predictedPrices,
+      numCheckpoints,
+      pathIndex: prefetchedIndex,
+    }: AddPathInput) => {
       if (!program) throw new Error('Wallet not connected')
 
       const user = program.provider.publicKey!
       const [marketPda] = deriveMarketPda(marketId)
 
-      const marketAcc = await (program.account as any).market.fetch(marketPda)
-      const pathIndex: number = marketAcc.numPaths
+      let pathIndex: number
+      if (prefetchedIndex !== undefined) {
+        pathIndex = prefetchedIndex
+      } else {
+        const marketAcc = await program.account.market.fetch(marketPda)
+        pathIndex = marketAcc.numPaths
+      }
 
       const [pathOutcomePda] = derivePathPda(marketId, pathIndex)
 
@@ -72,7 +124,7 @@ export function useAddPath() {
         generationTimestamp: new BN(Math.floor(Date.now() / 1000)),
       }
 
-      const sig = await (program.methods as any)
+      const ix = await program.methods
         .addPath(params)
         .accounts({
           market: marketPda,
@@ -80,11 +132,12 @@ export function useAddPath() {
           creator: user,
           systemProgram: SystemProgram.programId,
         })
-        .rpc()
+        .instruction()
 
-      return { sig: sig as string, pathIndex }
+      const sig = await sendInstructions(program, [ix], CU_LIMITS.addPath)
+      return { sig, pathIndex }
     },
-    onSuccess: ({ sig, pathIndex: _ }, { marketId }) => {
+    onSuccess: ({ sig }, { marketId }) => {
       queryClient.invalidateQueries({ queryKey: ['market', String(marketId)] })
       queryClient.invalidateQueries({ queryKey: ['markets'] })
       toast.success('Path created on-chain', { txSig: sig })
@@ -111,10 +164,9 @@ export function usePlaceWager() {
       const [pathPda] = derivePathPda(marketId, pathIndex)
       const [positionPda] = derivePositionPda(marketId, user, pathIndex)
 
-      // Fetch on-chain accounts for vault/treasury/insurance addresses
       const [marketAcc, protocolAcc] = await Promise.all([
-        (program.account as any).market.fetch(marketPda),
-        (program.account as any).protocolState.fetch(protocolPda),
+        program.account.market.fetch(marketPda),
+        program.account.protocolState.fetch(protocolPda),
       ])
 
       const vault = marketAcc.vault
@@ -123,7 +175,7 @@ export function usePlaceWager() {
       const insuranceFund = protocolAcc.insuranceFund
       const userTokenAccount = await getAssociatedTokenAddress(quoteMint, user)
 
-      const sig = await (program.methods as any)
+      const ix = await program.methods
         .placeWager(pathIndex, scaledAmount)
         .accounts({
           protocolState: protocolPda,
@@ -138,9 +190,9 @@ export function usePlaceWager() {
           tokenProgram: TOKEN_PROGRAM_ID,
           systemProgram: SystemProgram.programId,
         })
-        .rpc()
+        .instruction()
 
-      return sig as string
+      return sendInstructions(program, [ix], CU_LIMITS.placeWager)
     },
     onSuccess: (sig, { marketId }) => {
       queryClient.invalidateQueries({ queryKey: ['market', String(marketId)] })
@@ -172,8 +224,8 @@ export function usePlaceBatchWager() {
       const [marketPda] = deriveMarketPda(marketId)
 
       const [marketAcc, protocolAcc] = await Promise.all([
-        (program.account as any).market.fetch(marketPda),
-        (program.account as any).protocolState.fetch(protocolPda),
+        program.account.market.fetch(marketPda),
+        program.account.protocolState.fetch(protocolPda),
       ])
 
       const vault = marketAcc.vault
@@ -187,7 +239,7 @@ export function usePlaceBatchWager() {
           const [pathPda] = derivePathPda(marketId, pathIndex)
           const [positionPda] = derivePositionPda(marketId, user, pathIndex)
 
-          return (program.methods as any)
+          return program.methods
             .placeWager(pathIndex, scaledAmount)
             .accounts({
               protocolState: protocolPda,
@@ -206,11 +258,8 @@ export function usePlaceBatchWager() {
         }),
       )
 
-      const finalIxs = await buildTransaction({ instructions: ixs })
-      const tx = new Transaction().add(...finalIxs)
-      const sig = await (program.provider as any).sendAndConfirm(tx)
-
-      return sig as string
+      const computeUnitLimit = Math.min(CU_LIMITS.placeWager * pathIndices.length, MAX_CU_PER_TX)
+      return sendInstructions(program, ixs, computeUnitLimit)
     },
     onSuccess: (sig, { marketId, pathIndices }) => {
       queryClient.invalidateQueries({ queryKey: ['market', String(marketId)] })
@@ -238,12 +287,12 @@ export function useExitPosition() {
       const [pathPda] = derivePathPda(marketId, pathIndex)
       const [positionPda] = derivePositionPda(marketId, user, pathIndex)
 
-      const marketAcc = await (program.account as any).market.fetch(marketPda)
+      const marketAcc = await program.account.market.fetch(marketPda)
       const vault = marketAcc.vault
       const quoteMint = marketAcc.quoteMint
       const userTokenAccount = await getAssociatedTokenAddress(quoteMint, user)
 
-      const sig = await (program.methods as any)
+      const ix = await program.methods
         .exitPosition()
         .accounts({
           market: marketPda,
@@ -254,9 +303,9 @@ export function useExitPosition() {
           user,
           tokenProgram: TOKEN_PROGRAM_ID,
         })
-        .rpc()
+        .instruction()
 
-      return sig as string
+      return sendInstructions(program, [ix], CU_LIMITS.exitPosition)
     },
     onSuccess: (sig, { marketId }) => {
       queryClient.invalidateQueries({ queryKey: ['market', String(marketId)] })
@@ -285,8 +334,8 @@ export function useClaim() {
       const [positionPda] = derivePositionPda(marketId, user, pathIndex)
 
       const [marketAcc, protocolAcc] = await Promise.all([
-        (program.account as any).market.fetch(marketPda),
-        (program.account as any).protocolState.fetch(protocolPda),
+        program.account.market.fetch(marketPda),
+        program.account.protocolState.fetch(protocolPda),
       ])
 
       const vault = marketAcc.vault
@@ -295,7 +344,7 @@ export function useClaim() {
       const insuranceFund = protocolAcc.insuranceFund
       const userTokenAccount = await getAssociatedTokenAddress(quoteMint, user)
 
-      const sig = await (program.methods as any)
+      const ix = await program.methods
         .claim()
         .accounts({
           protocolState: protocolPda,
@@ -309,9 +358,9 @@ export function useClaim() {
           user,
           tokenProgram: TOKEN_PROGRAM_ID,
         })
-        .rpc()
+        .instruction()
 
-      return sig as string
+      return sendInstructions(program, [ix], CU_LIMITS.claim)
     },
     onSuccess: (sig, { marketId }) => {
       queryClient.invalidateQueries({ queryKey: ['market', String(marketId)] })

@@ -46,7 +46,7 @@ export async function getMarkets(): Promise<Market[]> {
   const program = getReadOnlyProgram()
   let allMarkets: any[]
   try {
-    allMarkets = await (program.account as any).market.all()
+    allMarkets = await program.account.market.all()
   } catch (err) {
     // IDL/account layout mismatch — deployed program may be newer than IDL.
     // Return empty rather than crashing the whole page.
@@ -77,7 +77,7 @@ export async function getMarket(id: string): Promise<Market> {
   const marketId = Number(id)
   const [marketPda] = deriveMarketPda(marketId)
 
-  const raw: any = await (program.account as any).market.fetch(marketPda)
+  const raw: any = await program.account.market.fetch(marketPda)
   const market = anchorMarketToFE(raw, id)
 
   const pairInfo = resolvePairLabel(raw.baseMint)
@@ -89,7 +89,7 @@ export async function getMarket(id: string): Promise<Market> {
   const numPaths = raw.numPaths as number
   const pathPromises = Array.from({ length: numPaths }, (_, i) => {
     const [pathPda] = derivePathPda(marketId, i)
-    return (program.account as any).pathOutcome.fetch(pathPda)
+    return program.account.pathOutcome.fetch(pathPda)
   })
   const pathRaws: any[] = await Promise.all(pathPromises)
 
@@ -125,7 +125,7 @@ export async function getPosition(
   const program = getReadOnlyProgram()
   const [positionPda] = derivePositionPda(marketId, wallet, pathIndex)
   try {
-    const raw: any = await (program.account as any).position.fetch(positionPda)
+    const raw: any = await program.account.position.fetch(positionPda)
     return anchorPositionToFE(raw, String(marketId), pathLabel, pathTone, pathDissolved)
   } catch {
     // Account doesn't exist — user has no position on this path
@@ -142,7 +142,7 @@ export async function getUserPositions(wallet: PublicKey): Promise<UserPosition[
 
   // Position account layout: 8 (discriminator) + 32 (market) + 32 (user) + ...
   // Filter on user field at offset 40
-  const accounts: any[] = await (program.account as any).position.all([
+  const accounts: any[] = await program.account.position.all([
     { memcmp: { offset: 40, bytes: wallet.toBase58() } },
   ])
 
@@ -155,10 +155,10 @@ export async function getUserPositions(wallet: PublicKey): Promise<UserPosition[
     const pathIndex = raw.pathIndex as number
     const marketPubkey = raw.market as PublicKey
     try {
-      const marketRaw: any = await (program.account as any).market.fetch(marketPubkey)
+      const marketRaw: any = await program.account.market.fetch(marketPubkey)
       const mktId = marketRaw.marketId.toNumber()
       const [pathPda] = derivePathPda(mktId, pathIndex)
-      const pathRaw: any = await (program.account as any).pathOutcome.fetch(pathPda)
+      const pathRaw: any = await program.account.pathOutcome.fetch(pathPda)
       const startTimeMs = marketRaw.startTime.toNumber() * 1000
       const checkpointInterval = marketRaw.checkpointInterval as number
       const path = anchorPathToFE(pathRaw, startTimeMs, checkpointInterval)

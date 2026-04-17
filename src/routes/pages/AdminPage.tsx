@@ -1,7 +1,10 @@
 import { useEffect, useRef, useMemo, useState } from 'react'
-import { BN } from '@coral-xyz/anchor'
-import { PublicKey, Keypair, SystemProgram } from '@solana/web3.js'
+import { AnchorProvider, BN, parseIdlErrors, translateError } from '@coral-xyz/anchor'
+import { PublicKey, Keypair, SystemProgram, Transaction } from '@solana/web3.js'
 import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress } from '@solana/spl-token'
+
+import { buildTransaction } from '@/lib/chain/buildTransaction'
+import { getPriorityFee } from '@/lib/chain/priorityFee'
 
 import { ChevronDown, Info } from 'lucide-react'
 
@@ -18,7 +21,7 @@ import { useProgram } from '@/lib/solana/program'
 import { deriveMarketPda, deriveProtocolPda } from '@/lib/solana/pda'
 import { toast } from '@/stores/toastStore'
 import { useWalletStore } from '@/stores/walletStore'
-import { PYTH_FEED_IDS, type SupportedPair } from '@/lib/pyth/feedIds'
+import type { SupportedPair } from '@/lib/pyth/feedIds'
 import { usePythFeed, useLatestPrice } from '@/lib/pyth/hooks'
 import { useBenchmarksHistory } from '@/lib/pyth/useBenchmarksHistory'
 import { feedIdForPair } from '@/lib/pyth/feedIds'
@@ -73,8 +76,6 @@ const AI_PROVIDERS = [
 ]
 
 /* ── Preview path generation ─────────────────────────────── */
-
-const TONE_POOL: PathTone[] = ['ultra-bull', 'bull', 'neutral', 'bear', 'ultra-bear']
 
 /**
  * Build N randomized preview paths rooted at `basePrice`.
@@ -254,21 +255,6 @@ function InfoTip({ text }: { text: string }) {
   )
 }
 
-/** Linearly interpolate between two hex colors. t=0 returns a, t=1 returns b. */
-function lerpColor(a: string, b: string, t: number): string {
-  const parse = (hex: string) => [
-    parseInt(hex.slice(1, 3), 16),
-    parseInt(hex.slice(3, 5), 16),
-    parseInt(hex.slice(5, 7), 16),
-  ]
-  const [r1, g1, b1] = parse(a)
-  const [r2, g2, b2] = parse(b)
-  const r = Math.round(r1 + (r2 - r1) * t)
-  const g = Math.round(g1 + (g2 - g1) * t)
-  const bl = Math.round(b1 + (b2 - b1) * t)
-  return `rgb(${r},${g},${bl})`
-}
-
 /** Format a unix-ms timestamp as a local yyyy-MM-ddTHH:mm string for datetime-local inputs. */
 function toLocalDatetime(ms: number): string {
   const d = new Date(ms)
@@ -276,7 +262,7 @@ function toLocalDatetime(ms: number): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-import { GRADIENT, SCALE } from '@/lib/constants'
+import { CU_LIMITS, GRADIENT, SCALE } from '@/lib/constants'
 
 import { CHIP, CHIP_ACTIVE, CHIP_INACTIVE } from '@/components/styles'
 
@@ -356,7 +342,7 @@ export function AdminPage() {
       const [protocolPda] = deriveProtocolPda()
 
       // Read protocol state to get next market_id
-      const protocolAcc: any = await (program.account as any).protocolState.fetch(protocolPda)
+      const protocolAcc = await program.account.protocolState.fetch(protocolPda)
       const nextMarketId = protocolAcc.totalMarketsCreated.toNumber()
       const [marketPda] = deriveMarketPda(nextMarketId)
 
@@ -388,7 +374,7 @@ export function AdminPage() {
         weightDisplacement: new BN(Math.round(0.25 * SCALE)),
       }
 
-      const sig = await (program.methods as any)
+      const ix = await program.methods
         .createMarket(params)
         .accounts({
           protocolState: protocolPda,
@@ -401,8 +387,22 @@ export function AdminPage() {
           systemProgram: SystemProgram.programId,
           tokenProgram: TOKEN_PROGRAM_ID,
         })
-        .signers([vaultKeypair])
-        .rpc()
+        .instruction()
+
+      const provider = program.provider as AnchorProvider
+      const priorityFeeMicroLamports = await getPriorityFee(provider.connection)
+      const finalIxs = await buildTransaction({
+        instructions: [ix],
+        computeUnitLimit: CU_LIMITS.createMarket,
+        priorityFeeMicroLamports,
+      })
+      const tx = new Transaction().add(...finalIxs)
+      let sig: string
+      try {
+        sig = await provider.sendAndConfirm(tx, [vaultKeypair])
+      } catch (sendErr) {
+        throw translateError(sendErr, parseIdlErrors(program.idl))
+      }
 
       toast.success('Market created', { txSig: sig })
     } catch (err) {

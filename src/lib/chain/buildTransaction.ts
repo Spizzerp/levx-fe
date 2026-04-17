@@ -1,4 +1,4 @@
-import type { TransactionInstruction } from '@solana/web3.js'
+import { ComputeBudgetProgram, type TransactionInstruction } from '@solana/web3.js'
 
 export interface BuildTransactionOptions {
   instructions: TransactionInstruction[]
@@ -7,14 +7,24 @@ export interface BuildTransactionOptions {
 }
 
 /**
- * Phase 2 shell — returns instructions unchanged.
- * Phase 4: prepend ComputeBudgetProgram.setComputeUnitLimit +
- *          ComputeBudgetProgram.setComputeUnitPrice instructions before signing.
- * The shape is frozen in Phase 2 so Phase 4 wiring is a single-file change.
+ * Prepends ComputeBudgetProgram instructions (CU limit, then CU price) to the
+ * caller's instructions when the corresponding options are provided. Either
+ * knob may be omitted; if both are omitted the instructions pass through
+ * unchanged.
  */
 export async function buildTransaction(
   opts: BuildTransactionOptions,
 ): Promise<TransactionInstruction[]> {
-  // TODO Phase 4: prepend compute unit + priority fee instructions.
-  return opts.instructions
+  const prefix: TransactionInstruction[] = []
+  if (opts.computeUnitLimit !== undefined) {
+    prefix.push(ComputeBudgetProgram.setComputeUnitLimit({ units: opts.computeUnitLimit }))
+  }
+  if (opts.priorityFeeMicroLamports !== undefined) {
+    prefix.push(
+      ComputeBudgetProgram.setComputeUnitPrice({
+        microLamports: opts.priorityFeeMicroLamports,
+      }),
+    )
+  }
+  return [...prefix, ...opts.instructions]
 }

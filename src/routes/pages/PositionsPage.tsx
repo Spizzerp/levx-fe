@@ -9,7 +9,7 @@ import { DataTable, NUM_CELL, type DataTableColumn } from '@/components/DataTabl
 import { cn } from '@/lib/cn'
 import { DOT_GRADIENT } from '@/lib/constants'
 import { formatUSD } from '@/lib/format'
-import { useExitPosition, useClaim } from '@/lib/solana/transactions'
+import { useExitPosition } from '@/lib/solana/transactions'
 import { PageLayout } from '@/layouts/PageLayout'
 import { useWalletStore } from '@/stores/walletStore'
 

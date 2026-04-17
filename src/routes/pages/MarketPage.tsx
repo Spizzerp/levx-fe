@@ -19,6 +19,8 @@ import { Stub } from '@/components/Stub'
 import { UserPositionCard } from '@/components/UserPositionCard'
 import { cn } from '@/lib/cn'
 import { useMarket, useUserPosition } from '@/lib/chain'
+import { useProgram } from '@/lib/solana/program'
+import { deriveMarketPda } from '@/lib/solana/pda'
 import { useAddPath, usePlaceBatchWager, useClaim } from '@/lib/solana/transactions'
 import { usePythFeed, useLatestPrice } from '@/lib/pyth/hooks'
 import { feedIdForPair } from '@/lib/pyth/feedIds'
@@ -34,31 +36,6 @@ import {
   maxLeverageByDuration,
 } from '@/lib/format'
 import type { Market, PredictionPath, PricePoint } from '@/types/market'
-
-/* ── Market duration options ─────────────────────────────── */
-
-type DurationOption = '1d' | '3d' | '7d' | '30d' | '90d'
-
-const DURATION_OPTIONS: { id: DurationOption; label: string; ms: number }[] = [
-  { id: '1d', label: '1 Day', ms: 1 * 24 * 60 * 60 * 1000 },
-  { id: '3d', label: '3 Days', ms: 3 * 24 * 60 * 60 * 1000 },
-  { id: '7d', label: '7 Days', ms: 7 * 24 * 60 * 60 * 1000 },
-  { id: '30d', label: '30 Days', ms: 30 * 24 * 60 * 60 * 1000 },
-  { id: '90d', label: '90 Days', ms: 90 * 24 * 60 * 60 * 1000 },
-]
-
-/* ── Checkpoint interval options (seconds) ───────────────── */
-
-type IntervalOption = '5m' | '15m' | '30m' | '1h' | '2h' | '4h'
-
-const INTERVAL_OPTIONS: { id: IntervalOption; label: string; sec: number }[] = [
-  { id: '5m', label: '5 Min', sec: 5 * 60 },
-  { id: '15m', label: '15 Min', sec: 15 * 60 },
-  { id: '30m', label: '30 Min', sec: 30 * 60 },
-  { id: '1h', label: '1 Hour', sec: 60 * 60 },
-  { id: '2h', label: '2 Hours', sec: 2 * 60 * 60 },
-  { id: '4h', label: '4 Hours', sec: 4 * 60 * 60 },
-]
 
 const META_SEP = <span className="text-line-strong mx-0.5">·</span>
 
@@ -115,6 +92,7 @@ export function MarketPage() {
     interval: candleInterval,
   })
 
+  const program = useProgram()
   const addPath = useAddPath()
   const placeBatchWager = usePlaceBatchWager()
 
@@ -132,7 +110,7 @@ export function MarketPage() {
   const [leverage, setLeverage] = useState(22)
   const [collateral, setCollateral] = useState('25.00')
   const [mountTime] = useState(() => Date.now())
-  const [showOtherPositions, setShowOtherPositions] = useState(false)
+  const [showOtherPositions] = useState(false)
 
   // Exit draw mode on unmount so a user navigating away doesn't leave the store in sweeping state.
   useEffect(() => () => exitDrawMode(), [exitDrawMode])
@@ -198,53 +176,81 @@ export function MarketPage() {
   const allPaths = useMemo(() => [...aiPaths, ...userPaths], [aiPaths, userPaths])
 
   const handleConfirmDrawing = async () => {
-    if (drawingState.phase !== 'ready' || !market) return
+    if (drawingState.phase !== 'ready' || !market || !program) return
     const values = drawingState.values
     confirmDrawing()
 
+    // Pre-fetch pathIndex so the pending row has a real index.
+    // useAddPath re-reads this at submit time; the program's init
+    // constraint catches any race and we roll back in the catch below.
+    const [marketPda] = deriveMarketPda(market.marketId)
+    let pathIndex: number
     try {
-      const { sig, pathIndex } = await addPath.mutateAsync({
+      const marketAcc = await program.account.market.fetch(marketPda)
+      pathIndex = marketAcc.numPaths
+    } catch (err) {
+      onTxError((err as Error).message)
+      return
+    }
+
+    const tempId = `user-${Date.now()}`
+    const intervalMs = chartCheckpointInterval * 1000
+    const data: PricePoint[] = values.map((v, i) => ({
+      time: chartMarketStart + i * intervalMs,
+      value: v,
+    }))
+    const pendingPath: PredictionPath = {
+      id: tempId,
+      label: 'Your Path',
+      tone: 'custom',
+      origin: 'user',
+      multiplier: 0,
+      data,
+      pathIndex,
+      predictedPrices: values,
+      numCheckpoints: values.length,
+      initialProbabilityBps: 0,
+      generationTimestamp: Date.now(),
+      creator: '',
+      cumulativeAction: 0,
+      compositeScore: 0,
+      peakAmplitude: 0,
+      amplitudeAtDecoherence: 0,
+      dissolved: false,
+      dissolvedAtCheckpoint: 0,
+      checkpointsProcessed: 0,
+      totalWagered: 0,
+      totalLeveragedExposure: 0,
+      lmsrSharesOutstanding: 0,
+      totalTimeWeightedExposure: 0,
+      currentImpliedProbability: 0,
+      onChainStatus: 'pending',
+    }
+    setUserPaths((prev) => [...prev, pendingPath])
+    setSelectedPathIds((prev) => new Set([...prev, tempId]))
+
+    try {
+      const { sig, pathIndex: confirmedIndex } = await addPath.mutateAsync({
         marketId: market.marketId,
         predictedPrices: values,
         numCheckpoints: values.length,
-      })
-
-      const intervalMs = chartCheckpointInterval * 1000
-      const data: PricePoint[] = values.map((v, i) => ({
-        time: chartMarketStart + i * intervalMs,
-        value: v,
-      }))
-      const userPath: PredictionPath = {
-        id: `user-${Date.now()}`,
-        label: 'Your Path',
-        tone: 'custom',
-        origin: 'user',
-        multiplier: 0,
-        data,
         pathIndex,
-        predictedPrices: values,
-        numCheckpoints: values.length,
-        initialProbabilityBps: 0,
-        generationTimestamp: Date.now(),
-        creator: '',
-        cumulativeAction: 0,
-        compositeScore: 0,
-        peakAmplitude: 0,
-        amplitudeAtDecoherence: 0,
-        dissolved: false,
-        dissolvedAtCheckpoint: 0,
-        checkpointsProcessed: 0,
-        totalWagered: 0,
-        totalLeveragedExposure: 0,
-        lmsrSharesOutstanding: 0,
-        totalTimeWeightedExposure: 0,
-        currentImpliedProbability: 0,
-        onChainStatus: 'confirmed',
-      }
-      setUserPaths((prev) => [...prev, userPath])
-      setSelectedPathIds((prev) => new Set([...prev, userPath.id]))
+      })
+      setUserPaths((prev) =>
+        prev.map((p) =>
+          p.id === tempId
+            ? { ...p, onChainStatus: 'confirmed' as const, pathIndex: confirmedIndex }
+            : p,
+        ),
+      )
       onTxSuccess(sig)
     } catch (err) {
+      setUserPaths((prev) => prev.filter((p) => p.id !== tempId))
+      setSelectedPathIds((prev) => {
+        const next = new Set(prev)
+        next.delete(tempId)
+        return next
+      })
       onTxError((err as Error).message)
     }
   }
@@ -256,7 +262,6 @@ export function MarketPage() {
 
   // Chart highlight: last-added path in the set (most recent click)
   const activePathId = selectedPathIds.size > 0 ? [...selectedPathIds].at(-1)! : null
-  const selectedPath = allPaths.find((p) => p.id === activePathId)
 
   const isPathLong = (p?: PredictionPath) => {
     if (!p) return true
@@ -264,7 +269,6 @@ export function MarketPage() {
     const first = p.data[0]
     return last && first ? last.value >= first.value : true
   }
-  const isLong = isPathLong(selectedPath)
 
   // Delta is only available from the mock layer (not from live Pyth ticks in Phase 1)
   const deltaDisplay = 0
