@@ -211,7 +211,7 @@ export function MarketPage() {
     const [marketPda] = deriveMarketPda(market.marketId)
     let pathIndex: number
     try {
-      const marketAcc = await (program.account as any).market.fetch(marketPda)
+      const marketAcc = await program.account.market.fetch(marketPda)
       pathIndex = marketAcc.numPaths
     } catch (err) {
       onTxError((err as Error).message)

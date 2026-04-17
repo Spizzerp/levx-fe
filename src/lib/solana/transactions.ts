@@ -12,7 +12,7 @@
  */
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { BN } from '@coral-xyz/anchor'
+import { AnchorProvider, BN } from '@coral-xyz/anchor'
 import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress } from '@solana/spl-token'
 import { SystemProgram, Transaction } from '@solana/web3.js'
 
@@ -59,7 +59,7 @@ export function useAddPath() {
       const user = program.provider.publicKey!
       const [marketPda] = deriveMarketPda(marketId)
 
-      const marketAcc = await (program.account as any).market.fetch(marketPda)
+      const marketAcc = await program.account.market.fetch(marketPda)
       const pathIndex: number = marketAcc.numPaths
 
       const [pathOutcomePda] = derivePathPda(marketId, pathIndex)
@@ -72,7 +72,7 @@ export function useAddPath() {
         generationTimestamp: new BN(Math.floor(Date.now() / 1000)),
       }
 
-      const sig = await (program.methods as any)
+      const sig = await program.methods
         .addPath(params)
         .accounts({
           market: marketPda,
@@ -113,8 +113,8 @@ export function usePlaceWager() {
 
       // Fetch on-chain accounts for vault/treasury/insurance addresses
       const [marketAcc, protocolAcc] = await Promise.all([
-        (program.account as any).market.fetch(marketPda),
-        (program.account as any).protocolState.fetch(protocolPda),
+        program.account.market.fetch(marketPda),
+        program.account.protocolState.fetch(protocolPda),
       ])
 
       const vault = marketAcc.vault
@@ -123,7 +123,7 @@ export function usePlaceWager() {
       const insuranceFund = protocolAcc.insuranceFund
       const userTokenAccount = await getAssociatedTokenAddress(quoteMint, user)
 
-      const sig = await (program.methods as any)
+      const sig = await program.methods
         .placeWager(pathIndex, scaledAmount)
         .accounts({
           protocolState: protocolPda,
@@ -172,8 +172,8 @@ export function usePlaceBatchWager() {
       const [marketPda] = deriveMarketPda(marketId)
 
       const [marketAcc, protocolAcc] = await Promise.all([
-        (program.account as any).market.fetch(marketPda),
-        (program.account as any).protocolState.fetch(protocolPda),
+        program.account.market.fetch(marketPda),
+        program.account.protocolState.fetch(protocolPda),
       ])
 
       const vault = marketAcc.vault
@@ -187,7 +187,7 @@ export function usePlaceBatchWager() {
           const [pathPda] = derivePathPda(marketId, pathIndex)
           const [positionPda] = derivePositionPda(marketId, user, pathIndex)
 
-          return (program.methods as any)
+          return program.methods
             .placeWager(pathIndex, scaledAmount)
             .accounts({
               protocolState: protocolPda,
@@ -208,7 +208,7 @@ export function usePlaceBatchWager() {
 
       const finalIxs = await buildTransaction({ instructions: ixs })
       const tx = new Transaction().add(...finalIxs)
-      const sig = await (program.provider as any).sendAndConfirm(tx)
+      const sig = await (program.provider as AnchorProvider).sendAndConfirm(tx)
 
       return sig as string
     },
@@ -238,12 +238,12 @@ export function useExitPosition() {
       const [pathPda] = derivePathPda(marketId, pathIndex)
       const [positionPda] = derivePositionPda(marketId, user, pathIndex)
 
-      const marketAcc = await (program.account as any).market.fetch(marketPda)
+      const marketAcc = await program.account.market.fetch(marketPda)
       const vault = marketAcc.vault
       const quoteMint = marketAcc.quoteMint
       const userTokenAccount = await getAssociatedTokenAddress(quoteMint, user)
 
-      const sig = await (program.methods as any)
+      const sig = await program.methods
         .exitPosition()
         .accounts({
           market: marketPda,
@@ -285,8 +285,8 @@ export function useClaim() {
       const [positionPda] = derivePositionPda(marketId, user, pathIndex)
 
       const [marketAcc, protocolAcc] = await Promise.all([
-        (program.account as any).market.fetch(marketPda),
-        (program.account as any).protocolState.fetch(protocolPda),
+        program.account.market.fetch(marketPda),
+        program.account.protocolState.fetch(protocolPda),
       ])
 
       const vault = marketAcc.vault
@@ -295,7 +295,7 @@ export function useClaim() {
       const insuranceFund = protocolAcc.insuranceFund
       const userTokenAccount = await getAssociatedTokenAddress(quoteMint, user)
 
-      const sig = await (program.methods as any)
+      const sig = await program.methods
         .claim()
         .accounts({
           protocolState: protocolPda,

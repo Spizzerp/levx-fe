@@ -356,7 +356,7 @@ export function AdminPage() {
       const [protocolPda] = deriveProtocolPda()
 
       // Read protocol state to get next market_id
-      const protocolAcc: any = await (program.account as any).protocolState.fetch(protocolPda)
+      const protocolAcc: any = await program.account.protocolState.fetch(protocolPda)
       const nextMarketId = protocolAcc.totalMarketsCreated.toNumber()
       const [marketPda] = deriveMarketPda(nextMarketId)
 
@@ -388,7 +388,7 @@ export function AdminPage() {
         weightDisplacement: new BN(Math.round(0.25 * SCALE)),
       }
 
-      const sig = await (program.methods as any)
+      const sig = await program.methods
         .createMarket(params)
         .accounts({
           protocolState: protocolPda,
