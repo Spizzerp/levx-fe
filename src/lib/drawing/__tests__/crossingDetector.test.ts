@@ -103,6 +103,7 @@ const mockMarket = (overrides: Partial<Market> = {}): Market => ({
   lambda: 0,
   decoherenceRate: 500_000,
   minimumProbability: 10_000,
+  nudgeRate: 50_000,
   pathMaxAge: 3600,
   pathsScored: 0,
   pathsDissolved: 0,
