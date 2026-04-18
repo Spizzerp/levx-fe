@@ -19,6 +19,7 @@
     "test": "vitest",
     "test:run": "vitest run",
     "test:rls": "vitest run --config vitest.rls.config.ts",
+    "test:edge": "cd supabase/functions/verify-wallet && deno test --allow-env --allow-net --no-check --no-lock",
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
