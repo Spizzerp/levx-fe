@@ -1,6 +1,6 @@
 import { serve } from 'std/http/server'
 import { createClient } from 'supabase-js'
-import * as nacl from 'tweetnacl'
+import nacl from 'tweetnacl'
 import bs58 from 'bs58'
 import { create as signJWT, getNumericDate } from 'djwt'
 import { corsHeaders } from './_shared/cors.ts'
@@ -49,7 +49,7 @@ serve(async (req) => {
 
   try {
     if (url.pathname.endsWith('/nonce'))  return await handleNonce()
-    if (url.pathname.endsWith('/verify')) return json({ error: 'not_implemented' }, 501)
+    if (url.pathname.endsWith('/verify')) return await handleVerify(req)
     return json({ error: 'not_found' }, 404)
   } catch (e) {
     console.error(e)
@@ -64,4 +64,52 @@ async function handleNonce(): Promise<Response> {
   const { error } = await admin.from('auth_nonces').insert({ nonce, expires_at: expiresAt })
   if (error) throw error
   return json({ nonce, message: buildMessage(nonce), expiresAt })
+}
+
+async function handleVerify(req: Request): Promise<Response> {
+  const parsed = await req.json().catch(() => null)
+  if (!parsed || typeof parsed !== 'object') return json({ error: 'malformed' }, 400)
+  const { pubkey, nonce, signature } = parsed as Record<string, unknown>
+  if (typeof pubkey !== 'string' || typeof nonce !== 'string' || typeof signature !== 'string') {
+    return json({ error: 'malformed' }, 400)
+  }
+
+  // Atomic consume: single delete returning the row, gated on expires_at.
+  const { data: deleted, error: delErr } = await admin
+    .from('auth_nonces').delete().eq('nonce', nonce)
+    .gt('expires_at', new Date().toISOString())
+    .select('nonce').maybeSingle()
+  if (delErr || !deleted) return json({ error: 'nonce_used_or_expired' }, 400)
+
+  const messageBytes = new TextEncoder().encode(buildMessage(nonce))
+  let sigBytes: Uint8Array
+  let pubkeyBytes: Uint8Array
+  try {
+    sigBytes    = bs58.decode(signature)
+    pubkeyBytes = bs58.decode(pubkey)
+  } catch {
+    return json({ error: 'malformed' }, 400)
+  }
+  if (sigBytes.length !== 64 || pubkeyBytes.length !== 32) {
+    return json({ error: 'malformed' }, 400)
+  }
+
+  const ok = nacl.sign.detached.verify(messageBytes, sigBytes, pubkeyBytes)
+  if (!ok) return json({ error: 'invalid_signature' }, 401)
+
+  const jwt = await signJWT(
+    { alg: 'HS256', typ: 'JWT' },
+    {
+      iss:    'supabase',
+      sub:    pubkey,
+      role:   'authenticated',
+      aud:    'authenticated',
+      wallet: pubkey,
+      iat:    getNumericDate(0),
+      exp:    getNumericDate(JWT_TTL_SECONDS),
+    },
+    await getJwtKey(),
+  )
+  const expiresAt = new Date(Date.now() + JWT_TTL_SECONDS * 1000).toISOString()
+  return json({ jwt, expiresAt })
 }
