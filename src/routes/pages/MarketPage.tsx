@@ -5,6 +5,7 @@ import { Button } from '@/components/Button'
 import { ChartFrame } from '@/components/ChartFrame'
 import { ConnectGate } from '@/components/ConnectGate'
 import { DrawingLayer } from '@/components/DrawingLayer'
+import { MarketComments } from '@/components/MarketComments'
 import { Input } from '@/components/Input'
 import { Label } from '@/components/Label'
 import { LevXChart } from '@/components/LevXChart'
@@ -582,6 +583,11 @@ export function MarketPage() {
       {/* ── Market details (collapsible) — spans full width below chart/rail ── */}
       <div className="[@media(min-width:1181px)]:col-span-full">
         <MarketMetaPanel market={market} />
+      </div>
+
+      {/* ── Comments — spans full width at bottom ── */}
+      <div className="[@media(min-width:1181px)]:col-span-full">
+        <MarketComments marketId={market.id} />
       </div>
     </main>
   )
