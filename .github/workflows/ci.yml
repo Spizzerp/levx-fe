@@ -48,4 +48,8 @@ jobs:
           APP_PROGRAM_ID: LEVXqi1Z2XujBw2jAEP15Dv8LyrDetDR95KZGGQNobV
           APP_SUPABASE_URL: http://127.0.0.1:54321
           APP_SUPABASE_ANON_KEY: ci-test-placeholder
+          # USE_MOCK routes useMarkets/useMarket through src/lib/api/mock.ts
+          # instead of making real RPC calls. Required because CI has no devnet
+          # access and the chain test (chain.test.ts) asserts mock data shape.
+          APP_USE_MOCK: 'true'
         run: pnpm test:run
