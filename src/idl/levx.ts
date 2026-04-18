@@ -5,7 +5,7 @@
  * IDL can be found at `target/idl/levx.json`.
  */
 export type Levx = {
-  "address": "BQ96FzD16VGxord1vPeoYbAibZ1KTvW4oH29XuvqYyte",
+  "address": "LEVXqi1Z2XujBw2jAEP15Dv8LyrDetDR95KZGGQNobV",
   "metadata": {
     "name": "levx",
     "version": "0.1.0",
@@ -240,63 +240,6 @@ export type Levx = {
       "args": []
     },
     {
-      "name": "checkDissolutionBatch",
-      "docs": [
-        "Batch dissolution: process all paths for one checkpoint in a single tx.",
-        "Paths passed via remaining_accounts. Cuts N_paths txs to 1 per checkpoint."
-      ],
-      "discriminator": [
-        231,
-        124,
-        113,
-        235,
-        149,
-        156,
-        69,
-        153
-      ],
-      "accounts": [
-        {
-          "name": "market",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  109,
-                  97,
-                  114,
-                  107,
-                  101,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "market.market_id",
-                "account": "market"
-              }
-            ]
-          }
-        },
-        {
-          "name": "priceSample",
-          "docs": [
-            "The most recent PriceSample for this market."
-          ]
-        },
-        {
-          "name": "keeper",
-          "docs": [
-            "Permissionless keeper"
-          ],
-          "signer": true
-        }
-      ],
-      "args": []
-    },
-    {
       "name": "claim",
       "discriminator": [
         62,
@@ -384,114 +327,6 @@ export type Levx = {
         },
         {
           "name": "user",
-          "signer": true
-        },
-        {
-          "name": "tokenProgram",
-          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "claimFor",
-      "docs": [
-        "Permissionless claim: keeper triggers payout on behalf of a user.",
-        "Tokens go to position owner's ATA, not the caller."
-      ],
-      "discriminator": [
-        245,
-        67,
-        97,
-        44,
-        59,
-        223,
-        144,
-        1
-      ],
-      "accounts": [
-        {
-          "name": "protocolState",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  114,
-                  111,
-                  116,
-                  111,
-                  99,
-                  111,
-                  108
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "market",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  109,
-                  97,
-                  114,
-                  107,
-                  101,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "market.market_id",
-                "account": "market"
-              }
-            ]
-          }
-        },
-        {
-          "name": "pathOutcome"
-        },
-        {
-          "name": "position",
-          "writable": true
-        },
-        {
-          "name": "vault",
-          "writable": true
-        },
-        {
-          "name": "userTokenAccount",
-          "docs": [
-            "The position owner's token account. Keeper provides this but tokens",
-            "go to the position owner, verified by constraint below."
-          ],
-          "writable": true
-        },
-        {
-          "name": "treasury",
-          "docs": [
-            "Treasury — receives settlement rake share"
-          ],
-          "writable": true
-        },
-        {
-          "name": "insuranceFund",
-          "docs": [
-            "Insurance fund — receives settlement rake share"
-          ],
-          "writable": true
-        },
-        {
-          "name": "keeper",
-          "docs": [
-            "Permissionless keeper — NOT the position owner. Pays TX fee only."
-          ],
           "signer": true
         },
         {
@@ -1152,7 +987,8 @@ export type Levx = {
       "name": "sampleAndDissolve",
       "docs": [
         "Combined sample + dissolve: sample oracle checkpoint and process all",
-        "paths' decoherence in one transaction. Paths via remaining_accounts."
+        "paths' decoherence in one transaction. Paths via remaining_accounts.",
+        "This is the primary production sampling path (levx-infra keeper)."
       ],
       "discriminator": [
         247,
@@ -1331,57 +1167,6 @@ export type Levx = {
       ]
     },
     {
-      "name": "scoreAllPaths",
-      "docs": [
-        "Batch scoring: score all surviving paths in one transaction.",
-        "Paths passed via remaining_accounts."
-      ],
-      "discriminator": [
-        159,
-        68,
-        211,
-        242,
-        141,
-        109,
-        42,
-        22
-      ],
-      "accounts": [
-        {
-          "name": "market",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  109,
-                  97,
-                  114,
-                  107,
-                  101,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "market.market_id",
-                "account": "market"
-              }
-            ]
-          }
-        },
-        {
-          "name": "keeper",
-          "docs": [
-            "Permissionless keeper"
-          ],
-          "signer": true
-        }
-      ],
-      "args": []
-    },
-    {
       "name": "scorePath",
       "discriminator": [
         122,
@@ -1426,58 +1211,6 @@ export type Levx = {
           "name": "keeper",
           "docs": [
             "Permissionless keeper"
-          ],
-          "signer": true
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "settleAndFinalize",
-      "docs": [
-        "Combined settle + finalize: settles and, if maturity window is zero or",
-        "already elapsed, finalizes in one transaction. Falls back to Maturing",
-        "if maturity window is still active."
-      ],
-      "discriminator": [
-        136,
-        163,
-        246,
-        28,
-        112,
-        234,
-        250,
-        113
-      ],
-      "accounts": [
-        {
-          "name": "market",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  109,
-                  97,
-                  114,
-                  107,
-                  101,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "market.market_id",
-                "account": "market"
-              }
-            ]
-          }
-        },
-        {
-          "name": "cranker",
-          "docs": [
-            "Permissionless"
           ],
           "signer": true
         }
@@ -1818,246 +1551,206 @@ export type Levx = {
   "errors": [
     {
       "code": 6000,
-      "name": "marketPendingNoWagers",
-      "msg": "Market is in Pending state; wagers are not yet accepted"
-    },
-    {
-      "code": 6001,
-      "name": "marketSettlingRejected",
-      "msg": "Market is in Settling state; no new wagers or exits accepted"
-    },
-    {
-      "code": 6002,
-      "name": "marketMaturingRejected",
-      "msg": "Market is in Maturing state; claims not yet available (verification window active)"
-    },
-    {
-      "code": 6003,
-      "name": "marketSettledRejected",
-      "msg": "Market has been settled; no further actions except claim"
-    },
-    {
-      "code": 6004,
-      "name": "marketVoidedRejected",
-      "msg": "Market has been voided; use claim to recover collateral"
-    },
-    {
-      "code": 6005,
       "name": "insufficientPaths",
       "msg": "Market activation rejected; fewer than 3 paths registered"
     },
     {
-      "code": 6006,
+      "code": 6001,
       "name": "marketNotStarted",
       "msg": "Market activation rejected; start_time has not been reached"
     },
     {
-      "code": 6007,
+      "code": 6002,
       "name": "pathFreshnessExpired",
       "msg": "Market activation rejected; AI path exceeds freshness window"
     },
     {
-      "code": 6008,
+      "code": 6003,
       "name": "maxPathsReached",
       "msg": "Maximum number of paths (16) reached"
     },
     {
-      "code": 6009,
+      "code": 6004,
       "name": "invalidMarketState",
       "msg": "Market is not in the expected state for this operation"
     },
     {
-      "code": 6010,
+      "code": 6005,
       "name": "alreadyClaimed",
       "msg": "Position has already been claimed"
     },
     {
-      "code": 6011,
+      "code": 6006,
       "name": "pathDissolved",
       "msg": "Cannot wager on dissolved path"
     },
     {
-      "code": 6012,
+      "code": 6007,
       "name": "unauthorized",
       "msg": "Unauthorized signer for this operation"
     },
     {
-      "code": 6013,
+      "code": 6008,
       "name": "checkpointMismatch",
       "msg": "Checkpoint count mismatch"
     },
     {
-      "code": 6014,
+      "code": 6009,
       "name": "wagersNotAccepted",
       "msg": "Market is not accepting wagers in current state"
     },
     {
-      "code": 6015,
+      "code": 6010,
       "name": "wagerTooSmall",
       "msg": "Wager amount too small or yields zero shares"
     },
     {
-      "code": 6016,
+      "code": 6011,
       "name": "checkpointNotDue",
       "msg": "Checkpoint not yet due"
     },
     {
-      "code": 6017,
+      "code": 6012,
       "name": "checkpointAlreadySampled",
       "msg": "Checkpoint already sampled"
     },
     {
-      "code": 6018,
+      "code": 6013,
       "name": "oracleConfidenceTooLow",
       "msg": "Oracle confidence too low or price invalid"
     },
     {
-      "code": 6019,
-      "name": "tooManySkippedCheckpoints",
-      "msg": "Too many checkpoints skipped; market should be voided"
-    },
-    {
-      "code": 6020,
+      "code": 6014,
       "name": "tradingCutoffReached",
       "msg": "Trading window closed; market has passed 75% of checkpoints"
     },
     {
-      "code": 6021,
+      "code": 6015,
       "name": "pathAlreadyDissolved",
       "msg": "Path has already been dissolved"
     },
     {
-      "code": 6022,
+      "code": 6016,
       "name": "quantumStateCollapsed",
       "msg": "All path amplitudes collapsed to zero"
     },
     {
-      "code": 6023,
+      "code": 6017,
       "name": "eigenNonConvergence",
       "msg": "Eigendecomposition did not converge within iteration limit"
     },
     {
-      "code": 6024,
+      "code": 6018,
       "name": "eigenVerificationFailed",
       "msg": "Eigendecomposition verification failed: reconstruction error exceeds tolerance"
     },
     {
-      "code": 6025,
+      "code": 6019,
       "name": "lambdaExceedsMax",
       "msg": "Lambda exceeds maximum allowed coupling strength"
     },
     {
-      "code": 6026,
+      "code": 6020,
       "name": "nudgeRateExceedsMax",
       "msg": "Nudge rate exceeds maximum (500_000 = 50%)"
     },
     {
-      "code": 6027,
+      "code": 6021,
       "name": "settlementIncomplete",
       "msg": "Settlement not complete; not all paths scored"
     },
     {
-      "code": 6028,
+      "code": 6022,
       "name": "marketNotSettled",
       "msg": "Market not in Settled or Void state; cannot claim"
     },
     {
-      "code": 6029,
+      "code": 6023,
       "name": "noSurvivingPaths",
       "msg": "No surviving paths to settle"
     },
     {
-      "code": 6030,
+      "code": 6024,
       "name": "invalidScoringWeights",
       "msg": "Invalid scoring weights; must sum to 10000"
     },
     {
-      "code": 6031,
+      "code": 6025,
       "name": "invalidPathIndex",
       "msg": "Invalid path index"
     },
     {
-      "code": 6032,
+      "code": 6026,
       "name": "maturityNotElapsed",
       "msg": "Maturity window has not elapsed; cannot finalize"
     },
     {
-      "code": 6033,
+      "code": 6027,
       "name": "marketDisputed",
       "msg": "Market is disputed; paused for governance review"
     },
     {
-      "code": 6034,
+      "code": 6028,
       "name": "mathOverflow",
       "msg": "Arithmetic overflow"
     },
     {
-      "code": 6035,
-      "name": "divisionByZero",
-      "msg": "Division by zero"
-    },
-    {
-      "code": 6036,
-      "name": "invalidFee",
-      "msg": "Invalid fee configuration"
-    },
-    {
-      "code": 6037,
+      "code": 6029,
       "name": "feeExceedsCap",
       "msg": "Fee exceeds maximum cap (5%)"
     },
     {
-      "code": 6038,
+      "code": 6030,
       "name": "leverageNotEnabled",
       "msg": "Leverage is not enabled for this market"
     },
     {
-      "code": 6039,
+      "code": 6031,
       "name": "leverageExceedsMaximum",
       "msg": "Leverage exceeds maximum for this market's timeframe"
     },
     {
-      "code": 6040,
+      "code": 6032,
       "name": "vaultInsufficientCapacity",
       "msg": "Insufficient vault capacity for this leveraged position"
     },
     {
-      "code": 6041,
+      "code": 6033,
       "name": "vaultUtilizationExceeded",
       "msg": "Vault utilization would exceed maximum after this borrow"
     },
     {
-      "code": 6042,
+      "code": 6034,
       "name": "leveragedOiCapExceeded",
       "msg": "Market leveraged open interest cap would be exceeded"
     },
     {
-      "code": 6043,
+      "code": 6035,
       "name": "positionUnderwater",
       "msg": "Position health factor below liquidation threshold"
     },
     {
-      "code": 6044,
+      "code": 6036,
       "name": "positionHealthy",
       "msg": "Position health factor is above liquidation threshold; cannot liquidate"
     },
     {
-      "code": 6045,
+      "code": 6037,
       "name": "unauthorizedBackstopLiquidator",
       "msg": "Caller is not the configured backstop liquidator"
     },
     {
-      "code": 6046,
+      "code": 6038,
       "name": "backstopLiquidatorDisabled",
       "msg": "Backstop liquidator is disabled"
     },
     {
-      "code": 6047,
+      "code": 6039,
       "name": "backstopGracePeriodActive",
       "msg": "Backstop grace period has not elapsed; regular keepers have priority"
     },
     {
-      "code": 6048,
+      "code": 6040,
       "name": "bucketGuardCooldown",
       "msg": "Operation rate-limited; cooldown period has not elapsed"
     }
@@ -2194,6 +1887,18 @@ export type Levx = {
               "0 = disabled. Per-checkpoint zero-sum quantity adjustment from oracle data."
             ],
             "type": "u64"
+          },
+          {
+            "name": "lmsrAlpha",
+            "docs": [
+              "LS-LMSR alpha (fixed-point 6 dec). `None` falls back to 50_000 (0.05).",
+              "Larger values prevent q/b saturation in the softmax at the cost of",
+              "flatter initial pricing — useful for tests or markets that expect",
+              "large sequential wagers without submitting eigendecomp between them."
+            ],
+            "type": {
+              "option": "u64"
+            }
           }
         ]
       }
@@ -2253,14 +1958,6 @@ export type Levx = {
               "Matches market.eigendecomp_version when fresh."
             ],
             "type": "u64"
-          },
-          {
-            "name": "needsRefresh",
-            "docs": [
-              "Set when a large trade exceeds perturbation safety threshold.",
-              "Keeper checks this flag and resubmits full eigendecomp when set."
-            ],
-            "type": "bool"
           },
           {
             "name": "cachedPrices",
@@ -2903,10 +2600,6 @@ export type Levx = {
             "type": "u64"
           },
           {
-            "name": "initialProbabilityBps",
-            "type": "u16"
-          },
-          {
             "name": "currentImpliedProbability",
             "type": "u16"
           },
@@ -3110,18 +2803,11 @@ export type Levx = {
             "type": "u64"
           },
           {
-            "name": "pythVerified",
-            "docs": [
-              "True — price was verified via Pyth Receiver Program (account owner check).",
-              "The raw Pyth signature is verified upstream by the Pyth receiver; we don't",
-              "store it on-chain (saves 64 bytes per checkpoint)."
-            ],
-            "type": "bool"
-          },
-          {
             "name": "sampledBy",
             "docs": [
-              "Keeper address (for reward distribution)"
+              "Keeper address (for reward distribution). Pyth verification is enforced",
+              "upstream by the Pyth Receiver program's account owner constraint — no",
+              "per-sample flag stored on-chain."
             ],
             "type": "pubkey"
           },

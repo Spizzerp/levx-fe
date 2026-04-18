@@ -215,7 +215,6 @@ export function MarketPage() {
       pathIndex,
       predictedPrices: values,
       numCheckpoints: values.length,
-      initialProbabilityBps: 0,
       generationTimestamp: Date.now(),
       creator: '',
       cumulativeAction: 0,

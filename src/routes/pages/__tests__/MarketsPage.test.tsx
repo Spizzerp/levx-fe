@@ -88,7 +88,6 @@ function makeMarketsAcrossStates(): Market[] {
           checkpointsRoot: '',
           checkpointsUri: '',
           numCheckpoints: 0,
-          initialProbabilityBps: 0,
           generationTimestamp: 0,
           creator: '',
           cumulativeAction: 0,
