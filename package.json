@@ -18,6 +18,9 @@
     "types": "tsc -b",
     "test": "vitest",
     "test:run": "vitest run",
+    "test:rls": "vitest run --config vitest.rls.config.ts",
+    "test:edge": "cd supabase/functions/verify-wallet && deno test --allow-env --allow-net --no-check --no-lock",
+    "test:all": "pnpm test:run && pnpm test:rls && pnpm test:edge",
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
@@ -29,6 +32,7 @@
     "@solana/wallet-adapter-react-ui": "0.9.39",
     "@solana/wallet-adapter-wallets": "^0.19.38",
     "@solana/web3.js": "^1.98.4",
+    "@supabase/supabase-js": "^2.103.3",
     "@tanstack/react-query": "^5.90.21",
     "@tanstack/react-router": "^1.157.16",
     "@visx/axis": "^3.12.0",
@@ -39,6 +43,7 @@
     "@visx/scale": "^3.12.0",
     "@visx/shape": "^3.12.0",
     "@visx/text": "^3.12.0",
+    "bs58": "^6.0.0",
     "buffer": "^6.0.3",
     "clsx": "^2.1.1",
     "d3-array": "^3.2.4",
@@ -67,6 +72,7 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.4.0",
+    "jose": "^6.2.2",
     "jsdom": "^26.1.0",
     "prettier": "^3.8.2",
     "prettier-plugin-tailwindcss": "^0.7.2",

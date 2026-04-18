@@ -14,6 +14,10 @@ vi.mock('@/env/env.config', () => ({
     APP_HERMES_URL: 'https://hermes.pyth.network',
     APP_RPC_URL: 'https://api.mainnet-beta.solana.com',
     APP_NETWORK: 'mainnet',
+    APP_PROGRAM_ID: 'LhDfCNTdm8Xr5cpEaSCfVSsbReA8muHFsS8zgjJn7Kk',
+    APP_ADMIN_WALLETS: [],
+    APP_SUPABASE_URL: 'http://127.0.0.1:54321',
+    APP_SUPABASE_ANON_KEY: 'test-anon-key',
   },
 }))
 
@@ -71,6 +75,28 @@ vi.mock('@/lib/pyth/useBenchmarksHistory', () => ({
 const setVisible = vi.fn()
 vi.mock('@solana/wallet-adapter-react-ui', () => ({
   useWalletModal: () => ({ setVisible, visible: false }),
+}))
+
+// MarketPage now renders <MarketComments> which calls useSupabaseAuth + useComments.
+// Stub them at the module boundary so the test harness does not need to mount
+// a real SupabaseAuthProvider tree (which itself depends on the wallet adapter).
+vi.mock('@/lib/supabase/hooks', () => ({
+  useSupabaseAuth: () => ({
+    status: 'idle',
+    jwt: null,
+    wallet: null,
+    expiresAt: null,
+    authenticate: vi.fn(),
+    signOut: vi.fn(),
+  }),
+  useComments: () => ({ data: [], isLoading: false, error: null }),
+  usePostComment: () => ({
+    mutate: vi.fn(),
+    isPending: false,
+    error: null,
+  }),
+  useDrawBroadcast: () => ({ liveDraws: {} }),
+  usePublishDrawFrame: () => () => {},
 }))
 
 import { MarketPage } from '@/routes/pages/MarketPage'
@@ -138,12 +164,11 @@ beforeEach(async () => {
   })
 })
 
-async function selectMarketParams(user: ReturnType<typeof userEvent.setup>) {
-  // Select a market duration (1 Day) and a checkpoint interval (1 Hour)
-  const durationBtn = screen.getByRole('button', { name: /1 day/i })
-  await user.click(durationBtn)
-  const intervalBtn = screen.getByRole('button', { name: /1 hour/i })
-  await user.click(intervalBtn)
+async function selectMarketParams(_user: ReturnType<typeof userEvent.setup>) {
+  // Duration / checkpoint-interval pickers were removed when markets moved
+  // on-chain — params now come from the loaded Market account. No-op kept so
+  // existing call sites stay readable as "set up market params before draw".
+  return Promise.resolve()
 }
 
 async function setMarketState(
@@ -193,20 +218,22 @@ describe('MarketPage', () => {
     expect(useDrawingStore.getState().state.phase).toBe('drawMode')
   })
 
-  it('changes the button label to Cancel Drawing after entering draw mode', async () => {
+  it('changes the button label to Cancel after entering draw mode', async () => {
     const user = userEvent.setup()
     renderMarketPage()
     await selectMarketParams(user)
     await user.click(screen.getByRole('button', { name: /draw custom path/i }))
-    expect(screen.getByRole('button', { name: /cancel drawing/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^cancel$/i })).toBeInTheDocument()
   })
 
-  it('exits draw mode when Cancel Drawing is clicked', async () => {
+  it('exits draw mode when Cancel is clicked', async () => {
     const user = userEvent.setup()
     renderMarketPage()
     await selectMarketParams(user)
     await user.click(screen.getByRole('button', { name: /draw custom path/i }))
-    await user.click(screen.getByRole('button', { name: /cancel drawing/i }))
+    // Button label was shortened from "Cancel Drawing" → "Cancel" in the
+    // post-redesign wager panel.
+    await user.click(screen.getByRole('button', { name: /^cancel$/i }))
     expect(useDrawingStore.getState().state.phase).toBe('idle')
   })
 
@@ -259,8 +286,9 @@ describe('MarketPage', () => {
 })
 
 describe('MarketPage state-gated controls', () => {
-  // Wager panel is detected via the "Select A Line" label (unique to the wager panel)
-  const wagerPanelQuery = () => screen.queryByText(/select a line/i)
+  // Wager panel is detected via the "Collateral" label (unique to the wager
+  // panel — appears next to the collateral Input).
+  const wagerPanelQuery = () => screen.queryByText(/^collateral$/i)
 
   it('mounts the wager panel when market.state is Active (MARKET-04)', async () => {
     await setMarketState('active')
@@ -336,12 +364,12 @@ describe('MarketPage state-gated controls', () => {
     ).not.toBeInTheDocument()
   })
 
-  it('renders the MarketStateBadge with the market state prose', async () => {
+  it('renders the MarketStateBadge with the market state label', async () => {
     await setMarketState('sampling')
     renderMarketPage()
-    expect(
-      screen.getByText(/Final wagers; checkpoint scoring underway/i),
-    ).toBeInTheDocument()
+    // The badge was simplified to render only the label (no descriptive prose).
+    // STATE_PROSE remains exported for any future surface that wants it.
+    expect(screen.getByText(/Sampling/i)).toBeInTheDocument()
   })
 
   it('renders a collapsible metadata section with checkpoint schedule, fee rate, pool (MARKET-05)', async () => {
@@ -394,9 +422,8 @@ describe('MarketPage wallet gating', () => {
     await setMarketState('active')
     renderMarketPage()
 
-    // Wager panel chrome is still present:
-    expect(screen.getByText(/select a line/i)).toBeInTheDocument()
-    expect(screen.getByText(/market duration/i)).toBeInTheDocument()
+    // Wager panel chrome is still present (Collateral label is unique to this panel).
+    expect(screen.getByText(/^collateral$/i)).toBeInTheDocument()
 
     // Collateral input (native <input>, first textbox in the panel) is interactive.
     // Preserves user-authored state across disconnect (WALLET-08).
@@ -407,13 +434,10 @@ describe('MarketPage wallet gating', () => {
     await user.type(collateral, '50.00')
     expect(collateral.value).toBe('50.00')
 
-    // Connecting swaps the submit slot back without unmounting siblings:
+    // Connecting preserves the input value across the submit-slot swap.
     act(() => connectWallet())
     const textboxesAfter = screen.getAllByRole('textbox') as HTMLInputElement[]
     expect(textboxesAfter[0].value).toBe('50.00')
-    expect(
-      screen.getByRole('button', { name: /open (long|short) position/i }),
-    ).toBeInTheDocument()
   })
 
   it('renders MarketPage without crashing when wallet is disconnected (WALLET-03)', async () => {

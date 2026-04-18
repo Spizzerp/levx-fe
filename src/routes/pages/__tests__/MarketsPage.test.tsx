@@ -198,14 +198,13 @@ describe('MarketsPage', () => {
   )
 
   it(
-    'renders existing columns (idx, pair, state, ends, pool) plus the new paths column (MARKET-01)',
+    'renders the canonical column set (market, state, expires, pool, paths) (MARKET-01)',
     async () => {
       await setUseMarkets({ data: makeMarketsAcrossStates() })
       renderPage()
-      expect(screen.getByText(/^idx$/i)).toBeInTheDocument()
-      expect(screen.getByText(/^pair$/i)).toBeInTheDocument()
+      expect(screen.getByText(/^market$/i)).toBeInTheDocument()
       expect(screen.getByText(/^state$/i)).toBeInTheDocument()
-      expect(screen.getByText(/^ends$/i)).toBeInTheDocument()
+      expect(screen.getByText(/^expires$/i)).toBeInTheDocument()
       expect(screen.getByText(/^pool$/i)).toBeInTheDocument()
       expect(screen.getByText(/^paths$/i)).toBeInTheDocument()
     },

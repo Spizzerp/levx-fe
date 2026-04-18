@@ -30,9 +30,15 @@ describe('buildAiPathFixture', () => {
     expect(tones).toEqual(['ultra-bull', 'bull', 'neutral', 'bear', 'ultra-bear'])
   })
 
-  it('paths are labeled A..E', () => {
+  it('paths are labeled with the model-provider names', () => {
     const labels = buildAiPathFixture(args).map((p) => p.label)
-    expect(labels).toEqual(['Path A', 'Path B', 'Path C', 'Path D', 'Path E'])
+    expect(labels).toEqual([
+      'Chronos-2 Path',
+      'TimesFM Path',
+      'GJR-GARCH Path',
+      'Merton JD Path',
+      'Monte Carlo Path',
+    ])
   })
 
   it('is deterministic — same args produce identical output', () => {

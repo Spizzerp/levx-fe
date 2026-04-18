@@ -1,4 +1,9 @@
 import '@testing-library/jest-dom/vitest'
+import { vi } from 'vitest'
+
+// Mock @supabase/supabase-js for FE unit/hook tests so they never hit a real
+// network. RLS tests live in supabase/tests/ and use the real client there.
+vi.mock('@supabase/supabase-js', () => import('@/lib/supabase/__mocks__/supabase-js'))
 
 // Mock ResizeObserver — required by @visx/responsive ParentSize in jsdom
 ;(globalThis as unknown as Record<string, unknown>).ResizeObserver = class ResizeObserver {

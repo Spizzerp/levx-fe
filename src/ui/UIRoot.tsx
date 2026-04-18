@@ -5,6 +5,7 @@ import { SolflareWalletAdapter } from '@solana/wallet-adapter-wallets'
 import { clusterApiUrl } from '@solana/web3.js'
 import { env, toSolanaCluster } from '@/env'
 import { AnchorProgramProvider } from '@/lib/chain'
+import { SupabaseAuthProvider } from '@/lib/supabase/provider'
 import { WalletSync } from '@/stores/walletStore'
 import '@/style/wallet.css'
 
@@ -24,7 +25,9 @@ export function UIRoot({ children }: PropsWithChildren) {
         <WalletModalProvider>
           <AnchorProgramProvider>
             <WalletSync />
-            {children}
+            <SupabaseAuthProvider>
+              {children}
+            </SupabaseAuthProvider>
           </AnchorProgramProvider>
         </WalletModalProvider>
       </WalletProvider>
