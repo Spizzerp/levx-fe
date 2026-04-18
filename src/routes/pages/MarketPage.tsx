@@ -391,6 +391,7 @@ export function MarketPage() {
                 margin={margin}
                 checkpointXs={checkpointXs}
                 marketStart={marketStart}
+                marketId={market.id}
               />
             )}
           />
