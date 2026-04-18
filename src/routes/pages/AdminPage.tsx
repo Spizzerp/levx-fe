@@ -125,7 +125,6 @@ function buildPreviewPaths(
       pathIndex: idx,
       predictedPrices: data.map((d) => d.value),
       numCheckpoints: totalCheckpoints,
-      initialProbabilityBps: Math.round(10_000 / count),
       generationTimestamp: startTime,
       creator: '',
       cumulativeAction: 0,
