@@ -1,0 +1,39 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Hard gate — `pnpm build` is `pnpm types && vite build`, so types failing
+      # silently broke the production build for ~4 days before this gate landed.
+      - name: Typecheck
+        run: pnpm types
+
+      # Soft gate — 6 pre-existing lint problems on `main` (5 errors + 1 warning,
+      # all unrelated to the typecheck cleanup that introduced this workflow).
+      # TODO: flip to a hard gate after a follow-up `chore/lint-cleanup` PR.
+      - name: Lint
+        run: pnpm lint
+        continue-on-error: true
+
+      - name: Unit tests
+        run: pnpm test:run
