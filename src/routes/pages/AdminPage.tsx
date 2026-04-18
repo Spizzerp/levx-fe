@@ -137,6 +137,7 @@ function buildPreviewPaths(
       totalWagered: 0,
       totalLeveragedExposure: 0,
       lmsrSharesOutstanding: 0,
+      totalTimeWeightedExposure: 0,
       currentImpliedProbability: Math.round(10_000 / count),
     }
   })
@@ -315,8 +316,9 @@ export function AdminPage() {
   // Use benchmarks as history; fallback to empty
   const chartHistory = useMemo(() => benchmarks ?? [], [benchmarks])
 
-  // Derive base price from latest tick or last benchmark candle
-  const basePrice = latestTick?.price ?? chartHistory[chartHistory.length - 1]?.value ?? 0
+  // Derive base price from latest tick or last benchmark candle.
+  // PythTick exposes the price as `value` (not `price`) — see src/lib/pyth/types.ts.
+  const basePrice = latestTick?.value ?? chartHistory[chartHistory.length - 1]?.value ?? 0
 
   // Build preview AI paths (stable seed from pair index so they don't flicker)
   const previewPaths = useMemo(
@@ -329,12 +331,18 @@ export function AdminPage() {
 
   if (!isAdmin) {
     return (
-      <PageLayout title="Admin" subtitle="Connect an admin wallet to access this page." />
+      <PageLayout title="Admin" subtitle="Connect an admin wallet to access this page.">
+        {null}
+      </PageLayout>
     )
   }
 
   async function handleCreateMarket() {
     if (!program || !publicKey) return
+    if (!feedId) {
+      toast.error('No Pyth feed configured for this pair')
+      return
+    }
     setIsPending(true)
 
     try {
@@ -375,7 +383,7 @@ export function AdminPage() {
 
       const ix = await program.methods
         .createMarket(params)
-        .accounts({
+        .accountsPartial({
           protocolState: protocolPda,
           market: marketPda,
           vault: vaultKeypair.publicKey,

@@ -1,0 +1,55 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Reads pnpm version from package.json's `packageManager` field.
+      # Do NOT pass `version:` here — pnpm/action-setup@v4 errors out if a
+      # version is specified in both places (ERR_PNPM_BAD_PM_VERSION).
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Hard gate — `pnpm build` is `pnpm types && vite build`, so types failing
+      # silently broke the production build for ~4 days before this gate landed.
+      - name: Typecheck
+        run: pnpm types
+
+      # Soft gate — 6 pre-existing lint problems on `main` (5 errors + 1 warning,
+      # all unrelated to the typecheck cleanup that introduced this workflow).
+      # TODO: flip to a hard gate after a follow-up `chore/lint-cleanup` PR.
+      - name: Lint
+        run: pnpm lint
+        continue-on-error: true
+
+      # Test-only env. Tests that touch real chain/RPC/Supabase mock at the
+      # module boundary (vi.mock); these placeholders just satisfy requireEnv()
+      # at module-load time. APP_PROGRAM_ID must be a valid base58 PublicKey
+      # because pda.ts constructs `new PublicKey(env.APP_PROGRAM_ID)` at import.
+      - name: Unit tests
+        env:
+          APP_HERMES_URL: https://hermes.pyth.network
+          APP_RPC_URL: https://api.devnet.solana.com
+          APP_NETWORK: devnet
+          APP_PROGRAM_ID: LEVXqi1Z2XujBw2jAEP15Dv8LyrDetDR95KZGGQNobV
+          APP_SUPABASE_URL: http://127.0.0.1:54321
+          APP_SUPABASE_ANON_KEY: ci-test-placeholder
+          # USE_MOCK routes useMarkets/useMarket through src/lib/api/mock.ts
+          # instead of making real RPC calls. Required because CI has no devnet
+          # access and the chain test (chain.test.ts) asserts mock data shape.
+          APP_USE_MOCK: 'true'
+        run: pnpm test:run
