@@ -101,4 +101,47 @@ describe('useSupabaseAuth', () => {
     await waitFor(() => expect(result.current.status).toBe('idle'))
     expect(localStorage.getItem('levx_jwt:' + PUBKEY_A)).toBeNull()
   })
+
+  it('in-flight guard: parallel authenticate() calls only fire one nonce request', async () => {
+    // Edge Function nonce response — held until we resolve `release` below
+    // so we can simulate a second authenticate() landing while the first is
+    // still mid-flight (the strict-mode double-fire scenario).
+    let releaseFirst: () => void = () => {}
+    const firstNonce = new Promise<Response>((resolve) => {
+      releaseFirst = () => resolve({
+        ok: true,
+        json: async () => ({
+          nonce: 'n1', message: 'sign', expiresAt: new Date(Date.now() + 60_000).toISOString(),
+        }),
+      } as unknown as Response)
+    })
+    ;(fetch as unknown as ReturnType<typeof vi.fn>)
+      .mockReturnValueOnce(firstNonce)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ jwt: 'fresh.jwt', expiresAt: new Date(Date.now() + 86400_000).toISOString() }),
+      })
+
+    const sign = vi.fn(okSign)
+    const { result } = renderHook(() => useSupabaseAuth(), { wrapper: makeWrapper(sign) })
+    act(() => setConnectedWallet(PUBKEY_A))
+    // First authenticate() (auto-fired by the connect effect) is now waiting on `firstNonce`.
+    // A second call must be a no-op (in-flight guard).
+    await act(async () => {
+      void result.current.authenticate()
+      void result.current.authenticate()
+      void result.current.authenticate()
+    })
+    // Now release the held nonce so the original flow completes.
+    await act(async () => {
+      releaseFirst()
+      await Promise.resolve()
+    })
+    await waitFor(() => expect(result.current.status).toBe('authenticated'))
+    // The user should have been prompted to sign exactly once, not 4 times.
+    expect(sign).toHaveBeenCalledTimes(1)
+    // Total fetch calls: 1 nonce + 1 verify = 2. Without the guard, the parallel
+    // calls would have queued additional nonce requests.
+    expect((fetch as unknown as ReturnType<typeof vi.fn>).mock.calls.length).toBe(2)
+  })
 })

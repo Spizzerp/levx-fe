@@ -33,6 +33,12 @@ export function SupabaseAuthProvider({ children, signMessage: signOverride }: Pr
   const [status, setStatus] = useState<AuthStatus>('idle')
   const [record, setRecord] = useState<JWTRecord | null>(null)
   const prevWalletRef = useRef<string | null>(null)
+  // In-flight guard. React 18 strict mode runs mount effects twice in dev,
+  // and any consumer-triggered re-call of `authenticate()` could overlap with
+  // an already-running flow. Without this guard, both invocations would
+  // request a nonce + open a wallet sign popup, burning two nonces and
+  // surfacing two prompts to the user.
+  const authInFlightRef = useRef(false)
 
   const wallet = publicKey?.toBase58() ?? null
 
@@ -44,6 +50,8 @@ export function SupabaseAuthProvider({ children, signMessage: signOverride }: Pr
 
   const authenticate = useCallback(async () => {
     if (!wallet) return
+    if (authInFlightRef.current) return
+    authInFlightRef.current = true
     setStatus('pending')
     try {
       const { nonce, message } = await requestNonce()
@@ -57,6 +65,8 @@ export function SupabaseAuthProvider({ children, signMessage: signOverride }: Pr
     } catch (e) {
       console.error('[supabase auth]', e)
       setStatus('error')
+    } finally {
+      authInFlightRef.current = false
     }
   }, [wallet, signMessage])
 

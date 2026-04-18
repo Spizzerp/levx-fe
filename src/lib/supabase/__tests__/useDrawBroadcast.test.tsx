@@ -56,4 +56,19 @@ describe('usePublishDrawFrame', () => {
     act(() => { vi.advanceTimersByTime(120) })
     expect(mockSend).toHaveBeenCalledTimes(2)
   })
+
+  it('cancels the trailing-edge timer on unmount (no stray send fires)', () => {
+    const { result, unmount } = renderHook(() => usePublishDrawFrame('btc', 'A'))
+    // Burst inside one throttle window: leading send fires, trailing one is queued.
+    act(() => {
+      result.current({ wallet: 'A', points: [{ time: 1, value: 1 }], timestamp: 1 })
+      result.current({ wallet: 'A', points: [{ time: 2, value: 2 }], timestamp: 2 })
+    })
+    expect(mockSend).toHaveBeenCalledTimes(1)
+    // Unmount before the throttle window closes.
+    unmount()
+    // Advance past the throttle window — the queued trailing send must be cancelled.
+    act(() => { vi.advanceTimersByTime(500) })
+    expect(mockSend).toHaveBeenCalledTimes(1)
+  })
 })

@@ -29,8 +29,8 @@ describe('channels ref-counting', () => {
     const a = acquireChannel(s, 'comments:1', { config: {} })
     const b = acquireChannel(s, 'comments:1', { config: {} })
     const c = acquireChannel(s, 'comments:1', { config: {} })
-    expect(a).toBe(b)
-    expect(b).toBe(c)
+    expect(a.channel).toBe(b.channel)
+    expect(b.channel).toBe(c.channel)
     expect(Object.keys(fakeChannels).length).toBe(1)
   })
 
@@ -56,6 +56,26 @@ describe('channels ref-counting', () => {
     const s = fakeSupabase()
     const a = acquireChannel(s, 'comments:1', { config: {} })
     const b = acquireChannel(s, 'comments:2', { config: {} })
-    expect(a).not.toBe(b)
+    expect(a.channel).not.toBe(b.channel)
+  })
+
+  it('exposes isFirstAcquire — true on creation, false on subsequent acquires', () => {
+    const s = fakeSupabase()
+    const a = acquireChannel(s, 'comments:1', { config: {} })
+    const b = acquireChannel(s, 'comments:1', { config: {} })
+    const c = acquireChannel(s, 'comments:1', { config: {} })
+    expect(a.isFirstAcquire).toBe(true)
+    expect(b.isFirstAcquire).toBe(false)
+    expect(c.isFirstAcquire).toBe(false)
+  })
+
+  it('isFirstAcquire resets to true after final release + re-acquire', () => {
+    const s = fakeSupabase()
+    const first = acquireChannel(s, 'comments:1', { config: {} })
+    expect(first.isFirstAcquire).toBe(true)
+    releaseChannel(s, 'comments:1')
+    const fresh = acquireChannel(s, 'comments:1', { config: {} })
+    expect(fresh.isFirstAcquire).toBe(true)
+    expect(fresh.channel).not.toBe(first.channel)
   })
 })
