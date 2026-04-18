@@ -36,5 +36,16 @@ jobs:
         run: pnpm lint
         continue-on-error: true
 
+      # Test-only env. Tests that touch real chain/RPC/Supabase mock at the
+      # module boundary (vi.mock); these placeholders just satisfy requireEnv()
+      # at module-load time. APP_PROGRAM_ID must be a valid base58 PublicKey
+      # because pda.ts constructs `new PublicKey(env.APP_PROGRAM_ID)` at import.
       - name: Unit tests
+        env:
+          APP_HERMES_URL: https://hermes.pyth.network
+          APP_RPC_URL: https://api.devnet.solana.com
+          APP_NETWORK: devnet
+          APP_PROGRAM_ID: LEVXqi1Z2XujBw2jAEP15Dv8LyrDetDR95KZGGQNobV
+          APP_SUPABASE_URL: http://127.0.0.1:54321
+          APP_SUPABASE_ANON_KEY: ci-test-placeholder
         run: pnpm test:run
