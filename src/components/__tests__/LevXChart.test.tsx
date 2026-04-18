@@ -11,6 +11,10 @@ vi.mock('@/env/env.config', () => ({
     APP_HERMES_URL: 'https://hermes.pyth.network',
     APP_RPC_URL: 'https://api.mainnet-beta.solana.com',
     APP_NETWORK: 'mainnet',
+    APP_PROGRAM_ID: 'LhDfCNTdm8Xr5cpEaSCfVSsbReA8muHFsS8zgjJn7Kk',
+    APP_ADMIN_WALLETS: [],
+    APP_SUPABASE_URL: 'http://127.0.0.1:54321',
+    APP_SUPABASE_ANON_KEY: 'test-anon-key',
   },
 }))
 
@@ -81,9 +85,10 @@ describe('LevXChart', () => {
 
   it('renders selected path at full opacity (selected overlay exists)', () => {
     const { container } = renderChart()
-    // The selected overlay is a separate LinePath with stroke="#FFFFFF"
-    const whiteStroke = container.querySelector('svg path[stroke="#FFFFFF"]')
-    expect(whiteStroke).toBeInTheDocument()
+    // The selected overlay uses the theme-aware --chart-line CSS variable
+    // (component uses `stroke={C.line}` where C.line = 'var(--chart-line, #FFFFFF)').
+    const selectedOverlay = container.querySelector('svg path[stroke*="chart-line"]')
+    expect(selectedOverlay).toBeInTheDocument()
   })
 
   it('renders distinct loading state', () => {

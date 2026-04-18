@@ -230,8 +230,9 @@ describe('WalletSync', () => {
     expect(s.cluster).toBeNull()
   })
 
-  it('does not write stale state when the component unmounts mid genesis-hash fetch', async () => {
-    // Deferred promise — we control when it resolves.
+  it('does not write stale wrongNetwork state when the component unmounts mid genesis-hash fetch', async () => {
+    // Deferred promise — we control when it resolves. Resolve to a BOGUS genesis
+    // so that, absent cancellation, the .then handler would set wrongNetwork=true.
     let resolveHash: (v: string) => void = () => {}
     const deferred = new Promise<string>((res) => {
       resolveHash = res
@@ -241,19 +242,24 @@ describe('WalletSync', () => {
     walletState = { publicKey: SYSTEM_KEY, connected: true, connecting: false }
     const { unmount } = renderHook(() => WalletSync())
 
+    // The component synchronously mirrors connection BEFORE the genesis-hash
+    // promise resolves (this is intentional — see walletStore.ts line ~76).
+    // The cancellation guard protects only the post-fetch wrongNetwork update.
+    expect(useWalletStore.getState().connected).toBe(true)
+    expect(useWalletStore.getState().wrongNetwork).toBe(false)
+
     // Unmount before the promise resolves.
     unmount()
-    // Now resolve the promise — the cancelled flag should block the store write.
-    resolveHash(DEVNET_GENESIS)
+    // Now resolve the promise with a bogus hash — the cancelled flag should
+    // block the would-be `wrongNetwork: true` write.
+    resolveHash(BOGUS_GENESIS)
     await act(async () => {
       await Promise.resolve()
       await Promise.resolve()
     })
 
-    // Store should NOT have been populated since the fetch was cancelled.
-    const s = useWalletStore.getState()
-    expect(s.connected).toBe(false)
-    expect(s.publicKey).toBeNull()
+    // wrongNetwork must still be false — the post-fetch update was cancelled.
+    expect(useWalletStore.getState().wrongNetwork).toBe(false)
   })
 
   // Additional coverage: unrelated test to exercise differentiated publicKey

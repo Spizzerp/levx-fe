@@ -283,12 +283,9 @@ export function DrawingLayer({
   }, [onStrokeEnd])
 
   // ----------------------------------------------------------------
-  // Render guard: no overlay when idle
-  // ----------------------------------------------------------------
-  if (!isActive) return null
-
-  // ----------------------------------------------------------------
-  // Derive React-rendered captured points for the smoothed curve + dots
+  // Derive React-rendered captured points for the smoothed curve + dots.
+  // Computed BEFORE the isActive early-return so the broadcast useEffect
+  // below has stable hook ordering across active/idle toggles.
   // ----------------------------------------------------------------
   const capturedPoints: CapturedPoint[] = []
   for (let i = 0; i < values.length; i++) {
@@ -300,15 +297,22 @@ export function DrawingLayer({
 
   // Broadcast captured points whenever they change (no-op if no marketId / wallet).
   // The hook itself throttles to ~10 Hz so a fast-moving stroke does not flood.
+  // Hook MUST be declared before any early return — rules of hooks.
+  const broadcastSig = capturedPoints.map((p) => p.value).join(',')
   useEffect(() => {
-    if (!marketId || !selfWallet || capturedPoints.length === 0) return
+    if (!isActive || !marketId || !selfWallet || capturedPoints.length === 0) return
     publish({
       wallet: selfWallet,
       points: capturedPoints,
       timestamp: Date.now(),
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [capturedPoints.length, capturedPoints.map((p) => p.value).join(',')])
+  }, [isActive, marketId, selfWallet, capturedPoints.length, broadcastSig])
+
+  // ----------------------------------------------------------------
+  // Render guard: no overlay when idle
+  // ----------------------------------------------------------------
+  if (!isActive) return null
 
   // Overlay rect covers only the future-time region.
   const futureStartX = Math.max(0, Number(xScale(marketStart)))

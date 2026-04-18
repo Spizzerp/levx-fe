@@ -3,10 +3,16 @@ import { render, renderHook } from '@testing-library/react'
 import React, { useEffect, useRef } from 'react'
 import { PublicKey } from '@solana/web3.js'
 
-// Controllable wallet-adapter-react mock
+// Controllable wallet-adapter-react mock. AnchorProgramProvider → useProgram()
+// reads from useWallet (publicKey), useAnchorWallet (signing wallet), and
+// useConnection. We stub all three since the test does not actually use any
+// connection or signer logic — useProgram returns null when there is no
+// AnchorWallet, which matches the Phase 2 "shell state" assertion.
 const walletState: { publicKey: PublicKey | null } = { publicKey: null }
 vi.mock('@solana/wallet-adapter-react', () => ({
   useWallet: () => ({ publicKey: walletState.publicKey }),
+  useAnchorWallet: () => undefined,
+  useConnection: () => ({ connection: {} }),
 }))
 
 import {

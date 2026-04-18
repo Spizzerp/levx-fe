@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 
-import { MarketStateBadge } from '@/components/MarketStateBadge'
+import { MarketStateBadge, STATE_PROSE } from '@/components/MarketStateBadge'
 import type { Market, MarketState } from '@/types/market'
 
 function makeMarket(overrides: Partial<Market> = {}): Market {
@@ -41,57 +41,63 @@ function renderState(state: MarketState, extra: Partial<Market> = {}) {
   return render(<MarketStateBadge market={makeMarket({ state, ...extra })} />)
 }
 
+// The shipped badge renders ONLY the StatusDot label per state. The descriptive
+// prose was removed in a UI simplification but the STATE_PROSE map is kept as
+// the canonical phrasing source for any future surface that wants it. These tests
+// assert both contracts: the visible label, and the STATE_PROSE export.
 describe('MarketStateBadge', () => {
-  it('renders Pending state with "Wagering opens" prose', () => {
+  it('renders Pending label', () => {
     renderState('pending')
     expect(screen.getByText(/Pending/i)).toBeInTheDocument()
-    expect(screen.getByText(/Wagering opens/i)).toBeInTheDocument()
   })
 
-  it('renders Active state with "Wager open until" prose', () => {
+  it('renders Active label', () => {
     renderState('active')
     expect(screen.getByText(/Active/i)).toBeInTheDocument()
-    expect(screen.getByText(/Wager open until/i)).toBeInTheDocument()
   })
 
-  it('renders Sampling state with "Final wagers; checkpoint scoring underway" prose', () => {
+  it('renders Sampling label', () => {
     renderState('sampling')
     expect(screen.getByText(/Sampling/i)).toBeInTheDocument()
-    expect(
-      screen.getByText(/Final wagers; checkpoint scoring underway/i),
-    ).toBeInTheDocument()
   })
 
-  it('renders Settling state with "Final score being computed" prose', () => {
+  it('renders Settling label', () => {
     renderState('settling')
     expect(screen.getByText(/Settling/i)).toBeInTheDocument()
-    expect(screen.getByText(/Final score being computed/i)).toBeInTheDocument()
   })
 
-  it('renders Maturing state with "Review window; claims open in {countdown}" prose', () => {
+  it('renders Maturing label', () => {
     renderState('maturing', { endTime: Date.now() + 2 * 60 * 60 * 1000 })
     expect(screen.getByText(/Maturing/i)).toBeInTheDocument()
-    expect(screen.getByText(/Review window; claims open in/i)).toBeInTheDocument()
   })
 
-  it('renders Settled state with "Claim available" prose', () => {
+  it('renders Settled label', () => {
     renderState('settled')
     expect(screen.getByText(/Settled/i)).toBeInTheDocument()
-    expect(screen.getByText(/Claim available/i)).toBeInTheDocument()
   })
 
-  it('renders Void state with "Market cancelled" prose', () => {
+  it('renders Void label', () => {
     renderState('void')
     expect(screen.getByText(/Void/i)).toBeInTheDocument()
-    expect(screen.getByText(/Market cancelled/i)).toBeInTheDocument()
   })
 
-  it('uses StatusDot with the lifecycle-mapped dot color', () => {
+  it('uses StatusDot with the lifecycle-mapped dot color (positive gradient for active)', () => {
     const { container } = renderState('active')
-    // StatusDot renders a dot span with aria-hidden + inline backgroundColor.
     const dot = container.querySelector('span[aria-hidden="true"]') as HTMLElement | null
     expect(dot).not.toBeNull()
-    // Active maps to --color-success in StatusDot's statusColors map.
-    expect(dot!.getAttribute('style') ?? '').toMatch(/--color-success/)
+    // Active maps to DOT_GRADIENT.positive in StatusDot's statusDots map —
+    // a linear-gradient containing #5CF78B (the success-tone hex).
+    expect(dot!.getAttribute('style') ?? '').toMatch(/#5CF78B/i)
+  })
+
+  it('STATE_PROSE provides phrasing for every market state', () => {
+    const m = makeMarket()
+    expect(STATE_PROSE.pending(m)).toMatch(/Wagering opens/i)
+    expect(STATE_PROSE.active(m)).toMatch(/Wager open until/i)
+    expect(STATE_PROSE.sampling(m)).toMatch(/Final wagers/i)
+    expect(STATE_PROSE.settling(m)).toMatch(/Final score being computed/i)
+    expect(STATE_PROSE.maturing({ ...m, endTime: Date.now() + 60_000 })).toMatch(/Review window/i)
+    expect(STATE_PROSE.settled(m)).toMatch(/Claim available/i)
+    expect(STATE_PROSE.void(m)).toMatch(/Market cancelled/i)
   })
 })
