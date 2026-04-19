@@ -72,3 +72,13 @@ export function resolutionForCheckpointInterval(intervalSec: number): Benchmarks
   if (intervalSec <= 4 * 60 * 60) return '240'
   return 'D'
 }
+
+/** Seconds-per-bar for each Benchmarks resolution. Used to compute page spans for pagination. */
+export const RESOLUTION_SECONDS: Record<BenchmarksResolution, number> = {
+  '1': 60,
+  '5': 5 * 60,
+  '15': 15 * 60,
+  '60': 60 * 60,
+  '240': 4 * 60 * 60,
+  D: 24 * 60 * 60,
+}

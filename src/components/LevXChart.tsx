@@ -85,6 +85,13 @@ export interface LevXChartProps {
   /** The full market is needed to build checkpoint Xs for the draw-mode grid. */
   market?: Pick<Market, 'startTime' | 'checkpointInterval' | 'totalCheckpoints'> | null
   /**
+   * Fires whenever the effective time-domain changes (pan/zoom/reset/default recompute).
+   * Consumers use this to drive lazy-loaded data: when the left edge approaches the
+   * oldest loaded bar, trigger fetchOlder on the data hook.
+   * Args are [fromMs, toMs] in unix milliseconds.
+   */
+  onViewportChange?: (domain: [number, number]) => void
+  /**
    * Optional render prop invoked INSIDE the SVG inner group (after DrawingGrid, before crosshair).
    * Receives live scales and checkpoint Xs so the consumer can mount DrawingLayer with
    * the correct coordinate space. Omitting it is backward-compatible (no overlay rendered).
@@ -122,6 +129,7 @@ function ChartInner({
   pair,
   market,
   isLoading,
+  onViewportChange,
   renderDrawingOverlay,
 }: InnerProps) {
   const innerWidth = Math.max(0, width - MARGIN.left - MARGIN.right)
@@ -185,7 +193,7 @@ function ChartInner({
   /* ── Viewport: pan / zoom ────────────────────────────────── */
   const {
     effectiveTimeDomain: viewportTimeDomain,
-    // isFollowing available for future use (e.g. reset button visibility)
+    isFollowing: viewportIsFollowing,
     svgRef: viewportSvgRef,
     pointerHandlers: viewportPointerHandlers,
     isPanning: viewportIsPanning,
@@ -198,6 +206,17 @@ function ChartInner({
     minSpanMs: 2 * 60 * 1000,
     maxSpanMs,
   })
+
+  /* ── Notify data layer of viewport changes (for lazy pagination) ──
+   *
+   * Gated on `!viewportIsFollowing` so we don't trigger a fetch when the user
+   * hasn't interacted. In following mode, `defaultTimeDomain` widens as older
+   * pages arrive — emitting that would create a self-sustaining load loop where
+   * each new page expands the domain, which emits again, which fetches again. */
+  useEffect(() => {
+    if (viewportIsFollowing) return
+    onViewportChange?.(viewportTimeDomain)
+  }, [viewportTimeDomain, viewportIsFollowing, onViewportChange])
 
   /* ── Price domain: envelope of data visible in viewport ──── */
   const priceDomainLive = useMemo<[number, number]>(

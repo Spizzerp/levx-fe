@@ -23,7 +23,7 @@ import { toast } from '@/stores/toastStore'
 import { useWalletStore } from '@/stores/walletStore'
 import type { SupportedPair } from '@/lib/pyth/feedIds'
 import { usePythFeed, useLatestPrice } from '@/lib/pyth/hooks'
-import { useBenchmarksHistory } from '@/lib/pyth/useBenchmarksHistory'
+import { useBenchmarksHistory, useLazyHistoryTrigger } from '@/lib/pyth/useBenchmarksHistory'
 import { feedIdForPair } from '@/lib/pyth/feedIds'
 
 /* ── Pair config ─────────────────────────────────────────── */
@@ -302,9 +302,22 @@ export function AdminPage() {
   const latestTick = useLatestPrice(feedId)
 
   // Historical candles for chart backdrop
-  const { data: benchmarks, isLoading: isBenchmarksLoading } = useBenchmarksHistory({
+  const {
+    data: benchmarks,
+    isLoading: isBenchmarksLoading,
+    fetchOlder,
+    hasMoreHistory,
+    isFetchingOlder,
+  } = useBenchmarksHistory({
     pair: pairLabel,
     interval: '1h',
+  })
+
+  const onChartViewportChange = useLazyHistoryTrigger({
+    history: benchmarks,
+    hasMoreHistory,
+    isFetchingOlder,
+    fetchOlder,
   })
 
   // Compute chart time boundaries from form state
@@ -442,6 +455,7 @@ export function AdminPage() {
             pair={pairLabel}
             isLoading={isBenchmarksLoading}
             error={null}
+            onViewportChange={onChartViewportChange}
             height={520}
             market={{
               startTime: chartMarketStart,

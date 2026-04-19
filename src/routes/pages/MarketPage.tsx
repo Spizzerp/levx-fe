@@ -25,7 +25,7 @@ import { deriveMarketPda } from '@/lib/solana/pda'
 import { useAddPath, usePlaceBatchWager, useClaim } from '@/lib/solana/transactions'
 import { usePythFeed, useLatestPrice } from '@/lib/pyth/hooks'
 import { feedIdForPair } from '@/lib/pyth/feedIds'
-import { useBenchmarksHistory } from '@/lib/pyth/useBenchmarksHistory'
+import { useBenchmarksHistory, useLazyHistoryTrigger } from '@/lib/pyth/useBenchmarksHistory'
 import { buildAiPathFixture } from '@/tests/fixtures/aiPaths'
 
 import { useDrawingStore } from '@/stores/drawingStore'
@@ -88,9 +88,22 @@ export function MarketPage() {
 
   const [candleInterval, setCandleInterval] = useState<CandleInterval>('1h')
 
-  const { data: benchmarksHistory, isLoading: isBenchmarksLoading } = useBenchmarksHistory({
+  const {
+    data: benchmarksHistory,
+    isLoading: isBenchmarksLoading,
+    fetchOlder,
+    hasMoreHistory,
+    isFetchingOlder,
+  } = useBenchmarksHistory({
     pair,
     interval: candleInterval,
+  })
+
+  const onChartViewportChange = useLazyHistoryTrigger({
+    history: benchmarksHistory,
+    hasMoreHistory,
+    isFetchingOlder,
+    fetchOlder,
   })
 
   const program = useProgram()
@@ -375,6 +388,7 @@ export function MarketPage() {
             pair={market.pair}
             isLoading={isBenchmarksLoading}
             error={null}
+            onViewportChange={onChartViewportChange}
             market={{
               startTime: chartMarketStart,
               checkpointInterval: chartCheckpointInterval,
