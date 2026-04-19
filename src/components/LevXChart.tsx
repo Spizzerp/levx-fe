@@ -264,7 +264,10 @@ function ChartInner({
   const chartRevealed = chartRevealing && !isLoading
 
   /* ── Crosshair state ─────────────────────────────────────── */
-  const [hover, setHover] = useState<{ x: number; time: number; value: number } | null>(null)
+  // Store only the data-space coords (time, value). Pixel positions are
+  // recomputed from the current scales at render, so the marker tracks the
+  // line correctly when the viewport changes (wheel zoom, live tick, etc.).
+  const [hover, setHover] = useState<{ time: number; value: number } | null>(null)
 
   const handleMove = useCallback(
     (evt: React.MouseEvent<SVGRectElement> | React.TouchEvent<SVGRectElement> | React.PointerEvent<SVGRectElement>) => {
@@ -289,7 +292,7 @@ function ChartInner({
       const d0 = sourceData[idx - 1]
       const d1 = sourceData[idx]
       const d = !d1 ? d0 : !d0 ? d1 : t - d0.time > d1.time - t ? d1 : d0
-      if (d) setHover({ x: timeScale(d.time), time: d.time, value: d.value })
+      if (d) setHover({ time: d.time, value: d.value })
     },
     [innerWidth, selectedPathId, timeScale, mergedHistory, predictions, nowTime],
   )
@@ -621,20 +624,23 @@ function ChartInner({
         />
 
         {/* ── Hover crosshair ─────────────────────── */}
-        {hover && (
-          <>
-            <Line
-              from={{ x: hover.x, y: 0 }}
-              to={{ x: hover.x, y: innerHeight }}
-              stroke={C.line}
-              strokeWidth={1}
-              strokeDasharray="1 3"
-              opacity={0.5}
-              pointerEvents="none"
-            />
-            <Circle cx={hover.x} cy={priceScale(hover.value)} r={3} fill={C.line} />
-          </>
-        )}
+        {hover && (() => {
+          const hx = timeScale(hover.time)
+          return (
+            <>
+              <Line
+                from={{ x: hx, y: 0 }}
+                to={{ x: hx, y: innerHeight }}
+                stroke={C.line}
+                strokeWidth={1}
+                strokeDasharray="1 3"
+                opacity={0.5}
+                pointerEvents="none"
+              />
+              <Circle cx={hx} cy={priceScale(hover.value)} r={3} fill={C.line} />
+            </>
+          )
+        })()}
 
         {/* ── Invisible hit area (pan + crosshair) ── */}
         <Bar
