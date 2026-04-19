@@ -7,7 +7,6 @@ import { WalletButton } from '@/components/WalletButton'
 
 const links = [
   { to: '/markets', label: 'Markets' },
-  { to: '/positions', label: 'Positions' },
   { to: '/vault', label: 'Vault' },
   { to: '/portfolio', label: 'Portfolio' },
   { to: '/leaderboard', label: 'Leaderboard' },

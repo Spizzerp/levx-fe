@@ -8,7 +8,6 @@ import { MarketPage } from '@/routes/pages/MarketPage'
 import { MarketsPage } from '@/routes/pages/MarketsPage'
 import { NotFoundPage } from '@/routes/pages/NotFoundPage'
 import { PortfolioPage } from '@/routes/pages/PortfolioPage'
-import { PositionsPage } from '@/routes/pages/PositionsPage'
 import { VaultPage } from '@/routes/pages/VaultPage'
 import { RootRouteComponent } from '@/routes/RootRoute'
 
@@ -40,7 +39,9 @@ const marketRoute = createRoute({
 const positionsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/positions',
-  component: PositionsPage,
+  beforeLoad: () => {
+    throw redirect({ to: '/portfolio' })
+  },
 })
 
 const vaultRoute = createRoute({
