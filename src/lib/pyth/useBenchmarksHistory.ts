@@ -15,8 +15,23 @@ const INTERVAL_TO_RESOLUTION: Record<CandleInterval, BenchmarksResolution> = {
   '1d': 'D',
 }
 
-/** Bars per page. 500 gives reasonable coverage at every resolution (500m / ~20d / ~500d). */
-const BARS_PER_PAGE = 500
+/**
+ * Bars per page, per resolution.
+ *
+ * Pyth Benchmarks has per-request limits we have to respect:
+ *   - D  → hard cap of 365 days per request ("Requested range exceeds 1 year")
+ *   - 1m → caps around ~48h span ("Too many datapoints to return")
+ * 500 works for everything except D, which we pull back to 300 days (safely
+ * under the 1-year limit). Paginating backwards still covers multi-year ranges.
+ */
+const BARS_PER_PAGE: Record<BenchmarksResolution, number> = {
+  '1': 500, // 500 min ≈ 8h
+  '5': 500, // 500 × 5m ≈ 41h
+  '15': 500, // 500 × 15m ≈ 125h
+  '60': 500, // 500 × 1h ≈ 20d
+  '240': 500, // 500 × 4h ≈ 83d
+  D: 300, // 300 days (cap 365)
+}
 
 export interface UseBenchmarksHistoryArgs {
   /** Market pair, e.g. "BTC/USDC". Resolved to a Benchmarks symbol internally. */
@@ -61,7 +76,7 @@ export function useBenchmarksHistory({
   toTime,
 }: UseBenchmarksHistoryArgs): UseBenchmarksHistoryResult {
   const resolution = INTERVAL_TO_RESOLUTION[interval]
-  const pageSpanSec = BARS_PER_PAGE * RESOLUTION_SECONDS[resolution]
+  const pageSpanSec = BARS_PER_PAGE[resolution] * RESOLUTION_SECONDS[resolution]
   const symbol = pair ? benchmarkSymbolForPair(pair) : null
 
   // Snapshot "now" once per mount so initialPageParam is pure across re-renders.
