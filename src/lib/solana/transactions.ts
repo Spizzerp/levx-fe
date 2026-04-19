@@ -126,7 +126,7 @@ export function useAddPath() {
 
       const ix = await program.methods
         .addPath(params)
-        .accounts({
+        .accountsPartial({
           market: marketPda,
           pathOutcome: pathOutcomePda,
           creator: user,
@@ -177,7 +177,7 @@ export function usePlaceWager() {
 
       const ix = await program.methods
         .placeWager(pathIndex, scaledAmount)
-        .accounts({
+        .accountsPartial({
           protocolState: protocolPda,
           market: marketPda,
           pathOutcome: pathPda,
@@ -241,7 +241,7 @@ export function usePlaceBatchWager() {
 
           return program.methods
             .placeWager(pathIndex, scaledAmount)
-            .accounts({
+            .accountsPartial({
               protocolState: protocolPda,
               market: marketPda,
               pathOutcome: pathPda,
@@ -294,7 +294,7 @@ export function useExitPosition() {
 
       const ix = await program.methods
         .exitPosition()
-        .accounts({
+        .accountsPartial({
           market: marketPda,
           pathOutcome: pathPda,
           position: positionPda,
@@ -346,7 +346,7 @@ export function useClaim() {
 
       const ix = await program.methods
         .claim()
-        .accounts({
+        .accountsPartial({
           protocolState: protocolPda,
           market: marketPda,
           pathOutcome: pathPda,

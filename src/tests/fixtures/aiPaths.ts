@@ -112,7 +112,6 @@ export function buildAiPathFixture(args: BuildAiPathFixtureArgs): PredictionPath
       pathIndex: toneIdx,
       predictedPrices: data.map((d) => d.value),
       numCheckpoints: totalCheckpoints,
-      initialProbabilityBps: Math.round(10_000 / TONES.length),
       generationTimestamp: startTime,
       ...PATH_OUTCOME_DEFAULTS,
     }

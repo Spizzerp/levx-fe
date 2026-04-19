@@ -105,7 +105,6 @@ export function anchorPathToFE(raw: any, marketStartTime: number, checkpointInte
     pathIndex: raw.pathIndex,
     predictedPrices,
     numCheckpoints: raw.numCheckpoints,
-    initialProbabilityBps: raw.initialProbabilityBps,
     generationTimestamp: i64(raw.generationTimestamp) * 1000,
     creator: raw.creator.toBase58(),
     cumulativeAction: bn(raw.cumulativeAction, true),

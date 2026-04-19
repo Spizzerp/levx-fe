@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 
-import { MarketStateBadge, STATE_PROSE } from '@/components/MarketStateBadge'
+import { MarketStateBadge } from '@/components/MarketStateBadge'
+import { STATE_PROSE } from '@/components/marketStateProse'
 import type { Market, MarketState } from '@/types/market'
 
 function makeMarket(overrides: Partial<Market> = {}): Market {
@@ -30,6 +31,7 @@ function makeMarket(overrides: Partial<Market> = {}): Market {
     lambda: 0.1,
     decoherenceRate: 0.01,
     minimumProbability: 0,
+    nudgeRate: 0.05,
     pathMaxAge: 0,
     pathsScored: 0,
     pathsDissolved: 0,

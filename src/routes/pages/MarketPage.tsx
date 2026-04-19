@@ -51,7 +51,7 @@ function ClaimButton({ market, pathIndex }: { market: Market; pathIndex?: number
 
   return (
     <div className="border-line flex flex-col gap-3 border p-6">
-      <p className="text-ink-strong font-mono text-label tracking-wide uppercase">
+      <p className="text-ink-strong text-label font-mono tracking-wide uppercase">
         Claim available
       </p>
       <p className="text-ink-muted font-mono text-sm leading-relaxed">
@@ -68,9 +68,7 @@ function ClaimButton({ market, pathIndex }: { market: Market; pathIndex?: number
         </Button>
       </ConnectGate>
       {claim.isError && (
-        <p className="text-accent font-mono text-caption mt-1">
-          {(claim.error as Error).message}
-        </p>
+        <p className="text-accent text-caption mt-1 font-mono">{(claim.error as Error).message}</p>
       )}
     </div>
   )
@@ -146,13 +144,13 @@ export function MarketPage() {
     benchmarksHistory && benchmarksHistory.length > 0 ? benchmarksHistory : (market?.history ?? [])
 
   // Live price from Pyth tick; fall back to last history point
-  const priceDisplay =
-    latestTick?.value ?? chartHistory[chartHistory.length - 1]?.value ?? 0
+  const priceDisplay = latestTick?.value ?? chartHistory[chartHistory.length - 1]?.value ?? 0
 
   // Use on-chain paths when available (active markets always have AI paths assigned).
   // Fall back to fixture paths for display when market.paths is empty (mock mode).
   const aiPaths = useMemo(() => {
-    if (market?.paths?.length > 0) return market.paths
+    const marketPaths = market?.paths ?? []
+    if (marketPaths.length > 0) return marketPaths
 
     // Fallback: generate fixture paths for mock/demo
     // Paths span from market start to market end, anchored at the price
@@ -184,7 +182,14 @@ export function MarketPage() {
     paths[1].totalWagered = 12_800
     paths[3].totalWagered = 1_900
     return paths
-  }, [market?.paths, chartHistory, chartMarketStart, chartCheckpointInterval, chartTotalCheckpoints, priceDisplay])
+  }, [
+    market?.paths,
+    chartHistory,
+    chartMarketStart,
+    chartCheckpointInterval,
+    chartTotalCheckpoints,
+    priceDisplay,
+  ])
 
   // Combine AI paths + user-drawn paths for chart
   const allPaths = useMemo(() => [...aiPaths, ...userPaths], [aiPaths, userPaths])
@@ -223,7 +228,6 @@ export function MarketPage() {
       pathIndex,
       predictedPrices: values,
       numCheckpoints: values.length,
-      initialProbabilityBps: 0,
       generationTimestamp: Date.now(),
       creator: '',
       cumulativeAction: 0,
@@ -315,14 +319,14 @@ export function MarketPage() {
   const showMaturityCard = market.state === 'maturing'
   const showClaimCard = market.state === 'settled'
   const showPositionRail = !showWagerRail && !!userPosition
-  const showRail =
-    showWagerRail || showMaturityCard || showClaimCard || showPositionRail
+  const showRail = showWagerRail || showMaturityCard || showClaimCard || showPositionRail
 
   return (
     <main
       className={cn(
         'mx-auto grid max-w-[1680px] grid-cols-1 items-start gap-14 px-10 pt-6 pb-12',
-        showRail && '[@media(min-width:1181px)]:grid-cols-[1fr_400px] [@media(min-width:1181px)]:gap-[72px]',
+        showRail &&
+          '[@media(min-width:1181px)]:grid-cols-[1fr_400px] [@media(min-width:1181px)]:gap-[72px]',
       )}
     >
       {/* ── Chart column ─────────────────────────────── */}
@@ -343,7 +347,7 @@ export function MarketPage() {
           <span>24H</span>
         </div>
 
-        <div className="text-ink-dim mt-8 flex flex-nowrap items-center gap-2 overflow-hidden font-mono text-caption tracking-normal whitespace-nowrap uppercase">
+        <div className="text-ink-dim text-caption mt-8 flex flex-nowrap items-center gap-2 overflow-hidden font-mono tracking-normal whitespace-nowrap uppercase">
           {market.state === 'pending' ? (
             <>
               <span>MARKET STARTS IN</span>
@@ -394,7 +398,15 @@ export function MarketPage() {
               checkpointInterval: chartCheckpointInterval,
               totalCheckpoints: chartTotalCheckpoints,
             }}
-            renderDrawingOverlay={({ xScale, yScale, innerWidth, innerHeight, checkpointXs, marketStart, margin }) => (
+            renderDrawingOverlay={({
+              xScale,
+              yScale,
+              innerWidth,
+              innerHeight,
+              checkpointXs,
+              marketStart,
+              margin,
+            }) => (
               <DrawingLayer
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 xScale={xScale as any}
@@ -418,173 +430,170 @@ export function MarketPage() {
 
       {/* ── Right rail (Active markets only) ───────────────────── */}
       {showWagerRail && (
-      <aside className="mt-[180px] flex flex-col">
-        <Label>Select Paths</Label>
+        <aside className="mt-[180px] flex flex-col">
+          <Label>Select Paths</Label>
 
-        <div className="border-line mt-5 border-0 border-t">
-          {allPaths.map((p, idx) => (
-            <PathRow
-              key={p.id}
-              index={idx + 1}
-              name={p.label}
-              multiplier={`${p.multiplier.toFixed(2)}×`}
-              wagered={p.totalWagered}
-              active={selectedPathIds.has(p.id)}
-              pending={p.origin === 'user' && p.onChainStatus === 'pending'}
-              onMouseEnter={() => setHoveredPathId(p.id)}
-              onMouseLeave={() => setHoveredPathId(null)}
-              onClick={() => setSelectedPathIds((prev) => {
-                const next = new Set(prev)
-                if (next.has(p.id)) next.delete(p.id)
-                else next.add(p.id)
-                return next
-              })}
-            />
-          ))}
-          {selectedPathIds.size > 4 && (
-            <p className="text-accent font-mono text-caption px-4 py-2">
-              Max 4 paths per transaction. Deselect some paths.
-            </p>
-          )}
-        </div>
+          <div className="border-line mt-5 border-0 border-t">
+            {allPaths.map((p, idx) => (
+              <PathRow
+                key={p.id}
+                index={idx + 1}
+                name={p.label}
+                multiplier={`${p.multiplier.toFixed(2)}×`}
+                wagered={p.totalWagered}
+                active={selectedPathIds.has(p.id)}
+                pending={p.origin === 'user' && p.onChainStatus === 'pending'}
+                onMouseEnter={() => setHoveredPathId(p.id)}
+                onMouseLeave={() => setHoveredPathId(null)}
+                onClick={() =>
+                  setSelectedPathIds((prev) => {
+                    const next = new Set(prev)
+                    if (next.has(p.id)) next.delete(p.id)
+                    else next.add(p.id)
+                    return next
+                  })
+                }
+              />
+            ))}
+            {selectedPathIds.size > 4 && (
+              <p className="text-accent text-caption px-4 py-2 font-mono">
+                Max 4 paths per transaction. Deselect some paths.
+              </p>
+            )}
+          </div>
 
-        {/*
+          {/*
           ── Draw button — desktop only (mobile gate: pure Tailwind CSS) ──
           This project uses DESKTOP-FIRST custom variants in src/style/customVariants.css:
           `md:` = `@media (max-width: 1024px)`. So base classes apply on desktop
           and `md:` variants override on viewports ≤1024px.
         */}
-        <div data-testid="draw-button-wrapper" className="block md:hidden">
-          {isInDrawMode ? (
-            <div className="mt-5 flex gap-3">
-              <Button
-                variant="secondary"
-                fullWidth
-                onClick={() => exitDrawMode()}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="primary"
-                fullWidth
-                onClick={handleConfirmDrawing}
-              >
-                Confirm
-              </Button>
-            </div>
-          ) : (
-            <Button
-              variant="dashed"
-              fullWidth
-              className="mt-5"
-              disabled={chartTotalCheckpoints <= 0}
-              onClick={() => enterDrawMode(chartTotalCheckpoints)}
-            >
-              + Draw Custom Path
-            </Button>
-          )}
-        </div>
-        <div
-          data-testid="drawing-desktop-notice"
-          className="mt-5 hidden md:block font-mono text-sm text-[color:var(--color-ink-dim,#666)]"
-        >
-          Drawing requires desktop
-        </div>
-
-        {market.leverageEnabled && (
-          <>
-            <hr className="bg-line my-9 mb-8 h-px border-0" />
-
-            <div className="mb-8">
-              <div className="mb-3.5 flex items-baseline justify-between">
-                <Label>Leverage</Label>
-                <span className="text-ink-strong text-body-sm font-mono font-bold">
-                  {Math.min(leverage, leverageCap)}×
-                </span>
+          <div data-testid="draw-button-wrapper" className="block md:hidden">
+            {isInDrawMode ? (
+              <div className="mt-5 flex gap-3">
+                <Button variant="secondary" fullWidth onClick={() => exitDrawMode()}>
+                  Cancel
+                </Button>
+                <Button variant="primary" fullWidth onClick={handleConfirmDrawing}>
+                  Confirm
+                </Button>
               </div>
-              <SegmentedSlider
-                value={Math.min(leverage, leverageCap)}
-                max={leverageCap}
-                onChange={setLeverage}
-              />
-              <div className="text-ink-dim mt-2.5 flex justify-between font-mono text-caption uppercase">
-                <span>1×</span>
-                <span>
-                  {leverageCap}× MAX · {formatMarketDurationLabel(market.startTime, market.endTime)}
-                </span>
-              </div>
-            </div>
-          </>
-        )}
-
-        {!market.leverageEnabled && <hr className="bg-line my-9 mb-8 h-px border-0" />}
-
-        <Input
-          label="Collateral"
-          value={collateral}
-          onChange={(e) => setCollateral(e.target.value)}
-          unit="USDC"
-          inputMode="decimal"
-          className="mb-8"
-        />
-        {numWagerable > 1 && (
-          <p className="text-ink-muted font-mono text-caption -mt-6 mb-6">
-            Total: {formatUSD((parseFloat(collateral) || 0) * numWagerable)} USDC across {numWagerable} paths
-          </p>
-        )}
-
-        <ConnectGate>
-          <Button
-            variant="primary"
-            fullWidth
-            className="mt-2"
-            disabled={
-              market.state !== 'active' ||
-              numWagerable === 0 ||
-              numWagerable > 4 ||
-              placeBatchWager.isPending
-            }
-            onClick={() => {
-              if (numWagerable === 0) return
-              placeBatchWager.mutate({
-                marketId: market.marketId,
-                pathIndices: wagerablePaths.map((p) => p.pathIndex),
-                amount: parseFloat(collateral) || 0,
-              })
-            }}
+            ) : (
+              <Button
+                variant="dashed"
+                fullWidth
+                className="mt-5"
+                disabled={chartTotalCheckpoints <= 0}
+                onClick={() => enterDrawMode(chartTotalCheckpoints)}
+              >
+                + Draw Custom Path
+              </Button>
+            )}
+          </div>
+          <div
+            data-testid="drawing-desktop-notice"
+            className="mt-5 hidden font-mono text-sm text-[color:var(--color-ink-dim,#666)] md:block"
           >
-            {placeBatchWager.isPending
-              ? 'Confirming…'
-              : numWagerable <= 1
-                ? `Open ${isPathLong(wagerablePaths[0]) ? 'Long' : 'Short'} Position`
-                : `Open ${numWagerable} Positions`}
-          </Button>
-        </ConnectGate>
-        {placeBatchWager.isError && (
-          <p className="text-accent font-mono text-caption mt-2">
-            {(placeBatchWager.error as Error).message}
-          </p>
-        )}
-      </aside>
+            Drawing requires desktop
+          </div>
+
+          {market.leverageEnabled && (
+            <>
+              <hr className="bg-line my-9 mb-8 h-px border-0" />
+
+              <div className="mb-8">
+                <div className="mb-3.5 flex items-baseline justify-between">
+                  <Label>Leverage</Label>
+                  <span className="text-ink-strong text-body-sm font-mono font-bold">
+                    {Math.min(leverage, leverageCap)}×
+                  </span>
+                </div>
+                <SegmentedSlider
+                  value={Math.min(leverage, leverageCap)}
+                  max={leverageCap}
+                  onChange={setLeverage}
+                />
+                <div className="text-ink-dim text-caption mt-2.5 flex justify-between font-mono uppercase">
+                  <span>1×</span>
+                  <span>
+                    {leverageCap}× MAX ·{' '}
+                    {formatMarketDurationLabel(market.startTime, market.endTime)}
+                  </span>
+                </div>
+              </div>
+            </>
+          )}
+
+          {!market.leverageEnabled && <hr className="bg-line my-9 mb-8 h-px border-0" />}
+
+          <Input
+            label="Collateral"
+            value={collateral}
+            onChange={(e) => setCollateral(e.target.value)}
+            unit="USDC"
+            inputMode="decimal"
+            className="mb-8"
+          />
+          {numWagerable > 1 && (
+            <p className="text-ink-muted text-caption -mt-6 mb-6 font-mono">
+              Total: {formatUSD((parseFloat(collateral) || 0) * numWagerable)} USDC across{' '}
+              {numWagerable} paths
+            </p>
+          )}
+
+          <ConnectGate>
+            <Button
+              variant="primary"
+              fullWidth
+              className="mt-2"
+              disabled={
+                market.state !== 'active' ||
+                numWagerable === 0 ||
+                numWagerable > 4 ||
+                placeBatchWager.isPending
+              }
+              onClick={() => {
+                if (numWagerable === 0) return
+                placeBatchWager.mutate({
+                  marketId: market.marketId,
+                  pathIndices: wagerablePaths.map((p) => p.pathIndex),
+                  amount: parseFloat(collateral) || 0,
+                })
+              }}
+            >
+              {placeBatchWager.isPending
+                ? 'Confirming…'
+                : numWagerable <= 1
+                  ? `Open ${isPathLong(wagerablePaths[0]) ? 'Long' : 'Short'} Position`
+                  : `Open ${numWagerable} Positions`}
+            </Button>
+          </ConnectGate>
+          {placeBatchWager.isError && (
+            <p className="text-accent text-caption mt-2 font-mono">
+              {(placeBatchWager.error as Error).message}
+            </p>
+          )}
+        </aside>
       )}
 
       {/* ── Right rail (Maturing) — countdown card in wager-slot position ── */}
       {showMaturityCard && (
         <aside className="flex flex-col gap-6">
           <MaturityCountdownCard market={market} />
-          {userPosition && (
-            <UserPositionCard position={userPosition} marketState={market.state} />
-          )}
+          {userPosition && <UserPositionCard position={userPosition} marketState={market.state} />}
         </aside>
       )}
 
       {/* ── Right rail (Settled) — claim button (ConnectGate-wrapped) ── */}
       {showClaimCard && (
         <aside className="flex flex-col gap-6">
-          <ClaimButton market={market} pathIndex={userPosition ? parseInt(userPosition.pathId.replace('path-', ''), 10) : undefined} />
-          {userPosition && (
-            <UserPositionCard position={userPosition} marketState={market.state} />
-          )}
+          <ClaimButton
+            market={market}
+            pathIndex={
+              userPosition ? parseInt(userPosition.pathId.replace('path-', ''), 10) : undefined
+            }
+          />
+          {userPosition && <UserPositionCard position={userPosition} marketState={market.state} />}
         </aside>
       )}
 

@@ -2,7 +2,7 @@
  * Shared types for markets, paths, and price data.
  *
  * These mirror the on-chain account schemas from the LevX program IDL
- * (LhDfCNTdm8Xr5cpEaSCfVSsbReA8muHFsS8zgjJn7Kk on devnet).
+ * (LEVXqi1Z2XujBw2jAEP15Dv8LyrDetDR95KZGGQNobV on devnet).
  * Fixed-point u64 fields are converted to plain numbers on the read
  * boundary; Pubkeys are stored as base-58 strings.
  */
@@ -64,8 +64,6 @@ export interface PredictionPath {
   predictedPrices: number[]
   /** Number of checkpoints in this path */
   numCheckpoints: number
-  /** Initial probability in basis points (e.g. 2000 = 20%) */
-  initialProbabilityBps: number
   /** unix ms — when the path was generated */
   generationTimestamp: number
   /** Creator pubkey (base-58) */
