@@ -16,6 +16,8 @@ import { useWalletStore } from '@/stores/walletStore'
 
 type PositionStatus = 'active' | 'sampling' | 'at-risk'
 
+// TODO: replace these mock-only shapes with UserPosition from @/types/market
+// once the wallet + indexer layer is wired up.
 interface Position {
   id: string
   marketId: string
@@ -24,7 +26,6 @@ interface Position {
   pathIndex: number
   pair: string
   providerNames: string[]
-  pathTone: string
   amount: number
   currentScore: number
   healthFactor?: number
@@ -51,7 +52,6 @@ const MOCK_POSITIONS: Position[] = [
     pathIndex: 1,
     pair: 'SOL/USDC',
     providerNames: ['Chronos-2', 'TimesFM 2.5'],
-    pathTone: 'bull',
     amount: 2500,
     currentScore: 87.3,
     healthFactor: 2.45,
@@ -66,7 +66,6 @@ const MOCK_POSITIONS: Position[] = [
     pathIndex: 2,
     pair: 'ETH/USDC',
     providerNames: ['GJR-GARCH'],
-    pathTone: 'neutral',
     amount: 5000,
     currentScore: 62.1,
     healthFactor: 1.82,
@@ -80,7 +79,6 @@ const MOCK_POSITIONS: Position[] = [
     pathIndex: 3,
     pair: 'BTC/USDC',
     providerNames: ['Merton Jump-Diffusion'],
-    pathTone: 'bear',
     amount: 1000,
     currentScore: 34.8,
     healthFactor: 1.12,
@@ -129,10 +127,9 @@ const SETTLED_POSITIONS: SettledPosition[] = [
   },
 ]
 
-const PERFORMANCE = {
-  totalPnl: 4330,
-  winRate: 67.5,
-}
+const TOTAL_PNL = SETTLED_POSITIONS.reduce((sum, p) => sum + (p.payout - p.wagered), 0)
+const WIN_RATE =
+  (SETTLED_POSITIONS.filter((p) => p.payout > p.wagered).length / SETTLED_POSITIONS.length) * 100
 
 const STATUS_LABELS: Record<PositionStatus, string> = {
   active: 'Active',
@@ -383,11 +380,11 @@ export function PortfolioPage() {
             <div
               className={cn(
                 'font-mono text-3xl font-bold tracking-[0.02em]',
-                PERFORMANCE.totalPnl >= 0 ? 'text-success' : 'text-accent',
+                TOTAL_PNL >= 0 ? 'text-success' : 'text-accent',
               )}
             >
-              {PERFORMANCE.totalPnl >= 0 ? '+' : ''}
-              {formatUSD(PERFORMANCE.totalPnl)}
+              {TOTAL_PNL >= 0 ? '+' : ''}
+              {formatUSD(TOTAL_PNL)}
             </div>
           </div>
           <div>
@@ -395,7 +392,7 @@ export function PortfolioPage() {
               Win Rate
             </div>
             <div className="text-ink-strong font-mono text-3xl font-bold tracking-[0.02em]">
-              {PERFORMANCE.winRate}%
+              {WIN_RATE.toFixed(1)}%
             </div>
           </div>
           <div>
@@ -428,7 +425,7 @@ export function PortfolioPage() {
           <DataTable
             columns={activeColumns}
             data={MOCK_POSITIONS}
-            gridCols="grid-cols-[200px_1fr_140px_120px_100px_72px]"
+            gridCols="grid-cols-[200px_1fr_140px_120px_100px]"
             gridColsWide="[@media(min-width:1201px)]:grid-cols-[240px_1fr_160px_140px_120px_120px_72px]"
             keyExtractor={(pos) => pos.id}
             emptyMessage="[ NO OPEN POSITIONS ]"
