@@ -384,7 +384,7 @@ export function ProfilePage() {
                     )}
                   >
                     <Camera size={14} strokeWidth={1.5} />
-                    <span className="text-label font-mono tracking-wider uppercase">Upload</span>
+                    <span className="text-micro font-mono tracking-wider uppercase">Upload</span>
                   </button>
                 )}
               </div>
