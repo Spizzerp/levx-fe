@@ -1,5 +1,6 @@
 import type { PropsWithChildren } from 'react'
 import { FileText } from 'lucide-react'
+import { useLocation } from '@tanstack/react-router'
 
 import { Nav } from '@/components/Nav'
 import { ToastContainer } from '@/components/ToastContainer'
@@ -14,29 +15,34 @@ function XIcon({ size = 16 }: { size?: number }) {
 }
 
 export function CommonLayout({ children }: PropsWithChildren) {
+  const { pathname } = useLocation()
+  const showChrome = pathname !== '/'
+
   return (
     <>
-      <Nav />
+      {showChrome && <Nav />}
       <WrongNetworkBanner />
       <div style={{ isolation: 'isolate' }} className="flex-1">{children}</div>
-      <div className="mt-auto flex items-center justify-center gap-4 py-8">
-        <a
-          href="https://x.com/LevXtrade"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-ink-dim hover:text-ink-strong duration-short ease-levx transition-colors"
-        >
-          <XIcon size={16} />
-        </a>
-        <a
-          href="#"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-ink-dim hover:text-ink-strong duration-short ease-levx transition-colors"
-        >
-          <FileText size={16} strokeWidth={1.5} />
-        </a>
-      </div>
+      {showChrome && (
+        <div className="mt-auto flex items-center justify-center gap-4 py-8">
+          <a
+            href="https://x.com/LevXtrade"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-ink-dim hover:text-ink-strong duration-short ease-levx transition-colors"
+          >
+            <XIcon size={16} />
+          </a>
+          <a
+            href="#"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-ink-dim hover:text-ink-strong duration-short ease-levx transition-colors"
+          >
+            <FileText size={16} strokeWidth={1.5} />
+          </a>
+        </div>
+      )}
       <ToastContainer />
     </>
   )

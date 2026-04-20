@@ -3,6 +3,7 @@ import { createRootRoute, createRoute, createRouter, redirect } from '@tanstack/
 import { AdminPage } from '@/routes/pages/AdminPage'
 import { AdminMarketsPage } from '@/routes/pages/AdminMarketsPage'
 import { LabsChartPage } from '@/routes/pages/LabsChartPage'
+import { LandingPage } from '@/routes/pages/LandingPage'
 import { LeaderboardPage } from '@/routes/pages/LeaderboardPage'
 import { MarketPage } from '@/routes/pages/MarketPage'
 import { MarketsPage } from '@/routes/pages/MarketsPage'
@@ -19,9 +20,7 @@ const rootRoute = createRootRoute({
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
-  beforeLoad: () => {
-    throw redirect({ to: '/markets' })
-  },
+  component: LandingPage,
 })
 
 const marketsRoute = createRoute({
