@@ -1,6 +1,7 @@
 import { ChartFrame } from '@/features/chart/ChartFrame'
 import { formatUSD } from '@/lib/format'
 import { DataTable, NUM_CELL, type DataTableColumn } from '@/ui/DataTable'
+import { SIGILS } from '@/ui/Sigils'
 
 import type { LeaderboardEntry } from './data'
 
@@ -15,7 +16,17 @@ const COLUMNS: DataTableColumn<LeaderboardEntry>[] = [
     key: 'user',
     header: 'USER',
     cellClassName: 'text-ink-strong font-mono text-sm font-bold tracking-normal',
-    render: (entry) => entry.user,
+    render: (entry) => {
+      const Sigil = SIGILS[entry.avatarIdx] ?? SIGILS[0]
+      return (
+        <span className="flex items-center gap-3">
+          <span className="border-line-strong bg-surface-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border">
+            <Sigil size={18} tone="strong" />
+          </span>
+          <span>{entry.user}</span>
+        </span>
+      )
+    },
   },
   {
     key: 'score',
@@ -47,7 +58,7 @@ export function LeaderboardTable({ entries }: { entries: LeaderboardEntry[] }) {
       <DataTable
         columns={COLUMNS}
         data={entries}
-        gridCols="grid-cols-[48px_140px_120px_100px_1fr]"
+        gridCols="grid-cols-[48px_180px_120px_100px_1fr]"
         rowHeight="h-[56px]"
         keyExtractor={(entry) => entry.rank}
       />
