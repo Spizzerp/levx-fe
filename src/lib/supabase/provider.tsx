@@ -1,24 +1,20 @@
-import { createContext, useCallback, useEffect, useMemo, useRef, useState, type PropsWithChildren } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type PropsWithChildren } from 'react'
 import { useWallet } from '@solana/wallet-adapter-react'
+import bs58 from 'bs58'
 
 import { useWalletStore } from '@/stores/walletStore'
+import { SupabaseAuthContext, type AuthContextValue } from './auth-context'
 import type { AuthStatus, JWTRecord } from './types'
 import {
-  cacheJWT, clearJWT, loadCachedJWT, requestNonce, verifyAndGetJWT, __setActiveWallet,
+  cacheJWT,
+  clearJWT,
+  loadCachedJWT,
+  requestNonce,
+  verifyAndGetJWT,
+  __setActiveWallet,
 } from './auth'
 
 type SignMessageFn = (message: Uint8Array) => Promise<Uint8Array>
-
-export type AuthContextValue = {
-  status:      AuthStatus
-  jwt:         string | null
-  wallet:      string | null
-  expiresAt:   number | null
-  authenticate(): Promise<void>
-  signOut():   void
-}
-
-export const SupabaseAuthContext = createContext<AuthContextValue | null>(null)
 
 type Props = PropsWithChildren<{
   /** Optional override for tests — defaults to the wallet adapter's signMessage. */
@@ -42,11 +38,14 @@ export function SupabaseAuthProvider({ children, signMessage: signOverride }: Pr
 
   const wallet = publicKey?.toBase58() ?? null
 
-  const signMessage: SignMessageFn = useCallback(async (msg) => {
-    if (signOverride) return signOverride(msg)
-    if (!adapter.signMessage) throw new Error('wallet does not support signMessage')
-    return adapter.signMessage(msg)
-  }, [adapter, signOverride])
+  const signMessage: SignMessageFn = useCallback(
+    async (msg) => {
+      if (signOverride) return signOverride(msg)
+      if (!adapter.signMessage) throw new Error('wallet does not support signMessage')
+      return adapter.signMessage(msg)
+    },
+    [adapter, signOverride],
+  )
 
   const authenticate = useCallback(async () => {
     if (!wallet) return
@@ -56,7 +55,6 @@ export function SupabaseAuthProvider({ children, signMessage: signOverride }: Pr
     try {
       const { nonce, message } = await requestNonce()
       const sig = await signMessage(new TextEncoder().encode(message))
-      const { default: bs58 } = await import('bs58')
       const signature = bs58.encode(sig)
       const rec = await verifyAndGetJWT({ pubkey: wallet, nonce, signature })
       cacheJWT(rec)
@@ -103,18 +101,17 @@ export function SupabaseAuthProvider({ children, signMessage: signOverride }: Pr
     void authenticate().catch(() => {})
   }, [connected, wallet, authenticate])
 
-  const value = useMemo<AuthContextValue>(() => ({
-    status,
-    jwt:       record?.jwt ?? null,
-    wallet:    wallet,
-    expiresAt: record?.expiresAt ?? null,
-    authenticate,
-    signOut,
-  }), [status, record, wallet, authenticate, signOut])
-
-  return (
-    <SupabaseAuthContext.Provider value={value}>
-      {children}
-    </SupabaseAuthContext.Provider>
+  const value = useMemo<AuthContextValue>(
+    () => ({
+      status,
+      jwt: record?.jwt ?? null,
+      wallet: wallet,
+      expiresAt: record?.expiresAt ?? null,
+      authenticate,
+      signOut,
+    }),
+    [status, record, wallet, authenticate, signOut],
   )
+
+  return <SupabaseAuthContext.Provider value={value}>{children}</SupabaseAuthContext.Provider>
 }

@@ -4,7 +4,7 @@ import {
   type UseQueryResult, type UseMutationResult,
 } from '@tanstack/react-query'
 
-import { SupabaseAuthContext, type AuthContextValue } from './provider'
+import { SupabaseAuthContext, type AuthContextValue } from './auth-context'
 import { getSupabase } from './client'
 import { acquireChannel, releaseChannel } from './channels'
 import type { Comment, DrawFrame, Profile, ProfileAvatarKind } from './types'
