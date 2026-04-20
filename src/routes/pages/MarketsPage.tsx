@@ -1,5 +1,5 @@
 import { useNavigate } from '@tanstack/react-router'
-import { Filter } from 'lucide-react'
+import { ArrowRight, Filter } from 'lucide-react'
 import { useMemo, useState } from 'react'
 
 import { ChartFrame } from '@/components/ChartFrame'
@@ -145,11 +145,11 @@ const COLUMNS: DataTableColumn<Market>[] = [
     key: 'arrow',
     header: '',
     cellClassName: cn(
-      'text-ink-dim text-right font-mono text-sm',
+      'text-ink-dim flex justify-end',
       'duration-short ease-levx transition-[color,transform]',
       'group-hover:text-ink-strong group-hover:translate-x-1',
     ),
-    render: () => '→',
+    render: () => <ArrowRight size={16} strokeWidth={1.75} aria-hidden />,
   },
 ]
 

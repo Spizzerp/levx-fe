@@ -1,5 +1,6 @@
 import { useParams } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
+import { Plus } from 'lucide-react'
 
 import { Button } from '@/components/Button'
 import { ChartFrame } from '@/components/ChartFrame'
@@ -482,11 +483,12 @@ export function MarketPage() {
               <Button
                 variant="dashed"
                 fullWidth
-                className="mt-5"
+                className="mt-5 gap-2"
                 disabled={chartTotalCheckpoints <= 0}
                 onClick={() => enterDrawMode(chartTotalCheckpoints)}
               >
-                + Draw Custom Path
+                <Plus size={14} strokeWidth={1.75} aria-hidden />
+                Draw Custom Path
               </Button>
             )}
           </div>
