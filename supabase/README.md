@@ -18,7 +18,7 @@ supabase functions serve verify-wallet \
 
 Notes:
 - `--env-file` requires an **absolute path** (the CLI resolves relative paths against the function dir).
-- The Supabase CLI strips any `SUPABASE_*` prefixed key from `--env-file` (auto-injected vars cannot be overridden), so the local override variable is named **`EDGE_JWT_SECRET`**. In production it falls back to `SUPABASE_JWT_SECRET` which the hosted runtime auto-injects.
+- The Supabase CLI strips any `SUPABASE_*` prefixed key from `--env-file` (auto-injected vars cannot be overridden), so the local override variable is named **`EDGE_JWT_SECRET`**. Use the **same value** as the project JWT secret from `supabase status -o env` (local) or Dashboard → **Project Settings → API** (JWT signing keys / JWT Secret).
 
 `supabase/functions/.env.local` (gitignored, dev only):
 ```
@@ -50,11 +50,12 @@ Two Deno-version caveats:
 ```bash
 supabase link --project-ref <your-ref>
 supabase db push
+supabase secrets set EDGE_JWT_SECRET='<paste JWT Secret from Dashboard → Project Settings → API>'
 supabase functions deploy verify-wallet
 supabase secrets set APP_ORIGIN=https://levx.app
 ```
 
-`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `SUPABASE_JWT_SECRET` are auto-injected by the hosted runtime — do NOT set them via `supabase secrets`.
+`SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` are provided by the hosted runtime. **JWT signing secret is not** — `verify-wallet` signs HS256 tokens that PostgREST must validate, so you must set **`EDGE_JWT_SECRET`** to the exact **JWT Secret** (or legacy JWT signing key) shown under **Project Settings → API**. Without it, `POST /verify-wallet/verify` returns 500 (or 503 with `jwt_secret_missing` after the latest handler).
 
 ## Manual smoke checklist (pre-release)
 
@@ -68,6 +69,7 @@ supabase secrets set APP_ORIGIN=https://levx.app
 ## Schema overview
 
 - `auth_nonces` — single-use nonces (5 min TTL). RLS denies all client access; only the Edge Function (service_role) reads/writes.
+- `users` — wallet-bound public user records with username, display name, bio, X ID, and avatar metadata. Public read; RLS-gated writes keyed on `auth.jwt() ->> 'wallet'`.
 - `comments` — per-market comments. Public read; RLS-gated insert/update/delete keyed on `auth.jwt() ->> 'wallet'`. Immutable columns enforced by trigger; `edited_at` server-stamped.
 - `comment_rate_limit` — last-comment-at per wallet for the cooldown trigger (10s cooldown + 30/hr cap; service_role bypasses).
 - `realtime.messages` — Realtime Authorization policies for the private `path-draw:*` channels (subscribe + publish require `authenticated`).
@@ -78,6 +80,7 @@ supabase secrets set APP_ORIGIN=https://levx.app
 supabase/
 ├── config.toml
 ├── migrations/0001_init.sql
+├── migrations/0002_users.sql
 ├── functions/verify-wallet/
 │   ├── index.ts                router + /nonce + /verify handlers
 │   ├── index.test.ts           Deno tests (8 cases)

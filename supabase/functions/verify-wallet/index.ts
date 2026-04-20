@@ -6,24 +6,30 @@ import { create as signJWT, getNumericDate } from 'djwt'
 import { corsHeaders } from './_shared/cors.ts'
 import { buildMessage } from './_shared/message.ts'
 
-const SUPABASE_URL              = Deno.env.get('SUPABASE_URL')!
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-const NONCE_TTL_SECONDS         = 5 * 60
-const JWT_TTL_SECONDS           = 24 * 60 * 60
+const NONCE_TTL_SECONDS = 5 * 60
+const JWT_TTL_SECONDS = 24 * 60 * 60
 
 const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
 })
+
+function jwtSigningSecret(): string | undefined {
+  // Must match the project's JWT signing secret (Dashboard → Project Settings → API → JWT signing keys / JWT Secret).
+  // Hosted Edge does not list this in "default" secrets — set explicitly:
+  //   supabase secrets set EDGE_JWT_SECRET='…'   (recommended name; avoids CLI stripping SUPABASE_* in local serve)
+  // Optional fallback name if you inject it yourself:
+  //   SUPABASE_JWT_SECRET
+  return Deno.env.get('EDGE_JWT_SECRET') ?? Deno.env.get('SUPABASE_JWT_SECRET')
+}
 
 // Lazy-init so the function can serve non-/verify routes even if the secret
 // isn't set yet (e.g. local dev before the env file is configured).
 let _jwtKey: Promise<CryptoKey> | null = null
 function getJwtKey(): Promise<CryptoKey> {
   if (!_jwtKey) {
-    // Hosted Supabase auto-injects SUPABASE_JWT_SECRET. Local `supabase functions
-    // serve --env-file` refuses any SUPABASE_* prefixed key, so dev uses
-    // EDGE_JWT_SECRET as an override. Both must hold the SAME value.
-    const secret = Deno.env.get('EDGE_JWT_SECRET') ?? Deno.env.get('SUPABASE_JWT_SECRET')
+    const secret = jwtSigningSecret()
     if (!secret) throw new Error('EDGE_JWT_SECRET or SUPABASE_JWT_SECRET must be set')
     _jwtKey = crypto.subtle.importKey(
       'raw',
@@ -48,7 +54,7 @@ serve(async (req) => {
   const url = new URL(req.url)
 
   try {
-    if (url.pathname.endsWith('/nonce'))  return await handleNonce()
+    if (url.pathname.endsWith('/nonce')) return await handleNonce()
     if (url.pathname.endsWith('/verify')) return await handleVerify(req)
     return json({ error: 'not_found' }, 404)
   } catch (e) {
@@ -74,18 +80,29 @@ async function handleVerify(req: Request): Promise<Response> {
     return json({ error: 'malformed' }, 400)
   }
 
+  // Fail before consuming a nonce so misconfiguration does not burn valid nonces.
+  if (!jwtSigningSecret()) {
+    console.error(
+      '[verify-wallet] Missing EDGE_JWT_SECRET. Set it to the API JWT secret: Dashboard → Project Settings → API, then `supabase secrets set EDGE_JWT_SECRET=…`',
+    )
+    return json({ error: 'jwt_secret_missing' }, 503)
+  }
+
   // Atomic consume: single delete returning the row, gated on expires_at.
   const { data: deleted, error: delErr } = await admin
-    .from('auth_nonces').delete().eq('nonce', nonce)
+    .from('auth_nonces')
+    .delete()
+    .eq('nonce', nonce)
     .gt('expires_at', new Date().toISOString())
-    .select('nonce').maybeSingle()
+    .select('nonce')
+    .maybeSingle()
   if (delErr || !deleted) return json({ error: 'nonce_used_or_expired' }, 400)
 
   const messageBytes = new TextEncoder().encode(buildMessage(nonce))
   let sigBytes: Uint8Array
   let pubkeyBytes: Uint8Array
   try {
-    sigBytes    = bs58.decode(signature)
+    sigBytes = bs58.decode(signature)
     pubkeyBytes = bs58.decode(pubkey)
   } catch {
     return json({ error: 'malformed' }, 400)
@@ -100,13 +117,13 @@ async function handleVerify(req: Request): Promise<Response> {
   const jwt = await signJWT(
     { alg: 'HS256', typ: 'JWT' },
     {
-      iss:    'supabase',
-      sub:    pubkey,
-      role:   'authenticated',
-      aud:    'authenticated',
+      iss: 'supabase',
+      sub: pubkey,
+      role: 'authenticated',
+      aud: 'authenticated',
       wallet: pubkey,
-      iat:    getNumericDate(0),
-      exp:    getNumericDate(JWT_TTL_SECONDS),
+      iat: getNumericDate(0),
+      exp: getNumericDate(JWT_TTL_SECONDS),
     },
     await getJwtKey(),
   )

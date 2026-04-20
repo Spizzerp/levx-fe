@@ -56,8 +56,15 @@ export async function verifyAndGetJWT(req: VerifyRequest): Promise<JWTRecord> {
     headers: { 'Content-Type': 'application/json', apikey: env.APP_SUPABASE_ANON_KEY },
     body: JSON.stringify(req),
   })
-  const body = await res.json()
-  if (!res.ok) throw new Error(body?.error ?? `verify failed: ${res.status}`)
+  const body = (await res.json()) as { error?: string; jwt?: string; expiresAt?: string }
+  if (!res.ok) {
+    if (body?.error === 'jwt_secret_missing') {
+      throw new Error(
+        'Wallet verify is misconfigured: set Edge secret EDGE_JWT_SECRET to your project JWT secret (Dashboard → API).',
+      )
+    }
+    throw new Error(body?.error ?? `verify failed: ${res.status}`)
+  }
   return {
     jwt:       body.jwt as string,
     expiresAt: Date.parse(body.expiresAt as string),
