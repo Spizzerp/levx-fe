@@ -168,14 +168,16 @@
      base    — default stacking
      above   — above siblings
      nav     — sticky top navigation
-     overlay — modals / dropdowns
-     toast   — floating notifications
+     overlay — dropdowns / popovers (anchored)
+     modal   — full-screen modals (above nav + dropdowns)
+     toast   — floating notifications (top-most)
   */
   --z-base: 0;
   --z-above: 10;
   --z-nav: 100;
   --z-overlay: 200;
-  --z-toast: 300;
+  --z-modal: 300;
+  --z-toast: 400;
 
   /* ── Sizes (common dimensions) ───────────────
      For buttons, inputs, icons
@@ -375,6 +377,9 @@
 }
 @utility z-overlay {
   z-index: var(--z-overlay);
+}
+@utility z-modal {
+  z-index: var(--z-modal);
 }
 @utility z-toast {
   z-index: var(--z-toast);
