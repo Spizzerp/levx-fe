@@ -202,41 +202,7 @@ export function ProfilePage() {
               }}
             />
 
-            <FieldLabel idx="01" label="Active Sigil" />
-
-            <div className="relative mt-6 mb-6 flex flex-col items-center">
-              {/* Callsign arc (dashed orbit + curved text) */}
-              <svg
-                viewBox="0 0 200 200"
-                className="absolute inset-0 mx-auto my-auto h-[200px] w-[200px]"
-                aria-hidden
-              >
-                <defs>
-                  <path id="callsign-arc" d="M 20 100 A 80 80 0 0 1 180 100" />
-                </defs>
-                <circle
-                  cx="100"
-                  cy="100"
-                  r="82"
-                  fill="none"
-                  stroke="var(--color-line)"
-                  strokeDasharray="1 4"
-                />
-                <text
-                  className="font-mono"
-                  style={{
-                    fontSize: '9px',
-                    letterSpacing: '0.24em',
-                    fill: 'var(--color-ink-muted)',
-                  }}
-                >
-                  <textPath href="#callsign-arc" startOffset="0%">
-                    CALLSIGN · {data.username.toUpperCase()} · SIGIL #
-                    {String(data.avatarIdx).padStart(2, '0')} ·
-                  </textPath>
-                </text>
-              </svg>
-
+            <div className="relative mt-2 mb-6 flex flex-col items-center">
               <motion.div
                 key={data.avatarIdx}
                 initial={{ opacity: 0, scale: 0.88 }}
@@ -265,7 +231,7 @@ export function ProfilePage() {
               </div>
             </div>
 
-            <FieldLabel idx="02" label="Select Sigil" />
+            <FieldLabel idx="01" label="Profile Image" />
 
             <div className="mt-4 grid grid-cols-4 gap-2">
               {SIGILS.map((Glyph, i) => {
@@ -338,7 +304,7 @@ export function ProfilePage() {
           {/* ═══ RIGHT: FORM ═══ */}
           <div className="px-8 py-8">
             <div className="space-y-7">
-              <FormRow index="03" label="Username" hint="3–20 · lowercase · [a-z 0-9 _ .]">
+              <FormRow index="02" label="Username" hint="3–20 · lowercase · [a-z 0-9 _ .]">
                 <div className="relative flex items-baseline gap-2">
                   <span className="text-ink-dim font-mono text-2xl">@</span>
                   <input
@@ -355,7 +321,7 @@ export function ProfilePage() {
                 </div>
               </FormRow>
 
-              <FormRow index="04" label="Display Name" hint="How you appear on leaderboards">
+              <FormRow index="03" label="Display Name" hint="How you appear on leaderboards">
                 <input
                   value={data.displayName}
                   onChange={(e) => setData((d) => ({ ...d, displayName: e.target.value }))}
@@ -365,7 +331,7 @@ export function ProfilePage() {
               </FormRow>
 
               <FormRow
-                index="05"
+                index="04"
                 label="Bio"
                 hint={`${charCount} / ${charMax}`}
                 hintTone={charCount > charMax ? 'accent' : 'muted'}
@@ -378,7 +344,7 @@ export function ProfilePage() {
                 />
               </FormRow>
 
-              <FormRow index="06" label="X / Twitter" hint="Optional">
+              <FormRow index="05" label="X / Twitter" hint="Optional">
                 <div className="flex items-baseline gap-2">
                   <span className="text-ink-dim font-mono text-body">@</span>
                   <input
@@ -392,24 +358,13 @@ export function ProfilePage() {
           </div>
         </div>
 
-        {/* ═══ FOOTER / COMMIT BAR ═══ */}
+        {/* ═══ FOOTER ═══ */}
         <footer
           className={cn(
-            'flex flex-wrap items-center justify-between gap-4',
+            'flex items-center justify-end',
             'border-line bg-surface-1/40 border-t px-8 py-5',
           )}
         >
-          <div className="text-ink-dim flex items-center gap-3 font-mono text-micro tracking-wider uppercase">
-            <span
-              className={cn(
-                'h-1.5 w-1.5 rounded-full',
-                canSave ? 'bg-brand-to' : 'bg-line-strong',
-              )}
-            />
-            <span>{canSave ? 'READY TO COMMIT' : 'AWAITING VALID INPUT'}</span>
-            <span className="text-line-strong">│</span>
-            <span>CHANGES NOT YET PERSISTED</span>
-          </div>
           <Button
             variant="primary"
             disabled={!canSave}
