@@ -416,7 +416,7 @@ export function PortfolioPage() {
     >
       <section>
         <div className="mb-5">
-          <h2 className="text-ink-strong font-mono text-xs font-bold tracking-wide uppercase">
+          <h2 className="text-ink-strong font-mono text-caption font-bold tracking-wide uppercase">
             Active Positions
           </h2>
         </div>
@@ -435,7 +435,7 @@ export function PortfolioPage() {
 
       <section className="mt-12">
         <div className="mb-5">
-          <h2 className="text-ink-strong font-mono text-xs font-bold tracking-wide uppercase">
+          <h2 className="text-ink-strong font-mono text-caption font-bold tracking-wide uppercase">
             Settled Positions
           </h2>
         </div>

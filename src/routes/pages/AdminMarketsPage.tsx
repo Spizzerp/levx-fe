@@ -89,7 +89,7 @@ export function AdminMarketsPage() {
                 {m.pair || `Market ${m.marketId}`}
               </span>
               <span className={cn(
-                'rounded-full border px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider',
+                'rounded-full border px-2 py-0.5 font-mono text-label uppercase tracking-wider',
                 m.state === 'active' ? 'border-success/30 text-success' :
                 m.state === 'pending' ? 'border-warning/30 text-warning' :
                 m.state === 'settled' ? 'border-ink-dim/30 text-ink-dim' :

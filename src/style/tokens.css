@@ -59,12 +59,12 @@
   --color-line-strong: var(--line-strong);
 
   /* ── Accent + semantic (same in both themes) ── */
-  --color-accent: #FF483B;
+  --color-accent: #ff483b;
   --color-accent-subtle: rgba(255, 72, 59, 0.15);
-  --color-success: #5CF78B;
+  --color-success: #5cf78b;
   --color-success-dim: #4a9e5c;
-  --color-brand-from: #F4FA4D;
-  --color-brand-to: #5CF78B;
+  --color-brand-from: #f4fa4d;
+  --color-brand-to: #5cf78b;
   --color-warning: #d4a843;
   --color-interactive: #5b9bf6;
 
@@ -94,10 +94,10 @@
      body        — 16px, primary copy
      body-sm     — 15px, secondary copy
      ui          — 14px, UI elements
-     caption     — 13px, button text
-     label       — 11px, uppercase mono metadata
-     micro       — 10px, small captions
-     nano        — 9px, tiny labels
+     caption     — 12px, button text / section headings
+     label       — 12px, uppercase mono metadata (workhorse)
+     micro       — 11px, dense chrome
+     nano        — 10px, floor for tiny labels
   */
   --fs-display-xl: 72px;
   --fs-display-lg: 56px;
@@ -108,10 +108,10 @@
   --fs-body: 16px;
   --fs-body-sm: 15px;
   --fs-ui: 14px;
-  --fs-caption: 13px;
-  --fs-label: 11px;
-  --fs-micro: 10px;
-  --fs-nano: 9px;
+  --fs-caption: 12px;
+  --fs-label: 12px;
+  --fs-micro: 11px;
+  --fs-nano: 10px;
 
   /* ── Line heights ─────────────────────────────
      tight  — display text, headings
@@ -137,13 +137,13 @@
      Based on 4px grid from tokens.md
      ════════════════════════════════════════════════ */
   --spacing-0: 0px;
-  --spacing-1: 4px;   /* optical/tight joins */
-  --spacing-2: 8px;   /* inside controls */
-  --spacing-3: 12px;  /* compact gaps */
-  --spacing-4: 16px;  /* normal element gaps */
-  --spacing-5: 20px;  /* medium gaps */
-  --spacing-6: 24px;  /* group separation */
-  --spacing-8: 32px;  /* section rhythm */
+  --spacing-1: 4px; /* optical/tight joins */
+  --spacing-2: 8px; /* inside controls */
+  --spacing-3: 12px; /* compact gaps */
+  --spacing-4: 16px; /* normal element gaps */
+  --spacing-5: 20px; /* medium gaps */
+  --spacing-6: 24px; /* group separation */
+  --spacing-8: 32px; /* section rhythm */
   --spacing-10: 40px; /* larger gaps */
   --spacing-12: 48px; /* large section breaks */
   --spacing-16: 64px; /* page-level breathing */
@@ -153,10 +153,10 @@
      BORDER RADIUS
      ════════════════════════════════════════════════ */
   --radius-none: 0px;
-  --radius-sm: 4px;   /* small elements */
-  --radius-md: 8px;   /* buttons, inputs */
-  --radius-lg: 12px;  /* cards, dropdowns */
-  --radius-xl: 16px;  /* modals, large cards */
+  --radius-sm: 4px; /* small elements */
+  --radius-md: 8px; /* buttons, inputs */
+  --radius-lg: 12px; /* cards, dropdowns */
+  --radius-xl: 16px; /* modals, large cards */
   --radius-2xl: 24px; /* hero elements */
   --radius-full: 9999px; /* pills, avatars */
 
@@ -168,14 +168,16 @@
      base    — default stacking
      above   — above siblings
      nav     — sticky top navigation
-     overlay — modals / dropdowns
-     toast   — floating notifications
+     overlay — dropdowns / popovers (anchored)
+     modal   — full-screen modals (above nav + dropdowns)
+     toast   — floating notifications (top-most)
   */
   --z-base: 0;
   --z-above: 10;
   --z-nav: 100;
   --z-overlay: 200;
-  --z-toast: 300;
+  --z-modal: 300;
+  --z-toast: 400;
 
   /* ── Sizes (common dimensions) ───────────────
      For buttons, inputs, icons
@@ -356,6 +358,31 @@
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
+}
+
+/* ════════════════════════════════════════════════
+   Z-INDEX UTILITIES
+   Tailwind v4 has no auto-namespace for z-index, so we
+   register each token explicitly. Keep in sync with the
+   --z-* variables in @theme above.
+   ════════════════════════════════════════════════ */
+@utility z-base {
+  z-index: var(--z-base);
+}
+@utility z-above {
+  z-index: var(--z-above);
+}
+@utility z-nav {
+  z-index: var(--z-nav);
+}
+@utility z-overlay {
+  z-index: var(--z-overlay);
+}
+@utility z-modal {
+  z-index: var(--z-modal);
+}
+@utility z-toast {
+  z-index: var(--z-toast);
 }
 
 /* ════════════════════════════════════════════════

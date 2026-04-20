@@ -17,6 +17,7 @@ import { feedIdForPair } from '@/lib/pyth/feedIds'
 import { buildCheckpointXs } from '@/lib/drawing/geometry'
 import { useYAxisFreeze } from '@/lib/drawing/yFreeze'
 import { useChartViewport } from '@/lib/chart/useChartViewport'
+import { useYAxisViewport } from '@/lib/chart/useYAxisViewport'
 import { computeVisiblePriceDomain } from '@/lib/chart/computeVisiblePriceDomain'
 import { DrawingGrid } from '@/components/DrawingGrid'
 import { ChartMorphLine } from '@/components/ChartMorphLine'
@@ -85,6 +86,13 @@ export interface LevXChartProps {
   /** The full market is needed to build checkpoint Xs for the draw-mode grid. */
   market?: Pick<Market, 'startTime' | 'checkpointInterval' | 'totalCheckpoints'> | null
   /**
+   * Fires whenever the effective time-domain changes (pan/zoom/reset/default recompute).
+   * Consumers use this to drive lazy-loaded data: when the left edge approaches the
+   * oldest loaded bar, trigger fetchOlder on the data hook.
+   * Args are [fromMs, toMs] in unix milliseconds.
+   */
+  onViewportChange?: (domain: [number, number]) => void
+  /**
    * Optional render prop invoked INSIDE the SVG inner group (after DrawingGrid, before crosshair).
    * Receives live scales and checkpoint Xs so the consumer can mount DrawingLayer with
    * the correct coordinate space. Omitting it is backward-compatible (no overlay rendered).
@@ -122,6 +130,7 @@ function ChartInner({
   pair,
   market,
   isLoading,
+  onViewportChange,
   renderDrawingOverlay,
 }: InnerProps) {
   const innerWidth = Math.max(0, width - MARGIN.left - MARGIN.right)
@@ -185,7 +194,7 @@ function ChartInner({
   /* ── Viewport: pan / zoom ────────────────────────────────── */
   const {
     effectiveTimeDomain: viewportTimeDomain,
-    // isFollowing available for future use (e.g. reset button visibility)
+    isFollowing: viewportIsFollowing,
     svgRef: viewportSvgRef,
     pointerHandlers: viewportPointerHandlers,
     isPanning: viewportIsPanning,
@@ -199,6 +208,17 @@ function ChartInner({
     maxSpanMs,
   })
 
+  /* ── Notify data layer of viewport changes (for lazy pagination) ──
+   *
+   * Gated on `!viewportIsFollowing` so we don't trigger a fetch when the user
+   * hasn't interacted. In following mode, `defaultTimeDomain` widens as older
+   * pages arrive — emitting that would create a self-sustaining load loop where
+   * each new page expands the domain, which emits again, which fetches again. */
+  useEffect(() => {
+    if (viewportIsFollowing) return
+    onViewportChange?.(viewportTimeDomain)
+  }, [viewportTimeDomain, viewportIsFollowing, onViewportChange])
+
   /* ── Price domain: envelope of data visible in viewport ──── */
   const priceDomainLive = useMemo<[number, number]>(
     () => computeVisiblePriceDomain(mergedHistory, predictions, viewportTimeDomain),
@@ -206,19 +226,31 @@ function ChartInner({
   )
 
   /* ── Y-axis freeze: domain held fixed during sweeping phase ── */
-  const { effectiveDomain, freeze, thaw } = useYAxisFreeze(priceDomainLive)
+  const { effectiveDomain: frozenOrLiveDomain, freeze, thaw } = useYAxisFreeze(priceDomainLive)
 
   useEffect(() => {
     if (drawingPhase === 'sweeping') freeze()
     else thaw()
   }, [drawingPhase, freeze, thaw])
 
+  /* ── Y-axis user scale (drag on axis-label area). Override wins over freeze. */
+  const {
+    effectiveDomain,
+    pointerHandlers: yAxisPointerHandlers,
+    resetYAxis,
+  } = useYAxisViewport({ basePriceDomain: frozenOrLiveDomain })
+
   const timeScale = useMemo(
     () => scaleTime<number>({ domain: viewportTimeDomain, range: [0, innerWidth] }),
     [innerWidth, viewportTimeDomain],
   )
   const priceScale = useMemo(
-    () => scaleLinear<number>({ domain: effectiveDomain, range: [innerHeight, 0], nice: true }),
+    // `nice: true` rounds the domain outward to tick boundaries — that makes
+    // user-driven scaling feel jittery (tiny drags get absorbed, then the range
+    // snaps) and lets the midpoint shift as rounding deltas change with span.
+    // Auto-fit already pads 0.9×/1.05× in computeVisiblePriceDomain, and d3's
+    // tick selection picks nice round values regardless of domain niceness.
+    () => scaleLinear<number>({ domain: effectiveDomain, range: [innerHeight, 0] }),
     [innerHeight, effectiveDomain],
   )
 
@@ -232,7 +264,10 @@ function ChartInner({
   const chartRevealed = chartRevealing && !isLoading
 
   /* ── Crosshair state ─────────────────────────────────────── */
-  const [hover, setHover] = useState<{ x: number; time: number; value: number } | null>(null)
+  // Store only the data-space coords (time, value). Pixel positions are
+  // recomputed from the current scales at render, so the marker tracks the
+  // line correctly when the viewport changes (wheel zoom, live tick, etc.).
+  const [hover, setHover] = useState<{ time: number; value: number } | null>(null)
 
   const handleMove = useCallback(
     (evt: React.MouseEvent<SVGRectElement> | React.TouchEvent<SVGRectElement> | React.PointerEvent<SVGRectElement>) => {
@@ -257,7 +292,7 @@ function ChartInner({
       const d0 = sourceData[idx - 1]
       const d1 = sourceData[idx]
       const d = !d1 ? d0 : !d0 ? d1 : t - d0.time > d1.time - t ? d1 : d0
-      if (d) setHover({ x: timeScale(d.time), time: d.time, value: d.value })
+      if (d) setHover({ time: d.time, value: d.value })
     },
     [innerWidth, selectedPathId, timeScale, mergedHistory, predictions, nowTime],
   )
@@ -521,6 +556,24 @@ function ChartInner({
           }}
         />
 
+        {/* ── Y-axis drag area (vertical scale) ──────
+            Transparent rect over the right-margin label strip. Pointer handlers
+            capture drag to scale the price domain; double-click resets. Sits
+            above the AxisRight ticks in paint order so it receives events. */}
+        <rect
+          x={innerWidth}
+          y={0}
+          width={MARGIN.right}
+          height={innerHeight}
+          fill="transparent"
+          style={{ cursor: 'ns-resize', touchAction: 'none' }}
+          onPointerDown={yAxisPointerHandlers.onPointerDown}
+          onPointerMove={yAxisPointerHandlers.onPointerMove}
+          onPointerUp={yAxisPointerHandlers.onPointerUp}
+          onPointerCancel={yAxisPointerHandlers.onPointerCancel}
+          onDoubleClick={resetYAxis}
+        />
+
         {/* ── Bottom X-axis ───────────────────────── */}
         <AxisBottom
           scale={timeScale}
@@ -571,20 +624,23 @@ function ChartInner({
         />
 
         {/* ── Hover crosshair ─────────────────────── */}
-        {hover && (
-          <>
-            <Line
-              from={{ x: hover.x, y: 0 }}
-              to={{ x: hover.x, y: innerHeight }}
-              stroke={C.line}
-              strokeWidth={1}
-              strokeDasharray="1 3"
-              opacity={0.5}
-              pointerEvents="none"
-            />
-            <Circle cx={hover.x} cy={priceScale(hover.value)} r={3} fill={C.line} />
-          </>
-        )}
+        {hover && (() => {
+          const hx = timeScale(hover.time)
+          return (
+            <>
+              <Line
+                from={{ x: hx, y: 0 }}
+                to={{ x: hx, y: innerHeight }}
+                stroke={C.line}
+                strokeWidth={1}
+                strokeDasharray="1 3"
+                opacity={0.5}
+                pointerEvents="none"
+              />
+              <Circle cx={hx} cy={priceScale(hover.value)} r={3} fill={C.line} />
+            </>
+          )
+        })()}
 
         {/* ── Invisible hit area (pan + crosshair) ── */}
         <Bar

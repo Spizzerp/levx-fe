@@ -1,5 +1,5 @@
 import { useNavigate } from '@tanstack/react-router'
-import { Filter } from 'lucide-react'
+import { ArrowRight, Filter } from 'lucide-react'
 import { useMemo, useState } from 'react'
 
 import { ChartFrame } from '@/components/ChartFrame'
@@ -145,11 +145,11 @@ const COLUMNS: DataTableColumn<Market>[] = [
     key: 'arrow',
     header: '',
     cellClassName: cn(
-      'text-ink-dim text-right font-mono text-sm',
+      'text-ink-dim flex justify-end',
       'duration-short ease-levx transition-[color,transform]',
       'group-hover:text-ink-strong group-hover:translate-x-1',
     ),
-    render: () => '→',
+    render: () => <ArrowRight size={16} strokeWidth={1.75} aria-hidden />,
   },
 ]
 
@@ -200,7 +200,7 @@ export function MarketsPage() {
                 {markets?.filter((m) => m.state === 'active').length ?? 0}
                 <span className="inline-flex items-center gap-1">
                   <span className="h-2 w-2 rounded-full bg-success animate-pulse" />
-                  <span className="text-success text-[10px] font-normal tracking-wide">Live</span>
+                  <span className="text-success text-label font-normal tracking-wide">Live</span>
                 </span>
               </div>
             </div>
@@ -265,14 +265,14 @@ export function MarketsPage() {
                 disabled={page === 0}
                 onClick={() => setPage((p) => p - 1)}
                 className={cn(
-                  'font-mono text-[10px] uppercase tracking-wider px-3 py-1 rounded-full border border-line-strong',
+                  'font-mono text-label uppercase tracking-wider px-3 py-1 rounded-full border border-line-strong',
                   'duration-short ease-levx transition-colors',
                   page === 0 ? 'text-ink-dim cursor-not-allowed' : 'text-ink-muted hover:text-ink-strong hover:border-ink',
                 )}
               >
                 Prev
               </button>
-              <span className="font-mono text-[10px] text-ink-muted uppercase tracking-wider">
+              <span className="font-mono text-label text-ink-muted uppercase tracking-wider">
                 {page + 1} / {totalPages}
               </span>
               <button
@@ -280,7 +280,7 @@ export function MarketsPage() {
                 disabled={page >= totalPages - 1}
                 onClick={() => setPage((p) => p + 1)}
                 className={cn(
-                  'font-mono text-[10px] uppercase tracking-wider px-3 py-1 rounded-full border border-line-strong',
+                  'font-mono text-label uppercase tracking-wider px-3 py-1 rounded-full border border-line-strong',
                   'duration-short ease-levx transition-colors',
                   page >= totalPages - 1 ? 'text-ink-dim cursor-not-allowed' : 'text-ink-muted hover:text-ink-strong hover:border-ink',
                 )}

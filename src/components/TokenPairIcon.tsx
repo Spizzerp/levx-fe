@@ -37,7 +37,7 @@ export function TokenPairIcon({ base, quote, size = 28, className }: TokenPairIc
         {baseImg ? (
           <img src={baseImg} alt={base} className="h-full w-full object-cover" />
         ) : (
-          <span className="flex h-full w-full items-center justify-center font-mono text-[9px] text-ink-muted uppercase">
+          <span className="flex h-full w-full items-center justify-center font-mono text-label text-ink-muted uppercase">
             {base.slice(0, 2)}
           </span>
         )}
@@ -52,7 +52,7 @@ export function TokenPairIcon({ base, quote, size = 28, className }: TokenPairIc
         {quoteImg ? (
           <img src={quoteImg} alt={quote} className="h-full w-full object-cover" />
         ) : (
-          <span className="flex h-full w-full items-center justify-center font-mono text-[9px] text-ink-muted uppercase">
+          <span className="flex h-full w-full items-center justify-center font-mono text-label text-ink-muted uppercase">
             {quote.slice(0, 2)}
           </span>
         )}

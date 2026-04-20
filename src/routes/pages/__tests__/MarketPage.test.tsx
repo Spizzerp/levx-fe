@@ -68,7 +68,12 @@ vi.mock('@/lib/pyth/useBenchmarksHistory', () => ({
     isError: false,
     error: null,
     isSuccess: false,
+    fetchStatus: 'idle',
+    isFetchingOlder: false,
+    hasMoreHistory: true,
+    fetchOlder: () => {},
   }),
+  useLazyHistoryTrigger: () => () => {},
 }))
 
 // Mock wallet-adapter-react-ui so ConnectGate can render without the provider tree
