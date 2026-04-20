@@ -29,7 +29,7 @@ const LINK_ACTIVE = 'text-ink-strong'
 
 export function Nav() {
   return (
-    <div className="sticky top-0 z-[9999] w-full bg-gradient-to-b from-surface from-60% to-transparent px-6 pt-3 pb-3">
+    <div className="sticky top-0 z-nav w-full bg-gradient-to-b from-surface from-60% to-transparent px-6 pt-3 pb-3">
     <nav className="pill-glow mx-auto flex w-full max-w-[1400px] items-center justify-between rounded-full border border-line-strong bg-surface px-6 py-3 relative">
       <img src="/logo_color.png" alt="LevX" className="relative z-10 h-12 -my-1 w-auto" />
       <ul className="absolute inset-0 flex items-center justify-center gap-9">

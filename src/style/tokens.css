@@ -359,6 +359,28 @@
 }
 
 /* ════════════════════════════════════════════════
+   Z-INDEX UTILITIES
+   Tailwind v4 has no auto-namespace for z-index, so we
+   register each token explicitly. Keep in sync with the
+   --z-* variables in @theme above.
+   ════════════════════════════════════════════════ */
+@utility z-base {
+  z-index: var(--z-base);
+}
+@utility z-above {
+  z-index: var(--z-above);
+}
+@utility z-nav {
+  z-index: var(--z-nav);
+}
+@utility z-overlay {
+  z-index: var(--z-overlay);
+}
+@utility z-toast {
+  z-index: var(--z-toast);
+}
+
+/* ════════════════════════════════════════════════
    TRANSITION UTILITIES
    ════════════════════════════════════════════════ */
 @utility transition-colors-fast {
