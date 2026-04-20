@@ -1,0 +1,45 @@
+name: supabase-deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/**'
+      - 'supabase/functions/**'
+      - 'supabase/config.toml'
+      - '.github/workflows/supabase-deploy.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: supabase-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      PROJECT_REF: ghczicioyzrbvtvdshcc
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          # Pinned to match the version used locally. Bump in a dedicated PR
+          # so a Supabase CLI release can't break the pipeline silently.
+          version: 2.75.0
+
+      - name: Link project
+        # Pass --password explicitly rather than relying on the CLI picking
+        # up SUPABASE_DB_PASSWORD from env — deterministic + obvious in logs.
+        run: supabase link --project-ref "$PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
+
+      - name: Push migrations
+        run: supabase db push
+
+      - name: Deploy verify-wallet edge function
+        # --no-verify-jwt: the /nonce endpoint is pre-authentication (clients
+        # need a nonce before they have a JWT). The function does its own
+        # wallet-signature auth.
+        run: supabase functions deploy verify-wallet --no-verify-jwt
