@@ -93,7 +93,7 @@ export function ExpandPill<T extends string = string>({
                   transition={{ duration: 0.2, delay: 0.1 + i * 0.03 }}
                   onClick={() => handleSelect(o.id)}
                   className={cn(
-                    'whitespace-nowrap px-3 py-1 font-mono text-[10px] uppercase tracking-wider',
+                    'whitespace-nowrap px-3 py-1 font-mono text-label uppercase tracking-wider',
                     o.id === value
                       ? 'text-ink-strong'
                       : 'text-ink-dim hover:text-ink-muted',

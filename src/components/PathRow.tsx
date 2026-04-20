@@ -41,7 +41,7 @@ export function PathRow({ index, name, multiplier, wagered, active = false, pend
           {pending ? `${name} — confirming…` : name}
         </span>
         {wagered != null && wagered > 0 && (
-          <span className="text-ink-dim text-nano font-mono tracking-wide">
+          <span className="text-ink-dim text-label font-mono tracking-wide">
             {formatUSD(wagered)} wagered
           </span>
         )}

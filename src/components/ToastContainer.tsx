@@ -22,11 +22,11 @@ function ToastItem({ toast }: { toast: Toast }) {
     >
       <span className={cn('mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full', TYPE_DOT[toast.type])} />
       <div className="flex-1 min-w-0">
-        <p className="text-ink-strong font-mono text-[11px] uppercase tracking-wide">
+        <p className="text-ink-strong font-mono text-label uppercase tracking-wide">
           {toast.title}
         </p>
         {toast.message && (
-          <p className="text-ink-muted font-mono text-[10px] mt-0.5 tracking-wide line-clamp-3">
+          <p className="text-ink-muted font-mono text-caption mt-0.5 tracking-wide line-clamp-3">
             {toast.message}
           </p>
         )}
@@ -35,7 +35,7 @@ function ToastItem({ toast }: { toast: Toast }) {
             href={explorerTxUrl(toast.txSig)}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-interactive font-mono text-[10px] mt-1 block truncate tracking-wide hover:underline"
+            className="text-interactive font-mono text-label mt-1 block truncate tracking-wide hover:underline"
           >
             View on Explorer
           </a>

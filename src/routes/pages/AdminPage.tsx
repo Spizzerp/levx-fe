@@ -190,7 +190,7 @@ function ProviderSelect({
         onClick={() => setOpen((v) => !v)}
         className={cn(
           'flex w-full items-center justify-between',
-          'font-mono text-[11px] text-ink uppercase tracking-wide',
+          'font-mono text-label text-ink uppercase tracking-wide',
           'cursor-pointer',
         )}
       >
@@ -216,7 +216,7 @@ function ProviderSelect({
               type="button"
               className={cn(
                 'flex w-full items-center justify-between px-3 py-2',
-                'font-mono text-[11px] uppercase tracking-wide',
+                'font-mono text-label uppercase tracking-wide',
                 'duration-short ease-levx transition-[background-color,color]',
                 p.id === value ? 'text-ink-strong' : 'text-ink-muted',
                 'hover:bg-surface-2 hover:text-ink-strong',
@@ -227,7 +227,7 @@ function ProviderSelect({
               }}
             >
               <span>{p.label}</span>
-              <span className="text-ink-dim text-[9px] tracking-wider">{p.type}</span>
+              <span className="text-ink-dim text-label tracking-wider">{p.type}</span>
             </button>
           ))}
         </div>
@@ -245,7 +245,7 @@ function InfoTip({ text }: { text: string }) {
       <span className={cn(
         'pointer-events-none absolute bottom-full left-1/2 z-toast mb-2 -translate-x-1/2',
         'w-56 rounded border border-line-strong bg-surface-1 px-3 py-2',
-        'font-mono text-[10px] leading-relaxed text-ink-muted',
+        'font-mono text-label leading-relaxed text-ink-muted',
         'opacity-0 transition-opacity duration-short ease-levx',
         'group-hover:opacity-100',
       )}>
@@ -483,7 +483,7 @@ export function AdminPage() {
                   type="button"
                   className={cn(
                     'flex h-7 w-7 items-center justify-center rounded-full border',
-                    'font-mono text-[9px] tracking-wide',
+                    'font-mono text-label tracking-wide',
                     'duration-short ease-levx transition-[border-color,color]',
                     'cursor-pointer',
                     n === numPaths
@@ -509,7 +509,7 @@ export function AdminPage() {
                   'hover:border-line-strong',
                 )}
               >
-                <span className="text-ink-dim font-mono text-[10px] w-5 shrink-0">
+                <span className="text-ink-dim font-mono text-label w-5 shrink-0">
                   {String(idx + 1).padStart(2, '0')}
                 </span>
                 <span

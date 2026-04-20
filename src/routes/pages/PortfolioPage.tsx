@@ -220,7 +220,7 @@ export function PortfolioPage() {
       }
     >
       <div className="mb-8 pb-4">
-        <h2 className="text-ink-strong font-mono text-xs font-bold tracking-wide uppercase">
+        <h2 className="text-ink-strong font-mono text-caption font-bold tracking-wide uppercase">
           Settled Positions
         </h2>
       </div>

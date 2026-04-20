@@ -215,7 +215,7 @@ export function ProfilePage() {
       }
     >
       <div className="mb-8 flex items-baseline justify-between pb-4">
-        <h2 className="text-ink-strong font-mono text-xs font-bold tracking-wide uppercase">
+        <h2 className="text-ink-strong font-mono text-caption font-bold tracking-wide uppercase">
           Public Identity
         </h2>
         <span className="text-ink-dim font-mono text-micro tracking-wider uppercase">
@@ -398,7 +398,7 @@ export function ProfilePage() {
                   )}
                 >
                   <Camera size={14} strokeWidth={1.5} />
-                  <span className="font-mono text-[8px] tracking-wider uppercase">Upload</span>
+                  <span className="font-mono text-label tracking-wider uppercase">Upload</span>
                 </button>
               )}
             </div>
@@ -587,7 +587,7 @@ function AvailabilityBadge({ state }: { state: Availability }) {
   return (
     <span
       className={cn(
-        'font-mono text-nano tracking-wider uppercase whitespace-nowrap',
+        'font-mono text-label tracking-wider uppercase whitespace-nowrap',
         tone,
       )}
     >
