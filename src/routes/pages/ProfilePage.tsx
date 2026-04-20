@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'motion/react'
-import { Camera, Check, Copy, Lock, Shuffle } from 'lucide-react'
+import { Camera, Check, Copy, Lock, Shuffle, Trash2 } from 'lucide-react'
 
 import { Button } from '@/components/Button'
 import { ChartFrame } from '@/components/ChartFrame'
+import { ImageCropModal } from '@/components/ImageCropModal'
 import { SIGILS } from '@/components/Sigils'
 import { cn } from '@/lib/cn'
+import { readFileAsDataUrl } from '@/lib/cropImage'
 import { formatAddress } from '@/lib/format'
 import { PageLayout } from '@/layouts/PageLayout'
 import { useWalletStore } from '@/stores/walletStore'
@@ -16,6 +18,8 @@ interface ProfileData {
   bio: string
   handle: string
   avatarIdx: number
+  /** Cropped 1:1 image as a data URL; when set, overrides `avatarIdx`. */
+  customImage: string | null
 }
 
 const DEFAULT_DATA: ProfileData = {
@@ -24,6 +28,7 @@ const DEFAULT_DATA: ProfileData = {
   bio: 'Gradient-curve believer. Long vol, short patience.',
   handle: 'zerocooler',
   avatarIdx: 4,
+  customImage: null,
 }
 
 const USERNAME_RE = /^[a-z0-9_.]{3,20}$/
@@ -47,7 +52,36 @@ export function ProfilePage() {
   const [data, setData] = useState<ProfileData>(DEFAULT_DATA)
   const [checkResult, setCheckResult] = useState<{ name: string; ok: boolean } | null>(null)
   const [copied, setCopied] = useState(false)
+  const [pendingUpload, setPendingUpload] = useState<string | null>(null)
   const firstInputRef = useRef<HTMLInputElement | null>(null)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+
+  const openFilePicker = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+      fileInputRef.current.click()
+    }
+  }
+
+  const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    try {
+      const dataUrl = await readFileAsDataUrl(file)
+      setPendingUpload(dataUrl)
+    } catch (err) {
+      console.error('Failed to read image', err)
+    }
+  }
+
+  const handleCropApply = (croppedDataUrl: string) => {
+    setData((d) => ({ ...d, customImage: croppedDataUrl }))
+    setPendingUpload(null)
+  }
+
+  const clearCustomImage = () => {
+    setData((d) => ({ ...d, customImage: null }))
+  }
 
   // Only the async debounce lives in an effect; idle/invalid/checking are
   // derived synchronously below.
@@ -108,6 +142,7 @@ export function ProfilePage() {
   const Sigil = SIGILS[data.avatarIdx] ?? SIGILS[0]
 
   return (
+    <>
     <PageLayout
       title="Profile"
       subtitle="Your public profile"
@@ -204,12 +239,12 @@ export function ProfilePage() {
 
             <div className="relative mt-2 mb-6 flex flex-col items-center">
               <motion.div
-                key={data.avatarIdx}
+                key={data.customImage ? 'custom' : `sigil-${data.avatarIdx}`}
                 initial={{ opacity: 0, scale: 0.88 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.22, ease: [0.25, 0.1, 0.25, 1] }}
                 className={cn(
-                  'relative flex h-[120px] w-[120px] items-center justify-center',
+                  'relative flex h-[120px] w-[120px] items-center justify-center overflow-hidden',
                   'border-ink-strong rounded-full border',
                   'bg-surface-1',
                 )}
@@ -218,7 +253,16 @@ export function ProfilePage() {
                     '0 0 0 6px var(--color-surface), 0 0 0 7px color-mix(in srgb, var(--color-brand-to) 60%, transparent)',
                 }}
               >
-                <Sigil size={76} tone="strong" />
+                {data.customImage ? (
+                  <img
+                    src={data.customImage}
+                    alt="Profile"
+                    className="h-full w-full object-cover"
+                    draggable={false}
+                  />
+                ) : (
+                  <Sigil size={76} tone="strong" />
+                )}
               </motion.div>
 
               <div className="mt-6 flex items-center gap-3">
@@ -235,12 +279,14 @@ export function ProfilePage() {
 
             <div className="mt-4 grid grid-cols-4 gap-2">
               {SIGILS.map((Glyph, i) => {
-                const selected = data.avatarIdx === i
+                const selected = !data.customImage && data.avatarIdx === i
                 return (
                   <motion.button
                     key={i}
                     type="button"
-                    onClick={() => setData((d) => ({ ...d, avatarIdx: i }))}
+                    onClick={() =>
+                      setData((d) => ({ ...d, avatarIdx: i, customImage: null }))
+                    }
                     whileHover={{ y: -1 }}
                     whileTap={{ scale: 0.96 }}
                     className={cn(
@@ -274,6 +320,7 @@ export function ProfilePage() {
                   setData((d) => ({
                     ...d,
                     avatarIdx: (d.avatarIdx + 1 + Math.floor(Math.random() * 7)) % SIGILS.length,
+                    customImage: null,
                   }))
                 }
                 className={cn(
@@ -286,19 +333,84 @@ export function ProfilePage() {
                 <Shuffle size={16} strokeWidth={1.5} />
               </motion.button>
 
-              {/* Upload */}
-              <button
-                type="button"
-                className={cn(
-                  'flex aspect-square flex-col items-center justify-center gap-1',
-                  'border-line-strong text-ink-muted rounded-md border border-dashed',
-                  'hover:border-ink hover:text-ink-strong transition-colors',
-                )}
-              >
-                <Camera size={14} strokeWidth={1.5} />
-                <span className="font-mono text-[8px] tracking-wider uppercase">Upload</span>
-              </button>
+              {/* Upload / custom image cell */}
+              {data.customImage ? (
+                <div
+                  className={cn(
+                    'group relative flex aspect-square items-center justify-center overflow-hidden',
+                    'border-ink-strong bg-surface-1 rounded-md border',
+                  )}
+                >
+                  <img
+                    src={data.customImage}
+                    alt="Uploaded"
+                    className="h-full w-full object-cover"
+                    draggable={false}
+                  />
+                  {/* Selected pip — matches sigil cell treatment */}
+                  <span
+                    aria-hidden
+                    className={cn(
+                      'absolute -top-1 -right-1 h-3 w-3',
+                      'border-surface bg-brand-to rounded-full border',
+                    )}
+                  />
+                  {/* Hover overlay: re-upload + remove */}
+                  <div
+                    className={cn(
+                      'absolute inset-0 flex items-center justify-center gap-1.5',
+                      'bg-surface/75 opacity-0 group-hover:opacity-100',
+                      'duration-short ease-levx transition-opacity',
+                    )}
+                  >
+                    <button
+                      type="button"
+                      onClick={openFilePicker}
+                      aria-label="Replace image"
+                      className={cn(
+                        'border-ink-strong text-ink-strong rounded-md border bg-transparent p-1',
+                        'hover:bg-surface-1 transition-colors',
+                      )}
+                    >
+                      <Camera size={12} strokeWidth={1.5} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={clearCustomImage}
+                      aria-label="Remove image"
+                      className={cn(
+                        'border-accent text-accent rounded-md border bg-transparent p-1',
+                        'hover:bg-accent-subtle transition-colors',
+                      )}
+                    >
+                      <Trash2 size={12} strokeWidth={1.5} />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={openFilePicker}
+                  className={cn(
+                    'flex aspect-square flex-col items-center justify-center gap-1',
+                    'border-line-strong text-ink-muted rounded-md border border-dashed',
+                    'hover:border-ink hover:text-ink-strong transition-colors',
+                  )}
+                >
+                  <Camera size={14} strokeWidth={1.5} />
+                  <span className="font-mono text-[8px] tracking-wider uppercase">Upload</span>
+                </button>
+              )}
             </div>
+
+            {/* Hidden file input — triggered by Upload / replace buttons */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleFileSelected}
+            />
           </div>
 
           {/* ═══ RIGHT: FORM ═══ */}
@@ -376,6 +488,14 @@ export function ProfilePage() {
         </footer>
       </ChartFrame>
     </PageLayout>
+
+    <ImageCropModal
+      open={pendingUpload !== null}
+      imageSrc={pendingUpload}
+      onClose={() => setPendingUpload(null)}
+      onApply={handleCropApply}
+    />
+    </>
   )
 }
 
