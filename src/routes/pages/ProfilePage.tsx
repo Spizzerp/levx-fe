@@ -94,11 +94,11 @@ export function ProfilePage() {
 
   if (!connected) {
     return (
-      <PageLayout title="Profile" subtitle="Identity · Sigil · Callsign">
+      <PageLayout title="Profile" subtitle="Your public profile">
         <div className="border-line-strong flex flex-col items-center justify-center gap-4 rounded-2xl border border-dashed py-24">
           <Lock size={32} strokeWidth={1.5} className="text-ink-dim" />
           <p className="text-ink-muted font-mono text-label uppercase">
-            [ Connect a wallet to edit your operator profile ]
+            [ Connect a wallet to edit your profile ]
           </p>
         </div>
       </PageLayout>
@@ -110,7 +110,7 @@ export function ProfilePage() {
   return (
     <PageLayout
       title="Profile"
-      subtitle="Identity · Sigil · Callsign"
+      subtitle="Your public profile"
       summaryBar={
         <div className="flex flex-wrap items-center gap-12 pb-8">
           <div>
@@ -181,7 +181,7 @@ export function ProfilePage() {
     >
       <div className="mb-8 flex items-baseline justify-between pb-4">
         <h2 className="text-ink-strong font-mono text-xs font-bold tracking-wide uppercase">
-          Operator Identity
+          Public Identity
         </h2>
         <span className="text-ink-dim font-mono text-micro tracking-wider uppercase">
           // Edit
