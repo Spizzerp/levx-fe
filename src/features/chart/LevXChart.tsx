@@ -19,9 +19,9 @@ import { useYAxisFreeze } from '@/lib/drawing/yFreeze'
 import { useChartViewport } from '@/lib/chart/useChartViewport'
 import { useYAxisViewport } from '@/lib/chart/useYAxisViewport'
 import { computeVisiblePriceDomain } from '@/lib/chart/computeVisiblePriceDomain'
-import { DrawingGrid } from '@/components/DrawingGrid'
-import { ChartMorphLine } from '@/components/ChartMorphLine'
-import { Stub } from '@/components/Stub'
+import { DrawingGrid } from '@/features/chart/DrawingGrid'
+import { ChartMorphLine } from '@/features/chart/ChartMorphLine'
+import { Stub } from '@/ui/Stub'
 
 import './LevXChart.css'
 

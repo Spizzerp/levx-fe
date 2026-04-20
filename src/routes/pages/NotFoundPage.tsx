@@ -1,4 +1,4 @@
-import { Stub } from '@/components/Stub'
+import { Stub } from '@/ui/Stub'
 
 export function NotFoundPage() {
   return <Stub title="404 · Page Not Found" subtitle="Check the URL and try again" />

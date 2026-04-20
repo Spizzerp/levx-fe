@@ -2,9 +2,9 @@ import { useMemo, useState } from 'react'
 
 import { useNavigate } from '@tanstack/react-router'
 
-import { Button } from '@/components/Button'
-import { ChartFrame } from '@/components/ChartFrame'
-import { LevXChart } from '@/components/LevXChart'
+import { Button } from '@/ui/Button'
+import { ChartFrame } from '@/features/chart/ChartFrame'
+import { LevXChart } from '@/features/chart/LevXChart'
 import { mulberry32, normalRandom } from '@/lib/rng'
 import { buildAiPathFixture } from '@/tests/fixtures/aiPaths'
 import type { PricePoint } from '@/types/market'

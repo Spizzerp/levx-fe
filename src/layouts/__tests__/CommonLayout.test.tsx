@@ -6,15 +6,15 @@ vi.mock('@tanstack/react-router', () => ({
   useLocation: () => ({ pathname: mockPathname }),
 }))
 
-vi.mock('@/components/Nav', () => ({
+vi.mock('@/layouts/Nav', () => ({
   Nav: () => <div data-testid="nav-marker">NAV</div>,
 }))
 
-vi.mock('@/components/WrongNetworkBanner', () => ({
+vi.mock('@/features/wallet/WrongNetworkBanner', () => ({
   WrongNetworkBanner: () => null,
 }))
 
-vi.mock('@/components/ToastContainer', () => ({
+vi.mock('@/ui/ToastContainer', () => ({
   ToastContainer: () => null,
 }))
 

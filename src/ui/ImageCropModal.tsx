@@ -4,7 +4,7 @@ import Cropper, { type Area } from 'react-easy-crop'
 import { AnimatePresence, motion } from 'motion/react'
 import { X } from 'lucide-react'
 
-import { Button } from '@/components/Button'
+import { Button } from '@/ui/Button'
 import { cn } from '@/lib/cn'
 import { getCroppedImage } from '@/lib/cropImage'
 

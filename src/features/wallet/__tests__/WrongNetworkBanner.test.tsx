@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, act } from '@testing-library/react'
 import { useWalletStore } from '@/stores/walletStore'
-import { WrongNetworkBanner } from '@/components/WrongNetworkBanner'
+import { WrongNetworkBanner } from '@/features/wallet/WrongNetworkBanner'
 
 let mockNetwork: 'devnet' | 'mainnet' = 'devnet'
 vi.mock('@/env', () => ({

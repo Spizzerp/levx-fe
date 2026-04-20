@@ -430,19 +430,19 @@ describe('MarketPage wallet gating', () => {
     // Wager panel chrome is still present (Collateral label is unique to this panel).
     expect(screen.getByText(/^collateral$/i)).toBeInTheDocument()
 
-    // Collateral input (native <input>, first textbox in the panel) is interactive.
-    // Preserves user-authored state across disconnect (WALLET-08).
+    // Collateral input is interactive and preserves user-authored state across
+    // disconnect (WALLET-08). Look up by its accessible label rather than DOM order
+    // so sibling textboxes (e.g. the comments composer) don't break the query.
     const user = userEvent.setup()
-    const textboxes = screen.getAllByRole('textbox') as HTMLInputElement[]
-    const collateral = textboxes[0]
+    const collateral = screen.getByLabelText(/collateral/i) as HTMLInputElement
     await user.clear(collateral)
     await user.type(collateral, '50.00')
     expect(collateral.value).toBe('50.00')
 
     // Connecting preserves the input value across the submit-slot swap.
     act(() => connectWallet())
-    const textboxesAfter = screen.getAllByRole('textbox') as HTMLInputElement[]
-    expect(textboxesAfter[0].value).toBe('50.00')
+    const collateralAfter = screen.getByLabelText(/collateral/i) as HTMLInputElement
+    expect(collateralAfter.value).toBe('50.00')
   })
 
   it('renders MarketPage without crashing when wallet is disconnected (WALLET-03)', async () => {

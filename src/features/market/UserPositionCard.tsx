@@ -1,5 +1,5 @@
-import { Button } from '@/components/Button'
-import { Label } from '@/components/Label'
+import { Button } from '@/ui/Button'
+import { Label } from '@/ui/Label'
 import { cn } from '@/lib/cn'
 import { formatUSD } from '@/lib/format'
 import type { MarketState, UserPosition } from '@/types/market'

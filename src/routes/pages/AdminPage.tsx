@@ -8,11 +8,11 @@ import { getPriorityFee } from '@/lib/chain/priorityFee'
 
 import { ChevronDown, Info } from 'lucide-react'
 
-import { Button } from '@/components/Button'
-import { ChartFrame } from '@/components/ChartFrame'
-import { Input } from '@/components/Input'
-import { Label } from '@/components/Label'
-import { LevXChart } from '@/components/LevXChart'
+import { Button } from '@/ui/Button'
+import { ChartFrame } from '@/features/chart/ChartFrame'
+import { Input } from '@/ui/Input'
+import { Label } from '@/ui/Label'
+import { LevXChart } from '@/features/chart/LevXChart'
 import { PageLayout } from '@/layouts/PageLayout'
 import { cn } from '@/lib/cn'
 import type { PathTone, PredictionPath, PricePoint } from '@/types/market'
@@ -264,7 +264,7 @@ function toLocalDatetime(ms: number): string {
 
 import { CU_LIMITS, GRADIENT, SCALE } from '@/lib/constants'
 
-import { CHIP, CHIP_ACTIVE, CHIP_INACTIVE } from '@/components/styles'
+import { CHIP, CHIP_ACTIVE, CHIP_INACTIVE } from '@/ui/styles'
 
 /* ── Page ────────────────────────────────────────────────── */
 

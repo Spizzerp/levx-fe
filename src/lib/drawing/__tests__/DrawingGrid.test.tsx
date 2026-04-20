@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { render } from '@testing-library/react'
 import { scaleLinear, scaleTime } from '@visx/scale'
-import { DrawingGrid } from '@/components/DrawingGrid'
+import { DrawingGrid } from '@/features/chart/DrawingGrid'
 
 const xScale = scaleTime({ domain: [0, 100_000], range: [0, 400] })
 const yScale = scaleLinear({ domain: [100, 200], range: [400, 0] })

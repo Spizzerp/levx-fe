@@ -1,7 +1,7 @@
 import { useNavigate } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
 
-import { Button } from '@/components/Button'
+import { Button } from '@/ui/Button'
 import { cn } from '@/lib/cn'
 import { useIsAdmin } from '@/lib/hooks/useIsAdmin'
 import { useMarkets } from '@/lib/api/hooks'

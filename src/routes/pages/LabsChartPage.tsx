@@ -1,7 +1,7 @@
 import { useState } from 'react'
 
-import { LevXChart } from '@/components/LevXChart'
-import { Stub } from '@/components/Stub'
+import { LevXChart } from '@/features/chart/LevXChart'
+import { Stub } from '@/ui/Stub'
 import { cn } from '@/lib/cn'
 import { useMarket } from '@/lib/api/hooks'
 

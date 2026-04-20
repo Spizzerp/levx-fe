@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
 import { PublicKey } from '@solana/web3.js'
 import { useWalletStore } from '@/stores/walletStore'
-import { WalletButton } from '@/components/WalletButton'
+import { WalletButton } from '@/features/wallet/WalletButton'
 
 // Mocks for wallet-adapter hooks
 const setVisible = vi.fn()

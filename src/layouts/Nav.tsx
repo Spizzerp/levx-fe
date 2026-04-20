@@ -1,8 +1,8 @@
 import { Link } from '@tanstack/react-router'
 
 import { cn } from '@/lib/cn'
-import { ThemeToggle } from '@/components/ThemeToggle'
-import { WalletButton } from '@/components/WalletButton'
+import { ThemeToggle } from '@/ui/ThemeToggle'
+import { WalletButton } from '@/features/wallet/WalletButton'
 
 
 const links = [

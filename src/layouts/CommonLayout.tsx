@@ -2,9 +2,9 @@ import type { PropsWithChildren } from 'react'
 import { FileText } from 'lucide-react'
 import { useLocation } from '@tanstack/react-router'
 
-import { Nav } from '@/components/Nav'
-import { ToastContainer } from '@/components/ToastContainer'
-import { WrongNetworkBanner } from '@/components/WrongNetworkBanner'
+import { Nav } from '@/layouts/Nav'
+import { ToastContainer } from '@/ui/ToastContainer'
+import { WrongNetworkBanner } from '@/features/wallet/WrongNetworkBanner'
 
 function XIcon({ size = 16 }: { size?: number }) {
   return (

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { render, fireEvent, act } from '@testing-library/react'
 import { scaleLinear, scaleTime } from '@visx/scale'
-import { DrawingLayer } from '@/components/DrawingLayer'
+import { DrawingLayer } from '@/features/chart/DrawingLayer'
 import { useDrawingStore } from '@/stores/drawingStore'
 
 // ----------------------------------------------------------------

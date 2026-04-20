@@ -10,7 +10,7 @@ import { queryClient } from '@/api/api.config'
 import { initEnv } from '@/env'
 import { router } from '@/routes/router'
 import '@/style/app.css'
-import { UIRoot } from '@/ui/UIRoot'
+import { UIRoot } from '@/providers/UIRoot'
 
 initEnv()
 

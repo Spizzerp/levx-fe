@@ -18,7 +18,7 @@ vi.mock('@tanstack/react-router', () => ({
 }))
 
 // Stub the chart — the landing test cares about chrome + CTA, not the chart itself.
-vi.mock('@/components/LevXChart', () => ({
+vi.mock('@/features/chart/LevXChart', () => ({
   LevXChart: () => <div data-testid="chart-stub" />,
 }))
 
