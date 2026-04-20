@@ -412,6 +412,10 @@ export function MarketPage() {
         <div className="mt-4">
           <TimeRangePicker value={candleInterval} onChange={setCandleInterval} />
         </div>
+
+        <div className="mt-8">
+          <MarketComments marketId={market.id} />
+        </div>
       </section>
 
       {/* ── Right rail (Active markets only) ───────────────────── */}
@@ -593,11 +597,6 @@ export function MarketPage() {
       {/* ── Market details (collapsible) — spans full width below chart/rail ── */}
       <div className="[@media(min-width:1181px)]:col-span-full">
         <MarketMetaPanel market={market} />
-      </div>
-
-      {/* ── Comments — spans full width at bottom ── */}
-      <div className="[@media(min-width:1181px)]:col-span-full">
-        <MarketComments marketId={market.id} />
       </div>
     </main>
   )
