@@ -1,9 +1,9 @@
 {
   "imports": {
     "std/http/server":  "https://deno.land/std@0.224.0/http/server.ts",
-    "supabase-js":      "https://esm.sh/@supabase/supabase-js@2.45.4",
-    "tweetnacl":        "https://esm.sh/tweetnacl@1.0.3",
-    "bs58":             "https://esm.sh/bs58@5.0.0",
+    "supabase-js":      "npm:@supabase/supabase-js@2.45.4",
+    "tweetnacl":        "npm:tweetnacl@1.0.3",
+    "bs58":             "npm:bs58@5.0.0",
     "djwt":             "https://deno.land/x/djwt@v3.0.2/mod.ts"
   }
 }

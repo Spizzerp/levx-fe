@@ -1,7 +1,7 @@
 import { assertEquals, assertExists } from 'https://deno.land/std@0.224.0/assert/mod.ts'
 import { buildMessage } from './_shared/message.ts'
-import nacl from 'https://esm.sh/tweetnacl@1.0.3'
-import bs58 from 'https://esm.sh/bs58@5.0.0'
+import nacl from 'npm:tweetnacl@1.0.3'
+import bs58 from 'npm:bs58@5.0.0'
 import { verify as verifyJWT } from 'https://deno.land/x/djwt@v3.0.2/mod.ts'
 
 const FN_URL = Deno.env.get('FN_URL') ?? 'http://127.0.0.1:54321/functions/v1/verify-wallet'
