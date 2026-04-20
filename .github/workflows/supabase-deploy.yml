@@ -26,10 +26,14 @@ jobs:
 
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          # Pinned to match the version used locally. Bump in a dedicated PR
+          # so a Supabase CLI release can't break the pipeline silently.
+          version: 2.75.0
 
       - name: Link project
-        run: supabase link --project-ref "$PROJECT_REF"
+        # Pass --password explicitly rather than relying on the CLI picking
+        # up SUPABASE_DB_PASSWORD from env — deterministic + obvious in logs.
+        run: supabase link --project-ref "$PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
 
       - name: Push migrations
         run: supabase db push
