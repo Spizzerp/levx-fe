@@ -1,6 +1,7 @@
 /** Test fixture factory for AI candidate paths.
  *  Generates realistic random-walk price trajectories per tone.
  */
+import { mulberry32, normalRandom } from '@/lib/rng'
 import type { PredictionPath, PathTone, PricePoint } from '@/types/market'
 
 export interface BuildAiPathFixtureArgs {
@@ -41,24 +42,6 @@ const TONE_VOL: Record<PathTone, number> = {
   bear: 0.006,
   'ultra-bear': 0.008,
   custom: 0.005,
-}
-
-/** Seeded pseudo-random number generator (mulberry32). Deterministic per seed. */
-function mulberry32(seed: number) {
-  return () => {
-    seed |= 0
-    seed = (seed + 0x6d2b79f5) | 0
-    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed)
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-  }
-}
-
-/** Box-Muller transform: uniform [0,1) → normal distribution. */
-function normalRandom(rng: () => number): number {
-  const u1 = rng()
-  const u2 = rng()
-  return Math.sqrt(-2 * Math.log(u1 || 1e-10)) * Math.cos(2 * Math.PI * u2)
 }
 
 const PATH_OUTCOME_DEFAULTS = {
