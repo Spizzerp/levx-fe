@@ -1,6 +1,8 @@
+import type { ReactElement } from 'react'
+
 export type SigilTone = 'strong' | 'accent'
 export type SigilProps = { size: number; tone: SigilTone }
-export type Sigil = (props: SigilProps) => JSX.Element
+export type Sigil = (props: SigilProps) => ReactElement
 
 export function sigilStroke(tone: SigilTone, opacity: number): string {
   const color = tone === 'accent' ? 'var(--color-brand-to)' : 'var(--color-ink-strong)'
