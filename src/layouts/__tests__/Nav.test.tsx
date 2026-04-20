@@ -63,7 +63,6 @@ describe('Nav', () => {
     render(<Nav />)
     expect(screen.getByAltText(/levx/i)).toBeInTheDocument()
     expect(screen.getByText(/markets/i)).toBeInTheDocument()
-    expect(screen.getByText(/positions/i)).toBeInTheDocument()
     expect(screen.getByText(/vault/i)).toBeInTheDocument()
     expect(screen.getByText(/portfolio/i)).toBeInTheDocument()
     expect(screen.getByText(/leaderboard/i)).toBeInTheDocument()
