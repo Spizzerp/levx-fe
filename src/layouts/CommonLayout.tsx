@@ -1,7 +1,7 @@
 import type { PropsWithChildren } from 'react'
 import { FileText } from 'lucide-react'
 
-import { Nav } from '@/ui/Nav'
+import { Nav } from '@/layouts/Nav'
 import { ToastContainer } from '@/ui/ToastContainer'
 import { WrongNetworkBanner } from '@/features/wallet/WrongNetworkBanner'
 

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { useWalletStore } from '@/stores/walletStore'
-import { Nav } from '@/ui/Nav'
+import { Nav } from '@/layouts/Nav'
 
 vi.mock('@solana/wallet-adapter-react-ui', () => ({
   useWalletModal: () => ({ setVisible: vi.fn(), visible: false }),
