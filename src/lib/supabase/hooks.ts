@@ -7,7 +7,23 @@ import {
 import { SupabaseAuthContext, type AuthContextValue } from './provider'
 import { getSupabase } from './client'
 import { acquireChannel, releaseChannel } from './channels'
-import type { Comment, DrawFrame } from './types'
+import type { Comment, DrawFrame, Profile, ProfileAvatarKind } from './types'
+
+const PROFILE_BUCKET = 'profile-images'
+const PROFILE_COLUMNS = [
+  'user_id',
+  'wallet_address',
+  'wallet_name',
+  'username',
+  'display_name',
+  'bio',
+  'x_id',
+  'avatar_kind',
+  'avatar_sigil_idx',
+  'avatar_image_path',
+  'created_at',
+  'updated_at',
+].join(', ')
 
 export function useSupabaseAuth(): AuthContextValue {
   const ctx = useContext(SupabaseAuthContext)
@@ -190,4 +206,135 @@ export function usePublishDrawFrame(
       }
     }
   }, [selfWallet, flush])
+}
+
+export type SaveProfileInput = {
+  walletAddress: string
+  walletName: string
+  username: string
+  displayName: string
+  bio: string
+  xId: string
+  avatarSigilIdx: number
+  avatarKind: ProfileAvatarKind
+  avatarPreview: string | null
+  existingProfile: Profile | null
+}
+
+export function useProfile(walletAddress: string | null): UseQueryResult<Profile | null> {
+  return useQuery<Profile | null>({
+    queryKey: ['supabase', 'profile', walletAddress],
+    enabled: Boolean(walletAddress),
+    queryFn: async () => {
+      if (!walletAddress) return null
+      const { data, error } = await getSupabase()
+        .from('users')
+        .select(PROFILE_COLUMNS)
+        .eq('wallet_address', walletAddress)
+        .maybeSingle()
+      if (error) throw new Error(error.message)
+      return (data ?? null) as Profile | null
+    },
+  })
+}
+
+export async function checkUsernameAvailability(
+  username: string,
+  walletAddress: string | null,
+): Promise<boolean> {
+  const { data, error } = await getSupabase()
+    .from('users')
+    .select('wallet_address')
+    .eq('username', username)
+    .maybeSingle()
+  if (error) throw new Error(error.message)
+  if (!data) return true
+  return data.wallet_address === walletAddress
+}
+
+export function useSaveProfile(): UseMutationResult<Profile, Error, SaveProfileInput> {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input) => {
+      const {
+        walletAddress,
+        walletName,
+        username,
+        displayName,
+        bio,
+        xId,
+        avatarSigilIdx,
+        avatarKind,
+        avatarPreview,
+        existingProfile,
+      } = input
+
+      const supabase = getSupabase()
+      let avatarImagePath = existingProfile?.avatar_image_path ?? null
+
+      if (avatarKind === 'image') {
+        if (!avatarPreview) throw new Error('Profile image is missing')
+        if (avatarPreview.startsWith('data:')) {
+          avatarImagePath = await uploadProfileAvatar(walletAddress, avatarPreview)
+        } else if (!avatarImagePath) {
+          throw new Error('Profile image path is missing')
+        }
+      } else if (avatarImagePath) {
+        const { error: removeError } = await supabase.storage.from(PROFILE_BUCKET).remove([avatarImagePath])
+        if (removeError) throw new Error(removeError.message)
+        avatarImagePath = null
+      }
+
+      const payload = {
+        wallet_address: walletAddress,
+        wallet_name: walletName,
+        username,
+        display_name: displayName,
+        bio,
+        x_id: xId,
+        avatar_kind: avatarKind,
+        avatar_sigil_idx: avatarSigilIdx,
+        avatar_image_path: avatarImagePath,
+      }
+
+      const { data, error } = await supabase
+        .from('users')
+        .upsert(payload, { onConflict: 'wallet_address' })
+        .select(PROFILE_COLUMNS)
+        .single()
+      if (error) throw new Error(error.message)
+      return data as unknown as Profile
+    },
+    onSuccess: (profile) => {
+      qc.setQueryData(['supabase', 'profile', profile.wallet_address], profile)
+    },
+  })
+}
+
+function dataUrlToBlob(dataUrl: string): Promise<Blob> {
+  return fetch(dataUrl).then(async (res) => {
+    if (!res.ok) throw new Error('Could not read cropped image')
+    return res.blob()
+  })
+}
+
+async function uploadProfileAvatar(walletAddress: string, dataUrl: string): Promise<string> {
+  const filePath = `${walletAddress}/avatar.png`
+  const blob = await dataUrlToBlob(dataUrl)
+  const { error } = await getSupabase()
+    .storage
+    .from(PROFILE_BUCKET)
+    .upload(filePath, blob, {
+      cacheControl: '3600',
+      contentType: blob.type || 'image/png',
+      upsert: true,
+    })
+
+  if (error) throw new Error(error.message)
+  return filePath
+}
+
+export function getProfileImageUrl(path: string | null): string | null {
+  if (!path) return null
+  return getSupabase().storage.from(PROFILE_BUCKET).getPublicUrl(path).data.publicUrl
 }

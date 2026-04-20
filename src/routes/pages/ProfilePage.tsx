@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useWallet } from '@solana/wallet-adapter-react'
 import { motion } from 'motion/react'
 import { Camera, Check, Copy, Lock, Shuffle, Trash2 } from 'lucide-react'
 
@@ -10,31 +11,30 @@ import { cn } from '@/lib/cn'
 import { readFileAsDataUrl } from '@/lib/cropImage'
 import { formatAddress } from '@/lib/format'
 import { PageLayout } from '@/layouts/PageLayout'
+import {
+  checkUsernameAvailability,
+  getProfileImageUrl,
+  useProfile,
+  useSaveProfile,
+  useSupabaseAuth,
+} from '@/lib/supabase/hooks'
+import type { Profile } from '@/lib/supabase/types'
 import { useWalletStore } from '@/stores/walletStore'
+import { toast } from '@/stores/toastStore'
 
 interface ProfileData {
   username: string
   displayName: string
   bio: string
-  handle: string
+  xId: string
   avatarIdx: number
-  /** Cropped 1:1 image as a data URL; when set, overrides `avatarIdx`. */
   customImage: string | null
-}
-
-const DEFAULT_DATA: ProfileData = {
-  username: 'zero.cooler',
-  displayName: 'Zero Cooler',
-  bio: 'Gradient-curve believer. Long vol, short patience.',
-  handle: 'zerocooler',
-  avatarIdx: 4,
-  customImage: null,
 }
 
 const USERNAME_RE = /^[a-z0-9_.]{3,20}$/
 const RESERVED = new Set(['admin', 'root', 'levx', 'null', 'void'])
+const CHAR_MAX = 160
 
-// Season stats — placeholder until wired to Supabase/on-chain.
 const SEASON_STATS = {
   rank: 142,
   accuracy: 72.8,
@@ -44,17 +44,94 @@ const SEASON_STATS = {
 type Availability = 'idle' | 'checking' | 'ok' | 'taken' | 'invalid'
 
 export function ProfilePage() {
+  const { status, authenticate } = useSupabaseAuth()
   const connected = useWalletStore((s) => s.connected)
   const publicKey = useWalletStore((s) => s.publicKey)
   const cluster = useWalletStore((s) => s.cluster)
-  const walletAddress = publicKey?.toBase58()
+  const walletAddress = publicKey?.toBase58() ?? null
+  const { wallet: walletAdapter } = useWallet()
+  const walletName = walletAdapter?.adapter.name ?? 'Unknown Wallet'
 
-  const [data, setData] = useState<ProfileData>(DEFAULT_DATA)
+  const profileQuery = useProfile(walletAddress)
+  const saveProfile = useSaveProfile()
+
+  const [data, setData] = useState<ProfileData>(() => buildDefaultData(null))
   const [checkResult, setCheckResult] = useState<{ name: string; ok: boolean } | null>(null)
   const [copied, setCopied] = useState(false)
   const [pendingUpload, setPendingUpload] = useState<string | null>(null)
-  const firstInputRef = useRef<HTMLInputElement | null>(null)
+  const [availabilityError, setAvailabilityError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const hydratedRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    const hydrationKey = walletAddress
+      ? profileQuery.data
+        ? `${walletAddress}:${profileQuery.data.updated_at}`
+        : profileQuery.isSuccess
+          ? `${walletAddress}:new`
+          : null
+      : 'disconnected'
+
+    if (!hydrationKey || hydratedRef.current === hydrationKey) return
+    hydratedRef.current = hydrationKey
+    setData(profileQuery.data ? profileToForm(profileQuery.data) : buildDefaultData(walletAddress))
+  }, [walletAddress, profileQuery.data, profileQuery.isSuccess])
+
+  useEffect(() => {
+    if (!data.username || !USERNAME_RE.test(data.username)) {
+      setCheckResult(null)
+      setAvailabilityError(null)
+      return
+    }
+    if (RESERVED.has(data.username)) {
+      setCheckResult({ name: data.username, ok: false })
+      setAvailabilityError(null)
+      return
+    }
+
+    setCheckResult(null)
+    setAvailabilityError(null)
+
+    let cancelled = false
+    const timer = window.setTimeout(() => {
+      void checkUsernameAvailability(data.username, walletAddress)
+        .then((ok) => {
+          if (!cancelled) setCheckResult({ name: data.username, ok })
+        })
+        .catch((error) => {
+          if (!cancelled) setAvailabilityError((error as Error).message)
+        })
+    }, 520)
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [data.username, walletAddress])
+
+  const availability: Availability = !data.username
+    ? 'idle'
+    : !USERNAME_RE.test(data.username)
+      ? 'invalid'
+      : RESERVED.has(data.username)
+        ? 'taken'
+        : checkResult?.name === data.username
+          ? checkResult.ok
+            ? 'ok'
+            : 'taken'
+          : 'checking'
+
+  const charCount = data.bio.length
+  const profile = profileQuery.data ?? null
+  const authReady = status === 'authenticated'
+  const usernameReady =
+    availability === 'ok' || (availabilityError !== null && availability !== 'taken')
+  const canSave =
+    status !== 'pending'
+    && usernameReady
+    && data.displayName.trim().length >= 2
+    && charCount <= CHAR_MAX
+    && !saveProfile.isPending
 
   const openFilePicker = () => {
     if (fileInputRef.current) {
@@ -70,47 +147,18 @@ export function ProfilePage() {
       const dataUrl = await readFileAsDataUrl(file)
       setPendingUpload(dataUrl)
     } catch (err) {
-      console.error('Failed to read image', err)
+      toast.error('Failed to read image', { message: (err as Error).message })
     }
   }
 
   const handleCropApply = (croppedDataUrl: string) => {
-    setData((d) => ({ ...d, customImage: croppedDataUrl }))
+    setData((draft) => ({ ...draft, customImage: croppedDataUrl }))
     setPendingUpload(null)
   }
 
   const clearCustomImage = () => {
-    setData((d) => ({ ...d, customImage: null }))
+    setData((draft) => ({ ...draft, customImage: null }))
   }
-
-  // Only the async debounce lives in an effect; idle/invalid/checking are
-  // derived synchronously below.
-  useEffect(() => {
-    if (!data.username || !USERNAME_RE.test(data.username)) return
-    const t = window.setTimeout(() => {
-      setCheckResult({
-        name: data.username,
-        ok: !RESERVED.has(data.username),
-      })
-    }, 520)
-    return () => window.clearTimeout(t)
-  }, [data.username])
-
-  const availability: Availability = !data.username
-    ? 'idle'
-    : !USERNAME_RE.test(data.username)
-      ? 'invalid'
-      : checkResult?.name === data.username
-        ? checkResult.ok
-          ? 'ok'
-          : 'taken'
-        : 'checking'
-
-  const charCount = data.bio.length
-  const charMax = 160
-
-  const canSave =
-    availability === 'ok' && data.displayName.trim().length >= 2 && charCount <= charMax
 
   const onCopyAddress = () => {
     if (!walletAddress) return
@@ -119,9 +167,30 @@ export function ProfilePage() {
     window.setTimeout(() => setCopied(false), 1500)
   }
 
-  const onSave = () => {
-    // TODO: wire to Supabase profile table
-    console.log('save profile', data)
+  const onSave = async () => {
+    if (!walletAddress) return
+
+    try {
+      if (!authReady) await authenticate()
+      const saved = await saveProfile.mutateAsync({
+        walletAddress,
+        walletName,
+        username: data.username.trim(),
+        displayName: data.displayName.trim(),
+        bio: data.bio.trim(),
+        xId: normalizeXId(data.xId),
+        avatarSigilIdx: data.avatarIdx,
+        avatarKind: data.customImage ? 'image' : 'sigil',
+        avatarPreview: data.customImage,
+        existingProfile: profile,
+      })
+      hydratedRef.current = `${walletAddress}:${saved.updated_at}`
+      setData(profileToForm(saved))
+      toast.success('Profile saved')
+    } catch (error) {
+      const message = humanizeProfileError(error)
+      toast.error('Failed to save profile', { message })
+    }
   }
 
   if (!connected) {
@@ -138,6 +207,16 @@ export function ProfilePage() {
   }
 
   const Sigil = SIGILS[data.avatarIdx] ?? SIGILS[0]
+  const authHint =
+    status === 'pending'
+      ? 'Wallet signature verification in progress.'
+      : status === 'error'
+        ? 'Wallet verification failed. Save will retry authentication.'
+        : availabilityError
+          ? 'Username check degraded. Save still validates server-side.'
+          : profileQuery.isLoading
+            ? 'Loading your profile.'
+            : null
 
   return (
     <>
@@ -174,6 +253,8 @@ export function ProfilePage() {
                     <span className="text-ink-muted text-caption uppercase">{cluster}</span>
                   </>
                 )}
+                <span className="text-line-strong">·</span>
+                <span className="text-ink-muted text-caption uppercase">{walletName}</span>
                 <button
                   type="button"
                   onClick={onCopyAddress}
@@ -213,9 +294,7 @@ export function ProfilePage() {
 
         <ChartFrame glow className="isolate overflow-visible!">
           <div className="grid grid-cols-1 [@media(min-width:960px)]:grid-cols-[360px_1fr]">
-            {/* ═══ LEFT: IDENTITY ═══ */}
             <div className="border-line relative px-8 py-8 [@media(min-width:960px)]:border-r">
-              {/* Ambient radial wash behind the sigil */}
               <div
                 aria-hidden
                 className="pointer-events-none absolute inset-0 opacity-60"
@@ -272,7 +351,7 @@ export function ProfilePage() {
                     <motion.button
                       key={i}
                       type="button"
-                      onClick={() => setData((d) => ({ ...d, avatarIdx: i, customImage: null }))}
+                      onClick={() => setData((draft) => ({ ...draft, avatarIdx: i, customImage: null }))}
                       whileHover={{ y: -1 }}
                       whileTap={{ scale: 0.96 }}
                       className={cn(
@@ -297,15 +376,14 @@ export function ProfilePage() {
                   )
                 })}
 
-                {/* Shuffle */}
                 <motion.button
                   type="button"
                   whileTap={{ rotate: 180 }}
                   transition={{ duration: 0.3 }}
                   onClick={() =>
-                    setData((d) => ({
-                      ...d,
-                      avatarIdx: (d.avatarIdx + 1 + Math.floor(Math.random() * 7)) % SIGILS.length,
+                    setData((draft) => ({
+                      ...draft,
+                      avatarIdx: (draft.avatarIdx + 1 + Math.floor(Math.random() * 7)) % SIGILS.length,
                       customImage: null,
                     }))
                   }
@@ -319,7 +397,6 @@ export function ProfilePage() {
                   <Shuffle size={16} strokeWidth={1.5} />
                 </motion.button>
 
-                {/* Upload / custom image cell */}
                 {data.customImage ? (
                   <div
                     className={cn(
@@ -333,7 +410,6 @@ export function ProfilePage() {
                       className="h-full w-full object-cover"
                       draggable={false}
                     />
-                    {/* Selected pip — matches sigil cell treatment */}
                     <span
                       aria-hidden
                       className={cn(
@@ -341,7 +417,6 @@ export function ProfilePage() {
                         'border-surface bg-brand-to rounded-full border',
                       )}
                     />
-                    {/* Hover overlay: re-upload + remove */}
                     <div
                       className={cn(
                         'absolute inset-0 flex items-center justify-center gap-1.5',
@@ -389,7 +464,6 @@ export function ProfilePage() {
                 )}
               </div>
 
-              {/* Hidden file input — triggered by Upload / replace buttons */}
               <input
                 ref={fileInputRef}
                 type="file"
@@ -399,17 +473,18 @@ export function ProfilePage() {
               />
             </div>
 
-            {/* ═══ RIGHT: FORM ═══ */}
             <div className="px-8 py-8">
               <div className="space-y-7">
                 <FormRow index="02" label="Username" hint="3–20 · lowercase · [a-z 0-9 _ .]">
                   <div className="relative flex items-baseline gap-2">
                     <span className="text-ink-dim font-mono text-2xl">@</span>
                     <input
-                      ref={firstInputRef}
                       value={data.username}
                       onChange={(e) =>
-                        setData((d) => ({ ...d, username: e.target.value.toLowerCase() }))
+                        setData((draft) => ({
+                          ...draft,
+                          username: e.target.value.toLowerCase().replace(/[^a-z0-9_.]/g, ''),
+                        }))
                       }
                       maxLength={20}
                       spellCheck={false}
@@ -422,7 +497,7 @@ export function ProfilePage() {
                 <FormRow index="03" label="Display Name" hint="How you appear on leaderboards">
                   <input
                     value={data.displayName}
-                    onChange={(e) => setData((d) => ({ ...d, displayName: e.target.value }))}
+                    onChange={(e) => setData((draft) => ({ ...draft, displayName: e.target.value }))}
                     maxLength={32}
                     className="text-ink-strong w-full font-sans text-2xl font-medium tracking-tight"
                   />
@@ -431,12 +506,12 @@ export function ProfilePage() {
                 <FormRow
                   index="04"
                   label="Bio"
-                  hint={`${charCount} / ${charMax}`}
-                  hintTone={charCount > charMax ? 'accent' : 'muted'}
+                  hint={`${charCount} / ${CHAR_MAX}`}
+                  hintTone={charCount > CHAR_MAX ? 'accent' : 'muted'}
                 >
                   <textarea
                     value={data.bio}
-                    onChange={(e) => setData((d) => ({ ...d, bio: e.target.value }))}
+                    onChange={(e) => setData((draft) => ({ ...draft, bio: e.target.value }))}
                     rows={2}
                     className="text-ink text-body-sm w-full resize-none font-sans leading-snug"
                   />
@@ -446,8 +521,11 @@ export function ProfilePage() {
                   <div className="flex items-baseline gap-2">
                     <span className="text-ink-dim text-body font-mono">@</span>
                     <input
-                      value={data.handle}
-                      onChange={(e) => setData((d) => ({ ...d, handle: e.target.value }))}
+                      value={data.xId}
+                      onChange={(e) =>
+                        setData((draft) => ({ ...draft, xId: normalizeXId(e.target.value) }))
+                      }
+                      maxLength={32}
                       className="text-ink-strong text-body w-0 min-w-0 flex-1 font-mono"
                     />
                   </div>
@@ -456,16 +534,17 @@ export function ProfilePage() {
             </div>
           </div>
 
-          {/* Footer — bg is intentionally transparent so the button's
-             dithered `::after` (z-index: -1) isn't covered. */}
-          <footer className="border-line flex items-center justify-end border-t px-8 py-5">
+          <footer className="border-line flex items-center justify-between gap-6 border-t px-8 py-5">
+            <div className="text-ink-dim text-micro max-w-[420px] font-mono tracking-wider uppercase">
+              {authHint ?? 'Profile writes are bound to the connected wallet and enforced by RLS.'}
+            </div>
             <Button
               variant="primary"
               disabled={!canSave}
               onClick={onSave}
               className="min-w-[200px]"
             >
-              Save Profile
+              {saveProfile.isPending ? 'Saving…' : status === 'pending' ? 'Verifying…' : 'Save Profile'}
             </Button>
           </footer>
         </ChartFrame>
@@ -481,9 +560,47 @@ export function ProfilePage() {
   )
 }
 
-// ═══════════════════════════════════════════════════════════
-// Sub-components
-// ═══════════════════════════════════════════════════════════
+function buildDefaultData(walletAddress: string | null): ProfileData {
+  const suffix = walletAddress ? walletAddress.slice(0, 8).toLowerCase() : 'cooler'
+  return {
+    username: `user_${suffix}`.slice(0, 20),
+    displayName: walletAddress ? `Trader ${formatAddress(walletAddress)}` : 'Zero Cooler',
+    bio: 'Calibrating curves. Profiling markets. Hunting clean entries.',
+    xId: '',
+    avatarIdx: 4,
+    customImage: null,
+  }
+}
+
+function profileToForm(profile: Profile): ProfileData {
+  return {
+    username: profile.username,
+    displayName: profile.display_name,
+    bio: profile.bio,
+    xId: profile.x_id,
+    avatarIdx: profile.avatar_sigil_idx,
+    customImage: getProfileImageUrl(profile.avatar_image_path),
+  }
+}
+
+function normalizeXId(input: string): string {
+  return input.replace(/^@+/, '').trim()
+}
+
+function humanizeProfileError(error: unknown): string {
+  const message = error instanceof Error ? error.message : 'Unknown error'
+  if (message.includes('EDGE_JWT_SECRET') || message.includes('Wallet verify is misconfigured')) {
+    return 'Server is missing the JWT signing secret for wallet verify. Ask the team to set Edge secret EDGE_JWT_SECRET (Dashboard → API).'
+  }
+  if (message.includes('duplicate key') && message.includes('users_username_key')) {
+    return 'Username is already taken.'
+  }
+  if (message.includes('duplicate key') && message.includes('username')) return 'Username is already taken.'
+  if (message.includes('users_username_format')) return 'Username format is invalid.'
+  if (message.includes('users_avatar_shape')) return 'Profile image state is inconsistent.'
+  if (message.includes('User rejected')) return 'Wallet signature was rejected.'
+  return message
+}
 
 function FieldLabel({ idx, label }: { idx: string; label: string }) {
   return (

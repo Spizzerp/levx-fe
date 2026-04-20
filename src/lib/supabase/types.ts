@@ -21,3 +21,20 @@ export type DrawFrame = {
 }
 
 export type AuthStatus = 'idle' | 'pending' | 'authenticated' | 'error'
+
+export type ProfileAvatarKind = 'sigil' | 'image'
+
+export type Profile = {
+  user_id: string
+  wallet_address: string
+  wallet_name: string
+  username: string
+  display_name: string
+  bio: string
+  x_id: string
+  avatar_kind: ProfileAvatarKind
+  avatar_sigil_idx: number
+  avatar_image_path: string | null
+  created_at: string
+  updated_at: string
+}

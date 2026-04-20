@@ -65,6 +65,7 @@ export function SupabaseAuthProvider({ children, signMessage: signOverride }: Pr
     } catch (e) {
       console.error('[supabase auth]', e)
       setStatus('error')
+      throw e
     } finally {
       authInFlightRef.current = false
     }
@@ -99,7 +100,7 @@ export function SupabaseAuthProvider({ children, signMessage: signOverride }: Pr
       setStatus('authenticated')
       return
     }
-    void authenticate()
+    void authenticate().catch(() => {})
   }, [connected, wallet, authenticate])
 
   const value = useMemo<AuthContextValue>(() => ({
