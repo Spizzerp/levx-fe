@@ -1,6 +1,120 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { anonClient, serviceClient, walletClient, resetTables, WALLET_A, WALLET_B } from './helpers'
 
+describe('RLS — users', () => {
+  beforeEach(async () => {
+    await resetTables()
+  })
+
+  it('anon can read public users', async () => {
+    await serviceClient().from('users').insert({
+      wallet_address: WALLET_A,
+      wallet_name: 'Phantom',
+      username: 'alice_wallet',
+      display_name: 'Alice',
+      bio: 'bio',
+      x_id: 'alice',
+      avatar_kind: 'sigil',
+      avatar_sigil_idx: 2,
+    })
+    const { data, error } = await anonClient().from('users').select('username, wallet_address')
+    expect(error).toBeNull()
+    expect(data).toEqual([
+      {
+        username: 'alice_wallet',
+        wallet_address: WALLET_A,
+      },
+    ])
+  })
+
+  it('auth: wallet can insert only its own profile row', async () => {
+    const client = await walletClient(WALLET_A)
+    const { data, error } = await client
+      .from('users')
+      .insert({
+        wallet_address: WALLET_A,
+        wallet_name: 'Phantom',
+        username: 'alice_wallet',
+        display_name: 'Alice',
+        bio: 'bio',
+        x_id: 'alice',
+        avatar_kind: 'sigil',
+        avatar_sigil_idx: 3,
+      })
+      .select('wallet_address, username')
+      .single()
+    expect(error).toBeNull()
+    expect(data).toEqual({
+      wallet_address: WALLET_A,
+      username: 'alice_wallet',
+    })
+  })
+
+  it('auth: wallet cannot insert another wallet profile row', async () => {
+    const client = await walletClient(WALLET_A)
+    const { error } = await client.from('users').insert({
+      wallet_address: WALLET_B,
+      wallet_name: 'Phantom',
+      username: 'bob_wallet',
+      display_name: 'Bob',
+      bio: 'bio',
+      x_id: 'bob',
+      avatar_kind: 'sigil',
+      avatar_sigil_idx: 0,
+    })
+    expect(error).not.toBeNull()
+  })
+
+  it('auth: wallet can update its own mutable profile columns', async () => {
+    await serviceClient().from('users').insert({
+      wallet_address: WALLET_A,
+      wallet_name: 'Phantom',
+      username: 'alice_wallet',
+      display_name: 'Alice',
+      bio: 'bio',
+      x_id: 'alice',
+      avatar_kind: 'sigil',
+      avatar_sigil_idx: 1,
+    })
+    const client = await walletClient(WALLET_A)
+    const { data, error } = await client
+      .from('users')
+      .update({
+        display_name: 'Alice Updated',
+        avatar_kind: 'image',
+        avatar_image_path: `${WALLET_A}/avatar.png`,
+      })
+      .eq('wallet_address', WALLET_A)
+      .select('display_name, avatar_kind, avatar_image_path')
+      .single()
+    expect(error).toBeNull()
+    expect(data).toEqual({
+      display_name: 'Alice Updated',
+      avatar_kind: 'image',
+      avatar_image_path: `${WALLET_A}/avatar.png`,
+    })
+  })
+
+  it('auth: wallet cannot mutate immutable profile columns', async () => {
+    await serviceClient().from('users').insert({
+      wallet_address: WALLET_A,
+      wallet_name: 'Phantom',
+      username: 'alice_wallet',
+      display_name: 'Alice',
+      bio: 'bio',
+      x_id: 'alice',
+      avatar_kind: 'sigil',
+      avatar_sigil_idx: 1,
+    })
+    const client = await walletClient(WALLET_A)
+    const { error } = await client
+      .from('users')
+      .update({ wallet_address: WALLET_B })
+      .eq('wallet_address', WALLET_A)
+    expect(error?.message).toMatch(/immutable_user_column_modified/)
+  })
+})
+
 describe('RLS — comments', () => {
   beforeEach(async () => {
     await resetTables()
