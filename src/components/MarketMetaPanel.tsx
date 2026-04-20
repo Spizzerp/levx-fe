@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Minus, Plus } from 'lucide-react'
 
 import { cn } from '@/lib/cn'
 import { formatUSD } from '@/lib/format'
@@ -39,14 +40,18 @@ export function MarketMetaPanel({ market }: MarketMetaPanelProps) {
         aria-controls="market-meta-panel-body"
         className={cn(
           'flex w-full items-center justify-between py-4',
-          'font-mono text-label tracking-wide uppercase',
+          'text-ui font-mono tracking-wide uppercase',
           'text-ink-muted hover:text-ink-strong',
           'duration-short ease-levx transition-colors',
         )}
       >
         <span>Market details</span>
-        <span aria-hidden className="text-ink-dim">
-          {open ? '−' : '+'}
+        <span aria-hidden className="text-ink-dim flex items-center justify-center">
+          {open ? (
+            <Minus size={18} strokeWidth={1.75} />
+          ) : (
+            <Plus size={18} strokeWidth={1.75} />
+          )}
         </span>
       </button>
       {open && (
@@ -59,10 +64,7 @@ export function MarketMetaPanel({ market }: MarketMetaPanelProps) {
           <MetaRow label="Entry fee" value={`${feePct}%`} />
           <MetaRow label="Pool" value={`${formatUSD(market.pool)} USDC`} />
           <MetaRow label="LMSR coupling" value={market.lambda.toFixed(3)} />
-          <MetaRow
-            label="Decoherence rate"
-            value={market.decoherenceRate.toFixed(4)}
-          />
+          <MetaRow label="Decoherence rate" value={market.decoherenceRate.toFixed(4)} />
         </div>
       )}
     </section>
@@ -72,9 +74,7 @@ export function MarketMetaPanel({ market }: MarketMetaPanelProps) {
 function MetaRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="border-line flex items-baseline justify-between gap-4 border-b px-1 py-3 last:border-b-0 sm:even:border-l sm:even:pl-4">
-      <span className="text-ink-dim font-mono text-caption tracking-wide uppercase">
-        {label}
-      </span>
+      <span className="text-ink-dim text-caption font-mono tracking-wide uppercase">{label}</span>
       <span className="text-ink-strong text-caption font-mono">{value}</span>
     </div>
   )
