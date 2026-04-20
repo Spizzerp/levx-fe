@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import Cropper, { type Area } from 'react-easy-crop'
 import { AnimatePresence, motion } from 'motion/react'
 import { X } from 'lucide-react'
@@ -54,12 +55,14 @@ export function ImageCropModal({ open, imageSrc, onClose, onApply }: ImageCropMo
     }
   }
 
-  return (
+  if (typeof document === 'undefined') return null
+
+  return createPortal(
     <AnimatePresence>
       {open && imageSrc && (
         <motion.div
           key="crop-backdrop"
-          className="z-overlay fixed inset-0 flex items-center justify-center p-6"
+          className="z-modal fixed inset-0 flex items-center justify-center p-6"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -176,7 +179,8 @@ export function ImageCropModal({ open, imageSrc, onClose, onApply }: ImageCropMo
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   )
 }
 
