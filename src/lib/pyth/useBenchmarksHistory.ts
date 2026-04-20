@@ -4,7 +4,7 @@ import { fetchHistoricalPrices, RESOLUTION_SECONDS } from './benchmarksClient'
 import type { BenchmarksResolution } from './benchmarksClient'
 import { benchmarkSymbolForPair } from './feedIds'
 import type { PricePoint } from '@/types/market'
-import type { CandleInterval } from '@/components/TimeRangePicker'
+import type { CandleInterval } from '@/features/chart/TimeRangePicker'
 
 /** Map each candle interval to its Benchmarks resolution string. */
 const INTERVAL_TO_RESOLUTION: Record<CandleInterval, BenchmarksResolution> = {

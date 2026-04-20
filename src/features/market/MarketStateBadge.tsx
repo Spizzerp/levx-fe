@@ -1,4 +1,4 @@
-import { StatusDot } from '@/components/StatusDot'
+import { StatusDot } from '@/ui/StatusDot'
 import type { Market, MarketState } from '@/types/market'
 
 const STATE_LABELS: Record<MarketState, string> = {

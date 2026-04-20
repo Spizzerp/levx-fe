@@ -6,7 +6,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { cn } from '@/lib/cn'
 import { explorerAddressUrl } from '@/lib/format'
 import { useIsAdmin } from '@/lib/hooks/useIsAdmin'
-import { MENU_ITEM } from '@/components/styles'
+import { MENU_ITEM } from '@/ui/styles'
 
 interface WalletDropdownProps {
   publicKey: PublicKey

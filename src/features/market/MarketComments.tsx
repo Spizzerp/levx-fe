@@ -3,7 +3,7 @@ import { useWalletModal } from '@solana/wallet-adapter-react-ui'
 
 import { useComments, usePostComment, useSupabaseAuth } from '@/lib/supabase/hooks'
 import { useWalletStore } from '@/stores/walletStore'
-import { Button } from './Button'
+import { Button } from '@/ui/Button'
 import { cn } from '@/lib/cn'
 
 type Props = { marketId: string }

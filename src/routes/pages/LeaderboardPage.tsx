@@ -1,5 +1,5 @@
-import { ChartFrame } from '@/components/ChartFrame'
-import { DataTable, NUM_CELL, type DataTableColumn } from '@/components/DataTable'
+import { ChartFrame } from '@/features/chart/ChartFrame'
+import { DataTable, NUM_CELL, type DataTableColumn } from '@/ui/DataTable'
 import { cn } from '@/lib/cn'
 import { formatUSD } from '@/lib/format'
 import { PageLayout } from '@/layouts/PageLayout'

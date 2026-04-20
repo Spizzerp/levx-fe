@@ -4,7 +4,7 @@ import { useWalletModal } from '@solana/wallet-adapter-react-ui'
 import { useWalletStore } from '@/stores/walletStore'
 import { formatAddress } from '@/lib/format'
 import { cn } from '@/lib/cn'
-import { WalletDropdown } from '@/components/WalletDropdown'
+import { WalletDropdown } from '@/features/wallet/WalletDropdown'
 
 // Pill styling for wallet button
 const PILL = cn(

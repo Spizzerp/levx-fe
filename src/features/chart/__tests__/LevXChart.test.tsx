@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import React from 'react'
-import { LevXChart } from '@/components/LevXChart'
+import { LevXChart } from '@/features/chart/LevXChart'
 
 // Mock env config to prevent missing-env-var throws during test module evaluation
 vi.mock('@/env/env.config', () => ({

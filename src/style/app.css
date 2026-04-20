@@ -2,7 +2,7 @@
 @import 'tailwindcss';
 @import './customVariants.css';
 @import './global.css';
-@import '../components/ChartFrame.css';
+@import '../features/chart/ChartFrame.css';
 
 /* ── Wallet adapter modal theme overrides ──────────────────────
    Scoped to .wallet-adapter-* — theming only (no layout / animation).

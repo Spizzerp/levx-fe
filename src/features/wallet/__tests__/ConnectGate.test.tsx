@@ -5,7 +5,7 @@ import { useState } from 'react'
 import { PublicKey } from '@solana/web3.js'
 
 import { useWalletStore } from '@/stores/walletStore'
-import { ConnectGate } from '@/components/ConnectGate'
+import { ConnectGate } from '@/features/wallet/ConnectGate'
 
 const setVisible = vi.fn()
 

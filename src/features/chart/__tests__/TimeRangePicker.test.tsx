@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { TimeRangePicker } from '@/components/TimeRangePicker'
+import { TimeRangePicker } from '@/features/chart/TimeRangePicker'
 
 describe('TimeRangePicker', () => {
   it('renders tabs for 1M / 5M / 15M / 1H / 1D', () => {

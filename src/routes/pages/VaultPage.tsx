@@ -1,7 +1,7 @@
 import { useState } from 'react'
 
-import { Button } from '@/components/Button'
-import { Input } from '@/components/Input'
+import { Button } from '@/ui/Button'
+import { Input } from '@/ui/Input'
 import { cn } from '@/lib/cn'
 import { formatUSD } from '@/lib/format'
 import { PageLayout } from '@/layouts/PageLayout'
