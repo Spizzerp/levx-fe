@@ -60,6 +60,18 @@ export function WalletDropdown({
         'min-w-[200px] overflow-hidden rounded-md border',
       )}
     >
+      <button
+        type="button"
+        role="menuitem"
+        className={MENU_ITEM}
+        onClick={() => {
+          onClose()
+          void navigate({ to: '/profile' })
+        }}
+      >
+        Profile
+      </button>
+      <hr className="border-line mx-2 my-1" />
       {isAdmin && (
         <>
           <button

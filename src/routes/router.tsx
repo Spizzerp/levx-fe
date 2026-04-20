@@ -9,6 +9,7 @@ import { MarketsPage } from '@/routes/pages/MarketsPage'
 import { NotFoundPage } from '@/routes/pages/NotFoundPage'
 import { PortfolioPage } from '@/routes/pages/PortfolioPage'
 import { PositionsPage } from '@/routes/pages/PositionsPage'
+import { ProfilePage } from '@/routes/pages/ProfilePage'
 import { VaultPage } from '@/routes/pages/VaultPage'
 import { RootRouteComponent } from '@/routes/RootRoute'
 
@@ -55,6 +56,12 @@ const portfolioRoute = createRoute({
   component: PortfolioPage,
 })
 
+const profileRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/profile',
+  component: ProfilePage,
+})
+
 const leaderboardRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/leaderboard',
@@ -86,6 +93,7 @@ const routeTree = rootRoute.addChildren([
   positionsRoute,
   vaultRoute,
   portfolioRoute,
+  profileRoute,
   leaderboardRoute,
   adminRoute,
   adminCreateRoute,
