@@ -425,16 +425,48 @@ export function ProfilePage() {
                   {data.customImage ? (
                     <div
                       className={cn(
-                        'group relative flex aspect-square items-center justify-center overflow-hidden',
+                        'group relative flex aspect-square items-center justify-center',
                         'border-ink-strong bg-surface-1 rounded-md border',
                       )}
                     >
-                      <img
-                        src={data.customImage}
-                        alt="Uploaded"
-                        className="h-full w-full object-cover"
-                        draggable={false}
-                      />
+                      <div className="relative h-full w-full overflow-hidden rounded-[inherit]">
+                        <img
+                          src={data.customImage}
+                          alt="Uploaded"
+                          className="h-full w-full object-cover"
+                          draggable={false}
+                        />
+                        <div
+                          className={cn(
+                            'absolute inset-0 flex items-center justify-center gap-1.5',
+                            'bg-surface/75 opacity-0 group-hover:opacity-100',
+                            'duration-short ease-levx transition-opacity',
+                          )}
+                        >
+                          <button
+                            type="button"
+                            onClick={openFilePicker}
+                            aria-label="Replace image"
+                            className={cn(
+                              'border-ink-strong text-ink-strong rounded-md border bg-transparent p-1',
+                              'hover:bg-surface-1 transition-colors',
+                            )}
+                          >
+                            <Camera size={12} strokeWidth={1.5} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={clearCustomImage}
+                            aria-label="Remove image"
+                            className={cn(
+                              'border-accent text-accent rounded-md border bg-transparent p-1',
+                              'hover:bg-accent-subtle transition-colors',
+                            )}
+                          >
+                            <Trash2 size={12} strokeWidth={1.5} />
+                          </button>
+                        </div>
+                      </div>
                       <span
                         aria-hidden
                         className={cn(
@@ -442,36 +474,6 @@ export function ProfilePage() {
                           'border-surface bg-brand-to rounded-full border',
                         )}
                       />
-                      <div
-                        className={cn(
-                          'absolute inset-0 flex items-center justify-center gap-1.5',
-                          'bg-surface/75 opacity-0 group-hover:opacity-100',
-                          'duration-short ease-levx transition-opacity',
-                        )}
-                      >
-                        <button
-                          type="button"
-                          onClick={openFilePicker}
-                          aria-label="Replace image"
-                          className={cn(
-                            'border-ink-strong text-ink-strong rounded-md border bg-transparent p-1',
-                            'hover:bg-surface-1 transition-colors',
-                          )}
-                        >
-                          <Camera size={12} strokeWidth={1.5} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={clearCustomImage}
-                          aria-label="Remove image"
-                          className={cn(
-                            'border-accent text-accent rounded-md border bg-transparent p-1',
-                            'hover:bg-accent-subtle transition-colors',
-                          )}
-                        >
-                          <Trash2 size={12} strokeWidth={1.5} />
-                        </button>
-                      </div>
                     </div>
                   ) : (
                     <button
