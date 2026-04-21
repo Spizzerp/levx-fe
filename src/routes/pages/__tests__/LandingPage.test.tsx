@@ -29,15 +29,21 @@ describe('LandingPage', () => {
     navigateSpy.mockClear()
   })
 
-  it('renders the tagline and logo', () => {
+  it('renders the market-preview header and logo', () => {
     render(<LandingPage />)
-    expect(screen.getByText(/predict the path not the outcome/i)).toBeInTheDocument()
     expect(screen.getByAltText(/levx/i)).toBeInTheDocument()
+    // Pair header from the recreated market container
+    expect(screen.getByText(/btc \/ usdc/i)).toBeInTheDocument()
+    // State badge
+    expect(screen.getByText(/^active$/i)).toBeInTheDocument()
+    // Meta strip label (unique enough to this hero)
+    expect(screen.getByText(/entry fee/i)).toBeInTheDocument()
   })
 
-  it('navigates to /markets when Launch is clicked', async () => {
+  it('navigates to /markets when the market-preview CTA is clicked', async () => {
     render(<LandingPage />)
-    await userEvent.click(screen.getByRole('button', { name: /launch/i }))
+    // With no paths selected, MarketPreview's rail CTA reads "Join Waitlist".
+    await userEvent.click(screen.getByRole('button', { name: /join waitlist/i }))
     expect(navigateSpy).toHaveBeenCalledWith({ to: '/markets' })
   })
 })
