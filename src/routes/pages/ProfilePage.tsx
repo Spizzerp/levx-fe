@@ -229,16 +229,6 @@ export function ProfilePage() {
   }
 
   const Sigil = SIGILS[data.avatarIdx] ?? SIGILS[0]
-  const authHint =
-    status === 'pending'
-      ? 'Wallet signature verification in progress.'
-      : status === 'error'
-        ? 'Wallet verification failed. Save will retry authentication.'
-        : availabilityError
-          ? 'Username check degraded. Save still validates server-side.'
-          : profileQuery.isLoading
-            ? 'Loading your profile.'
-            : null
 
   return (
     <>
@@ -585,11 +575,7 @@ export function ProfilePage() {
               </div>
             </div>
 
-            <footer className="border-line flex items-center justify-between gap-6 border-t px-8 py-5">
-              <div className="text-ink-dim text-micro max-w-[420px] font-mono tracking-wider uppercase">
-                {authHint ??
-                  'Profile writes are bound to the connected wallet and enforced by RLS.'}
-              </div>
+            <footer className="border-line flex justify-end border-t px-8 py-5">
               <Button
                 variant="primary"
                 disabled={!canSave}

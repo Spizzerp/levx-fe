@@ -79,8 +79,7 @@ export function ProfilePageSkeleton() {
         </div>
       </div>
 
-      <footer className="border-line flex items-center justify-between gap-6 border-t px-8 py-5">
-        <Skeleton className="h-3 w-full max-w-[420px]" />
+      <footer className="border-line flex justify-end border-t px-8 py-5">
         <Skeleton className="h-11 w-[200px] rounded-full" />
       </footer>
     </ChartFrame>
