@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { FileText } from 'lucide-react'
+import Lenis from 'lenis'
 
 import { useNavigate } from '@tanstack/react-router'
 
@@ -16,11 +17,18 @@ function TypingHeadline({
   text,
   startAfter = 0,
   speed = 55,
+  scrollProgress = 0,
   className,
 }: {
   text: string
   startAfter?: number
   speed?: number
+  /**
+   * 0-1 scroll position through the hero. Once typing completes, this maps
+   * linearly to the visible character count — as the user scrolls down, the
+   * text reverses (appears to be deleted from the end).
+   */
+  scrollProgress?: number
   className?: string
 }) {
   // `started` guards the cursor + text so nothing renders during the pre-roll.
@@ -50,11 +58,19 @@ function TypingHeadline({
     }
   }, [text, startAfter, speed])
 
+  // After typing finishes, hand control over to scrollProgress — characters
+  // recede from the end proportional to how far the page has scrolled.
+  const typingDone = chars >= text.length
+  const clampedScroll = Math.max(0, Math.min(1, scrollProgress))
+  const displayed = typingDone
+    ? Math.max(0, text.length - Math.floor(clampedScroll * text.length))
+    : chars
+
   return (
     <h1 className={className} aria-label={text}>
       {started && (
         <>
-          <span aria-hidden="true">{text.slice(0, chars)}</span>
+          <span aria-hidden="true">{text.slice(0, displayed)}</span>
           <span aria-hidden="true" className="typing-cursor" />
         </>
       )}
@@ -111,6 +127,39 @@ export function LandingPage() {
     const t = setTimeout(() => setMarkersReady(true), 1500)
     return () => clearTimeout(t)
   }, [])
+
+  // Lenis smooth-scroll. Inertial easing on wheel/trackpad — drives
+  // scroll-linked animations as we add sections below the hero.
+  useEffect(() => {
+    const lenis = new Lenis()
+    let rafId = 0
+    const raf = (time: number) => {
+      lenis.raf(time)
+      rafId = requestAnimationFrame(raf)
+    }
+    rafId = requestAnimationFrame(raf)
+    return () => {
+      cancelAnimationFrame(rafId)
+      lenis.destroy()
+    }
+  }, [])
+
+  // Hero scroll progress (0 at the top, 1 at the end of the pin phase).
+  // Feeds the TypingHeadline's reverse-delete effect. The divisor sets how
+  // many viewports of scroll the text delete takes — larger = slower
+  // vanish. 1.5 ≈ one-and-a-half viewports of wheel travel to fully clear
+  // the headline.
+  const [scrollProgress, setScrollProgress] = useState(0)
+  useEffect(() => {
+    const handleScroll = () => {
+      const vh = window.innerHeight
+      if (vh <= 0) return
+      setScrollProgress(Math.max(0, Math.min(1, window.scrollY / (vh * 1.5))))
+    }
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    handleScroll()
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
   const { history, predictions, marketStart, marketEnd } = useMemo(() => {
     const marketStart = now - 2 * DAY_MS
     const marketEnd = now + 5 * DAY_MS
@@ -130,10 +179,10 @@ export function LandingPage() {
   const goToApp = () => navigate({ to: '/markets' })
 
   return (
-    <main className="relative h-dvh w-full overflow-hidden bg-black">
-      <div className="landing-dither" aria-hidden="true" />
-
-      <div className="absolute top-0 right-0 left-0 z-10 flex items-center justify-between px-6 py-4">
+    <main className="relative min-h-dvh w-full bg-black">
+      {/* Fixed (not absolute) so it stays pinned to the viewport while the
+          page scrolls. */}
+      <div className="fixed top-0 right-0 left-0 z-20 flex items-center justify-between px-6 py-4">
         <img src="/logo_color.png" alt="LevX" className="h-12 w-auto" />
         <div className="flex items-center gap-4">
           <a
@@ -157,38 +206,56 @@ export function LandingPage() {
         </div>
       </div>
 
-      <div className="relative flex h-full flex-col items-center justify-between px-6 pt-32 pb-6 sm:px-10 sm:pt-40 sm:pb-10">
-        {/* Typewriter headline — starts after the card's 1.4s rise animation
-            finishes so the two animations don't overlap. */}
-        <TypingHeadline
-          text="Predict the path, not the outcome"
-          startAfter={1500}
-          className="text-ink-strong font-display text-display-sm text-center font-medium tracking-tight"
-        />
+      {/* Pin wrapper — 250vh tall. The hero sticks to top:0 for the first
+          150vh of scroll (the page visually freezes while scrollProgress
+          drives the text delete), then the hero scrolls off normally once
+          the user scrolls past. 150vh matches the scrollProgress divisor
+          of 1.5 in the scroll handler. */}
+      <div className="relative h-[250vh]">
+        <section className="sticky top-0 flex h-dvh flex-col items-center justify-between overflow-hidden px-6 pt-24 pb-20 sm:px-10 sm:pt-28 sm:pb-24">
+          {/* Pulsating brand-green dither BG — scoped to the hero only so
+              it doesn't bleed into sections below when the page scrolls. */}
+          <div className="landing-dither" aria-hidden="true" />
 
-        {/* zoom: 0.7 uniformly scales the card's rendered size AND its layout
-            footprint — text, padding, chart, rail width all shrink by the
-            same factor, unlike tweaking max-w + chartHeight piecemeal. */}
-        <div
-          className={`border-line-strong bg-surface landing-rise mx-auto w-full max-w-[1440px] rounded-2xl border-2 p-5 sm:p-7${
-            markersReady ? '' : ' hide-chart-markers'
-          }`}
-          style={{ zoom: 0.7 }}
-        >
-          <MarketPreview
-            pair="BTC/USDC"
-            history={history}
-            predictions={predictions}
-            now={now}
-            marketStart={marketStart}
-            marketEnd={marketEnd}
-            checkpointInterval={CHECKPOINT_INTERVAL_SEC}
-            totalCheckpoints={TOTAL_CHECKPOINTS}
-            chartHeight={420}
-            onCtaClick={goToApp}
+          {/* Typewriter headline — starts after the card's 1.4s rise
+              animation finishes so the two animations don't overlap. */}
+          <TypingHeadline
+            text="Predict the path, not the outcome"
+            startAfter={1500}
+            scrollProgress={scrollProgress}
+            className="text-ink-strong font-display text-display-sm text-center font-medium tracking-tight"
           />
-        </div>
+
+          {/* zoom: 0.7 uniformly scales the card's rendered size AND its
+              layout footprint — text, padding, chart, rail width all
+              shrink by the same factor, unlike tweaking max-w +
+              chartHeight piecemeal. */}
+          <div
+            className={`border-line-strong bg-surface landing-rise mx-auto w-full max-w-[1440px] rounded-2xl border-2 p-5 sm:p-7${
+              markersReady ? '' : ' hide-chart-markers'
+            }`}
+            style={{ zoom: 0.7 }}
+          >
+            <MarketPreview
+              pair="BTC/USDC"
+              history={history}
+              predictions={predictions}
+              now={now}
+              marketStart={marketStart}
+              marketEnd={marketEnd}
+              checkpointInterval={CHECKPOINT_INTERVAL_SEC}
+              totalCheckpoints={TOTAL_CHECKPOINTS}
+              chartHeight={420}
+              onCtaClick={goToApp}
+            />
+          </div>
+        </section>
       </div>
+
+      {/* Placeholder below-fold section — reserves scroll room so Lenis has
+          something to ease into. Replace / extend as we build the
+          scroll-driven story. */}
+      <section className="h-dvh" aria-hidden="true" />
     </main>
   )
 }
