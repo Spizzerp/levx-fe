@@ -6,6 +6,7 @@ import { MarketPreview } from '@/features/market/MarketPreview'
 import { LogoReveal } from './LogoReveal'
 import './landing.css'
 import { WaitlistModal, type WaitlistPayload } from '@/ui/WaitlistModal'
+import { submitWaitlist } from '@/lib/supabase/auth'
 
 /**
  * Typewriter headline — reveals one character at a time after an optional
@@ -123,9 +124,7 @@ export function LandingPage() {
   const [waitlistOpen, setWaitlistOpen] = useState(false)
 
   const handleWaitlistSubmit = async (payload: WaitlistPayload) => {
-    // TODO: wire to real endpoint
-    console.log('[waitlist] submit', payload)
-    await new Promise((r) => setTimeout(r, 600))
+    await submitWaitlist(payload)
   }
   // Intro gate — flips when the LogoReveal overlay signals completion
   // (~5.9s after mount, as the logo begins its 400ms fade-out). Every
