@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
+import { CrtEffects } from '@/ui/CrtEffects'
+
 interface LogoRevealProps {
   onComplete: () => void
 }
@@ -89,21 +91,36 @@ export function LogoReveal({ onComplete }: LogoRevealProps) {
         handingOff ? 'opacity-0' : 'opacity-100'
       }`}
     >
-      {/* Video fills the viewport via object-cover. `transform: scale(1.5)`
-          zooms past the video's built-in black border so the scribble
+      {/* CRT/VHS wrapper — adds scanlines, VCR tracking noise, and a
+          subtle wobble over the scribble video so the intro reads as a
+          worn tape playing on an old monitor. Adapted from Mobius1's
+          ScreenEffect CodePen; only the scanlines + vcr + wobble
+          subset is enabled. The `blur(1.5px)` on the video itself
+          mirrors the demo's `image.blur = 1.5` image-path setting, and
+          combines with the existing scale(1.5) zoom (transform and
+          filter stack independently, so both apply cleanly).
+
+          Video fills the CRT wrapper via object-cover; the wrapper
+          fills the viewport via absolute inset-0. scale(1.5) zooms
+          past the video's built-in black border so the scribble
           content reaches the viewport edges. The video contains both
           the scribble animation AND the logo resolve — no separate
           overlay logo is needed. */}
-      <video
-        ref={videoRef}
-        src="/levx-logo-reveal.mp4"
-        autoPlay
-        muted
-        playsInline
-        preload="auto"
-        style={{ transform: 'scale(1.5)' }}
-        className="absolute inset-0 h-full w-full object-cover"
-      />
+      <CrtEffects
+        className="absolute inset-0"
+        vcr={{ opacity: 0.1, num: 56 }}
+      >
+        <video
+          ref={videoRef}
+          src="/levx-logo-reveal.mp4"
+          autoPlay
+          muted
+          playsInline
+          preload="auto"
+          style={{ transform: 'scale(1.5)', filter: 'blur(0.5px)' }}
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+      </CrtEffects>
 
       {/* Dither-scrim — 2×2 mask + backdrop blur + soft black tint; sits
           above the video. Fades at video end so the final logo frame

@@ -1,0 +1,89 @@
+/* ── CrtEffects: CRT/VHS screen overlay ────────────────────
+   Layered on top of any visual child (see CrtEffects.tsx). Three parts:
+     .crt-inner    — wraps the child + overlays; .crt-wobble adds the
+                     1px Y-jitter frame dance.
+     .crt-vcr      — canvas overlay positioned above the child; opacity
+                     and blur are set inline from the VCR config so the
+                     caller can tune per-surface.
+     .crt-scanlines — stacked gradients: a 2px horizontal dim-band pattern
+                     plus a 3px vertical RGB chroma fringe, both pointer-
+                     events-none so they never block underlying content. */
+
+.crt-root {
+  /* `absolute` so the root sits on top of its parent (the caller's
+     positioned container). Using `absolute` rather than `relative`
+     dodges a Vite stylesheet-order trap where Tailwind's `.absolute`
+     from a passed className would lose to our `.crt-root { position:
+     relative }` and collapse the element to zero height. */
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.crt-inner {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  /* Isolate so .crt-vcr (z:2) and .crt-scanlines (z:3) always stack
+     above the passed-in child — regardless of whether `wobble` is on
+     (which would otherwise be the only thing creating a local stacking
+     context via its animated transform). */
+  isolation: isolate;
+}
+
+.crt-wobble {
+  animation: crt-wobble-y 100ms infinite;
+}
+
+@keyframes crt-wobble-y {
+  0% {
+    transform: translateY(1px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+.crt-vcr {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  /* Sit above the child content but below the scanlines, so the lines
+     still read sharply across the noise. */
+  z-index: 2;
+}
+
+.crt-scanlines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+  /* Layer 1: 2px horizontal dim bands (even rows transparent, odd rows
+     dark) → the classic scanline texture.
+     Layer 2: 3px vertical slivers of red/green/blue at low alpha → a
+     subtle CRT chroma fringe. Background-size pairs 1:1 with the layer
+     list order. */
+  background:
+    linear-gradient(
+      rgba(18, 16, 16, 0) 50%,
+      rgba(0, 0, 0, 0.25) 50%
+    ),
+    linear-gradient(
+      90deg,
+      rgba(255, 0, 0, 0.06),
+      rgba(0, 255, 0, 0.02),
+      rgba(0, 0, 255, 0.06)
+    );
+  background-size:
+    100% 2px,
+    3px 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .crt-wobble {
+    animation: none;
+  }
+}
