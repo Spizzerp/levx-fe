@@ -1,3 +1,4 @@
+// @ts-nocheck — Deno test; run with `pnpm test:edge`, not Vitest/tsc.
 import { assertEquals, assertExists } from 'https://deno.land/std@0.224.0/assert/mod.ts'
 import { buildMessage } from './_shared/message.ts'
 import nacl from 'npm:tweetnacl@1.0.3'

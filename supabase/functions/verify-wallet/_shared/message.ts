@@ -1,3 +1,4 @@
+// @ts-nocheck — Supabase Edge (Deno).
 /**
  * Canonical signing message. Sole source of truth — index.ts returns this in
  * /nonce responses, FE signs it verbatim, and /verify reconstructs it from the

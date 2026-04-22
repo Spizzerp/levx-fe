@@ -1,3 +1,4 @@
+// @ts-nocheck — Supabase Edge (Deno).
 const ORIGIN = Deno.env.get('APP_ORIGIN') ?? '*'
 
 export const corsHeaders = {
