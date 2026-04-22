@@ -1,18 +1,13 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { FileText } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ChevronDown, FileText } from 'lucide-react'
 import Lenis from 'lenis'
 
 import { useNavigate } from '@tanstack/react-router'
 
 import { MarketPreview } from '@/features/market/MarketPreview'
+import { MagicCard } from '@/ui/MagicCard'
 import { LogoReveal } from './LogoReveal'
 import './landing.css'
-import { BezierLogo } from '@/ui/BezierLogo'
-import {
-  LogoVariantCipher,
-  LogoVariantFan,
-  LogoVariantRootSystem,
-} from '@/ui/BezierLogo/variants'
 
 /**
  * Typewriter headline — reveals one character at a time after an optional
@@ -74,12 +69,32 @@ function TypingHeadline({
     ? Math.max(0, text.length - Math.floor(clampedScroll * text.length))
     : chars
 
+  // Hide the cursor once the scroll-delete has fully cleared the headline —
+  // without this the blinking vertical bar lingers on an otherwise empty
+  // hero as the user continues scrolling. `animation: none` is required
+  // alongside the opacity override: CSS keyframe animations outrank
+  // non-!important inline styles, so without it the blink animation would
+  // keep driving opacity between 0 and 1 and the fade-out wouldn't stick.
+  const cursorHidden = typingDone && displayed === 0
+
   return (
     <h1 className={className} aria-label={text}>
       {started && (
         <>
           <span aria-hidden="true">{text.slice(0, displayed)}</span>
-          <span aria-hidden="true" className="typing-cursor" />
+          <span
+            aria-hidden="true"
+            className="typing-cursor"
+            style={
+              cursorHidden
+                ? {
+                    opacity: 0,
+                    animation: 'none',
+                    transition: 'opacity 300ms ease-out',
+                  }
+                : undefined
+            }
+          />
         </>
       )}
     </h1>
@@ -165,17 +180,66 @@ export function LandingPage() {
     }
   }, [])
 
-  // Hero scroll progress (0 at the top, 1 at the end of the pin phase).
-  // Feeds the TypingHeadline's reverse-delete effect. The divisor sets how
-  // many viewports of scroll the text delete takes — larger = slower
-  // vanish. 1.5 ≈ one-and-a-half viewports of wheel travel to fully clear
-  // the headline.
+  // Dynamic card scale — the market card's `zoom` is driven by the viewport
+  // so the whole card (header + chart + comments + sidebar) always fits the
+  // hero on any screen ratio. Measured via ResizeObserver on the card: we
+  // infer the card's logical (un-zoomed) dimensions by dividing the rendered
+  // rect by the currently-applied zoom, then compute the scale needed to
+  // fit within 72% of viewport height and 88% of viewport width. Capped at
+  // 0.7 (original design scale) and floored at 0.35 (so the card doesn't
+  // shrink to illegibility on very small viewports). Uses a ref to track
+  // the latest scale inside the observer callback so we avoid a stale
+  // closure that would prevent convergence.
+  const cardRef = useRef<HTMLDivElement>(null)
+  const cardScaleRef = useRef(0.55)
+  const [cardScale, setCardScale] = useState(0.55)
+  useEffect(() => {
+    const el = cardRef.current
+    if (!el) return
+
+    const compute = () => {
+      const rect = el.getBoundingClientRect()
+      const currentScale = cardScaleRef.current
+      if (rect.width === 0 || rect.height === 0) return
+      const logicalH = rect.height / currentScale
+      const logicalW = rect.width / currentScale
+      const vh = window.innerHeight
+      const vw = window.innerWidth
+      const byH = (vh * 0.72) / logicalH
+      const byW = (vw * 0.88) / logicalW
+      const newScale = Math.min(0.7, Math.max(0.35, Math.min(byH, byW)))
+      if (Math.abs(newScale - currentScale) > 0.01) {
+        cardScaleRef.current = newScale
+        setCardScale(newScale)
+      }
+    }
+
+    compute()
+    const ro = new ResizeObserver(compute)
+    ro.observe(el)
+    window.addEventListener('resize', compute)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', compute)
+    }
+  }, [])
+
+  // Two-phase hero scroll progress (both clamp 0-1).
+  //   `scrollProgress`  — phase 1, 0..1 over the first 1.5 viewports; drives
+  //                       the typewriter reverse-delete + cursor fade.
+  //   `scrollProgress2` — phase 2, 0..1 over the next 1.5 viewports; drives
+  //                       the market card's rightward slide + rotateY tilt.
+  // The pin wrapper below is sized to 400vh so the sticky hero stays pinned
+  // for all 3 viewports of phase-1 + phase-2 travel before releasing.
   const [scrollProgress, setScrollProgress] = useState(0)
+  const [scrollProgress2, setScrollProgress2] = useState(0)
   useEffect(() => {
     const handleScroll = () => {
       const vh = window.innerHeight
       if (vh <= 0) return
-      setScrollProgress(Math.max(0, Math.min(1, window.scrollY / (vh * 1.5))))
+      const y = window.scrollY
+      setScrollProgress(Math.max(0, Math.min(1, y / (vh * 1.5))))
+      setScrollProgress2(Math.max(0, Math.min(1, (y - vh * 1.5) / (vh * 1.5))))
     }
     window.addEventListener('scroll', handleScroll, { passive: true })
     handleScroll()
@@ -215,7 +279,7 @@ export function LandingPage() {
       {/* Fixed (not absolute) so it stays pinned to the viewport while the
           page scrolls. */}
       <div className="fixed top-0 right-0 left-0 z-20 flex items-center justify-between px-6 py-4">
-        <img src="/logo_color.png" alt="LevX" className="h-12 w-auto" />
+        <img src="/logo_wordmark.png" alt="LevX" className="h-5 w-auto" />
         <div className="flex items-center gap-4">
           <a
             href="https://x.com/LevXtrade"
@@ -238,24 +302,25 @@ export function LandingPage() {
         </div>
       </div>
 
-      {/* Pin wrapper — 250vh tall. The hero sticks to top:0 for the first
-          150vh of scroll (the page visually freezes while scrollProgress
-          drives the text delete), then the hero scrolls off normally once
-          the user scrolls past. 150vh matches the scrollProgress divisor
-          of 1.5 in the scroll handler. */}
-      <div className="relative h-[250vh]">
+      {/* Pin wrapper — 400vh tall. The hero sticks to top:0 for 300vh of
+          sticky travel (3 viewports): 1.5 viewports for phase 1 (text
+          delete) + 1.5 viewports for phase 2 (market card slide + tilt),
+          matching the two scrollProgress divisors above. */}
+      <div className="relative h-[400vh]">
         {/* z-[1100] lifts the sticky section's stacking context above
             LogoReveal's z-[1000] — sticky *creates* a stacking context
             even without z-index, so without this the market card inside
             gets painted below the intro overlay regardless of any z-index
             we put on it directly. */}
         <section className="sticky top-0 z-[1100] flex h-dvh flex-col items-center justify-between overflow-hidden px-6 pt-24 pb-20 sm:px-10 sm:pt-28 sm:pb-24">
-          {/* Pulsating brand-green dither BG — scoped to the hero only so
+          {/* Pulsating brand-green dither aura — scoped to the hero only so
               it doesn't bleed into sections below when the page scrolls.
               Wrapped with an opacity transition so it smoothly fades in
               after the market card lands (marketSettled) rather than
               popping into whatever mid-pulse state it happened to be in
-              when LogoReveal unmounts. */}
+              when LogoReveal unmounts. Intentionally static — it doesn't
+              translate or scale with the card's scroll-tilt, so the aura
+              stays centered on the viewport as the card slides over it. */}
           <div
             className="absolute inset-0 transition-opacity duration-[1000ms] ease-out"
             style={{ opacity: marketSettled ? 1 : 0 }}
@@ -289,88 +354,112 @@ export function LandingPage() {
             </h1>
           )}
 
-          {/* zoom: 0.7 uniformly scales the card's rendered size AND its
-              layout footprint — text, padding, chart, rail width all
-              shrink by the same factor, unlike tweaking max-w +
-              chartHeight piecemeal.
-              `landing-rise` + markers-hidden are both gated on introDone —
-              the card stays invisible + collapsed through the intro and
-              only triggers the rise animation when the reveal hands off.
-              `relative z-[1100]` stacks the card above LogoReveal's
-              z-[1000] so it slides up AND OVER the still-visible video /
-              logo during the rise — the overlay then crossfades out
-              from underneath. */}
+          {/* Two transform wrappers around the card so three independent
+              transforms stay cleanly separated:
+                outer  — perspective container + horizontal slide driven by
+                         scrollProgress2 (phase 2 of hero scroll).
+                middle — rotateY tilt + shrink, also driven by
+                         scrollProgress2. A separate element so it doesn't
+                         collide with the landing-rise animation that
+                         lives on the card.
+                card   — keeps `landing-rise` (translateY + opacity) +
+                         `zoom: 0.7` exactly as before; no inline transform
+                         so the keyframe animation runs unobstructed.
+              The inline `perspective` and `transform` values are only set
+              once scroll has advanced into phase 2 — at rest they're
+              omitted entirely. Applying any transform (even identity)
+              promotes the subtree to a GPU compositor layer and can
+              cause sub-pixel blur/shift on the card's text, so the card
+              needs to be transform-free while it's sitting flat. */}
           <div
-            className={`border-line-strong bg-surface relative z-[1100] mx-auto w-full max-w-[1440px] rounded-2xl border-2 p-5 sm:p-7 ${
-              introDone ? 'landing-rise' : 'opacity-0'
-            }${markersReady ? '' : ' hide-chart-markers'}`}
-            style={{ zoom: 0.7 }}
+            className="mx-auto w-full max-w-[1000px]"
+            style={
+              scrollProgress2 > 0
+                ? {
+                    perspective: '1400px',
+                    transform: `translateX(${-scrollProgress2 * 15}vw)`,
+                  }
+                : undefined
+            }
           >
-            <MarketPreview
-              pair="BTC/USDC"
-              history={history}
-              predictions={predictions}
-              now={now}
-              marketStart={marketStart}
-              marketEnd={marketEnd}
-              checkpointInterval={CHECKPOINT_INTERVAL_SEC}
-              totalCheckpoints={TOTAL_CHECKPOINTS}
-              chartHeight={420}
-              onCtaClick={goToApp}
+            <div
+              style={
+                scrollProgress2 > 0
+                  ? {
+                      transform: `rotateY(${scrollProgress2 * 18}deg) scale(${1 - scrollProgress2 * 0.1})`,
+                      transformOrigin: 'center center',
+                    }
+                  : undefined
+              }
+            >
+              {/* MagicCard owns the surface fill, the 1px gradient
+                  border-ring that tracks the cursor, and the soft inner
+                  spotlight that fades in on hover. We keep the card's
+                  existing responsibilities on the wrapper itself:
+                    - `ref={cardRef}` feeds the ResizeObserver that drives
+                       the dynamic `zoom`.
+                    - `landing-card-glow` provides the diffuse outer halo
+                       (brand-green + faint white) that sits on top of the
+                       dither aura behind.
+                    - `zoom: cardScale` uniformly scales rendered size
+                       AND layout footprint.
+                    - `relative z-[1100]` stacks above LogoReveal's
+                       z-[1000] so the rise animation plays above the
+                       still-fading intro overlay.
+                    - `landing-rise` / `opacity-0` + marker-hide gates
+                       stay on MagicCard — the intro rise keyframes
+                       animate the whole card including MagicCard's
+                       border and spotlight layers.
+                  Padding for MarketPreview's inner content moves onto
+                  an inner div because MagicCard's z-stack needs direct
+                  ownership of its outer edges (padding there would pull
+                  the z-20 surface + z-30 spotlight layers inward). */}
+              <MagicCard
+                ref={cardRef}
+                className={`landing-card-glow relative z-[1100] mx-auto rounded-2xl ${
+                  introDone ? 'landing-rise' : 'opacity-0'
+                }${markersReady ? '' : ' hide-chart-markers'}`}
+                style={{ zoom: cardScale }}
+              >
+                <div className="p-5 sm:p-7">
+                  <MarketPreview
+                    pair="BTC/USDC"
+                    history={history}
+                    predictions={predictions}
+                    now={now}
+                    marketStart={marketStart}
+                    marketEnd={marketEnd}
+                    checkpointInterval={CHECKPOINT_INTERVAL_SEC}
+                    totalCheckpoints={TOTAL_CHECKPOINTS}
+                    chartHeight={420}
+                    onCtaClick={goToApp}
+                  />
+                </div>
+              </MagicCard>
+            </div>
+          </div>
+
+          {/* Scroll hint — gentle down-chevron that fades in once the
+              market card has landed, then fades out again the moment the
+              user starts scrolling. Absolute-positioned so it sits within
+              the section's bottom padding without reflowing the flex
+              layout above. pointer-events-none so it never intercepts
+              clicks on the card below. */}
+          <div
+            aria-hidden="true"
+            className={`pointer-events-none absolute bottom-6 left-1/2 -translate-x-1/2 transition-opacity duration-700 ease-out ${
+              marketSettled && scrollProgress < 0.02 ? 'opacity-60' : 'opacity-0'
+            }`}
+          >
+            <ChevronDown
+              className="scroll-hint text-ink-muted"
+              size={28}
+              strokeWidth={1.5}
             />
           </div>
         </section>
       </div>
 
-      {/* Logo variations — four renderings of the same bezier silhouette
-          shown side-by-side as a CAD-sheet grid. Each panel has a small
-          mono annotation (plate number + name) in the Nothing/drafting
-          tradition. The canonical SDF (FLUID MERGE) occupies the top-left;
-          the other three are Canvas 2D variants, each interpreting the
-          mark through a different lens of the brand's visual language. */}
-      <section className="flex min-h-dvh w-full items-center justify-center px-6 py-12 sm:px-10">
-        <div className="w-full max-w-[min(92vh,92vw,1400px)]">
-          <div className="grid aspect-square grid-cols-2 grid-rows-2 gap-4">
-            <LogoPanel plate="01" name="FLUID MERGE">
-              <BezierLogo color="#ffffff" ariaLabel="LevX" />
-            </LogoPanel>
-            <LogoPanel plate="02" name="CIPHER STREAM">
-              <LogoVariantCipher />
-            </LogoPanel>
-            <LogoPanel plate="03" name="PROBABILITY FAN">
-              <LogoVariantFan />
-            </LogoPanel>
-            <LogoPanel plate="04" name="ROOT SYSTEM">
-              <LogoVariantRootSystem />
-            </LogoPanel>
-          </div>
-        </div>
-      </section>
     </main>
-  )
-}
-
-/** CAD-sheet panel wrapper — thin border, mono plate annotation top-left. */
-function LogoPanel({
-  plate,
-  name,
-  children,
-}: {
-  plate: string
-  name: string
-  children: ReactNode
-}) {
-  return (
-    <div className="border-line relative aspect-square overflow-hidden border">
-      {/* Plate annotation — mirrors drafting-sheet conventions: plate
-          number, slash separator, caps name. Sits atop the canvas so it
-          reads regardless of what each variant renders underneath. */}
-      <div className="pointer-events-none absolute top-2 left-2 z-10 flex items-center gap-1.5 font-mono text-[9px] leading-none tracking-[0.14em] uppercase">
-        <span className="text-ink-dim">{plate}</span>
-        <span className="text-ink-dim">/</span>
-        <span className="text-ink-muted">{name}</span>
-      </div>
-      <div className="h-full w-full">{children}</div>
-    </div>
   )
 }

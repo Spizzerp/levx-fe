@@ -132,6 +132,39 @@
   visibility: hidden;
 }
 
+/* ── Market card diffuse glow ────────────────────────────
+   Soft, multi-layered aura around the landing market card. A faint
+   white core + wider brand-green bloom rings so the card feels lit by
+   the dither aura behind it rather than floating on a flat black plane.
+   box-shadow scales with the card's `zoom`, so the blur radii are set
+   generously to stay diffuse after the ~0.55 zoom the card receives. */
+.landing-card-glow {
+  box-shadow:
+    0 0 60px rgba(255, 255, 255, 0.08),
+    0 0 160px rgba(92, 247, 139, 0.10),
+    0 0 320px rgba(92, 247, 139, 0.05);
+}
+
+/* ── Scroll hint bounce ──────────────────────────────────
+   Subtle up/down motion on the down-chevron sitting below the market
+   card, suggesting "keep scrolling". Animation lives on the icon itself
+   so the parent wrapper is free to carry positioning transforms
+   (translate-x-1/2 centering) without conflicting. */
+.scroll-hint {
+  animation: scroll-hint-bounce 1.8s ease-in-out infinite;
+}
+
+@keyframes scroll-hint-bounce {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(6px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scroll-hint {
+    animation: none;
+  }
+}
+
 /* ── LogoReveal: dither-scrim overlay ────────────────────
    Sits above the scribble video, below the logo. Adds a fine 2×2 dither
    + subtle backdrop blur + soft black tint so the video reads as
