@@ -2,12 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronDown, FileText } from 'lucide-react'
 import Lenis from 'lenis'
 
-import { useNavigate } from '@tanstack/react-router'
-
 import { MarketPreview } from '@/features/market/MarketPreview'
 import { MagicCard } from '@/ui/MagicCard'
 import { LogoReveal } from './LogoReveal'
 import './landing.css'
+import { WaitlistModal, type WaitlistPayload } from '@/ui/WaitlistModal'
+import { submitWaitlist } from '@/lib/supabase/auth'
 
 /**
  * Typewriter headline — reveals one character at a time after an optional
@@ -141,8 +141,12 @@ function buildMockHistory(now: number): PricePoint[] {
 }
 
 export function LandingPage() {
-  const navigate = useNavigate()
   const [now] = useState(() => Date.now())
+  const [waitlistOpen, setWaitlistOpen] = useState(false)
+
+  const handleWaitlistSubmit = async (payload: WaitlistPayload) => {
+    await submitWaitlist(payload)
+  }
   // Intro gate — flips when the LogoReveal overlay signals completion
   // (~5.9s after mount, as the logo begins its 400ms fade-out). Every
   // scripted hero animation below keys off this flag so the typing
@@ -261,7 +265,7 @@ export function LandingPage() {
     return { history, predictions, marketStart, marketEnd }
   }, [now])
 
-  const goToApp = () => navigate({ to: '/markets' })
+  const openWaitlist = useCallback(() => setWaitlistOpen(true), [])
   // Memoized so LogoReveal's effect doesn't re-run when introDone flips —
   // a new function reference each render would cause the effect's cleanup
   // + re-execution to call video.play() again, restarting the ended video.
@@ -432,7 +436,7 @@ export function LandingPage() {
                     checkpointInterval={CHECKPOINT_INTERVAL_SEC}
                     totalCheckpoints={TOTAL_CHECKPOINTS}
                     chartHeight={420}
-                    onCtaClick={goToApp}
+                    onCtaClick={openWaitlist}
                   />
                 </div>
               </MagicCard>
@@ -460,6 +464,11 @@ export function LandingPage() {
         </section>
       </div>
 
+      <WaitlistModal
+        open={waitlistOpen}
+        onOpenChange={setWaitlistOpen}
+        onSubmit={handleWaitlistSubmit}
+      />
     </main>
   )
 }

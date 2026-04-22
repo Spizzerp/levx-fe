@@ -39,6 +39,11 @@ export function getActiveJWT(): JWTRecord | null {
 
 export type NonceResponse = { nonce: string; message: string; expiresAt: string }
 export type VerifyRequest = { pubkey: string; nonce: string; signature: string }
+export type SubmitWaitlistRequest = {
+  email: string
+  xUsername: string
+  walletAddress: string
+}
 
 export async function requestNonce(): Promise<NonceResponse> {
   const res = await fetch(`${env.APP_SUPABASE_URL}/functions/v1/verify-wallet/nonce`, {
@@ -63,4 +68,32 @@ export async function verifyAndGetJWT(req: VerifyRequest): Promise<JWTRecord> {
     expiresAt: Date.parse(body.expiresAt as string),
     wallet:    req.pubkey,
   }
+}
+
+export async function submitWaitlist(req: SubmitWaitlistRequest): Promise<void> {
+  const res = await fetch(`${env.APP_SUPABASE_URL}/functions/v1/submit-waitlist`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', apikey: env.APP_SUPABASE_ANON_KEY },
+    body: JSON.stringify(req),
+  })
+
+  if (res.ok) return
+
+  const body = await res.json().catch(() => null)
+  const code = body?.error
+
+  if (code === 'waitlist_identity_conflict') {
+    throw new Error('This email or wallet is already linked to another waitlist entry.')
+  }
+  if (code === 'invalid_email') {
+    throw new Error('Enter a valid email address.')
+  }
+  if (code === 'invalid_x_username') {
+    throw new Error('Enter a valid X username.')
+  }
+  if (code === 'invalid_wallet_address') {
+    throw new Error('Invalid Solana wallet address.')
+  }
+
+  throw new Error('Could not join the waitlist. Try again.')
 }
