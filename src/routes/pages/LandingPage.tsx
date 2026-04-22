@@ -5,6 +5,7 @@ import Lenis from 'lenis'
 import { useNavigate } from '@tanstack/react-router'
 
 import { MarketPreview } from '@/features/market/MarketPreview'
+import { BezierLogo } from '@/ui/BezierLogo'
 
 /**
  * Typewriter headline — reveals one character at a time after an optional
@@ -252,10 +253,16 @@ export function LandingPage() {
         </section>
       </div>
 
-      {/* Placeholder below-fold section — reserves scroll room so Lenis has
-          something to ease into. Replace / extend as we build the
-          scroll-driven story. */}
-      <section className="h-dvh" aria-hidden="true" />
+      {/* Interactive SDF logo — hover it to swirl the shape around the
+          cursor. Sits at the bottom of the page as a visual bookend; sized
+          to fit the viewport so it feels deliberate rather than decorative.
+          The square aspect wrapper keeps the logo proportions intact at
+          any viewport width. */}
+      <section className="flex min-h-dvh w-full items-center justify-center px-6 py-24 sm:px-10">
+        <div className="aspect-square w-full max-w-[min(80vh,720px)]">
+          <BezierLogo color="#ffffff" ariaLabel="LevX" />
+        </div>
+      </section>
     </main>
   )
 }
