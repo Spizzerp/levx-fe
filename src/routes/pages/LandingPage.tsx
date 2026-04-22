@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { FileText } from 'lucide-react'
 import Lenis from 'lenis'
 
 import { useNavigate } from '@tanstack/react-router'
 
 import { MarketPreview } from '@/features/market/MarketPreview'
+import { LogoReveal } from './LogoReveal'
+import './landing.css'
 
 /**
  * Typewriter headline — reveals one character at a time after an optional
@@ -120,13 +122,26 @@ function buildMockHistory(now: number): PricePoint[] {
 export function LandingPage() {
   const navigate = useNavigate()
   const [now] = useState(() => Date.now())
-  // Flips true after the card's 1.4s rise animation so the chart's dashed
+  // Intro gate — flips when the LogoReveal overlay signals completion
+  // (~5.9s after mount, as the logo begins its 400ms fade-out). Every
+  // scripted hero animation below keys off this flag so the typing
+  // headline and card rise only begin once the reveal is handing off.
+  const [introDone, setIntroDone] = useState(false)
+  // Flips true after the card's 1.8s rise animation so the chart's dashed
   // marker lines (NOW / OPENS / END) appear only once the card is settled.
+  // Same timer also flips marketSettled which triggers the dither fade-in
+  // below — both are keyed to the same "card has landed" moment.
   const [markersReady, setMarkersReady] = useState(false)
+  const [marketSettled, setMarketSettled] = useState(false)
   useEffect(() => {
-    const t = setTimeout(() => setMarkersReady(true), 1500)
-    return () => clearTimeout(t)
-  }, [])
+    if (!introDone) return
+    const markersT = setTimeout(() => setMarkersReady(true), 1900)
+    const settledT = setTimeout(() => setMarketSettled(true), 1900)
+    return () => {
+      clearTimeout(markersT)
+      clearTimeout(settledT)
+    }
+  }, [introDone])
 
   // Lenis smooth-scroll. Inertial easing on wheel/trackpad — drives
   // scroll-linked animations as we add sections below the hero.
@@ -177,9 +192,20 @@ export function LandingPage() {
   }, [now])
 
   const goToApp = () => navigate({ to: '/markets' })
+  // Memoized so LogoReveal's effect doesn't re-run when introDone flips —
+  // a new function reference each render would cause the effect's cleanup
+  // + re-execution to call video.play() again, restarting the ended video.
+  const handleIntroComplete = useCallback(() => setIntroDone(true), [])
 
   return (
     <main className="relative min-h-dvh w-full bg-black">
+      {/* Plays before any hero content is visible. Unmounts itself once
+          its own fade-out completes; onComplete fires as the logo begins
+          fading so the hero's entrance animations overlap the last tail
+          of the intro — the market card rises over the still-visible
+          video as the overlay crossfades out from underneath. */}
+      <LogoReveal onComplete={handleIntroComplete} />
+
       {/* Fixed (not absolute) so it stays pinned to the viewport while the
           page scrolls. */}
       <div className="fixed top-0 right-0 left-0 z-20 flex items-center justify-between px-6 py-4">
@@ -212,28 +238,66 @@ export function LandingPage() {
           the user scrolls past. 150vh matches the scrollProgress divisor
           of 1.5 in the scroll handler. */}
       <div className="relative h-[250vh]">
-        <section className="sticky top-0 flex h-dvh flex-col items-center justify-between overflow-hidden px-6 pt-24 pb-20 sm:px-10 sm:pt-28 sm:pb-24">
+        {/* z-[1100] lifts the sticky section's stacking context above
+            LogoReveal's z-[1000] — sticky *creates* a stacking context
+            even without z-index, so without this the market card inside
+            gets painted below the intro overlay regardless of any z-index
+            we put on it directly. */}
+        <section className="sticky top-0 z-[1100] flex h-dvh flex-col items-center justify-between overflow-hidden px-6 pt-24 pb-20 sm:px-10 sm:pt-28 sm:pb-24">
           {/* Pulsating brand-green dither BG — scoped to the hero only so
-              it doesn't bleed into sections below when the page scrolls. */}
-          <div className="landing-dither" aria-hidden="true" />
+              it doesn't bleed into sections below when the page scrolls.
+              Wrapped with an opacity transition so it smoothly fades in
+              after the market card lands (marketSettled) rather than
+              popping into whatever mid-pulse state it happened to be in
+              when LogoReveal unmounts. */}
+          <div
+            className="absolute inset-0 transition-opacity duration-[1000ms] ease-out"
+            style={{ opacity: marketSettled ? 1 : 0 }}
+            aria-hidden="true"
+          >
+            {marketSettled && <div className="landing-dither" aria-hidden="true" />}
+          </div>
 
-          {/* Typewriter headline — starts after the card's 1.4s rise
-              animation finishes so the two animations don't overlap. */}
-          <TypingHeadline
-            text="Predict the path, not the outcome"
-            startAfter={1500}
-            scrollProgress={scrollProgress}
-            className="text-ink-strong font-display text-display-sm text-center font-medium tracking-tight"
-          />
+          {/* Typewriter headline — only mounts once the intro is handing
+              off. startAfter=1900 delays typing until the card's 1.8s
+              rise finishes, preserving the non-overlapping rhythm with
+              the slightly slower rise. */}
+          {introDone && (
+            <TypingHeadline
+              text="Predict the path, not the outcome"
+              startAfter={1900}
+              scrollProgress={scrollProgress}
+              className="text-ink-strong font-display text-display-sm text-center font-medium tracking-tight"
+            />
+          )}
+          {/* Placeholder preserves vertical rhythm during the intro so the
+              sticky hero layout doesn't shift when the headline mounts.
+              aria-hidden + invisible keeps it out of the a11y tree while
+              reserving its line-box. */}
+          {!introDone && (
+            <h1
+              aria-hidden="true"
+              className="text-display-sm invisible font-display text-center font-medium tracking-tight"
+            >
+              &nbsp;
+            </h1>
+          )}
 
           {/* zoom: 0.7 uniformly scales the card's rendered size AND its
               layout footprint — text, padding, chart, rail width all
               shrink by the same factor, unlike tweaking max-w +
-              chartHeight piecemeal. */}
+              chartHeight piecemeal.
+              `landing-rise` + markers-hidden are both gated on introDone —
+              the card stays invisible + collapsed through the intro and
+              only triggers the rise animation when the reveal hands off.
+              `relative z-[1100]` stacks the card above LogoReveal's
+              z-[1000] so it slides up AND OVER the still-visible video /
+              logo during the rise — the overlay then crossfades out
+              from underneath. */}
           <div
-            className={`border-line-strong bg-surface landing-rise mx-auto w-full max-w-[1440px] rounded-2xl border-2 p-5 sm:p-7${
-              markersReady ? '' : ' hide-chart-markers'
-            }`}
+            className={`border-line-strong bg-surface relative z-[1100] mx-auto w-full max-w-[1440px] rounded-2xl border-2 p-5 sm:p-7 ${
+              introDone ? 'landing-rise' : 'opacity-0'
+            }${markersReady ? '' : ' hide-chart-markers'}`}
             style={{ zoom: 0.7 }}
           >
             <MarketPreview
