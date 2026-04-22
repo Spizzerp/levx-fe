@@ -21,7 +21,7 @@ export function UIRoot({ children }: PropsWithChildren) {
 
   return (
     <ConnectionProvider endpoint={endpoint}>
-      <WalletProvider wallets={WALLETS} autoConnect>
+      <WalletProvider wallets={WALLETS}>
         <WalletModalProvider>
           <AnchorProgramProvider>
             <WalletSync />
