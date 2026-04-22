@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { FileText } from 'lucide-react'
 import Lenis from 'lenis'
 
@@ -6,6 +6,11 @@ import { useNavigate } from '@tanstack/react-router'
 
 import { MarketPreview } from '@/features/market/MarketPreview'
 import { BezierLogo } from '@/ui/BezierLogo'
+import {
+  LogoVariantCipher,
+  LogoVariantFan,
+  LogoVariantRootSystem,
+} from '@/ui/BezierLogo/variants'
 
 /**
  * Typewriter headline — reveals one character at a time after an optional
@@ -253,16 +258,55 @@ export function LandingPage() {
         </section>
       </div>
 
-      {/* Interactive SDF logo — hover it to swirl the shape around the
-          cursor. Sits at the bottom of the page as a visual bookend; sized
-          to fit the viewport so it feels deliberate rather than decorative.
-          The square aspect wrapper keeps the logo proportions intact at
-          any viewport width. */}
-      <section className="flex min-h-dvh w-full items-center justify-center px-6 py-24 sm:px-10">
-        <div className="aspect-square w-full max-w-[min(80vh,720px)]">
-          <BezierLogo color="#ffffff" ariaLabel="LevX" />
+      {/* Logo variations — four renderings of the same bezier silhouette
+          shown side-by-side as a CAD-sheet grid. Each panel has a small
+          mono annotation (plate number + name) in the Nothing/drafting
+          tradition. The canonical SDF (FLUID MERGE) occupies the top-left;
+          the other three are Canvas 2D variants, each interpreting the
+          mark through a different lens of the brand's visual language. */}
+      <section className="flex min-h-dvh w-full items-center justify-center px-6 py-12 sm:px-10">
+        <div className="w-full max-w-[min(92vh,92vw,1400px)]">
+          <div className="grid aspect-square grid-cols-2 grid-rows-2 gap-4">
+            <LogoPanel plate="01" name="FLUID MERGE">
+              <BezierLogo color="#ffffff" ariaLabel="LevX" />
+            </LogoPanel>
+            <LogoPanel plate="02" name="CIPHER STREAM">
+              <LogoVariantCipher />
+            </LogoPanel>
+            <LogoPanel plate="03" name="PROBABILITY FAN">
+              <LogoVariantFan />
+            </LogoPanel>
+            <LogoPanel plate="04" name="ROOT SYSTEM">
+              <LogoVariantRootSystem />
+            </LogoPanel>
+          </div>
         </div>
       </section>
     </main>
+  )
+}
+
+/** CAD-sheet panel wrapper — thin border, mono plate annotation top-left. */
+function LogoPanel({
+  plate,
+  name,
+  children,
+}: {
+  plate: string
+  name: string
+  children: ReactNode
+}) {
+  return (
+    <div className="border-line relative aspect-square overflow-hidden border">
+      {/* Plate annotation — mirrors drafting-sheet conventions: plate
+          number, slash separator, caps name. Sits atop the canvas so it
+          reads regardless of what each variant renders underneath. */}
+      <div className="pointer-events-none absolute top-2 left-2 z-10 flex items-center gap-1.5 font-mono text-[9px] leading-none tracking-[0.14em] uppercase">
+        <span className="text-ink-dim">{plate}</span>
+        <span className="text-ink-dim">/</span>
+        <span className="text-ink-muted">{name}</span>
+      </div>
+      <div className="h-full w-full">{children}</div>
+    </div>
   )
 }
