@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronDown, FileText } from 'lucide-react'
+import { FileText } from 'lucide-react'
 import Lenis from 'lenis'
 
 import { MarketPreview } from '@/features/market/MarketPreview'
@@ -7,112 +7,255 @@ import { MagicCard } from '@/ui/MagicCard'
 import { LogoReveal } from './LogoReveal'
 import { ChartLogoReveal } from './ChartLogoReveal'
 import { SpreadLogoReveal } from './SpreadLogoReveal'
+import { HeroCalloutCard } from './HeroCalloutCard'
 import './landing.css'
 import { WaitlistModal, type WaitlistPayload } from '@/ui/WaitlistModal'
 import { submitWaitlist } from '@/lib/supabase/auth'
+import { cn } from '@/lib/cn'
 
 /**
- * Typewriter headline — reveals one character at a time after an optional
- * delay, then leaves a blinking cursor at the end. Respects
- * prefers-reduced-motion (shows the full string immediately) via the CSS
- * rule on `.typing-cursor`, since the JS interval itself is near-harmless
- * but we still want to not make the cursor strobe.
+ * Editorial hero intro — a four-register choreographed composition:
+ *   1. Eyebrow kicker — monospace caps flanked by hairline brand rules.
+ *   2. Display H1 line A — Bricolage Grotesque at display-xl.
+ *   3. Display H1 line B — same family, softened weight + muted ink so
+ *      the negation reads as counter-voice rather than continuation.
+ *   4. Spec strip — three monospace caps separated by hairline ticks,
+ *      a printed-spec line that anchors the protocol's concrete shape.
+ *
+ * Entrance: each register has its OWN stagger + duration + lift + blur
+ * so they don't arrive as a uniform block — eyebrow snaps in, title
+ * lines glide in with a longer ease, spec strip drifts in last.
+ *
+ * Exit (scroll-driven): per-register parallax — the eyebrow lifts and
+ * fades fastest, title line A slightly slower, line B slower still,
+ * and the spec strip lingers the longest. Each register also picks up
+ * a touch of exit blur. The differential rates create depth: the page
+ * doesn't slide away as one card; the hero dissolves register-by-
+ * register the way an editorial spread might wipe between pages.
  */
-function TypingHeadline({
-  text,
-  startAfter = 0,
-  speed = 55,
-  scrollProgress = 0,
-  className,
-}: {
-  text: string
-  startAfter?: number
-  speed?: number
-  /**
-   * 0-1 scroll position through the hero. Once typing completes, this maps
-   * linearly to the visible character count — as the user scrolls down, the
-   * text reverses (appears to be deleted from the end).
-   */
-  scrollProgress?: number
-  className?: string
-}) {
-  // `started` guards the cursor + text so nothing renders during the pre-roll.
-  // Without it, the blinking cursor would appear alone before `startAfter`
-  // elapses and look like a stray glyph on the empty page.
-  const [started, setStarted] = useState(false)
-  const [chars, setChars] = useState(0)
-
-  useEffect(() => {
-    let intervalId: ReturnType<typeof setInterval> | undefined
-    const startTimer = setTimeout(() => {
-      setStarted(true)
-      intervalId = setInterval(() => {
-        setChars((n) => {
-          if (n >= text.length) {
-            if (intervalId) clearInterval(intervalId)
-            return n
-          }
-          return n + 1
-        })
-      }, speed)
-    }, startAfter)
-
-    return () => {
-      clearTimeout(startTimer)
-      if (intervalId) clearInterval(intervalId)
+function HeroIntro({ show, scrollProgress }: { show: boolean; scrollProgress: number }) {
+  // Per-register exit speed multipliers — eyebrow accelerates fastest
+  // because its visual weight is light; the spec strip lags so it's the
+  // last vestige left as the card begins its tilt.
+  const exitFor = (speed: number) => {
+    const t = Math.max(0, Math.min(1, scrollProgress * speed))
+    // Ease-in (cube) so each register starts gently and accelerates
+    // toward zero — feels like the page is "letting go" rather than
+    // being yanked away.
+    const eased = t * t * t
+    return {
+      opacity: 1 - eased,
+      lift: -eased * 32,
+      blur: eased * 6,
     }
-  }, [text, startAfter, speed])
+  }
+  const exitEyebrow = exitFor(1.7)
+  const exitTitleA = exitFor(1.35)
+  const exitTitleB = exitFor(1.15)
+  const exitSpec = exitFor(0.95)
 
-  // After typing finishes, hand control over to scrollProgress — characters
-  // recede from the end proportional to how far the page has scrolled.
-  const typingDone = chars >= text.length
-  const clampedScroll = Math.max(0, Math.min(1, scrollProgress))
-  const displayed = typingDone
-    ? Math.max(0, text.length - Math.floor(clampedScroll * text.length))
-    : chars
-
-  // Hide the cursor once the scroll-delete has fully cleared the headline —
-  // without this the blinking vertical bar lingers on an otherwise empty
-  // hero as the user continues scrolling. `animation: none` is required
-  // alongside the opacity override: CSS keyframe animations outrank
-  // non-!important inline styles, so without it the blink animation would
-  // keep driving opacity between 0 and 1 and the fade-out wouldn't stick.
-  const cursorHidden = typingDone && displayed === 0
+  const itemStyle = (e: { opacity: number; lift: number; blur: number }) => ({
+    opacity: e.opacity,
+    transform: `translateY(${e.lift}px)`,
+    filter: e.blur > 0.05 ? `blur(${e.blur}px)` : 'none',
+    willChange: 'opacity, transform, filter',
+  })
 
   return (
-    <h1 className={className} aria-label={text}>
-      {started && (
-        <>
-          <span aria-hidden="true">{text.slice(0, displayed)}</span>
-          <span
-            aria-hidden="true"
-            className="typing-cursor"
-            style={
-              cursorHidden
-                ? {
-                    opacity: 0,
-                    animation: 'none',
-                    transition: 'opacity 300ms ease-out',
-                  }
-                : undefined
-            }
-          />
-        </>
+    <div
+      aria-hidden={!show}
+      className={cn(
+        'relative z-[1200] flex w-full max-w-[920px] flex-col items-center px-4 text-center',
+        show && 'hero-intro--show',
       )}
-    </h1>
+      style={{
+        transition: show ? 'none' : 'opacity 400ms ease-out',
+        opacity: show ? 1 : 0,
+      }}
+    >
+      {/* Eyebrow kicker — hairline rules + monospace caps. Reads as a
+          dek rule on an editorial page; the brand-green tip anchors
+          the protocol lineage without shouting. */}
+      <div
+        className="hero-intro__item hero-intro__item--eyebrow flex items-center gap-3"
+        style={{ ['--stagger' as string]: '0ms' }}
+      >
+        <div style={itemStyle(exitEyebrow)} className="flex items-center gap-3">
+          <span aria-hidden className="hero-intro__rule" />
+          <span className="text-ink-muted text-nano font-mono tracking-[0.32em] uppercase">
+            LevX Protocol <span className="text-ink-dim">·</span> v0.1 Beta
+          </span>
+          <span aria-hidden className="hero-intro__rule hero-intro__rule--right" />
+        </div>
+      </div>
+
+      {/* Display title — Bricolage Grotesque at display-xl. Line-height
+          under 1 so the two lines kern into a single visual column.
+          Tight negative tracking (-0.035em) pulls the grotesque metrics
+          into a confident mass at hero size. Slightly trimmed from the
+          previous 88px ceiling for a tauter editorial mass. */}
+      <h1
+        className="text-ink-strong mt-7 text-[52px] leading-[0.96] tracking-[-0.035em] sm:text-[68px] md:text-[80px]"
+        style={{
+          fontFamily: 'var(--font-editorial)',
+          fontVariationSettings: '"opsz" 96',
+        }}
+      >
+        <span
+          className="hero-intro__item hero-intro__item--title-a block"
+          style={{ ['--stagger' as string]: '160ms' }}
+        >
+          <span
+            className="block"
+            style={{ ...itemStyle(exitTitleA), fontWeight: 400 }}
+          >
+            Predict the path,
+          </span>
+        </span>
+        <span
+          className="hero-intro__item hero-intro__item--title-b text-ink-muted block"
+          style={{ ['--stagger' as string]: '320ms' }}
+        >
+          <span
+            className="block"
+            style={{ ...itemStyle(exitTitleB), fontWeight: 360 }}
+          >
+            not the outcome.
+          </span>
+        </span>
+      </h1>
+
+      {/* Spec strip — printed-instrument metadata. Three concrete facts
+          about the protocol, separated by hairline ticks. Sits at nano
+          size in mono caps so it reads as a dek/spec line, not a
+          tagline. The tick separators reuse the hairline language of
+          the chart's checkpoint marks. */}
+      <div
+        className="hero-intro__item hero-intro__item--spec mt-8 flex items-center justify-center gap-4"
+        style={{ ['--stagger' as string]: '520ms' }}
+      >
+        <div
+          style={itemStyle(exitSpec)}
+          className="flex items-center gap-4 text-ink-muted text-nano font-mono tracking-[0.28em] uppercase"
+        >
+          <span>168 HR Horizon</span>
+          <span aria-hidden className="hero-intro__tick" />
+          <span>Hourly Oracles</span>
+          <span aria-hidden className="hero-intro__tick" />
+          <span>5 Base Agents</span>
+        </div>
+      </div>
+    </div>
   )
+}
+
+/**
+ * Right-rail feature callouts that reveal as the market card tilts away.
+ *
+ * Each item is keyed to a specific area of the tilted dashboard:
+ *   01 · Trajectory  — about the chart/prediction paths
+ *   02 · Checkpoints — about the hourly oracle marks on the axis
+ *   03 · Agents      — about the model roster in the sidebar
+ *
+ * `progress` is the hero's phase-2 scroll (0..1). Each card has its own
+ * start offset so they reveal in sequence, sliding in from the right while
+ * the dashboard rotates and slides to the left. A dashed annotation
+ * leader line extends from each card toward the dashboard — a schematic
+ * "leader" that ties the callout to the UI it's describing.
+ *
+ * Hidden under `lg` because the tilt composition itself only reads well
+ * on wide screens; on tablet/mobile the dashboard alone carries the hero.
+ */
+interface HeroCallout {
+  num: string
+  kicker: string
+  title: string
+  body: string
+}
+
+const HERO_CALLOUTS: readonly HeroCallout[] = [
+  {
+    num: '01',
+    kicker: 'Trajectory',
+    title: 'Trade the line, not the strike.',
+    body: 'Every forecast is a 168-step curve. P&L accrues for every hour the tape shadows your path — not just where it lands.',
+  },
+  {
+    num: '02',
+    kicker: 'Checkpoints',
+    title: 'Hour-by-hour resolution.',
+    body: 'Oracles stamp the price on the hour. Miss six, win the next fifty. Shape of the curve beats endpoint luck.',
+  },
+  {
+    num: '03',
+    kicker: 'Agents',
+    title: 'Borrow conviction from the floor.',
+    body: 'Fork GJR-GARCH. Stack Merton-JD. Draft your own against the room, and let the tape settle the argument.',
+  },
+] as const
+
+function HeroFeatureCallouts({ progress }: { progress: number }) {
+  const clamp01 = (n: number) => Math.max(0, Math.min(1, n))
+  // Wider reveal window (0.26) than step (0.14) so adjacent cards
+  // crossfade instead of arriving as discrete pop-ins.
+  const REVEAL_STEP = 0.14
+  const REVEAL_WINDOW = 0.26
+  const REVEAL_START = 0.04
+  // Floor each card's visibility so they never fully disappear once the
+  // hero has begun tilting — solves the "nothing on the right at all"
+  // moment when progress is small. Cards still slide/fade in, just not
+  // from zero.
+  const MIN_OPACITY = 0.12
+
+  return (
+    <div
+      aria-hidden={progress < 0.02}
+      data-hero-callouts=""
+      className={cn(
+        'pointer-events-none fixed inset-y-0 top-[10%] left-[72%] z-[1200] flex flex-col justify-center gap-3 py-20',
+        'w-[28vw] max-w-[340px]',
+      )}
+    >
+      {HERO_CALLOUTS.map((c, i) => {
+        const start = REVEAL_START + i * REVEAL_STEP
+        const local = clamp01((progress - start) / REVEAL_WINDOW)
+        // Once the hero has begun tilting, lift the card to MIN_OPACITY so
+        // it's never invisible-but-mounted. Before phase-2 starts we keep
+        // it fully hidden so nothing clutters the centered intro state.
+        const reveal = progress > 0.01 ? Math.max(MIN_OPACITY, local) : 0
+        const translate = (1 - local) * 48
+        return (
+          <HeroCalloutCard
+            key={c.num}
+            num={c.num}
+            kicker={c.kicker}
+            title={c.title}
+            body={c.body}
+            leaderOpacity={local}
+            style={{
+              opacity: reveal,
+              transform: `translateX(${translate}px)`,
+              willChange: 'opacity, transform',
+            }}
+          />
+        )
+      })}
+    </div>
+  )
+}
+
+/** Ease-out cubic — softens scroll-driven transforms so motion starts
+ * gently and decelerates. Used by the hero card's tilt + slide so the
+ * pivot feels like it's settling rather than tracking the wheel 1:1. */
+function easeOutCubic(t: number) {
+  const x = Math.max(0, Math.min(1, t))
+  return 1 - Math.pow(1 - x, 3)
 }
 
 /** X (Twitter) glyph — mirrors the one used in CommonLayout's footer. */
 function XIcon({ size = 16 }: { size?: number }) {
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="currentColor"
-      aria-hidden="true"
-    >
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
       <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
     </svg>
   )
@@ -385,30 +528,13 @@ export function LandingPage() {
             {marketSettled && <div className="landing-dither" aria-hidden="true" />}
           </div>
 
-          {/* Typewriter headline — only mounts once the intro is handing
-              off. startAfter=1900 delays typing until the card's 1.8s
-              rise finishes, preserving the non-overlapping rhythm with
-              the slightly slower rise. */}
-          {introDone && (
-            <TypingHeadline
-              text="Predict the path, not the outcome"
-              startAfter={1900}
-              scrollProgress={scrollProgress}
-              className="text-ink-strong font-display text-display-sm text-center font-medium tracking-tight"
-            />
-          )}
-          {/* Placeholder preserves vertical rhythm during the intro so the
-              sticky hero layout doesn't shift when the headline mounts.
-              aria-hidden + invisible keeps it out of the a11y tree while
-              reserving its line-box. */}
-          {!introDone && (
-            <h1
-              aria-hidden="true"
-              className="text-display-sm invisible font-display text-center font-medium tracking-tight"
-            >
-              &nbsp;
-            </h1>
-          )}
+          {/* Editorial hero — always mounted to reserve its own vertical
+              rhythm during the intro overlay. `show` stays false until
+              the LogoReveal hands off, at which point the staggered
+              blur-up reveal kicks in. The block also responds to phase-1
+              scroll by fading + lifting to clear the stage for the
+              market-card tilt in phase-2. */}
+          <HeroIntro show={introDone} scrollProgress={scrollProgress} />
 
           {/* Two transform wrappers around the card so three independent
               transforms stay cleanly separated:
@@ -427,13 +553,19 @@ export function LandingPage() {
               promotes the subtree to a GPU compositor layer and can
               cause sub-pixel blur/shift on the card's text, so the card
               needs to be transform-free while it's sitting flat. */}
+          {/* Tilt math — apply ease-out (cubic) to the linear scroll
+              progress so motion starts gently and decelerates. Couple
+              with a tiny upward float so the card feels like it's
+              releasing from gravity as it pivots, instead of just
+              sliding flatly across the stage. Angle slightly trimmed
+              (16°) so the perspective never gets cartoon-deep. */}
           <div
             className="mx-auto w-full max-w-[1000px]"
             style={
               scrollProgress2 > 0
                 ? {
-                    perspective: '1400px',
-                    transform: `translateX(${-scrollProgress2 * 15}vw)`,
+                    perspective: '1600px',
+                    transform: `translateX(${-easeOutCubic(scrollProgress2) * 13}vw) translateY(${-easeOutCubic(scrollProgress2) * 3.5}vh)`,
                   }
                 : undefined
             }
@@ -442,7 +574,7 @@ export function LandingPage() {
               style={
                 scrollProgress2 > 0
                   ? {
-                      transform: `rotateY(${scrollProgress2 * 18}deg) scale(${1 - scrollProgress2 * 0.1})`,
+                      transform: `rotateY(${easeOutCubic(scrollProgress2) * 16}deg) scale(${1 - easeOutCubic(scrollProgress2) * 0.08})`,
                       transformOrigin: 'center center',
                     }
                   : undefined
@@ -474,7 +606,7 @@ export function LandingPage() {
                 ref={cardRef}
                 className={`landing-card-glow relative z-[1100] mx-auto rounded-2xl ${
                   introDone ? 'landing-rise' : 'opacity-0'
-                }${markersReady ? '' : ' hide-chart-markers'}`}
+                }${markersReady ? '' : 'hide-chart-markers'}`}
                 style={{ zoom: cardScale }}
               >
                 <div className="p-5 sm:p-7">
@@ -495,23 +627,31 @@ export function LandingPage() {
             </div>
           </div>
 
-          {/* Scroll hint — gentle down-chevron that fades in once the
-              market card has landed, then fades out again the moment the
-              user starts scrolling. Absolute-positioned so it sits within
-              the section's bottom padding without reflowing the flex
-              layout above. pointer-events-none so it never intercepts
-              clicks on the card below. */}
+          {/* Right-rail feature callouts — reveal as the card tilts away
+              during phase 2 of hero scroll. Pointer-events disabled so
+              they never intercept clicks on the card behind. Hidden on
+              narrow viewports where the tilt composition doesn't read. */}
+          <HeroFeatureCallouts progress={scrollProgress2} />
+
+          {/* Editorial scroll cue — hairline rule + mono caps + a green
+              tracer that drops down the rule on a 2.4s cycle. Replaces
+              the previous bare chevron with a piece of typographic
+              instrumentation that matches the rest of the page's
+              drafting language. Fades out the moment the user starts
+              scrolling so it never competes with the title's fade. */}
           <div
             aria-hidden="true"
-            className={`pointer-events-none absolute bottom-6 left-1/2 -translate-x-1/2 transition-opacity duration-700 ease-out ${
-              marketSettled && scrollProgress < 0.02 ? 'opacity-60' : 'opacity-0'
-            }`}
+            className={cn(
+              'pointer-events-none absolute bottom-7 left-1/2 z-[1100] -translate-x-1/2 transition-opacity duration-700 ease-out',
+              marketSettled && scrollProgress < 0.02 ? 'opacity-60' : 'opacity-0',
+            )}
           >
-            <ChevronDown
-              className="scroll-hint text-ink-muted"
-              size={28}
-              strokeWidth={1.5}
-            />
+            <div className="flex flex-col items-center gap-2.5">
+              <span className="text-ink-muted font-mono text-nano tracking-[0.32em] uppercase">
+                Scroll
+              </span>
+              <span className="hero-scroll-rule" />
+            </div>
           </div>
         </section>
       </div>

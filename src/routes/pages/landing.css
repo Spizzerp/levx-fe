@@ -1,3 +1,116 @@
+/* ── Landing hero intro — choreographed entrance ────────
+   Each `.hero-intro__item` is a layout slot whose entrance is keyed
+   off its `--stagger` delay. The parent `.hero-intro--show` gate
+   triggers the animation once the LogoReveal intro hands off — before
+   that, items sit invisibly in place so their line-boxes are still
+   reserved and nothing shifts on mount.
+
+   Per-register variants override duration/translate/blur so each
+   layer arrives with its own character:
+     --eyebrow  — short snap-in; light visual weight, quick reveal
+     --title-a  — long ease-out glide; the dominant statement
+     --title-b  — same as A but with a touch more lift, so it reads
+                  as a deliberate aftermath of line A
+     --spec     — gentle drift up; the printed-spec footer that lands
+                  last and subtly anchors the composition */
+.hero-intro__item {
+  opacity: 0;
+  transform: translateY(14px);
+  filter: blur(6px);
+  will-change: opacity, transform, filter;
+}
+
+.hero-intro--show .hero-intro__item {
+  animation-name: hero-intro-item;
+  animation-fill-mode: both;
+  animation-delay: var(--stagger, 0ms);
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  animation-duration: 1100ms;
+}
+
+.hero-intro--show .hero-intro__item--eyebrow {
+  animation-name: hero-intro-eyebrow;
+  animation-duration: 800ms;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.hero-intro--show .hero-intro__item--title-a {
+  animation-name: hero-intro-title;
+  animation-duration: 1300ms;
+}
+
+.hero-intro--show .hero-intro__item--title-b {
+  animation-name: hero-intro-title;
+  animation-duration: 1400ms;
+}
+
+.hero-intro--show .hero-intro__item--spec {
+  animation-name: hero-intro-spec;
+  animation-duration: 1100ms;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes hero-intro-item {
+  from { opacity: 0; transform: translateY(14px); filter: blur(6px); }
+  to   { opacity: 1; transform: translateY(0);    filter: blur(0); }
+}
+
+@keyframes hero-intro-eyebrow {
+  from { opacity: 0; transform: translateY(8px);  filter: blur(3px); }
+  to   { opacity: 1; transform: translateY(0);    filter: blur(0); }
+}
+
+@keyframes hero-intro-title {
+  from { opacity: 0; transform: translateY(22px); filter: blur(10px); }
+  to   { opacity: 1; transform: translateY(0);    filter: blur(0); }
+}
+
+@keyframes hero-intro-spec {
+  from { opacity: 0; transform: translateY(10px) scaleX(0.96); filter: blur(4px); }
+  to   { opacity: 1; transform: translateY(0)    scaleX(1);    filter: blur(0); }
+}
+
+/* ── Kicker rule — thin hairline with a brand-gradient core
+   Used on both sides of the eyebrow caps. Gradient fades out at the
+   outer tip so the rule reads as "emanating from" the text rather
+   than a hard-edged line. */
+.hero-intro__rule {
+  display: inline-block;
+  height: 1px;
+  width: clamp(28px, 4vw, 56px);
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--color-line-strong) 40%,
+    var(--color-brand-to) 100%
+  );
+}
+.hero-intro__rule--right {
+  background: linear-gradient(
+    90deg,
+    var(--color-brand-to) 0%,
+    var(--color-line-strong) 60%,
+    transparent 100%
+  );
+}
+
+/* ── Spec-strip tick — hairline separator between mono-caps facts
+   in the spec strip below the title. A 1px × 8px vertical mark, dim
+   so it reads as a printed instrument tick rather than a divider. */
+.hero-intro__tick {
+  display: inline-block;
+  width: 1px;
+  height: 8px;
+  background-color: var(--color-line-strong);
+  opacity: 0.55;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-intro--show .hero-intro__item {
+    animation-duration: 1ms;
+  }
+}
+
 /* ── Landing page dither BG ──────────────────────────── */
 
 /* Full-viewport animated dither. Lives as a sibling at the top of <main>,
@@ -47,18 +160,21 @@
     url("data:image/svg+xml,%3Csvg width='2' height='2' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='1' height='1' fill='white'/%3E%3C/svg%3E");
   -webkit-mask-size: 100% 100%, 2px 2px;
   -webkit-mask-composite: source-in;
-  animation: landing-dither-pulse 4.5s ease-in-out infinite;
+  /* Slower, softer breathing cycle (7s up from 4.5s) so the aura reads
+     as ambient glow rather than a heartbeat. Range tightened (0.7→1
+     opacity, 1→1.18 brightness) for a more refined swell. */
+  animation: landing-dither-pulse 7s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   will-change: opacity, filter;
 }
 
 @keyframes landing-dither-pulse {
   0%, 100% {
-    opacity: 0.6;
+    opacity: 0.7;
     filter: brightness(1);
   }
   50% {
     opacity: 1;
-    filter: brightness(1.35);
+    filter: brightness(1.18);
   }
 }
 
@@ -100,29 +216,6 @@
   }
 }
 
-/* ── Typing cursor — a blinking vertical bar that follows the last
-       revealed character during and after the typing animation. */
-.typing-cursor {
-  display: inline-block;
-  width: 0.06em;
-  height: 0.9em;
-  margin-left: 0.08em;
-  translate: 0 0.12em;
-  background-color: currentColor;
-  animation: typing-cursor-blink 1s step-end infinite;
-}
-
-@keyframes typing-cursor-blink {
-  0%, 49%   { opacity: 1; }
-  50%, 100% { opacity: 0; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .typing-cursor {
-    animation: none;
-  }
-}
-
 /* ── Chart marker delay (landing only) ───────────────────
    Hides the vertical/horizontal dashed markers inside the chart (NOW,
    OPENS, START, END connector) until the card's rise animation has
@@ -145,25 +238,59 @@
     0 0 320px rgba(92, 247, 139, 0.05);
 }
 
-/* ── Scroll hint bounce ──────────────────────────────────
-   Subtle up/down motion on the down-chevron sitting below the market
-   card, suggesting "keep scrolling". Animation lives on the icon itself
-   so the parent wrapper is free to carry positioning transforms
-   (translate-x-1/2 centering) without conflicting. */
-.scroll-hint {
-  animation: scroll-hint-bounce 1.8s ease-in-out infinite;
+/* ── Editorial scroll cue ────────────────────────────────
+   A 32px hairline rule with a brand-green tracer that drops down it
+   on a continuous loop. Replaces the old chevron bounce with a piece
+   of typographic instrumentation that matches the page's drafting
+   language. The rule itself is a 1px line with a faint gradient core;
+   the tracer is a tiny luminous segment painted via the ::after
+   pseudo, animated through a translateY cycle. */
+.hero-scroll-rule {
+  position: relative;
+  display: inline-block;
+  width: 1px;
+  height: 36px;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    var(--color-line-strong) 35%,
+    var(--color-line-strong) 100%
+  );
+  overflow: hidden;
+}
+.hero-scroll-rule::after {
+  content: '';
+  position: absolute;
+  left: -1px;
+  top: 0;
+  width: 3px;
+  height: 10px;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    var(--color-brand-to) 50%,
+    transparent 100%
+  );
+  filter: blur(0.5px);
+  box-shadow: 0 0 6px rgba(92, 247, 139, 0.7);
+  animation: hero-scroll-tracer 2.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-@keyframes scroll-hint-bounce {
-  0%, 100% { transform: translateY(0); }
-  50%      { transform: translateY(6px); }
+@keyframes hero-scroll-tracer {
+  0%   { transform: translateY(-12px); opacity: 0; }
+  20%  { opacity: 1; }
+  80%  { opacity: 1; }
+  100% { transform: translateY(36px);  opacity: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .scroll-hint {
+  .hero-scroll-rule::after {
     animation: none;
+    opacity: 0.6;
+    transform: translateY(12px);
   }
 }
+
 
 /* ── LogoReveal: dither-scrim overlay ────────────────────
    Sits above the scribble video, below the logo. Adds a fine 2×2 dither
