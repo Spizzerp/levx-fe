@@ -292,6 +292,36 @@
 }
 
 
+/* ── Tour overlay: waitlist pulse ────────────────────────
+   The final phase-4 tour stop frames the "Join Waitlist" button
+   instead of showing an explainer card. A steady pulse of the dashed
+   stroke + a brand-green drop-shadow reads as "click me" without
+   needing text. Runs on a 1.6s cycle — slow enough that the blinking
+   doesn't feel frantic but fast enough to feel alive. */
+.tour-waitlist-pulse {
+  animation: tour-waitlist-pulse 1.6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  filter: drop-shadow(0 0 10px rgba(92, 247, 139, 0.75));
+  transform-box: fill-box;
+}
+
+@keyframes tour-waitlist-pulse {
+  0%, 100% {
+    stroke-opacity: 0.65;
+    filter: drop-shadow(0 0 6px rgba(92, 247, 139, 0.55));
+  }
+  50% {
+    stroke-opacity: 1;
+    filter: drop-shadow(0 0 16px rgba(92, 247, 139, 1));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tour-waitlist-pulse {
+    animation: none;
+    filter: drop-shadow(0 0 10px rgba(92, 247, 139, 0.85));
+  }
+}
+
 /* ── LogoReveal: dither-scrim overlay ────────────────────
    Sits above the scribble video, below the logo. Adds a fine 2×2 dither
    + subtle backdrop blur + soft black tint so the video reads as

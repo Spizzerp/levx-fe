@@ -194,7 +194,15 @@ const HERO_CALLOUTS: readonly HeroCallout[] = [
   },
 ] as const
 
-function HeroFeatureCallouts({ progress }: { progress: number }) {
+function HeroFeatureCallouts({
+  progress,
+  fadeOut,
+}: {
+  progress: number
+  /** 0..1 phase-3 progress — drives the per-card fade-out + slide-right
+   *  as the chart zooms into focus below. */
+  fadeOut: number
+}) {
   const clamp01 = (n: number) => Math.max(0, Math.min(1, n))
   // Wider reveal window (0.26) than step (0.14) so adjacent cards
   // crossfade instead of arriving as discrete pop-ins.
@@ -206,10 +214,14 @@ function HeroFeatureCallouts({ progress }: { progress: number }) {
   // moment when progress is small. Cards still slide/fade in, just not
   // from zero.
   const MIN_OPACITY = 0.12
+  // Callouts should be completely gone by ~40% into phase 3 so they
+  // don't compete with the chart-explainer that takes over the reading
+  // role below. Faster fade than reveal makes room for the zoom.
+  const exit = clamp01(fadeOut / 0.4)
 
   return (
     <div
-      aria-hidden={progress < 0.02}
+      aria-hidden={progress < 0.02 || exit > 0.95}
       data-hero-callouts=""
       className={cn(
         'pointer-events-none fixed inset-y-0 top-[10%] left-[72%] z-[1200] flex flex-col justify-center gap-3 py-20',
@@ -222,8 +234,11 @@ function HeroFeatureCallouts({ progress }: { progress: number }) {
         // Once the hero has begun tilting, lift the card to MIN_OPACITY so
         // it's never invisible-but-mounted. Before phase-2 starts we keep
         // it fully hidden so nothing clutters the centered intro state.
-        const reveal = progress > 0.01 ? Math.max(MIN_OPACITY, local) : 0
-        const translate = (1 - local) * 48
+        const revealBase = progress > 0.01 ? Math.max(MIN_OPACITY, local) : 0
+        // Phase-3 exit: opacity fades to zero and each card slides a
+        // further ~80px to the right — trailing cards exit last.
+        const reveal = revealBase * (1 - exit)
+        const translate = (1 - local) * 48 + exit * (80 + i * 12)
         return (
           <HeroCalloutCard
             key={c.num}
@@ -231,7 +246,7 @@ function HeroFeatureCallouts({ progress }: { progress: number }) {
             kicker={c.kicker}
             title={c.title}
             body={c.body}
-            leaderOpacity={local}
+            leaderOpacity={local * (1 - exit)}
             style={{
               opacity: reveal,
               transform: `translateX(${translate}px)`,
@@ -244,12 +259,436 @@ function HeroFeatureCallouts({ progress }: { progress: number }) {
   )
 }
 
+/**
+ * Guided tour through the market preview — phase-4 scroll choreography.
+ *
+ * After phase-3 settles the card at "full view" (scale 1.0), the camera
+ * pans + zooms across six anchor points on the card. Each stop keys a
+ * tooltip that explains the feature beneath the zoom: live price, the
+ * forecast fan, the provider rail, custom-path draw, leverage, and the
+ * waitlist CTA. Because the zoom is driven by `transform-origin`, the
+ * focused point stays pinned to its original viewport location while
+ * the rest of the card scales away from it — giving each stop a natural
+ * "magnifying glass" feel without needing to know card dimensions.
+ *
+ * Tooltip anchors are set in viewport units (vw/vh) so they sit in the
+ * empty space opposite the focused element — price tooltip on the right
+ * since the price lives upper-left of the card, provider tooltip on the
+ * left since the rail is upper-right, etc.
+ */
+interface TourStop {
+  id: string
+  /** transform-origin percentages relative to the card's post-zoom box. */
+  origin: { x: number; y: number }
+  /** multiplied on top of the card's existing cardScale to magnify. */
+  scale: number
+  /** Highlight box dimensions in card rest percentages (width, height). The
+   *  box is drawn centered on `origin` so the focused element stays framed
+   *  even as the camera zooms. */
+  box: { w: number; h: number }
+  /** If null, no tooltip card is rendered for this stop — only the
+   *  highlight box + zoom. Used for the waitlist CTA which gets a pulse
+   *  highlight instead of an explainer card. */
+  tooltip: {
+    num: string
+    kicker: string
+    title: string
+    body: string
+  } | null
+  /** Viewport position of the tooltip card (vw, vh). Unused when
+   *  `tooltip` is null. */
+  tooltipAnchor: { x: number; y: number }
+}
+
+const TOUR_STOPS: readonly TourStop[] = [
+  {
+    id: 'price',
+    origin: { x: 14, y: 10 },
+    scale: 2.2,
+    box: { w: 30, h: 14 },
+    tooltip: {
+      num: '01',
+      kicker: 'Live Price',
+      title: 'BTC tape, streamed from spot.',
+      body: 'The ticker updates in real time from Pyth oracles. Every tick repositions where your paths sit relative to the market.',
+    },
+    tooltipAnchor: { x: 50, y: 48 },
+  },
+  {
+    id: 'paths',
+    origin: { x: 48, y: 42 },
+    scale: 1.9,
+    box: { w: 64, h: 38 },
+    tooltip: {
+      num: '02',
+      kicker: 'Forecast Fan',
+      title: 'Each dashed curve is a 168-hour bet.',
+      body: 'Agent paths fan out from market start. P&L accrues for every checkpoint your chosen curve shadows — trade the line, not the strike.',
+    },
+    tooltipAnchor: { x: 6, y: 18 },
+  },
+  {
+    id: 'providers',
+    origin: { x: 86, y: 28 },
+    scale: 2.3,
+    box: { w: 28, h: 28 },
+    tooltip: {
+      num: '03',
+      kicker: 'Providers',
+      title: 'Five base agents, each at its own multiplier.',
+      body: 'Chronos-2, TimesFM, GJR-GARCH, Merton-JD, Monte Carlo. Multipliers reflect how the room has priced each reading.',
+    },
+    tooltipAnchor: { x: 18, y: 36 },
+  },
+  {
+    id: 'drawPath',
+    origin: { x: 86, y: 50 },
+    scale: 2.5,
+    box: { w: 28, h: 6 },
+    tooltip: {
+      num: '04',
+      kicker: 'Custom Path',
+      title: 'Or draw your own conviction.',
+      body: 'Sketch a 168-hour curve by hand when no agent matches your read. Your path picks up a multiplier based on how the pool tags it.',
+    },
+    tooltipAnchor: { x: 18, y: 52 },
+  },
+  {
+    id: 'leverage',
+    origin: { x: 86, y: 64 },
+    scale: 2.4,
+    box: { w: 28, h: 14 },
+    tooltip: {
+      num: '05',
+      kicker: 'Leverage',
+      title: 'Size the bet against duration.',
+      body: 'Leverage cap scales with market length — shorter markets carry higher ceilings. Seven-day curves top out at 20×.',
+    },
+    tooltipAnchor: { x: 18, y: 58 },
+  },
+  {
+    id: 'waitlist',
+    origin: { x: 86, y: 94 },
+    scale: 2.6,
+    box: { w: 28, h: 6 },
+    // No tooltip card — the pulsing highlight + zoomed button is the
+    // whole focus. User wanted a direct "click me" moment here rather
+    // than another explanation.
+    tooltip: null,
+    tooltipAnchor: { x: 0, y: 0 },
+  },
+]
+
+/** Smoothstep — ease-in-out with zero slope at endpoints. */
+function smoothstep(t: number) {
+  const x = Math.max(0, Math.min(1, t))
+  return x * x * (3 - 2 * x)
+}
+
+function lerp(a: number, b: number, t: number) {
+  return a + (b - a) * t
+}
+
+/**
+ * Resolve the current camera state (origin + scale) from phase-4 scroll
+ * progress. Timeline is [0, STOPS.length+1]:
+ *   - [0, 1]      — pan from "full view" into stop 0
+ *   - [N, N+1]    — dwell on stop N-1, then transition to stop N
+ *   - [N+1, ...]  — hold on final stop
+ *
+ * smoothstep on the transition fraction gives each stop a natural dwell
+ * at its endpoint, so the tooltip has a steady moment to read.
+ */
+function resolveCamera(progress4: number): {
+  originX: number
+  originY: number
+  scale: number
+} {
+  const FULL_VIEW = { originX: 50, originY: 50, scale: 1 }
+  // timeline: 0 at entry, 1 at stop 0, 2 at stop 1, ..., STOPS.length at stop N-1
+  const timeline = progress4 * (TOUR_STOPS.length + 0.4)
+
+  if (timeline <= 0) return FULL_VIEW
+  if (timeline >= TOUR_STOPS.length) {
+    const last = TOUR_STOPS[TOUR_STOPS.length - 1]
+    return { originX: last.origin.x, originY: last.origin.y, scale: last.scale }
+  }
+
+  // Determine the two endpoints to interpolate between.
+  const segment = Math.floor(timeline) // 0..STOPS.length-1
+  const t = smoothstep(timeline - segment)
+  const prev =
+    segment === 0
+      ? FULL_VIEW
+      : {
+          originX: TOUR_STOPS[segment - 1].origin.x,
+          originY: TOUR_STOPS[segment - 1].origin.y,
+          scale: TOUR_STOPS[segment - 1].scale,
+        }
+  const next = TOUR_STOPS[segment]
+  return {
+    originX: lerp(prev.originX, next.origin.x, t),
+    originY: lerp(prev.originY, next.origin.y, t),
+    scale: lerp(prev.scale, next.scale, t),
+  }
+}
+
+/**
+ * Tooltip visibility for stop N — peak when timeline is centered on N+1
+ * (the moment the camera arrives and before it starts panning to N+2).
+ * Triangular window keeps the fade snappy so stacked tooltips don't
+ * bleed into each other.
+ */
+function tooltipVisibility(progress4: number, stopIndex: number): number {
+  const timeline = progress4 * (TOUR_STOPS.length + 0.4)
+  const peak = stopIndex + 1
+  const d = Math.abs(timeline - peak)
+  if (d < 0.25) return 1
+  if (d > 0.55) return 0
+  return 1 - (d - 0.25) / 0.3
+}
+
+function ChartTour({ progress }: { progress: number }) {
+  // Don't mount tooltips at all until phase 4 has started; this keeps
+  // the DOM lean during phases 1-3 when no tooltip is visible.
+  if (progress <= 0) return null
+  return (
+    <div aria-hidden={progress < 0.02} className="pointer-events-none fixed inset-0 z-[1250]">
+      {TOUR_STOPS.map((stop, i) => {
+        if (!stop.tooltip) return null
+        const opacity = tooltipVisibility(progress, i)
+        if (opacity < 0.01) return null
+        return (
+          <div
+            key={stop.id}
+            className="pointer-events-none absolute w-[min(360px,38vw)]"
+            style={{
+              left: `${stop.tooltipAnchor.x}vw`,
+              top: `${stop.tooltipAnchor.y}vh`,
+              opacity,
+              transform: `translateY(${(1 - opacity) * 16}px)`,
+              willChange: 'opacity, transform',
+            }}
+          >
+            <HeroCalloutCard
+              num={stop.tooltip.num}
+              kicker={stop.tooltip.kicker}
+              title={stop.tooltip.title}
+              body={stop.tooltip.body}
+              leaderOpacity={0}
+            />
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+/**
+ * Schematic overlay — dashed highlight rectangles over the focused
+ * region of the card, plus a leader line + arrowhead from each tooltip
+ * to its target. Sits above the card transform but below the tooltip
+ * cards so the arrow lands *into* each tooltip visually.
+ *
+ * Geometry: because the card's phase-4 transform uses
+ * `transform-origin` set to the target point, that point stays pinned
+ * to its rest viewport location during zoom. Given the CURRENT
+ * (transformed) bounding rect, the formula `rect.left + origin.x% *
+ * rect.width` always resolves to the same viewport position — so we
+ * can reuse the current rect for both target position and current box
+ * size without juggling separate "rest" and "zoomed" measurements.
+ *
+ * The waitlist stop skips the arrow + tooltip and instead pulses its
+ * highlight box so the zoomed button reads as the final call-to-action.
+ */
+function TourOverlay({
+  progress,
+  cardRect,
+}: {
+  progress: number
+  cardRect: DOMRect | null
+}) {
+  if (progress <= 0 || !cardRect || cardRect.width === 0) return null
+
+  return (
+    <svg
+      aria-hidden="true"
+      className="pointer-events-none fixed inset-0 z-[1245] h-screen w-screen"
+    >
+      <defs>
+        <marker
+          id="tour-arrowhead"
+          viewBox="0 0 10 10"
+          refX="9"
+          refY="5"
+          markerWidth="9"
+          markerHeight="9"
+          orient="auto-start-reverse"
+        >
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#5CF78B" />
+        </marker>
+      </defs>
+      {TOUR_STOPS.map((stop, i) => {
+        const opacity = tooltipVisibility(progress, i)
+        if (opacity < 0.01) return null
+
+        // Target viewport position — invariant during phase-4 zoom
+        // because transform-origin is set to this point.
+        const targetX = cardRect.left + (stop.origin.x / 100) * cardRect.width
+        const targetY = cardRect.top + (stop.origin.y / 100) * cardRect.height
+
+        // Box size scales with the current zoom because cardRect is the
+        // transformed rect (width already multiplied by current scale).
+        const boxW = (stop.box.w / 100) * cardRect.width
+        const boxH = (stop.box.h / 100) * cardRect.height
+        const boxLeft = targetX - boxW / 2
+        const boxTop = targetY - boxH / 2
+
+        const isWaitlist = stop.tooltip === null
+
+        return (
+          <g key={stop.id} opacity={opacity}>
+            <rect
+              x={boxLeft}
+              y={boxTop}
+              width={boxW}
+              height={boxH}
+              fill="none"
+              stroke="#5CF78B"
+              strokeWidth={isWaitlist ? 2 : 1.4}
+              strokeDasharray={isWaitlist ? '6 5' : '5 4'}
+              rx={6}
+              ry={6}
+              className={isWaitlist ? 'tour-waitlist-pulse' : undefined}
+            />
+            {/* Corner ticks — four short L-marks at the highlight box's
+                corners. Reinforces the CAD/drafting language used
+                elsewhere on the landing. */}
+            {!isWaitlist && (
+              <>
+                <TourCornerTick x={boxLeft} y={boxTop} kind="tl" />
+                <TourCornerTick x={boxLeft + boxW} y={boxTop} kind="tr" />
+                <TourCornerTick x={boxLeft} y={boxTop + boxH} kind="bl" />
+                <TourCornerTick x={boxLeft + boxW} y={boxTop + boxH} kind="br" />
+              </>
+            )}
+            {stop.tooltip && (
+              <TourArrow
+                tooltipAnchor={stop.tooltipAnchor}
+                box={{ left: boxLeft, top: boxTop, width: boxW, height: boxH }}
+              />
+            )}
+          </g>
+        )
+      })}
+    </svg>
+  )
+}
+
+/** Tiny 8px L-shaped tick drawn at each corner of a highlight box. */
+function TourCornerTick({
+  x,
+  y,
+  kind,
+}: {
+  x: number
+  y: number
+  kind: 'tl' | 'tr' | 'bl' | 'br'
+}) {
+  const L = 8
+  const dx = kind === 'tr' || kind === 'br' ? -L : L
+  const dy = kind === 'bl' || kind === 'br' ? -L : L
+  return (
+    <path
+      d={`M ${x + dx} ${y} L ${x} ${y} L ${x} ${y + dy}`}
+      fill="none"
+      stroke="#5CF78B"
+      strokeWidth={1.5}
+      strokeLinecap="round"
+    />
+  )
+}
+
+/**
+ * Leader arrow from a tooltip card to its highlight box. The arrow
+ * starts at the midpoint of the tooltip's edge nearest the target and
+ * ends at the nearest edge of the highlight box — so the arrowhead
+ * visually "lands" on the box rather than crossing it.
+ *
+ * Tooltip card dimensions are approximated (width = min(360, 38vw),
+ * height ~170px). Overshoot is acceptable since the arrow + tooltip
+ * share the same opacity fade.
+ */
+function TourArrow({
+  tooltipAnchor,
+  box,
+}: {
+  tooltipAnchor: { x: number; y: number }
+  box: { left: number; top: number; width: number; height: number }
+}) {
+  const vw = window.innerWidth
+  const vh = window.innerHeight
+  const tipX = (tooltipAnchor.x / 100) * vw
+  const tipY = (tooltipAnchor.y / 100) * vh
+  const tipW = Math.min(360, vw * 0.38)
+  // Matches the HeroCalloutCard header + body padding — approximate.
+  const tipH = 160
+
+  const boxCx = box.left + box.width / 2
+  const boxCy = box.top + box.height / 2
+
+  // Pick tooltip edge nearest the box center.
+  let startX: number, startY: number
+  if (boxCx > tipX + tipW) {
+    startX = tipX + tipW
+    startY = tipY + tipH / 2
+  } else if (boxCx < tipX) {
+    startX = tipX
+    startY = tipY + tipH / 2
+  } else if (boxCy > tipY + tipH) {
+    startX = tipX + tipW / 2
+    startY = tipY + tipH
+  } else {
+    startX = tipX + tipW / 2
+    startY = tipY
+  }
+
+  // Clip the end point to the box's perimeter so the arrowhead sits on
+  // the edge (not inside the box).
+  const endX = Math.max(box.left, Math.min(box.left + box.width, startX))
+  const endY = Math.max(box.top, Math.min(box.top + box.height, startY))
+
+  return (
+    <line
+      x1={startX}
+      y1={startY}
+      x2={endX}
+      y2={endY}
+      stroke="#5CF78B"
+      strokeWidth={1.4}
+      strokeDasharray="5 4"
+      strokeLinecap="round"
+      markerEnd="url(#tour-arrowhead)"
+      opacity={0.9}
+    />
+  )
+}
+
 /** Ease-out cubic — softens scroll-driven transforms so motion starts
  * gently and decelerates. Used by the hero card's tilt + slide so the
  * pivot feels like it's settling rather than tracking the wheel 1:1. */
 function easeOutCubic(t: number) {
   const x = Math.max(0, Math.min(1, t))
   return 1 - Math.pow(1 - x, 3)
+}
+
+/** Ease-in-out cubic — gentle S-curve used for the phase-3 chart zoom
+ * so the scale-up starts slow, accelerates through the middle, and
+ * settles at the end. Avoids the "sudden stop" a pure ease-out gives
+ * when the scale amplitude is large. */
+function easeInOutCubic(t: number) {
+  const x = Math.max(0, Math.min(1, t))
+  return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2
 }
 
 /** X (Twitter) glyph — mirrors the one used in CommonLayout's footer. */
@@ -360,6 +799,14 @@ export function LandingPage() {
   const cardRef = useRef<HTMLDivElement>(null)
   const cardScaleRef = useRef(0.55)
   const [cardScale, setCardScale] = useState(0.55)
+
+  // Live bounding rect of the market card — feeds the phase-4 TourOverlay
+  // so highlight boxes + arrows can be drawn in viewport pixels over the
+  // (transformed) card. Tracked on scroll/resize because phase-2/3/4
+  // transforms move and scale the card's visible rect; getBoundingClientRect
+  // returns the current post-transform box. For the tour geometry that's
+  // exactly what we want — see TourOverlay for why.
+  const [cardRect, setCardRect] = useState<DOMRect | null>(null)
   useEffect(() => {
     const el = cardRef.current
     if (!el) return
@@ -391,15 +838,55 @@ export function LandingPage() {
     }
   }, [])
 
-  // Two-phase hero scroll progress (both clamp 0-1).
+  // Track the card's viewport rect on scroll + resize so the TourOverlay
+  // can position highlight boxes + arrows over it. rAF-throttled so we
+  // don't call getBoundingClientRect more than once per frame even under
+  // a flood of scroll events.
+  useEffect(() => {
+    const el = cardRef.current
+    if (!el) return
+    let rafId = 0
+    let pending = false
+    const schedule = () => {
+      if (pending) return
+      pending = true
+      rafId = requestAnimationFrame(() => {
+        pending = false
+        if (cardRef.current) setCardRect(cardRef.current.getBoundingClientRect())
+      })
+    }
+    schedule()
+    const ro = new ResizeObserver(schedule)
+    ro.observe(el)
+    window.addEventListener('scroll', schedule, { passive: true })
+    window.addEventListener('resize', schedule)
+    return () => {
+      cancelAnimationFrame(rafId)
+      ro.disconnect()
+      window.removeEventListener('scroll', schedule)
+      window.removeEventListener('resize', schedule)
+    }
+  }, [])
+
+  // Four-phase hero scroll progress (all clamp 0-1).
   //   `scrollProgress`  — phase 1, 0..1 over the first 1.5 viewports; drives
-  //                       the typewriter reverse-delete + cursor fade.
+  //                       the hero-intro fade + lift.
   //   `scrollProgress2` — phase 2, 0..1 over the next 1.5 viewports; drives
-  //                       the market card's rightward slide + rotateY tilt.
-  // The pin wrapper below is sized to 400vh so the sticky hero stays pinned
-  // for all 3 viewports of phase-1 + phase-2 travel before releasing.
+  //                       the market card's rightward slide + rotateY tilt,
+  //                       and the right-rail callouts' reveal.
+  //   `scrollProgress3` — phase 3, 0..1 over the following 2 viewports; drives
+  //                       the un-tilt and settles the card at "full view"
+  //                       (scale 1.0 — MarketPreview fully visible).
+  //   `scrollProgress4` — phase 4, 0..1 over the following 6 viewports; drives
+  //                       the guided tour across six tour stops (price, paths,
+  //                       providers, draw-path, leverage, waitlist).
+  // Pin wrapper sized to 1200vh so the sticky hero stays pinned through all
+  // 11 viewports of travel before releasing. Thresholds: phase-1 0→1.5vh,
+  // phase-2 1.5→3vh, phase-3 3→5vh, phase-4 5→11vh.
   const [scrollProgress, setScrollProgress] = useState(0)
   const [scrollProgress2, setScrollProgress2] = useState(0)
+  const [scrollProgress3, setScrollProgress3] = useState(0)
+  const [scrollProgress4, setScrollProgress4] = useState(0)
   useEffect(() => {
     const handleScroll = () => {
       const vh = window.innerHeight
@@ -407,6 +894,8 @@ export function LandingPage() {
       const y = window.scrollY
       setScrollProgress(Math.max(0, Math.min(1, y / (vh * 1.5))))
       setScrollProgress2(Math.max(0, Math.min(1, (y - vh * 1.5) / (vh * 1.5))))
+      setScrollProgress3(Math.max(0, Math.min(1, (y - vh * 3) / (vh * 2))))
+      setScrollProgress4(Math.max(0, Math.min(1, (y - vh * 5) / (vh * 6))))
     }
     window.addEventListener('scroll', handleScroll, { passive: true })
     handleScroll()
@@ -501,11 +990,12 @@ export function LandingPage() {
         </div>
       </div>
 
-      {/* Pin wrapper — 400vh tall. The hero sticks to top:0 for 300vh of
-          sticky travel (3 viewports): 1.5 viewports for phase 1 (text
-          delete) + 1.5 viewports for phase 2 (market card slide + tilt),
-          matching the two scrollProgress divisors above. */}
-      <div className="relative h-[400vh]">
+      {/* Pin wrapper — 1200vh tall. The hero sticks to top:0 for 11
+          viewports of sticky travel: 1.5 for phase 1 (hero intro fade)
+          + 1.5 for phase 2 (card slide + tilt) + 2 for phase 3 (un-tilt
+          + settle at full view) + 6 for phase 4 (six-stop guided tour).
+          Matches the four scrollProgress divisors above. */}
+      <div className="relative h-[1200vh]">
         {/* z-[1100] lifts the sticky section's stacking context above
             LogoReveal's z-[1000] — sticky *creates* a stacking context
             even without z-index, so without this the market card inside
@@ -553,77 +1043,124 @@ export function LandingPage() {
               promotes the subtree to a GPU compositor layer and can
               cause sub-pixel blur/shift on the card's text, so the card
               needs to be transform-free while it's sitting flat. */}
-          {/* Tilt math — apply ease-out (cubic) to the linear scroll
-              progress so motion starts gently and decelerates. Couple
-              with a tiny upward float so the card feels like it's
-              releasing from gravity as it pivots, instead of just
-              sliding flatly across the stage. Angle slightly trimmed
-              (16°) so the perspective never gets cartoon-deep. */}
+          {/* Choreographed transforms across phases 2, 3, and 4.
+              Phase 2 — the card tilts right and floats up into the
+              reading stage (translateX-13vw, translateY-3.5vh,
+              rotateY 16°, scale 0.92).
+              Phase 3 — the card un-tilts and re-centers, settling at
+              scale 1.0 with the full MarketPreview in view.
+              Phase 4 — a new inner transform applies `transform-origin`
+              + `scale` per tour stop so the camera pans and zooms
+              through each feature of the card. The origin is set to
+              the target point, so that point stays pinned to its
+              original viewport location while the rest scales away
+              from it — a magnifying-glass effect without needing to
+              measure card dimensions. */}
           <div
             className="mx-auto w-full max-w-[1000px]"
             style={
-              scrollProgress2 > 0
-                ? {
-                    perspective: '1600px',
-                    transform: `translateX(${-easeOutCubic(scrollProgress2) * 13}vw) translateY(${-easeOutCubic(scrollProgress2) * 3.5}vh)`,
-                  }
+              scrollProgress2 > 0 || scrollProgress3 > 0
+                ? (() => {
+                    const uncrunch = easeOutCubic(
+                      Math.max(0, Math.min(1, scrollProgress3 / 0.35)),
+                    )
+                    const tiltX = -easeOutCubic(scrollProgress2) * 13 * (1 - uncrunch)
+                    const tiltY = -easeOutCubic(scrollProgress2) * 3.5
+                    return {
+                      perspective: '1600px',
+                      transform: `translateX(${tiltX}vw) translateY(${tiltY}vh)`,
+                    }
+                  })()
                 : undefined
             }
           >
             <div
               style={
-                scrollProgress2 > 0
-                  ? {
-                      transform: `rotateY(${easeOutCubic(scrollProgress2) * 16}deg) scale(${1 - easeOutCubic(scrollProgress2) * 0.08})`,
-                      transformOrigin: 'center center',
-                    }
+                scrollProgress2 > 0 || scrollProgress3 > 0
+                  ? (() => {
+                      const uncrunch = easeOutCubic(
+                        Math.max(0, Math.min(1, scrollProgress3 / 0.35)),
+                      )
+                      const zoomP = easeInOutCubic(
+                        Math.max(0, Math.min(1, (scrollProgress3 - 0.25) / 0.65)),
+                      )
+                      const rot = easeOutCubic(scrollProgress2) * 16 * (1 - uncrunch)
+                      const basePhase2Scale = 1 - easeOutCubic(scrollProgress2) * 0.08
+                      // Settle at 1.0 (full MarketPreview visible) by end
+                      // of phase 3 — was 1.95 previously, which zoomed
+                      // past the card's natural fit.
+                      const scale = basePhase2Scale + zoomP * (1.0 - basePhase2Scale)
+                      return {
+                        transform: `rotateY(${rot}deg) scale(${scale})`,
+                        transformOrigin: 'center center',
+                      }
+                    })()
                   : undefined
               }
             >
-              {/* MagicCard owns the surface fill, the 1px gradient
-                  border-ring that tracks the cursor, and the soft inner
-                  spotlight that fades in on hover. We keep the card's
-                  existing responsibilities on the wrapper itself:
-                    - `ref={cardRef}` feeds the ResizeObserver that drives
-                       the dynamic `zoom`.
-                    - `landing-card-glow` provides the diffuse outer halo
-                       (brand-green + faint white) that sits on top of the
-                       dither aura behind.
-                    - `zoom: cardScale` uniformly scales rendered size
-                       AND layout footprint.
-                    - `relative z-[1100]` stacks above LogoReveal's
-                       z-[1000] so the rise animation plays above the
-                       still-fading intro overlay.
-                    - `landing-rise` / `opacity-0` + marker-hide gates
-                       stay on MagicCard — the intro rise keyframes
-                       animate the whole card including MagicCard's
-                       border and spotlight layers.
-                  Padding for MarketPreview's inner content moves onto
-                  an inner div because MagicCard's z-stack needs direct
-                  ownership of its outer edges (padding there would pull
-                  the z-20 surface + z-30 spotlight layers inward). */}
-              <MagicCard
-                ref={cardRef}
-                className={`landing-card-glow relative z-[1100] mx-auto rounded-2xl ${
-                  introDone ? 'landing-rise' : 'opacity-0'
-                }${markersReady ? '' : 'hide-chart-markers'}`}
-                style={{ zoom: cardScale }}
+              {/* Phase-4 zoom-into-point wrapper. Applies `transform-origin`
+                  + `scale` to magnify a specific region of the card per
+                  tour stop. Sits inside the phase-2/3 rotation wrapper
+                  so its origin is independent of the rotateY pivot. */}
+              <div
+                style={
+                  scrollProgress4 > 0
+                    ? (() => {
+                        const cam = resolveCamera(scrollProgress4)
+                        return {
+                          transform: `scale(${cam.scale})`,
+                          transformOrigin: `${cam.originX}% ${cam.originY}%`,
+                          willChange: 'transform',
+                        }
+                      })()
+                    : undefined
+                }
               >
-                <div className="p-5 sm:p-7">
-                  <MarketPreview
-                    pair="BTC/USDC"
-                    history={history}
-                    predictions={predictions}
-                    now={now}
-                    marketStart={marketStart}
-                    marketEnd={marketEnd}
-                    checkpointInterval={CHECKPOINT_INTERVAL_SEC}
-                    totalCheckpoints={TOTAL_CHECKPOINTS}
-                    chartHeight={420}
-                    onCtaClick={openWaitlist}
-                  />
-                </div>
-              </MagicCard>
+                {/* MagicCard owns the surface fill, the 1px gradient
+                    border-ring that tracks the cursor, and the soft inner
+                    spotlight that fades in on hover. We keep the card's
+                    existing responsibilities on the wrapper itself:
+                      - `ref={cardRef}` feeds the ResizeObserver that drives
+                         the dynamic `zoom`.
+                      - `landing-card-glow` provides the diffuse outer halo
+                         (brand-green + faint white) that sits on top of the
+                         dither aura behind.
+                      - `zoom: cardScale` uniformly scales rendered size
+                         AND layout footprint.
+                      - `relative z-[1100]` stacks above LogoReveal's
+                         z-[1000] so the rise animation plays above the
+                         still-fading intro overlay.
+                      - `landing-rise` / `opacity-0` + marker-hide gates
+                         stay on MagicCard — the intro rise keyframes
+                         animate the whole card including MagicCard's
+                         border and spotlight layers.
+                    Padding for MarketPreview's inner content moves onto
+                    an inner div because MagicCard's z-stack needs direct
+                    ownership of its outer edges (padding there would pull
+                    the z-20 surface + z-30 spotlight layers inward). */}
+                <MagicCard
+                  ref={cardRef}
+                  className={`landing-card-glow relative z-[1100] mx-auto rounded-2xl ${
+                    introDone ? 'landing-rise' : 'opacity-0'
+                  }${markersReady ? '' : 'hide-chart-markers'}`}
+                  style={{ zoom: cardScale }}
+                >
+                  <div className="p-5 sm:p-7">
+                    <MarketPreview
+                      pair="BTC/USDC"
+                      history={history}
+                      predictions={predictions}
+                      now={now}
+                      marketStart={marketStart}
+                      marketEnd={marketEnd}
+                      checkpointInterval={CHECKPOINT_INTERVAL_SEC}
+                      totalCheckpoints={TOTAL_CHECKPOINTS}
+                      chartHeight={420}
+                      onCtaClick={openWaitlist}
+                    />
+                  </div>
+                </MagicCard>
+              </div>
             </div>
           </div>
 
@@ -631,7 +1168,18 @@ export function LandingPage() {
               during phase 2 of hero scroll. Pointer-events disabled so
               they never intercept clicks on the card behind. Hidden on
               narrow viewports where the tilt composition doesn't read. */}
-          <HeroFeatureCallouts progress={scrollProgress2} />
+          <HeroFeatureCallouts progress={scrollProgress2} fadeOut={scrollProgress3} />
+
+          {/* Phase-4 guided tour — six tooltips keyed to the camera
+              panning/zooming across the card. One per feature: live
+              price, forecast fan, providers, custom-path, leverage,
+              and the waitlist CTA. Each fades in when the camera
+              arrives at its stop and fades out as it moves to the
+              next. TourOverlay renders the dashed highlight boxes +
+              leader arrows beneath the tooltip cards; ChartTour
+              renders the explainer cards themselves. */}
+          <TourOverlay progress={scrollProgress4} cardRect={cardRect} />
+          <ChartTour progress={scrollProgress4} />
 
           {/* Editorial scroll cue — hairline rule + mono caps + a green
               tracer that drops down the rule on a 2.4s cycle. Replaces
