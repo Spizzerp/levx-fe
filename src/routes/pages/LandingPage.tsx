@@ -4,8 +4,6 @@ import Lenis from 'lenis'
 
 import { MarketPreview } from '@/features/market/MarketPreview'
 import { MagicCard } from '@/ui/MagicCard'
-import { LogoReveal } from './LogoReveal'
-import { ChartLogoReveal } from './ChartLogoReveal'
 import { SpreadLogoReveal } from './SpreadLogoReveal'
 import { HeroCalloutCard } from './HeroCalloutCard'
 import './landing.css'
@@ -723,20 +721,6 @@ function buildMockHistory(now: number): PricePoint[] {
   return points
 }
 
-type IntroKind = 'video' | 'chart' | 'chartCam' | 'spread'
-const INTRO_STORAGE_KEY = 'levx:landing:intro'
-const INTRO_KINDS: readonly IntroKind[] = ['video', 'chart', 'chartCam', 'spread']
-
-function loadIntroKind(): IntroKind {
-  if (typeof window === 'undefined') return 'video'
-  try {
-    const v = window.localStorage.getItem(INTRO_STORAGE_KEY)
-    return (INTRO_KINDS as readonly string[]).includes(v ?? '') ? (v as IntroKind) : 'video'
-  } catch {
-    return 'video'
-  }
-}
-
 export function LandingPage() {
   const [now] = useState(() => Date.now())
   const [waitlistOpen, setWaitlistOpen] = useState(false)
@@ -744,11 +728,6 @@ export function LandingPage() {
   const handleWaitlistSubmit = async (payload: WaitlistPayload) => {
     await submitWaitlist(payload)
   }
-  // Which intro to play — persisted so refresh keeps the user's choice.
-  // Toggling at runtime remounts the chosen overlay via `key` below so the
-  // new intro plays from the start instead of jumping to the already-
-  // completed handoff state.
-  const [introKind, setIntroKind] = useState<IntroKind>(loadIntroKind)
   // Intro gate — flips when the active intro overlay signals completion.
   // Every scripted hero animation below keys off this flag so the typing
   // headline and card rise only begin once the reveal is handing off.
@@ -917,28 +896,10 @@ export function LandingPage() {
   }, [now])
 
   const openWaitlist = useCallback(() => setWaitlistOpen(true), [])
-  // Memoized so LogoReveal's effect doesn't re-run when introDone flips —
-  // a new function reference each render would cause the effect's cleanup
-  // + re-execution to call video.play() again, restarting the ended video.
+  // Memoized so the intro's handoff effect doesn't re-run when introDone
+  // flips — a new function reference each render would re-trigger the
+  // effect's cleanup and restart the handoff timer.
   const handleIntroComplete = useCallback(() => setIntroDone(true), [])
-
-  // Swap intros: reset the handoff gates so the new intro plays from the
-  // top, persist the choice, and let the `key={introKind}` prop on the
-  // overlay below remount the chosen component.
-  const switchIntro = useCallback((kind: IntroKind) => {
-    setIntroKind((current) => {
-      if (current === kind) return current
-      try {
-        window.localStorage.setItem(INTRO_STORAGE_KEY, kind)
-      } catch {
-        // Private mode etc. — non-fatal, the choice just won't persist.
-      }
-      setIntroDone(false)
-      setMarkersReady(false)
-      setMarketSettled(false)
-      return kind
-    })
-  }, [])
 
   return (
     <main className="relative min-h-dvh w-full bg-black">
@@ -946,22 +907,8 @@ export function LandingPage() {
           its own fade-out completes; onComplete fires as the logo begins
           fading so the hero's entrance animations overlap the last tail
           of the intro — the market card rises over the still-visible
-          video as the overlay crossfades out from underneath.
-          `key={introKind}` forces a remount when the toggle flips so the
-          newly-selected intro plays from t=0 instead of inheriting the
-          previous one's handoff state. */}
-      {introKind === 'video' && <LogoReveal key="video" onComplete={handleIntroComplete} />}
-      {introKind === 'chart' && <ChartLogoReveal key="chart" onComplete={handleIntroComplete} />}
-      {introKind === 'chartCam' && (
-        <ChartLogoReveal key="chartCam" onComplete={handleIntroComplete} cameraTransform />
-      )}
-      {introKind === 'spread' && <SpreadLogoReveal key="spread" onComplete={handleIntroComplete} />}
-
-      {/* Intro kind toggle — tiny segmented pill pinned top-right, above
-          the intro overlay (z-[1200] > z-[1000]) so it remains reachable
-          even while the intro is playing. Choice is persisted to
-          localStorage via switchIntro. */}
-      <IntroToggle value={introKind} onChange={switchIntro} />
+          reveal as the overlay crossfades out from underneath. */}
+      <SpreadLogoReveal onComplete={handleIntroComplete} />
 
       {/* Fixed (not absolute) so it stays pinned to the viewport while the
           page scrolls. */}
@@ -996,17 +943,17 @@ export function LandingPage() {
           Matches the four scrollProgress divisors above. */}
       <div className="relative h-[1200vh]">
         {/* z-[1100] lifts the sticky section's stacking context above
-            LogoReveal's z-[1000] — sticky *creates* a stacking context
-            even without z-index, so without this the market card inside
-            gets painted below the intro overlay regardless of any z-index
-            we put on it directly. */}
+            SpreadLogoReveal's z-[1000] — sticky *creates* a stacking
+            context even without z-index, so without this the market card
+            inside gets painted below the intro overlay regardless of any
+            z-index we put on it directly. */}
         <section className="sticky top-0 z-[1100] flex h-dvh flex-col items-center justify-between overflow-hidden px-6 pt-24 pb-20 sm:px-10 sm:pt-28 sm:pb-24">
           {/* Pulsating brand-green dither aura — scoped to the hero only so
               it doesn't bleed into sections below when the page scrolls.
               Wrapped with an opacity transition so it smoothly fades in
               after the market card lands (marketSettled) rather than
               popping into whatever mid-pulse state it happened to be in
-              when LogoReveal unmounts. Intentionally static — it doesn't
+              when the intro unmounts. Intentionally static — it doesn't
               translate or scale with the card's scroll-tilt, so the aura
               stays centered on the viewport as the card slides over it. */}
           <div
@@ -1102,7 +1049,7 @@ export function LandingPage() {
                          dither aura behind.
                       - `zoom: cardScale` uniformly scales rendered size
                          AND layout footprint.
-                      - `relative z-[1100]` stacks above LogoReveal's
+                      - `relative z-[1100]` stacks above SpreadLogoReveal's
                          z-[1000] so the rise animation plays above the
                          still-fading intro overlay.
                       - `landing-rise` / `opacity-0` + marker-hide gates
@@ -1188,69 +1135,3 @@ export function LandingPage() {
   )
 }
 
-/**
- * Intro kind toggle — segmented two-option pill. Pinned top-right at
- * z-[1200] so it sits above the fullscreen intro overlay (z-[1000]) and
- * the fixed header (z-20), letting the user switch intros even mid-play.
- * Monospace caps match the drafting/CAD annotation language used elsewhere
- * on the landing page.
- */
-function IntroToggle({
-  value,
-  onChange,
-}: {
-  value: IntroKind
-  onChange: (kind: IntroKind) => void
-}) {
-  return (
-    <div
-      className="border-line-strong bg-surface/80 fixed top-4 right-6 z-[1200] flex items-center gap-0 overflow-hidden rounded-full border font-mono text-[10px] leading-none tracking-[0.14em] uppercase backdrop-blur-sm"
-      role="group"
-      aria-label="Intro style"
-    >
-      <IntroToggleOption
-        label="Video"
-        active={value === 'video'}
-        onClick={() => onChange('video')}
-      />
-      <IntroToggleOption
-        label="Chart"
-        active={value === 'chart'}
-        onClick={() => onChange('chart')}
-      />
-      <IntroToggleOption
-        label="ChartCam"
-        active={value === 'chartCam'}
-        onClick={() => onChange('chartCam')}
-      />
-      <IntroToggleOption
-        label="Spread"
-        active={value === 'spread'}
-        onClick={() => onChange('spread')}
-      />
-    </div>
-  )
-}
-
-function IntroToggleOption({
-  label,
-  active,
-  onClick,
-}: {
-  label: string
-  active: boolean
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={`duration-short ease-levx px-3 py-1.5 transition-colors ${
-        active ? 'bg-ink-strong text-surface' : 'text-ink-muted hover:text-ink-strong'
-      }`}
-    >
-      {label}
-    </button>
-  )
-}

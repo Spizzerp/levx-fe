@@ -92,6 +92,35 @@ export function LogoVariantRootSystem({ ariaLabel = 'LevX' }: LogoVariantRootSys
       }
     }
 
+    // ─── Dither (Bayer 4×4, baked once, tiled over the tendril field)
+    // Tiled black with per-cell alpha from a Bayer threshold matrix.
+    // When drawn source-over after the tendril stroke, the pattern
+    // darkens bright tendril pixels in a fixed-screen stipple while
+    // leaving the black background untouched — reads as a CRT/halftone
+    // texture on the glow without destroying the line continuity.
+    // Cell ≥ 2 CSS pixels so the stipple reads as a pattern rather than
+    // submerging into per-pixel noise on retina displays.
+    const ditherCell = Math.max(2, ((size.dpr || 1) * 2) | 0)
+    const DITHER_N = 4
+    const DITHER_STRENGTH = 0.85
+    const bayer = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5]
+    const ditherTex = document.createElement('canvas')
+    ditherTex.width = DITHER_N * ditherCell
+    ditherTex.height = DITHER_N * ditherCell
+    const dctx = ditherTex.getContext('2d')
+    let ditherPattern: CanvasPattern | null = null
+    if (dctx) {
+      for (let y = 0; y < DITHER_N; y++) {
+        for (let x = 0; x < DITHER_N; x++) {
+          const v = bayer[y * DITHER_N + x] / 16
+          const a = DITHER_STRENGTH * (1 - v)
+          dctx.fillStyle = `rgba(0,0,0,${a})`
+          dctx.fillRect(x * ditherCell, y * ditherCell, ditherCell, ditherCell)
+        }
+      }
+      ditherPattern = ctx.createPattern(ditherTex, 'repeat')
+    }
+
     // ─── Vignette (built per frame with animated radii) ────────────
     // Drawn live each tick rather than baked so the inner/outer radii
     // and end-stop alpha can close in toward the logo through SETTLE,
@@ -105,20 +134,24 @@ export function LogoVariantRootSystem({ ariaLabel = 'LevX' }: LogoVariantRootSys
     // full close keeps the silhouette region bright — the logo lives
     // inside roughly `min(w,h)/2` from center at zoom=1.
     const VIGNETTE_OUTER_WIDE = maxDim
-    const VIGNETTE_OUTER_TIGHT = minDim * 0.5
+    const VIGNETTE_OUTER_TIGHT = minDim * 0.55
     const VIGNETTE_INNER_WIDE = minDim * 0.45
     const VIGNETTE_INNER_TIGHT = minDim * 0.08
-    const VIGNETTE_END_ALPHA_WIDE = 0.4
-    const VIGNETTE_END_ALPHA_TIGHT = 0.92
+    const VIGNETTE_END_ALPHA_WIDE = 0.65
+    const VIGNETTE_END_ALPHA_TIGHT = 1.0
     const lerp = (a: number, b: number, t: number) => a + (b - a) * t
 
     // ─── Sequence phases (ms) — one-shot, does not loop ────────────
     const BUILD_MS = 2000
-    const SETTLE_MS = 3000
+    const SETTLE_MS = 1500
     const RESOLVE_MS = 1500
     const T_BUILD = BUILD_MS
     const T_SETTLE = BUILD_MS + SETTLE_MS
     const T_RESOLVE = BUILD_MS + SETTLE_MS + RESOLVE_MS
+    // Vignette has its own timeline so the darkening runs alongside the
+    // spread from frame zero and finishes closing by the end of SETTLE.
+    const VIGNETTE_START_MS = 0
+    const VIGNETTE_FULL_MS = T_SETTLE
 
     // ─── Tendril pool ──────────────────────────────────────────────
     const MAX_PTS = 400
@@ -213,7 +246,7 @@ export function LogoVariantRootSystem({ ariaLabel = 'LevX' }: LogoVariantRootSys
       t.pts[1] = y
       t.n = 1
       t.age = 0
-      t.growth = 110 + ((Math.random() * 130) | 0)
+      t.growth = 160 + ((Math.random() * 160) | 0)
     }
 
     function growOneStep(t: Tendril) {
@@ -223,37 +256,62 @@ export function LogoVariantRootSystem({ ariaLabel = 'LevX' }: LogoVariantRootSys
       const hy = t.pts[headIdx + 1]
 
       // Wig scaled by current speed so the relative jitter stays
-      // particle-like regardless of tuned base speed — with speed 5 and
-      // WIG_FRAC 0.28 each step bends by up to ~16° from the prior
-      // heading, accumulating into the brownian/wandering lines the
-      // reference shot shows in the open black field.
-      const WIG_FRAC = 0.28
+      // particle-like regardless of tuned base speed. Fresh noise is
+      // low-pass filtered against the prior heading so the per-step
+      // direction change is gentle — the tendrils still wander, but
+      // without the sharp kinks that a raw additive wig produces.
+      const WIG_FRAC = 0.14
+      const WIG_SMOOTH = 0.78
       const wig = WIG_FRAC * t.speed
-      let vx = t.vx + (Math.random() - 0.5) * wig
-      let vy = t.vy + (Math.random() - 0.5) * wig
+      const nvx = t.vx + (Math.random() - 0.5) * wig
+      const nvy = t.vy + (Math.random() - 0.5) * wig
+      let vx = t.vx * WIG_SMOOTH + nvx * (1 - WIG_SMOOTH)
+      let vy = t.vy * WIG_SMOOTH + nvy * (1 - WIG_SMOOTH)
       let m = Math.hypot(vx, vy) || 1
       vx = (vx / m) * t.speed
       vy = (vy / m) * t.speed
 
-      const look = 3.5
-      const lookX = hx + vx * look
-      const lookY = hy + vy * look
-      if (isInside(lookX, lookY)) {
+      // Two-zone proximity check. NEAR is the hard-collision look —
+      // triggers a strong tangent blend and a steep slowdown so the
+      // head traces right against the silhouette. FAR is an approach
+      // look — pulls velocity toward the tangent earlier and applies
+      // a milder slowdown, so tendrils curve in *before* they'd hit
+      // the outline and bunch up in a halo around it. Step scale < 1
+      // shortens each advance, piling more polyline points into the
+      // same arc length → visual density along the outline.
+      const NEAR_LOOK = 3.5
+      const FAR_LOOK = 12
+      let stepScale = 1
+      if (isInside(hx + vx * NEAR_LOOK, hy + vy * NEAR_LOOK)) {
         let tvx = -vy
         let tvy = vx
-        if (isInside(hx + tvx * look, hy + tvy * look)) {
+        if (isInside(hx + tvx * NEAR_LOOK, hy + tvy * NEAR_LOOK)) {
           tvx = vy
           tvy = -vx
         }
-        vx = vx * 0.62 + tvx * 0.38
-        vy = vy * 0.62 + tvy * 0.38
+        vx = vx * 0.5 + tvx * 0.5
+        vy = vy * 0.5 + tvy * 0.5
         m = Math.hypot(vx, vy) || 1
         vx = (vx / m) * t.speed
         vy = (vy / m) * t.speed
+        stepScale = 0.35
+      } else if (isInside(hx + vx * FAR_LOOK, hy + vy * FAR_LOOK)) {
+        let tvx = -vy
+        let tvy = vx
+        if (isInside(hx + tvx * FAR_LOOK, hy + tvy * FAR_LOOK)) {
+          tvx = vy
+          tvy = -vx
+        }
+        vx = vx * 0.82 + tvx * 0.18
+        vy = vy * 0.82 + tvy * 0.18
+        m = Math.hypot(vx, vy) || 1
+        vx = (vx / m) * t.speed
+        vy = (vy / m) * t.speed
+        stepScale = 0.65
       }
 
-      const newX = hx + vx
-      const newY = hy + vy
+      const newX = hx + vx * stepScale
+      const newY = hy + vy * stepScale
       if (isInside(newX, newY)) return // wedged — freeze head here
 
       t.vx = vx
@@ -287,24 +345,32 @@ export function LogoVariantRootSystem({ ariaLabel = 'LevX' }: LogoVariantRootSys
       // full through RESOLVE/HOLD.
       let tendrilAlpha = 1
       let logoAlpha = 0
-      let vignetteAlpha = 0
       let shouldSpawn = false
       if (cycleElapsed < T_BUILD) {
         shouldSpawn = true
       } else if (cycleElapsed < T_SETTLE) {
-        const p = (cycleElapsed - T_BUILD) / SETTLE_MS
-        // Smoothstep for a soft in/out ease on the darkening.
-        vignetteAlpha = p * p * (3 - 2 * p)
+        // spawning done, tendrils still finishing their growth
       } else if (cycleElapsed < T_RESOLVE) {
         const p = (cycleElapsed - T_SETTLE) / RESOLVE_MS
         tendrilAlpha = 1 - p
         logoAlpha = p
-        vignetteAlpha = 1
       } else {
         // HOLD — indefinite.
         tendrilAlpha = 0
         logoAlpha = 1
+      }
+
+      // Vignette timeline is independent of the phase transitions: it
+      // runs alongside the spread from frame zero and locks at 1 for
+      // the remainder of the sequence (SETTLE/RESOLVE/HOLD). Quintic
+      // smoothstep gives a gentle, barely-perceptible start, a firm
+      // ramp through the middle, and a soft settle into full close.
+      let vignetteAlpha = 0
+      if (cycleElapsed >= VIGNETTE_FULL_MS) {
         vignetteAlpha = 1
+      } else if (cycleElapsed >= VIGNETTE_START_MS) {
+        const p = (cycleElapsed - VIGNETTE_START_MS) / (VIGNETTE_FULL_MS - VIGNETTE_START_MS)
+        vignetteAlpha = p * p * p * (p * (p * 6 - 15) + 10)
       }
 
       // ── Spawn during BUILD — catch up to the easing curve ────────
@@ -337,29 +403,66 @@ export function LogoVariantRootSystem({ ariaLabel = 'LevX' }: LogoVariantRootSys
         const WIDTH_MIN = 2.0
         const widthP = Math.min(1, cycleElapsed / T_SETTLE)
         const tendrilWidth = lerp(WIDTH_BASE, WIDTH_MIN, widthP) * size.dpr
-        ctx.globalCompositeOperation = 'lighter'
-        ctx.globalAlpha = tendrilAlpha * 0.85
-        ctx.strokeStyle = '#ffffff'
-        ctx.lineWidth = tendrilWidth
-        ctx.lineCap = 'round'
-        ctx.lineJoin = 'round'
-        // Phosphor bloom around the stroke — single-pass shadowBlur
-        // matches the white-fill halo ChartLogoReveal uses and is cheap
-        // because the whole pool is drawn in one stroke() call, so the
-        // shadow is cast once over the composite path.
-        ctx.shadowColor = 'rgba(255,255,255,0.85)'
-        ctx.shadowBlur = 24 * size.dpr
+
+        // Build the path once — reused across every bloom pass.
+        // Quadratic-through-midpoints: tangent-continuous curves hide
+        // residual per-step noise as a soft wander, not a polyline.
         ctx.beginPath()
         for (let i = 0; i < pool.length; i++) {
           const t = pool[i]
           if (!t.active || t.n < 2) continue
           ctx.moveTo(t.pts[0], t.pts[1])
-          for (let p = 1; p < t.n; p++) {
-            ctx.lineTo(t.pts[p * 2], t.pts[p * 2 + 1])
+          if (t.n === 2) {
+            ctx.lineTo(t.pts[2], t.pts[3])
+            continue
           }
+          for (let p = 1; p < t.n - 1; p++) {
+            const x0 = t.pts[p * 2]
+            const y0 = t.pts[p * 2 + 1]
+            const x1 = t.pts[(p + 1) * 2]
+            const y1 = t.pts[(p + 1) * 2 + 1]
+            ctx.quadraticCurveTo(x0, y0, (x0 + x1) * 0.5, (y0 + y1) * 0.5)
+          }
+          const last = (t.n - 1) * 2
+          ctx.lineTo(t.pts[last], t.pts[last + 1])
         }
+
+        // Multi-pass Gaussian bloom — same technique the logo resolve
+        // uses. Each pass strokes the shared path with a different blur
+        // radius and width; `lighter` stacks them into a wide, smooth,
+        // spreading halo with no crisp core (the line dissolves into
+        // the bloom, which is the target look).
+        ctx.globalCompositeOperation = 'lighter'
+        ctx.strokeStyle = '#ffffff'
+        ctx.lineCap = 'round'
+        ctx.lineJoin = 'round'
+
+        ctx.filter = `blur(${48 * size.dpr}px)`
+        ctx.globalAlpha = tendrilAlpha * 0.55
+        ctx.lineWidth = tendrilWidth * 3
         ctx.stroke()
-        ctx.shadowBlur = 0
+
+        ctx.filter = `blur(${18 * size.dpr}px)`
+        ctx.globalAlpha = tendrilAlpha * 0.6
+        ctx.lineWidth = tendrilWidth * 1.8
+        ctx.stroke()
+
+        ctx.filter = `blur(${4 * size.dpr}px)`
+        ctx.globalAlpha = tendrilAlpha * 0.75
+        ctx.lineWidth = tendrilWidth
+        ctx.stroke()
+
+        ctx.filter = 'none'
+
+        // Dither stipple over the whole bloom field. Black background
+        // is opaque black so the pattern only visibly affects bright
+        // pixels — reads as a uniform halftone grain across the glow.
+        if (ditherPattern) {
+          ctx.globalCompositeOperation = 'source-over'
+          ctx.globalAlpha = tendrilAlpha
+          ctx.fillStyle = ditherPattern
+          ctx.fillRect(0, 0, size.width, size.height)
+        }
       }
 
       // ── Vignette — closes in on the logo through SETTLE ─────────
@@ -371,8 +474,16 @@ export function LogoVariantRootSystem({ ariaLabel = 'LevX' }: LogoVariantRootSys
         const innerR = lerp(VIGNETTE_INNER_WIDE, VIGNETTE_INNER_TIGHT, vignetteAlpha)
         const endA = lerp(VIGNETTE_END_ALPHA_WIDE, VIGNETTE_END_ALPHA_TIGHT, vignetteAlpha)
         const vg = ctx.createRadialGradient(cx, cy, innerR, cx, cy, outerR)
-        vg.addColorStop(0, 'rgba(0,0,0,0)')
-        vg.addColorStop(1, `rgba(0,0,0,${endA})`)
+        // Multi-stop smoothstep falloff. Two-stop linear leaves a visible
+        // ring where the gradient meets the solid outer fill; smoothstep
+        // with 6 stops spreads the darkening across the full radius with
+        // no perceptible inflection at either end.
+        const VIGNETTE_STOPS = 12
+        for (let i = 0; i <= VIGNETTE_STOPS; i++) {
+          const p = i / VIGNETTE_STOPS
+          const curve = p * p * (3 - 2 * p)
+          vg.addColorStop(p, `rgba(0,0,0,${endA * curve})`)
+        }
         ctx.globalAlpha = 1
         ctx.globalCompositeOperation = 'source-over'
         ctx.fillStyle = vg
@@ -380,7 +491,7 @@ export function LogoVariantRootSystem({ ariaLabel = 'LevX' }: LogoVariantRootSys
       }
 
       // ── Final white-fill with VHS/CRT phosphor bloom ────────────
-      // Lifted from ChartLogoReveal's white-fill phase: three additive
+      // Three additive
       // blur passes stacked under a crisp source-over core fill, with
       // the glow leading the core by ~15% so the image reads as
       // "bloom first, shape solidifies after". `logoAlpha` is the

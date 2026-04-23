@@ -9,8 +9,10 @@ interface SpreadLogoRevealProps {
 // Matches LogoVariantRootSystem internal timing (BUILD + SETTLE + RESOLVE).
 // When the resolve completes the silhouette is fully opaque, so this is
 // the earliest moment the hero can take over without visible competition.
-const SPREAD_RESOLVE_MS = 4200 + 700 + 1500
-const HOLD_MS = 1200
+// Keep these three constants in sync with BUILD_MS / SETTLE_MS / RESOLVE_MS
+// inside LogoVariantRootSystem.
+const SPREAD_RESOLVE_MS = 2000 + 1500 + 1500
+const HOLD_MS = 400
 const FADE_MS = 1500
 
 export function SpreadLogoReveal({ onComplete }: SpreadLogoRevealProps) {
