@@ -67,6 +67,7 @@ function HeroIntro({ show, scrollProgress }: { show: boolean; scrollProgress: nu
       className={cn(
         'relative z-[1200] flex w-full max-w-[920px] flex-col items-center px-4 text-center',
         show && 'hero-intro--show',
+        scrollProgress > 0.1 && 'pointer-events-none select-none',
       )}
       style={{
         transition: show ? 'none' : 'opacity 400ms ease-out',
@@ -131,7 +132,7 @@ function HeroIntro({ show, scrollProgress }: { show: boolean; scrollProgress: nu
           tagline. The tick separators reuse the hairline language of
           the chart's checkpoint marks. */}
       <div
-        className="hero-intro__item hero-intro__item--spec mt-8 flex items-center justify-center gap-4"
+        className="hero-intro__item hero-intro__item--spec mt-8 mb-2 flex items-center justify-center gap-4"
         style={{ ['--stagger' as string]: '520ms' }}
       >
         <div
@@ -1012,8 +1013,15 @@ export function LandingPage() {
             className="pointer-events-none absolute inset-0 transition-opacity duration-[1000ms] ease-out"
             style={{
               opacity: marketSettled ? 1 : 0,
-              transform: scrollProgress2 > 0
-                ? `translateX(${-easeOutCubic(scrollProgress2) * 13}vw) translateY(${-easeOutCubic(scrollProgress2) * 3.5}vh)`
+              transform: scrollProgress2 > 0 || scrollProgress3 > 0
+                ? (() => {
+                    const uncrunch = easeOutCubic(
+                      Math.max(0, Math.min(1, scrollProgress3 / 0.35)),
+                    )
+                    const tiltX = -easeOutCubic(scrollProgress2) * 13 * (1 - uncrunch)
+                    const tiltY = -easeOutCubic(scrollProgress2) * 3.5
+                    return `translateX(${tiltX}vw) translateY(${tiltY}vh)`
+                  })()
                 : undefined,
             }}
             aria-hidden="true"
