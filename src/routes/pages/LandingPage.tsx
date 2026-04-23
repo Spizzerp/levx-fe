@@ -6,6 +6,7 @@ import { MarketPreview } from '@/features/market/MarketPreview'
 import { MagicCard } from '@/ui/MagicCard'
 import { LogoReveal } from './LogoReveal'
 import { ChartLogoReveal } from './ChartLogoReveal'
+import { RootLogoReveal } from './RootLogoReveal'
 import './landing.css'
 import { WaitlistModal, type WaitlistPayload } from '@/ui/WaitlistModal'
 import { submitWaitlist } from '@/lib/supabase/auth'
@@ -141,17 +142,17 @@ function buildMockHistory(now: number): PricePoint[] {
   return points
 }
 
-type IntroKind = 'video' | 'chart' | 'chartCam'
+type IntroKind = 'video' | 'chart' | 'chartCam' | 'roots'
 const INTRO_STORAGE_KEY = 'levx:landing:intro'
-const INTRO_KINDS: readonly IntroKind[] = ['video', 'chart', 'chartCam']
+const INTRO_KINDS: readonly IntroKind[] = ['video', 'chart', 'chartCam', 'roots']
 
 function loadIntroKind(): IntroKind {
-  if (typeof window === 'undefined') return 'video'
+  if (typeof window === 'undefined') return 'roots'
   try {
     const v = window.localStorage.getItem(INTRO_STORAGE_KEY)
-    return (INTRO_KINDS as readonly string[]).includes(v ?? '') ? (v as IntroKind) : 'video'
+    return (INTRO_KINDS as readonly string[]).includes(v ?? '') ? (v as IntroKind) : 'roots'
   } catch {
-    return 'video'
+    return 'roots'
   }
 }
 
@@ -323,6 +324,7 @@ export function LandingPage() {
       {introKind === 'chartCam' && (
         <ChartLogoReveal key="chartCam" onComplete={handleIntroComplete} cameraTransform />
       )}
+      {introKind === 'roots' && <RootLogoReveal key="roots" onComplete={handleIntroComplete} />}
 
       {/* Intro kind toggle — tiny segmented pill pinned top-right, above
           the intro overlay (z-[1200] > z-[1000]) so it remains reachable
@@ -557,6 +559,11 @@ function IntroToggle({
         label="ChartCam"
         active={value === 'chartCam'}
         onClick={() => onChange('chartCam')}
+      />
+      <IntroToggleOption
+        label="Roots"
+        active={value === 'roots'}
+        onClick={() => onChange('roots')}
       />
     </div>
   )
