@@ -83,7 +83,7 @@ function HeroIntro({ show, scrollProgress }: { show: boolean; scrollProgress: nu
         <div style={itemStyle(exitEyebrow)} className="flex items-center gap-3">
           <span aria-hidden className="hero-intro__rule" />
           <span className="text-ink-muted text-nano font-mono tracking-[0.32em] uppercase">
-            LevX Protocol <span className="text-ink-dim">·</span> v0.1 Beta
+            LevX Protocol <span className="text-ink-dim">·</span> v1 Devnet
           </span>
           <span aria-hidden className="hero-intro__rule hero-intro__rule--right" />
         </div>
@@ -109,7 +109,7 @@ function HeroIntro({ show, scrollProgress }: { show: boolean; scrollProgress: nu
             className="block"
             style={{ ...itemStyle(exitTitleA), fontWeight: 400 }}
           >
-            Predict the path,
+            Predict the path
           </span>
         </span>
         <span
@@ -136,13 +136,11 @@ function HeroIntro({ show, scrollProgress }: { show: boolean; scrollProgress: nu
       >
         <div
           style={itemStyle(exitSpec)}
-          className="flex items-center gap-4 text-ink-muted text-nano font-mono tracking-[0.28em] uppercase"
+          className="flex items-center gap-8 text-white text-nano font-mono tracking-[0.28em] uppercase"
         >
-          <span>168 HR Horizon</span>
-          <span aria-hidden className="hero-intro__tick" />
-          <span>Hourly Oracles</span>
-          <span aria-hidden className="hero-intro__tick" />
-          <span>5 Base Agents</span>
+          <span>Live Scoring</span>
+          <span>AI + Human Predictions</span>
+          <span>No Order Book</span>
         </div>
       </div>
     </div>
@@ -176,21 +174,21 @@ interface HeroCallout {
 const HERO_CALLOUTS: readonly HeroCallout[] = [
   {
     num: '01',
-    kicker: 'Trajectory',
-    title: 'Trade the line, not the strike.',
-    body: 'Every forecast is a 168-step curve. P&L accrues for every hour the tape shadows your path — not just where it lands.',
+    kicker: 'Predict',
+    title: 'Predict the path, not just the price.',
+    body: 'AI generates possible futures. You pick the one you believe — or draw your own.',
   },
   {
     num: '02',
-    kicker: 'Checkpoints',
-    title: 'Hour-by-hour resolution.',
-    body: 'Oracles stamp the price on the hour. Miss six, win the next fifty. Shape of the curve beats endpoint luck.',
+    kicker: 'Score',
+    title: 'Accuracy pays.',
+    body: 'Paths are scored continuously against reality. The closer your prediction tracks what actually happens, the more you earn.',
   },
   {
     num: '03',
-    kicker: 'Agents',
-    title: 'Borrow conviction from the floor.',
-    body: 'Fork GJR-GARCH. Stack Merton-JD. Draft your own against the room, and let the tape settle the argument.',
+    kicker: 'Edge',
+    title: 'Beat the AI, keep the edge.',
+    body: "Think you see something the models don't? Draw your own line on the chart. If you're right and the crowd is wrong, you earn more per dollar than anyone else.",
   },
 ] as const
 
@@ -224,7 +222,7 @@ function HeroFeatureCallouts({
       aria-hidden={progress < 0.02 || exit > 0.95}
       data-hero-callouts=""
       className={cn(
-        'pointer-events-none fixed inset-y-0 top-[10%] left-[72%] z-[1200] flex flex-col justify-center gap-3 py-20',
+        'pointer-events-none fixed inset-y-0 top-[16%] left-[72%] z-[1200] flex flex-col justify-center gap-3 py-20',
         'w-[28vw] max-w-[340px]',
       )}
     >
@@ -1011,51 +1009,20 @@ export function LandingPage() {
               translate or scale with the card's scroll-tilt, so the aura
               stays centered on the viewport as the card slides over it. */}
           <div
-            className="absolute inset-0 transition-opacity duration-[1000ms] ease-out"
-            style={{ opacity: marketSettled ? 1 : 0 }}
+            className="pointer-events-none absolute inset-0 transition-opacity duration-[1000ms] ease-out"
+            style={{
+              opacity: marketSettled ? 1 : 0,
+              transform: scrollProgress2 > 0
+                ? `translateX(${-easeOutCubic(scrollProgress2) * 13}vw) translateY(${-easeOutCubic(scrollProgress2) * 3.5}vh)`
+                : undefined,
+            }}
             aria-hidden="true"
           >
             {marketSettled && <div className="landing-dither" aria-hidden="true" />}
           </div>
 
-          {/* Editorial hero — always mounted to reserve its own vertical
-              rhythm during the intro overlay. `show` stays false until
-              the LogoReveal hands off, at which point the staggered
-              blur-up reveal kicks in. The block also responds to phase-1
-              scroll by fading + lifting to clear the stage for the
-              market-card tilt in phase-2. */}
           <HeroIntro show={introDone} scrollProgress={scrollProgress} />
 
-          {/* Two transform wrappers around the card so three independent
-              transforms stay cleanly separated:
-                outer  — perspective container + horizontal slide driven by
-                         scrollProgress2 (phase 2 of hero scroll).
-                middle — rotateY tilt + shrink, also driven by
-                         scrollProgress2. A separate element so it doesn't
-                         collide with the landing-rise animation that
-                         lives on the card.
-                card   — keeps `landing-rise` (translateY + opacity) +
-                         `zoom: 0.7` exactly as before; no inline transform
-                         so the keyframe animation runs unobstructed.
-              The inline `perspective` and `transform` values are only set
-              once scroll has advanced into phase 2 — at rest they're
-              omitted entirely. Applying any transform (even identity)
-              promotes the subtree to a GPU compositor layer and can
-              cause sub-pixel blur/shift on the card's text, so the card
-              needs to be transform-free while it's sitting flat. */}
-          {/* Choreographed transforms across phases 2, 3, and 4.
-              Phase 2 — the card tilts right and floats up into the
-              reading stage (translateX-13vw, translateY-3.5vh,
-              rotateY 16°, scale 0.92).
-              Phase 3 — the card un-tilts and re-centers, settling at
-              scale 1.0 with the full MarketPreview in view.
-              Phase 4 — a new inner transform applies `transform-origin`
-              + `scale` per tour stop so the camera pans and zooms
-              through each feature of the card. The origin is set to
-              the target point, so that point stays pinned to its
-              original viewport location while the rest scales away
-              from it — a magnifying-glass effect without needing to
-              measure card dimensions. */}
           <div
             className="mx-auto w-full max-w-[1000px]"
             style={
@@ -1142,7 +1109,7 @@ export function LandingPage() {
                   ref={cardRef}
                   className={`landing-card-glow relative z-[1100] mx-auto rounded-2xl ${
                     introDone ? 'landing-rise' : 'opacity-0'
-                  }${markersReady ? '' : 'hide-chart-markers'}`}
+                  } ${markersReady ? '' : 'hide-chart-markers'}`}
                   style={{ zoom: cardScale }}
                 >
                   <div className="p-5 sm:p-7">
