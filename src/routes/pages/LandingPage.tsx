@@ -5,6 +5,7 @@ import Lenis from 'lenis'
 import { MarketPreview } from '@/features/market/MarketPreview'
 import { MagicCard } from '@/ui/MagicCard'
 import { LogoReveal } from './LogoReveal'
+import { ChartLogoReveal } from './ChartLogoReveal'
 import './landing.css'
 import { WaitlistModal, type WaitlistPayload } from '@/ui/WaitlistModal'
 import { submitWaitlist } from '@/lib/supabase/auth'
@@ -140,6 +141,20 @@ function buildMockHistory(now: number): PricePoint[] {
   return points
 }
 
+type IntroKind = 'video' | 'chart' | 'chartCam'
+const INTRO_STORAGE_KEY = 'levx:landing:intro'
+const INTRO_KINDS: readonly IntroKind[] = ['video', 'chart', 'chartCam']
+
+function loadIntroKind(): IntroKind {
+  if (typeof window === 'undefined') return 'video'
+  try {
+    const v = window.localStorage.getItem(INTRO_STORAGE_KEY)
+    return (INTRO_KINDS as readonly string[]).includes(v ?? '') ? (v as IntroKind) : 'video'
+  } catch {
+    return 'video'
+  }
+}
+
 export function LandingPage() {
   const [now] = useState(() => Date.now())
   const [waitlistOpen, setWaitlistOpen] = useState(false)
@@ -147,9 +162,13 @@ export function LandingPage() {
   const handleWaitlistSubmit = async (payload: WaitlistPayload) => {
     await submitWaitlist(payload)
   }
-  // Intro gate — flips when the LogoReveal overlay signals completion
-  // (~5.9s after mount, as the logo begins its 400ms fade-out). Every
-  // scripted hero animation below keys off this flag so the typing
+  // Which intro to play — persisted so refresh keeps the user's choice.
+  // Toggling at runtime remounts the chosen overlay via `key` below so the
+  // new intro plays from the start instead of jumping to the already-
+  // completed handoff state.
+  const [introKind, setIntroKind] = useState<IntroKind>(loadIntroKind)
+  // Intro gate — flips when the active intro overlay signals completion.
+  // Every scripted hero animation below keys off this flag so the typing
   // headline and card rise only begin once the reveal is handing off.
   const [introDone, setIntroDone] = useState(false)
   // Flips true after the card's 1.8s rise animation so the chart's dashed
@@ -271,14 +290,45 @@ export function LandingPage() {
   // + re-execution to call video.play() again, restarting the ended video.
   const handleIntroComplete = useCallback(() => setIntroDone(true), [])
 
+  // Swap intros: reset the handoff gates so the new intro plays from the
+  // top, persist the choice, and let the `key={introKind}` prop on the
+  // overlay below remount the chosen component.
+  const switchIntro = useCallback((kind: IntroKind) => {
+    setIntroKind((current) => {
+      if (current === kind) return current
+      try {
+        window.localStorage.setItem(INTRO_STORAGE_KEY, kind)
+      } catch {
+        // Private mode etc. — non-fatal, the choice just won't persist.
+      }
+      setIntroDone(false)
+      setMarkersReady(false)
+      setMarketSettled(false)
+      return kind
+    })
+  }, [])
+
   return (
     <main className="relative min-h-dvh w-full bg-black">
       {/* Plays before any hero content is visible. Unmounts itself once
           its own fade-out completes; onComplete fires as the logo begins
           fading so the hero's entrance animations overlap the last tail
           of the intro — the market card rises over the still-visible
-          video as the overlay crossfades out from underneath. */}
-      <LogoReveal onComplete={handleIntroComplete} />
+          video as the overlay crossfades out from underneath.
+          `key={introKind}` forces a remount when the toggle flips so the
+          newly-selected intro plays from t=0 instead of inheriting the
+          previous one's handoff state. */}
+      {introKind === 'video' && <LogoReveal key="video" onComplete={handleIntroComplete} />}
+      {introKind === 'chart' && <ChartLogoReveal key="chart" onComplete={handleIntroComplete} />}
+      {introKind === 'chartCam' && (
+        <ChartLogoReveal key="chartCam" onComplete={handleIntroComplete} cameraTransform />
+      )}
+
+      {/* Intro kind toggle — tiny segmented pill pinned top-right, above
+          the intro overlay (z-[1200] > z-[1000]) so it remains reachable
+          even while the intro is playing. Choice is persisted to
+          localStorage via switchIntro. */}
+      <IntroToggle value={introKind} onChange={switchIntro} />
 
       {/* Fixed (not absolute) so it stays pinned to the viewport while the
           page scrolls. */}
@@ -470,5 +520,67 @@ export function LandingPage() {
         onSubmit={handleWaitlistSubmit}
       />
     </main>
+  )
+}
+
+/**
+ * Intro kind toggle — segmented two-option pill. Pinned top-right at
+ * z-[1200] so it sits above the fullscreen intro overlay (z-[1000]) and
+ * the fixed header (z-20), letting the user switch intros even mid-play.
+ * Monospace caps match the drafting/CAD annotation language used elsewhere
+ * on the landing page.
+ */
+function IntroToggle({
+  value,
+  onChange,
+}: {
+  value: IntroKind
+  onChange: (kind: IntroKind) => void
+}) {
+  return (
+    <div
+      className="border-line-strong bg-surface/80 fixed top-4 right-6 z-[1200] flex items-center gap-0 overflow-hidden rounded-full border font-mono text-[10px] leading-none tracking-[0.14em] uppercase backdrop-blur-sm"
+      role="group"
+      aria-label="Intro style"
+    >
+      <IntroToggleOption
+        label="Video"
+        active={value === 'video'}
+        onClick={() => onChange('video')}
+      />
+      <IntroToggleOption
+        label="Chart"
+        active={value === 'chart'}
+        onClick={() => onChange('chart')}
+      />
+      <IntroToggleOption
+        label="ChartCam"
+        active={value === 'chartCam'}
+        onClick={() => onChange('chartCam')}
+      />
+    </div>
+  )
+}
+
+function IntroToggleOption({
+  label,
+  active,
+  onClick,
+}: {
+  label: string
+  active: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`duration-short ease-levx px-3 py-1.5 transition-colors ${
+        active ? 'bg-ink-strong text-surface' : 'text-ink-muted hover:text-ink-strong'
+      }`}
+    >
+      {label}
+    </button>
   )
 }
