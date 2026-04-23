@@ -129,7 +129,7 @@
   /* Single-hue brand green (#5CF78B / --color-success). No yellow interpolation
      — the whole aura is one color, just varied alpha for the radial falloff. */
   background: radial-gradient(
-    ellipse 80% 65% at 50% 50%,
+    ellipse 80% 65% at 50% 58%,
     rgba(244, 250, 77, 1) 0%,
     rgba(244, 250, 77, 0.8) 10%,
     rgba(184, 248, 108, 0.6) 30%,
@@ -141,7 +141,7 @@
      (vs. 3x3's ~11%) so the effect reads as a bold brand-green aura. */
   mask-image:
     radial-gradient(
-      ellipse 80% 65% at 50% 50%,
+      ellipse 80% 65% at 50% 58%,
       black 0%,
       rgba(0, 0, 0, 0.9) 25%,
       rgba(0, 0, 0, 0.5) 55%,
@@ -152,7 +152,7 @@
   mask-composite: intersect;
   -webkit-mask-image:
     radial-gradient(
-      ellipse 80% 65% at 50% 50%,
+      ellipse 80% 65% at 50% 58%,
       black 0%,
       rgba(0, 0, 0, 0.9) 25%,
       rgba(0, 0, 0, 0.5) 55%,
