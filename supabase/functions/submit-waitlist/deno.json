@@ -1,0 +1,6 @@
+{
+  "imports": {
+    "bs58": "npm:bs58@6.0.0",
+    "supabase-js": "npm:@supabase/supabase-js@2.45.4"
+  }
+}

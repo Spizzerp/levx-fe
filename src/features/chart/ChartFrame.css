@@ -91,6 +91,10 @@
 .btn-gradient-glow {
   position: relative;
   overflow: visible;
+  /* Create a stacking context so the ::after dither (z-index: -1) stays
+     contained within the button's own stack instead of slipping behind
+     opaque ancestor backgrounds (e.g. a card's bg-surface). */
+  isolation: isolate;
   transition: box-shadow 250ms cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 
@@ -141,3 +145,6 @@
 .btn-gradient-glow:disabled::after {
   display: none;
 }
+
+/* Landing-page-specific CSS (dither, rise, typing cursor, marker-hide)
+   lives in src/routes/pages/landing.css — imported by LandingPage.tsx. */

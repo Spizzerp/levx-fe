@@ -1,19 +1,18 @@
-import type { PropsWithChildren } from 'react'
+import type { HTMLAttributes } from 'react'
 
 import { cn } from '@/lib/cn'
 
 
-interface ChartFrameProps extends PropsWithChildren {
+interface ChartFrameProps extends HTMLAttributes<HTMLDivElement> {
   /** Enable the subtle dithered glow border effect */
   glow?: boolean
-  className?: string
 }
 
 /**
  * Reusable chart container with flatline-style border treatment.
  * 2px border, large radius, semi-transparent surface, optional dither glow.
  */
-export function ChartFrame({ glow = false, className, children }: ChartFrameProps) {
+export function ChartFrame({ glow = false, className, children, ...rest }: ChartFrameProps) {
   return (
     <div
       className={cn(
@@ -21,6 +20,7 @@ export function ChartFrame({ glow = false, className, children }: ChartFrameProp
         glow && 'chart-frame-glow',
         className,
       )}
+      {...rest}
     >
       {children}
     </div>
