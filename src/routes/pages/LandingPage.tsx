@@ -80,7 +80,7 @@ function HeroIntro({ show, scrollProgress }: { show: boolean; scrollProgress: nu
           the hairline rules compete visually with the locked hero
           and the row adds no information beyond decoration. */}
       <div
-        className="hero-intro__item hero-intro__item--eyebrow hidden items-center gap-3 lg:flex"
+        className="hero-intro__item hero-intro__item--eyebrow hidden items-center gap-3 xl:flex"
         style={{ ['--stagger' as string]: '0ms' }}
       >
         <div style={itemStyle(exitEyebrow)} className="flex items-center gap-3">
@@ -789,7 +789,7 @@ export function LandingPage() {
   useEffect(() => {
     if (!introOverlayHidden) return
     if (typeof window === 'undefined') return
-    if (!window.matchMedia('(min-width: 1024px)').matches) return
+    if (!window.matchMedia('(min-width: 1367px)').matches) return
 
     const lenis = new Lenis()
     let rafId = 0
@@ -1085,7 +1085,7 @@ export function LandingPage() {
   const handleIntroComplete = useCallback(() => setIntroDone(true), [])
 
   return (
-    <main className="relative min-h-dvh w-full bg-black max-lg:h-dvh max-lg:max-h-dvh max-lg:overflow-hidden">
+    <main className="relative min-h-dvh w-full bg-black h-dvh max-h-dvh overflow-hidden xl:h-auto xl:max-h-none xl:overflow-visible">
       {/* Plays before any hero content is visible. Unmounts itself once
           its own fade-out completes; onComplete fires as the logo begins
           fading so the hero's entrance animations overlap the last tail
@@ -1145,7 +1145,7 @@ export function LandingPage() {
           read on small screens, and native touch scrolling past the
           card would strand the user in empty phase transitions. The
           card's "Join Waitlist" CTA still opens the modal. */}
-      <div className="relative h-dvh lg:h-[1400vh]">
+      <div className="relative h-dvh xl:h-[1400vh]">
         {/* z-[1100] lifts the sticky section's stacking context above
             SpreadLogoReveal's z-[1000] — sticky *creates* a stacking
             context even without z-index, so without this the market card
@@ -1324,7 +1324,7 @@ export function LandingPage() {
           <div
             aria-hidden="true"
             className={cn(
-              'pointer-events-none absolute bottom-7 left-1/2 z-[1100] hidden -translate-x-1/2 transition-opacity duration-700 ease-out lg:block',
+              'pointer-events-none absolute bottom-7 left-1/2 z-[1100] hidden -translate-x-1/2 transition-opacity duration-700 ease-out xl:block',
               marketSettled && scrollProgress < 0.02 ? 'opacity-100' : 'opacity-0',
             )}
           >
