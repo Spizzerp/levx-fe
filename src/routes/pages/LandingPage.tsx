@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { FileText } from 'lucide-react'
 import Lenis from 'lenis'
 
@@ -483,11 +483,9 @@ function tooltipVisibility(progress4: number, stopIndex: number, stopCount: numb
 function ChartTour({
   progress,
   stops,
-  onMeasure,
 }: {
   progress: number
   stops: readonly TourStop[]
-  onMeasure: (id: string, height: number) => void
 }) {
   // Don't mount tooltips at all until phase 4 has started; this keeps
   // the DOM lean during phases 1-3 when no tooltip is visible.
@@ -498,38 +496,22 @@ function ChartTour({
         if (!stop.tooltip) return null
         const opacity = tooltipVisibility(progress, i, stops.length)
         if (opacity < 0.01) return null
-        return <TourTooltip key={stop.id} stop={stop} opacity={opacity} onMeasure={onMeasure} />
+        return <TourTooltip key={stop.id} stop={stop} opacity={opacity} />
       })}
     </div>
   )
 }
 
-/** Tooltip wrapper — measures its rendered height on mount + layout and
- *  reports it up via onMeasure so TourArrow can anchor the leader line
- *  to the actual bottom edge (not a constant approximation). */
 function TourTooltip({
   stop,
   opacity,
-  onMeasure,
 }: {
   stop: TourStop
   opacity: number
-  onMeasure: (id: string, height: number) => void
 }) {
-  const ref = useRef<HTMLDivElement>(null)
-  useLayoutEffect(() => {
-    const el = ref.current
-    if (!el) return
-    const report = () => onMeasure(stop.id, el.getBoundingClientRect().height)
-    report()
-    const ro = new ResizeObserver(report)
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [stop.id, onMeasure])
   if (!stop.tooltip) return null
   return (
     <div
-      ref={ref}
       className="pointer-events-none absolute w-[min(360px,38vw)]"
       style={{
         left: `${stop.tooltipAnchor.x}vw`,
@@ -562,21 +544,42 @@ function TourTooltip({
  * can reuse the current rect for both target position and current box
  * size without juggling separate "rest" and "zoomed" measurements.
  *
- * The waitlist stop skips the arrow + tooltip and instead pulses its
- * highlight box so the zoomed button reads as the final call-to-action.
+ * Implemented as a cinematic spotlight: a viewport-wide dim layer with
+ * a rounded-rect cutout over the currently-focused region, plus a
+ * crisp white rim + soft brand-green halo around the cutout. The
+ * focus region is interpolated (origin + box) between adjacent stops
+ * as phase-4 scroll pans the camera, so the spotlight morphs smoothly
+ * rather than snapping between stops. Tooltip cards float at their
+ * configured anchors outside the lit area — the brightness contrast
+ * carries the association without a leader line.
  */
 function TourOverlay({
   progress,
   stops,
   cardRect,
-  tooltipHeights,
 }: {
   progress: number
   stops: readonly TourStop[]
   cardRect: DOMRect | null
-  tooltipHeights: Record<string, number>
 }) {
   if (progress <= 0 || !cardRect || cardRect.width === 0) return null
+
+  const focus = resolveFocusBox(progress, stops)
+  if (!focus) return null
+
+  // Floor the minimum rendered size so an extreme trim on boxAdjust
+  // can't produce a zero-area cutout that would render as invisible.
+  const focusW = Math.max(24, (focus.box.w / 100) * cardRect.width)
+  const focusH = Math.max(24, (focus.box.h / 100) * cardRect.height)
+  const focusCx = cardRect.left + (focus.origin.x / 100) * cardRect.width
+  const focusCy = cardRect.top + (focus.origin.y / 100) * cardRect.height
+  const focusLeft = focusCx - focusW / 2
+  const focusTop = focusCy - focusH / 2
+  const rx = 8
+
+  // Stable mask id isn't strictly required (only one overlay exists),
+  // but keeping it explicit documents intent.
+  const maskId = 'tour-spotlight-mask'
 
   return (
     <svg
@@ -584,163 +587,157 @@ function TourOverlay({
       className="pointer-events-none fixed inset-0 z-[1245] h-screen w-screen"
     >
       <defs>
-        <marker
-          id="tour-arrowhead"
-          viewBox="0 0 10 10"
-          refX="9"
-          refY="5"
-          markerWidth="9"
-          markerHeight="9"
-          orient="auto-start-reverse"
-        >
-          <path d="M 0 0 L 10 5 L 0 10 z" fill="#FFFFFF" />
-        </marker>
+        {/* Feather filter on the cutout edge — reads as a soft vignette
+            between lit and dim rather than a hard geometric cut. */}
+        <filter id="tour-spotlight-feather" x="-5%" y="-5%" width="110%" height="110%">
+          <feGaussianBlur stdDeviation="1.5" />
+        </filter>
+        <mask id={maskId} maskUnits="userSpaceOnUse">
+          <rect x="0" y="0" width="100%" height="100%" fill="white" />
+          <rect
+            x={focusLeft}
+            y={focusTop}
+            width={focusW}
+            height={focusH}
+            rx={rx}
+            fill="black"
+            filter="url(#tour-spotlight-feather)"
+          />
+        </mask>
       </defs>
-      {stops.map((stop, i) => {
-        const opacity = tooltipVisibility(progress, i, stops.length)
-        if (opacity < 0.01) return null
 
-        // Target viewport position — invariant during phase-4 zoom
-        // because transform-origin is set to this point.
-        const targetX = cardRect.left + (stop.origin.x / 100) * cardRect.width
-        const targetY = cardRect.top + (stop.origin.y / 100) * cardRect.height
+      {/* Dim layer — everything except the focused region is muted,
+          pulling the user's eye straight to the lit cutout. Intensity
+          ramps in as the camera commits to the first stop so the dim
+          doesn't pop on instantly. */}
+      <rect
+        x="0"
+        y="0"
+        width="100%"
+        height="100%"
+        fill="rgba(0, 0, 0, 0.6)"
+        mask={`url(#${maskId})`}
+        opacity={focus.intensity}
+      />
 
-        // Box size scales with the current zoom because cardRect is the
-        // transformed rect (width already multiplied by current scale).
-        const boxW = (stop.box.w / 100) * cardRect.width
-        const boxH = (stop.box.h / 100) * cardRect.height
-        const boxLeft = targetX - boxW / 2
-        const boxTop = targetY - boxH / 2
+      {/* Outer brand-green halo — a blurred glow just beyond the rim.
+          Gives the spotlight a "lit" quality instead of the flat look
+          of a bare white border. */}
+      <rect
+        x={focusLeft - 3}
+        y={focusTop - 3}
+        width={focusW + 6}
+        height={focusH + 6}
+        rx={rx + 3}
+        fill="none"
+        stroke="rgba(92, 247, 139, 0.5)"
+        strokeWidth={6}
+        opacity={focus.intensity * 0.75}
+        style={{ filter: 'blur(6px)' }}
+      />
 
-        const isWaitlist = stop.tooltip === null
+      {/* Crisp white rim — the primary edge of the lit region. Higher
+          alpha (0.95) and thicker stroke (1.75) than the old hairline
+          so it's clearly legible without the corner brackets. */}
+      <rect
+        x={focusLeft}
+        y={focusTop}
+        width={focusW}
+        height={focusH}
+        rx={rx}
+        fill="none"
+        stroke="rgba(255, 255, 255, 0.95)"
+        strokeWidth={1.75}
+        opacity={focus.intensity}
+      />
 
-        return (
-          <g key={stop.id} opacity={opacity}>
-            <rect
-              x={boxLeft}
-              y={boxTop}
-              width={boxW}
-              height={boxH}
-              fill="none"
-              stroke="#FFFFFF"
-              strokeWidth={isWaitlist ? 2.75 : 2}
-              strokeDasharray={isWaitlist ? '6 5' : '5 4'}
-              className={isWaitlist ? 'tour-waitlist-pulse' : undefined}
-            />
-            {/* Corner ticks — four short L-marks at the highlight box's
-                corners. Reinforces the CAD/drafting language used
-                elsewhere on the landing. */}
-            {!isWaitlist && (
-              <>
-                <TourCornerTick x={boxLeft} y={boxTop} kind="tl" />
-                <TourCornerTick x={boxLeft + boxW} y={boxTop} kind="tr" />
-                <TourCornerTick x={boxLeft} y={boxTop + boxH} kind="bl" />
-                <TourCornerTick x={boxLeft + boxW} y={boxTop + boxH} kind="br" />
-              </>
-            )}
-            {stop.tooltip && (
-              <TourArrow
-                tooltipAnchor={stop.tooltipAnchor}
-                box={{ left: boxLeft, top: boxTop, width: boxW, height: boxH }}
-                leaderFrom={stop.leaderFrom}
-                tipHeight={tooltipHeights[stop.id]}
-              />
-            )}
-          </g>
-        )
-      })}
+      {/* Waitlist final beat — same geometry but with the brand-green
+          pulse animation on top of the white rim, so the CTA reads as
+          "click me" rather than just another stop. */}
+      {focus.isWaitlist && (
+        <rect
+          x={focusLeft}
+          y={focusTop}
+          width={focusW}
+          height={focusH}
+          rx={rx}
+          fill="none"
+          stroke={TOUR_BRAND_GREEN}
+          strokeWidth={2}
+          opacity={focus.intensity}
+          className="tour-waitlist-pulse"
+        />
+      )}
     </svg>
   )
 }
 
-/** Tiny 8px L-shaped tick drawn at each corner of a highlight box. */
-function TourCornerTick({ x, y, kind }: { x: number; y: number; kind: 'tl' | 'tr' | 'bl' | 'br' }) {
-  const L = 8
-  const dx = kind === 'tr' || kind === 'br' ? -L : L
-  const dy = kind === 'bl' || kind === 'br' ? -L : L
-  return (
-    <path
-      d={`M ${x + dx} ${y} L ${x} ${y} L ${x} ${y + dy}`}
-      fill="none"
-      stroke="#FFFFFF"
-      strokeWidth={2}
-      strokeLinecap="round"
-    />
-  )
-}
+const TOUR_BRAND_GREEN = '#5CF78B'
 
 /**
- * Leader arrow from a tooltip card to its highlight box. The arrow
- * starts at the midpoint of the tooltip's edge nearest the target and
- * ends at the nearest edge of the highlight box — so the arrowhead
- * visually "lands" on the box rather than crossing it.
+ * Interpolate the current spotlight region from phase-4 progress.
+ * Timeline mirrors `resolveCamera`'s so origin/scale/box stay aligned:
+ *   • [0, 1]        — fade spotlight in while camera pans to stop 0.
+ *   • [N, N+1]      — morph origin + box from stop N-1 to stop N.
+ *   • [stops.length, …] — hold on final stop.
  *
- * Tooltip card dimensions are approximated (width = min(360, 38vw),
- * height ~170px). Overshoot is acceptable since the arrow + tooltip
- * share the same opacity fade.
+ * `intensity` is the overall strength of the dim + rim (0-1) so the
+ * overlay can fade in on entry without popping.
  */
-function TourArrow({
-  tooltipAnchor,
-  box,
-  leaderFrom,
-  tipHeight,
-}: {
-  tooltipAnchor: { x: number; y: number }
-  box: { left: number; top: number; width: number; height: number }
-  leaderFrom?: 'top' | 'right' | 'bottom' | 'left'
-  tipHeight?: number
-}) {
-  const vw = window.innerWidth
-  const vh = window.innerHeight
-  const tipX = (tooltipAnchor.x / 100) * vw
-  const tipY = (tooltipAnchor.y / 100) * vh
-  const tipW = Math.min(360, vw * 0.38)
-  // Prefer the measured tooltip height so the line anchors to the real
-  // bottom edge regardless of body length. Falls back to 160 only for
-  // the single frame between first render and the first measurement.
-  const tipH = tipHeight ?? 160
+function resolveFocusBox(
+  progress4: number,
+  stops: readonly TourStop[],
+): {
+  origin: { x: number; y: number }
+  box: { w: number; h: number }
+  intensity: number
+  isWaitlist: boolean
+} | null {
+  const timeline = progress4 * (stops.length + 0.4)
+  if (timeline <= 0) return null
 
-  const boxCx = box.left + box.width / 2
-  const boxCy = box.top + box.height / 2
-
-  // Pick tooltip edge: either the explicit override or the nearest to
-  // the box center.
-  let startX: number, startY: number
-  const side =
-    leaderFrom ??
-    (boxCx > tipX + tipW ? 'right' : boxCx < tipX ? 'left' : boxCy > tipY + tipH ? 'bottom' : 'top')
-  if (side === 'right') {
-    startX = tipX + tipW
-    startY = tipY + tipH / 2
-  } else if (side === 'left') {
-    startX = tipX
-    startY = tipY + tipH / 2
-  } else if (side === 'bottom') {
-    startX = tipX + tipW / 2
-    startY = tipY + tipH
-  } else {
-    startX = tipX + tipW / 2
-    startY = tipY
+  if (timeline >= stops.length) {
+    const last = stops[stops.length - 1]
+    return {
+      origin: last.origin,
+      box: last.box,
+      intensity: 1,
+      isWaitlist: last.tooltip === null,
+    }
   }
 
-  // Clip the end point to the box's perimeter so the arrowhead sits on
-  // the edge (not inside the box).
-  const endX = Math.max(box.left, Math.min(box.left + box.width, startX))
-  const endY = Math.max(box.top, Math.min(box.top + box.height, startY))
+  const segment = Math.floor(timeline)
+  const t = smoothstep(timeline - segment)
+  const next = stops[segment]
+  if (segment === 0) {
+    // Before the first stop — fade the spotlight in as the camera
+    // arrives. Use `t` directly for intensity so nothing is visible
+    // until timeline starts advancing.
+    return {
+      origin: next.origin,
+      box: next.box,
+      intensity: t,
+      isWaitlist: next.tooltip === null,
+    }
+  }
 
-  return (
-    <line
-      x1={startX}
-      y1={startY}
-      x2={endX}
-      y2={endY}
-      stroke="#FFFFFF"
-      strokeWidth={2}
-      strokeDasharray="5 4"
-      strokeLinecap="butt"
-      opacity={0.9}
-    />
-  )
+  const prev = stops[segment - 1]
+  const isNextWaitlist = next.tooltip === null
+  const isPrevWaitlist = prev.tooltip === null
+  return {
+    origin: {
+      x: lerp(prev.origin.x, next.origin.x, t),
+      y: lerp(prev.origin.y, next.origin.y, t),
+    },
+    box: {
+      w: lerp(prev.box.w, next.box.w, t),
+      h: lerp(prev.box.h, next.box.h, t),
+    },
+    intensity: 1,
+    // Treat the segment as the waitlist beat past the midpoint so the
+    // pulse lights up as the camera commits to the final stop.
+    isWaitlist: t > 0.5 ? isNextWaitlist : isPrevWaitlist,
+  }
 }
 
 /** Ease-out cubic — softens scroll-driven transforms so motion starts
@@ -862,17 +859,6 @@ export function LandingPage() {
   // returns the current post-transform box. For the tour geometry that's
   // exactly what we want — see TourOverlay for why.
   const [cardRect, setCardRect] = useState<DOMRect | null>(null)
-  // Per-stop tooltip heights — measured by TourTooltip via ResizeObserver
-  // so TourArrow can anchor the leader line to the tooltip's real bottom
-  // edge instead of a constant approximation.
-  const [tooltipHeights, setTooltipHeights] = useState<Record<string, number>>({})
-  const handleTooltipMeasure = useCallback((id: string, height: number) => {
-    setTooltipHeights((prev) =>
-      prev[id] !== undefined && Math.abs(prev[id] - height) < 0.5
-        ? prev
-        : { ...prev, [id]: height },
-    )
-  }, [])
   useEffect(() => {
     const el = cardRef.current
     if (!el) return
@@ -1316,13 +1302,8 @@ export function LandingPage() {
             progress={scrollProgress4}
             stops={resolvedTourStops}
             cardRect={cardRect}
-            tooltipHeights={tooltipHeights}
           />
-          <ChartTour
-            progress={scrollProgress4}
-            stops={resolvedTourStops}
-            onMeasure={handleTooltipMeasure}
-          />
+          <ChartTour progress={scrollProgress4} stops={resolvedTourStops} />
 
           {/* Editorial scroll cue — hairline rule + mono caps + a green
               tracer that drops down the rule on a 2.4s cycle. Replaces

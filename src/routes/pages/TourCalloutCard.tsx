@@ -12,16 +12,19 @@ interface TourCalloutCardProps {
 }
 
 /**
- * Tour-overlay variant of the callout card — same content layout as
- * HeroCalloutCard but pinned inside an outlined wrapper so it visually
- * pairs with the white dashed highlight box that TourOverlay draws over
- * the focused region of the market card. No leader dot here: the dashed
- * leader line from TourOverlay already connects the card to its target.
+ * Tour-overlay variant of the callout card. Shares its chrome vocabulary
+ * with the phase-4 overlay brackets so the tooltip reads as "the
+ * annotation attached to the viewfinder":
  *
- * The outline lives on an absolutely-positioned sibling inside TiltCard
- * so it sits within TiltCard's overflow-hidden box (otherwise a ring
- * drawn outside MagicCard would be clipped). pointer-events-none keeps
- * MagicCard's cursor-follow spotlight receiving hover events.
+ *   • Hairline outer ring (white ~15% alpha) instead of a chunky solid
+ *     border — lets the MagicCard's cursor-follow spotlight do the
+ *     heavy lifting for edge definition.
+ *   • Header has a brand-green dot leading the kicker (matches the
+ *     brand accent on each bracket's inner tip) and a subdued step
+ *     number on the right so the reader can track tour position
+ *     without the number dominating the card.
+ *   • Soft layered drop-shadow lifts the card off the dither backdrop
+ *     with a whisper of brand-green so it feels lit, not pasted on.
  */
 export function TourCalloutCard({
   num,
@@ -33,36 +36,79 @@ export function TourCalloutCard({
   return (
     <div className="relative" style={style}>
       <TiltCard
-        tiltLimit={12}
-        scale={1.03}
+        tiltLimit={8}
+        scale={1.015}
         perspective={1400}
         effect="evade"
         spotlight={false}
         className="rounded-lg"
       >
-        <div className="relative rounded-lg">
-          <MagicCard className="rounded-lg" gradientSize={220}>
-            <header className="flex items-center border-b border-line px-4 py-2">
-              <span className="text-ink-muted font-mono text-nano tracking-[0.18em] uppercase">
-                {num} <span className="text-ink-dim">·</span> {kicker}
+        <div
+          className="relative rounded-lg"
+          style={{
+            boxShadow:
+              '0 24px 60px rgba(0, 0, 0, 0.55), 0 0 42px rgba(92, 247, 139, 0.08)',
+          }}
+        >
+          <MagicCard className="rounded-lg" gradientSize={260}>
+            <header className="border-line/60 flex items-center justify-between border-b px-5 py-3">
+              <div className="flex items-center gap-2.5">
+                <span
+                  aria-hidden="true"
+                  className="bg-brand-to inline-block h-1 w-1 rounded-full"
+                  style={{ boxShadow: '0 0 6px rgba(92, 247, 139, 0.9)' }}
+                />
+                <span className="text-ink-muted font-mono text-nano tracking-[0.22em] uppercase">
+                  {kicker}
+                </span>
+              </div>
+              <span className="text-ink-dim font-mono text-nano tracking-[0.22em]">
+                {num}
               </span>
             </header>
 
-            <div className="px-4 py-4">
+            <div className="px-5 py-4">
               <h3 className="text-ink-strong text-body font-sans leading-snug tracking-tight">
                 {title}
               </h3>
-              <p className="text-ink-muted text-body-sm mt-2 font-sans leading-normal">
+              <p className="text-ink-muted text-body-sm mt-2 font-sans leading-relaxed">
                 {body}
               </p>
             </div>
           </MagicCard>
+
+          {/* Hairline ring — replaces the old solid white border. Sits
+              above MagicCard inside TiltCard's overflow-hidden box so
+              it doesn't get clipped. */}
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute inset-0 rounded-lg border border-white"
+            className="pointer-events-none absolute inset-0 rounded-lg border border-white/15"
           />
+
+          {/* Drafting-style corner marks at the card's four corners —
+              visually echo the overlay brackets so the tooltip and its
+              target read as a single annotation system. */}
+          <CalloutCornerMark pos="tl" />
+          <CalloutCornerMark pos="tr" />
+          <CalloutCornerMark pos="bl" />
+          <CalloutCornerMark pos="br" />
         </div>
       </TiltCard>
     </div>
+  )
+}
+
+function CalloutCornerMark({ pos }: { pos: 'tl' | 'tr' | 'bl' | 'br' }) {
+  const byPos: Record<typeof pos, string> = {
+    tl: 'top-1.5 left-1.5 border-t border-l',
+    tr: 'top-1.5 right-1.5 border-t border-r',
+    bl: 'bottom-1.5 left-1.5 border-b border-l',
+    br: 'bottom-1.5 right-1.5 border-b border-r',
+  }
+  return (
+    <span
+      aria-hidden="true"
+      className={`pointer-events-none absolute h-2 w-2 border-white/80 ${byPos[pos]}`}
+    />
   )
 }

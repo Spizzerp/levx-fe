@@ -300,19 +300,19 @@
    needing text. Runs on a 1.6s cycle — slow enough that the blinking
    doesn't feel frantic but fast enough to feel alive. */
 .tour-waitlist-pulse {
-  animation: tour-waitlist-pulse 1.6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-  filter: drop-shadow(0 0 10px rgba(92, 247, 139, 0.75));
+  animation: tour-waitlist-pulse 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  filter: drop-shadow(0 0 8px rgba(92, 247, 139, 0.6));
   transform-box: fill-box;
 }
 
 @keyframes tour-waitlist-pulse {
   0%, 100% {
-    stroke-opacity: 0.65;
-    filter: drop-shadow(0 0 6px rgba(92, 247, 139, 0.55));
+    stroke-opacity: 0.6;
+    filter: drop-shadow(0 0 5px rgba(92, 247, 139, 0.45));
   }
   50% {
-    stroke-opacity: 1;
-    filter: drop-shadow(0 0 16px rgba(92, 247, 139, 1));
+    stroke-opacity: 0.95;
+    filter: drop-shadow(0 0 14px rgba(92, 247, 139, 0.95));
   }
 }
 
