@@ -17,8 +17,11 @@ const HOLD_MS = 400
 const FADE_MS = 1500
 
 export function SpreadLogoReveal({ onComplete, onHidden }: SpreadLogoRevealProps) {
+  const prefersReducedMotion = typeof window !== 'undefined'
+    && typeof window.matchMedia === 'function'
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches
   const [handingOff, setHandingOff] = useState(false)
-  const [mounted, setMounted] = useState(true)
+  const [mounted, setMounted] = useState(!prefersReducedMotion)
   const completedRef = useRef(false)
 
   useEffect(() => {
@@ -61,17 +64,16 @@ export function SpreadLogoReveal({ onComplete, onHidden }: SpreadLogoRevealProps
   }, [mounted])
 
   useEffect(() => {
-    const prefersReduced = typeof window.matchMedia === 'function'
-      && window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    if (prefersReduced) {
-      setMounted(false)
+    if (completedRef.current) return
+
+    if (prefersReducedMotion) {
+      completedRef.current = true
       onComplete()
       onHidden?.()
       return
     }
 
     const handoffTimer = window.setTimeout(() => {
-      if (completedRef.current) return
       completedRef.current = true
       onComplete()
       setHandingOff(true)
@@ -84,7 +86,7 @@ export function SpreadLogoReveal({ onComplete, onHidden }: SpreadLogoRevealProps
     return () => {
       window.clearTimeout(handoffTimer)
     }
-  }, [onComplete, onHidden])
+  }, [onComplete, onHidden, prefersReducedMotion])
 
   if (!mounted) return null
 
