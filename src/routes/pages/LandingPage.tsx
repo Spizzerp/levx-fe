@@ -788,6 +788,9 @@ export function LandingPage() {
   // Every scripted hero animation below keys off this flag so the typing
   // headline and card rise only begin once the reveal is handing off.
   const [introDone, setIntroDone] = useState(false)
+  // Tracks the moment the intro overlay fully unmounts so the sticky
+  // hero can stay underneath it for the entire fade-out window.
+  const [introOverlayHidden, setIntroOverlayHidden] = useState(false)
   // Flips true after the card's 1.8s rise animation so the chart's dashed
   // marker lines (NOW / OPENS / END) appear only once the card is settled.
   // Same timer also flips marketSettled which triggers the dither fade-in
@@ -807,6 +810,8 @@ export function LandingPage() {
   // Lenis smooth-scroll. Inertial easing on wheel/trackpad — drives
   // scroll-linked animations as we add sections below the hero.
   useEffect(() => {
+    if (!introOverlayHidden) return
+
     const lenis = new Lenis()
     let rafId = 0
     const raf = (time: number) => {
@@ -818,7 +823,7 @@ export function LandingPage() {
       cancelAnimationFrame(rafId)
       lenis.destroy()
     }
-  }, [])
+  }, [introOverlayHidden])
 
   // Dynamic card scale — the market card's `zoom` is driven by the viewport
   // so the whole card (header + chart + comments + sidebar) always fits the
@@ -973,7 +978,10 @@ export function LandingPage() {
           fading so the hero's entrance animations overlap the last tail
           of the intro — the market card rises over the still-visible
           reveal as the overlay crossfades out from underneath. */}
-      <SpreadLogoReveal onComplete={handleIntroComplete} />
+      <SpreadLogoReveal
+        onComplete={handleIntroComplete}
+        onHidden={() => setIntroOverlayHidden(true)}
+      />
 
       {/* Fixed (not absolute) so it stays pinned to the viewport while the
           page scrolls. */}
@@ -1012,7 +1020,12 @@ export function LandingPage() {
             context even without z-index, so without this the market card
             inside gets painted below the intro overlay regardless of any
             z-index we put on it directly. */}
-        <section className="sticky top-0 z-[1100] flex h-dvh flex-col items-center justify-between overflow-hidden px-6 pt-24 pb-20 sm:px-10 sm:pt-28 sm:pb-24">
+        <section
+          className={cn(
+            'sticky top-0 flex h-dvh flex-col items-center justify-between overflow-hidden px-6 pt-24 pb-20 sm:px-10 sm:pt-28 sm:pb-24',
+            introOverlayHidden ? 'z-[1100]' : 'z-[900]',
+          )}
+        >
           {/* Pulsating brand-green dither aura — scoped to the hero only so
               it doesn't bleed into sections below when the page scrolls.
               Wrapped with an opacity transition so it smoothly fades in
@@ -1203,4 +1216,3 @@ export function LandingPage() {
     </main>
   )
 }
-
