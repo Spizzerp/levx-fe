@@ -119,9 +119,17 @@ Deno.serve(async (req) => {
     if (existingId) {
       if (existingStatus === 'joined') return json({ ok: true, deduped: true }, 200)
 
+      // Preserve `invited` on re-submission — otherwise a re-POST from an
+      // invited user whose wallet isn't yet in `users` would compute
+      // `nextStatus = 'pending'` and silently downgrade their invitation.
+      // Only roles strictly weaker than the current one should ever be
+      // written here.
+      const preservedStatus =
+        existingStatus === 'invited' ? existingStatus : nextStatus
+
       const { error } = await admin
         .from('waitlist_entries')
-        .update({ ...payload, status: nextStatus })
+        .update({ ...payload, status: preservedStatus })
         .eq('id', existingId)
       if (error) throw error
       return json({ ok: true, deduped: true }, 200)

@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Check } from 'lucide-react'
 import { PublicKey } from '@solana/web3.js'
 
@@ -53,18 +53,26 @@ export function WaitlistForm({
   const [manualAddress, setManualAddress] = useState('')
   const [status, setStatus] = useState<Status>('idle')
   const [error, setError] = useState<string | null>(null)
+  // `status` is React state — setting it is async. Between
+  // `setStatus('submitting')` and the re-render that disables the
+  // submit button, a fast double-click (or Enter keypress twice) can
+  // re-enter `handleSubmit` and fire `onSubmit` twice. A synchronous
+  // ref gives us a same-tick guard that the state check can't provide.
+  const submittingRef = useRef(false)
 
   const effectiveAddress = connected ? connectedAddress : manualAddress.trim()
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
+    if (submittingRef.current) return
     setError(null)
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       setError('Enter a valid email address.')
       return
     }
-    if (!xUsername.trim()) {
+    const cleanedX = xUsername.trim().replace(/^@/, '')
+    if (!cleanedX) {
       setError('X (Twitter) username is required.')
       return
     }
@@ -77,9 +85,9 @@ export function WaitlistForm({
       return
     }
 
+    submittingRef.current = true
     setStatus('submitting')
     try {
-      const cleanedX = xUsername.trim().replace(/^@/, '')
       await onSubmit?.({
         email: email.trim(),
         xUsername: cleanedX,
@@ -89,6 +97,8 @@ export function WaitlistForm({
     } catch (err) {
       setStatus('idle')
       setError(err instanceof Error ? err.message : 'Something went wrong. Try again.')
+    } finally {
+      submittingRef.current = false
     }
   }
 

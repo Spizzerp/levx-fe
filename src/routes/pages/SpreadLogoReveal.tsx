@@ -23,6 +23,13 @@ export function SpreadLogoReveal({ onComplete, onHidden }: SpreadLogoRevealProps
   const [handingOff, setHandingOff] = useState(false)
   const [mounted, setMounted] = useState(!prefersReducedMotion)
   const completedRef = useRef(false)
+  // The fade-out is driven by a nested setTimeout inside the handoff
+  // timer. Track it in a ref so the effect cleanup can cancel it on
+  // unmount — otherwise navigating away mid-fade (e.g., back-nav during
+  // the 1.5s tail) calls onHidden() and setMounted(false) on a dead
+  // component and can fire downstream state setters (parent's
+  // setIntroOverlayHidden) on an unmounted mount path.
+  const fadeTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
     if (!mounted) return
@@ -77,7 +84,8 @@ export function SpreadLogoReveal({ onComplete, onHidden }: SpreadLogoRevealProps
       completedRef.current = true
       onComplete()
       setHandingOff(true)
-      window.setTimeout(() => {
+      fadeTimerRef.current = window.setTimeout(() => {
+        fadeTimerRef.current = null
         onHidden?.()
         setMounted(false)
       }, FADE_MS)
@@ -85,6 +93,10 @@ export function SpreadLogoReveal({ onComplete, onHidden }: SpreadLogoRevealProps
 
     return () => {
       window.clearTimeout(handoffTimer)
+      if (fadeTimerRef.current !== null) {
+        window.clearTimeout(fadeTimerRef.current)
+        fadeTimerRef.current = null
+      }
     }
   }, [onComplete, onHidden, prefersReducedMotion])
 
