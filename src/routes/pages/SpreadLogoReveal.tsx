@@ -23,13 +23,17 @@ export function SpreadLogoReveal({ onComplete, onHidden }: SpreadLogoRevealProps
   const [handingOff, setHandingOff] = useState(false)
   const [mounted, setMounted] = useState(!prefersReducedMotion)
   const completedRef = useRef(false)
-  // The fade-out is driven by a nested setTimeout inside the handoff
-  // timer. Track it in a ref so the effect cleanup can cancel it on
-  // unmount — otherwise navigating away mid-fade (e.g., back-nav during
-  // the 1.5s tail) calls onHidden() and setMounted(false) on a dead
-  // component and can fire downstream state setters (parent's
-  // setIntroOverlayHidden) on an unmounted mount path.
   const fadeTimerRef = useRef<number | null>(null)
+  // Latest-callback refs. The parent passes inline arrows for onHidden,
+  // so the callback identity changes every render. Routing them through
+  // refs lets the handoff effect run exactly once (on mount) — we read
+  // the current callbacks at fire time without re-scheduling the timer
+  // on every parent render, which was previously cancelling the in-
+  // flight fade timeout and wedging the intro overlay on screen.
+  const onCompleteRef = useRef(onComplete)
+  const onHiddenRef = useRef(onHidden)
+  onCompleteRef.current = onComplete
+  onHiddenRef.current = onHidden
 
   useEffect(() => {
     if (!mounted) return
@@ -75,18 +79,18 @@ export function SpreadLogoReveal({ onComplete, onHidden }: SpreadLogoRevealProps
 
     if (prefersReducedMotion) {
       completedRef.current = true
-      onComplete()
-      onHidden?.()
+      onCompleteRef.current()
+      onHiddenRef.current?.()
       return
     }
 
     const handoffTimer = window.setTimeout(() => {
       completedRef.current = true
-      onComplete()
+      onCompleteRef.current()
       setHandingOff(true)
       fadeTimerRef.current = window.setTimeout(() => {
         fadeTimerRef.current = null
-        onHidden?.()
+        onHiddenRef.current?.()
         setMounted(false)
       }, FADE_MS)
     }, SPREAD_RESOLVE_MS + HOLD_MS)
@@ -98,7 +102,12 @@ export function SpreadLogoReveal({ onComplete, onHidden }: SpreadLogoRevealProps
         fadeTimerRef.current = null
       }
     }
-  }, [onComplete, onHidden, prefersReducedMotion])
+    // Intentionally empty deps — the callbacks are read via refs so this
+    // effect must only run on mount/unmount. Re-running it on every
+    // parent render (when `onHidden` gets a new inline identity) would
+    // cancel the in-flight fade timer and leave the overlay stuck.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   if (!mounted) return null
 
