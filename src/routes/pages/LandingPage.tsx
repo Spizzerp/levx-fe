@@ -331,20 +331,20 @@ const TOUR_STOPS: readonly TourStop[] = [
   },
   {
     id: 'providers',
-    origin: { x: 86, y: 28 },
+    origin: { x: 86, y: 34 },
     scale: 2.3,
-    box: { w: 28, h: 28 },
+    box: { w: 28, h: 38 },
     tooltip: {
       num: '03',
-      kicker: 'Providers',
-      title: 'Five base agents, each at its own multiplier.',
-      body: 'Chronos-2, TimesFM, GJR-GARCH, Merton-JD, Monte Carlo. Multipliers reflect how the room has priced each reading.',
+      kicker: 'AI Providers',
+      title: 'Internal & external AI provide possibile price paths',
+      body: 'Multiple AI providers compete to offer price paths that users can select and use as a wager base. Multipliers reflect how the market has priced each path',
     },
     tooltipAnchor: { x: 18, y: 36 },
   },
   {
     id: 'drawPath',
-    origin: { x: 86, y: 50 },
+    origin: { x: 86, y: 58 },
     scale: 2.5,
     box: { w: 28, h: 6 },
     tooltip: {
