@@ -62,7 +62,13 @@ export function LogoVariantRootSystem({ ariaLabel = 'LevX' }: LogoVariantRootSys
     const aspect = size.width / size.height
     const MASK_W = aspect >= 1 ? MASK_LONG : Math.max(1, Math.round(MASK_LONG * aspect))
     const MASK_H = aspect >= 1 ? Math.max(1, Math.round(MASK_LONG / aspect)) : MASK_LONG
-    const mask = buildMaskPixels(MASK_W, MASK_H, 1.0)
+    // Logo zoom — at zoom=1 the silhouette spans the canvas's short
+    // dimension. On portrait we pull it in only slightly (0.92) so
+    // there's a thin margin for side-spawned tendrils, while keeping
+    // the bracket + X letterforms large enough that the bloom doesn't
+    // dissolve their internal detail.
+    const LOGO_ZOOM = aspect >= 1 ? 1.0 : Math.max(0.92, 0.92 + (aspect - 0.45) * 0.15)
+    const mask = buildMaskPixels(MASK_W, MASK_H, LOGO_ZOOM)
     const maskScaleX = MASK_W / size.width
     const maskScaleY = MASK_H / size.height
     const isInside = (px: number, py: number): boolean => {
@@ -75,7 +81,7 @@ export function LogoVariantRootSystem({ ariaLabel = 'LevX' }: LogoVariantRootSys
     const cx = size.width / 2
     const cy = size.height / 2
 
-    const { bracket: logoBracket, x: logoX } = buildLogoPaths(size.width, size.height, 1.0)
+    const { bracket: logoBracket, x: logoX } = buildLogoPaths(size.width, size.height, LOGO_ZOOM)
 
     // ─── Scanlines (baked once, drawn at full strength) ────────────
     const scanTex = document.createElement('canvas')
@@ -155,6 +161,12 @@ export function LogoVariantRootSystem({ ariaLabel = 'LevX' }: LogoVariantRootSys
 
     // ─── Tendril pool ──────────────────────────────────────────────
     const MAX_PTS = 400
+    // Keep the desktop population on portrait too — fewer tendrils
+    // makes the silhouette read as a sparse blob instead of a clean
+    // outline. Bunching on portrait is solved by thinner strokes
+    // (see WIDTH_BASE/WIDTH_MIN below) and the tighter look-ahead
+    // (see NEAR_LOOK/FAR_LOOK below), not by reducing the count.
+    const isPortrait = aspect < 1
     const MAX_TENDRILS = 60
     const SPAWN_TARGET = 60
     // Front-loaded: target by progress p is SPAWN_TARGET·(1-(1-p)³) —
@@ -279,8 +291,12 @@ export function LogoVariantRootSystem({ ariaLabel = 'LevX' }: LogoVariantRootSys
       // the outline and bunch up in a halo around it. Step scale < 1
       // shortens each advance, piling more polyline points into the
       // same arc length → visual density along the outline.
-      const NEAR_LOOK = 3.5
-      const FAR_LOOK = 12
+      // Tighter look-ahead on portrait so tendrils hug the silhouette
+      // closer — at the wide look-ahead distance, the deflection
+      // outline drifts further from the actual letterform and the
+      // shape reads as generic blobs instead of bracket + X.
+      const NEAR_LOOK = isPortrait ? 2.0 : 3.5
+      const FAR_LOOK = isPortrait ? 7 : 12
       let stepScale = 1
       if (isInside(hx + vx * NEAR_LOOK, hy + vy * NEAR_LOOK)) {
         let tvx = -vy
@@ -399,8 +415,10 @@ export function LogoVariantRootSystem({ ariaLabel = 'LevX' }: LogoVariantRootSys
         // Width decays smoothly from BASE at cycle start to MIN by the
         // end of SETTLE, then holds thin through RESOLVE — so the mass
         // reads as dense at first and wisps out as the vignette closes.
-        const WIDTH_BASE = 10.0
-        const WIDTH_MIN = 2.0
+        // Thinner strokes on portrait — at narrow aspects the same
+        // base width reads as ribbons rather than fibers.
+        const WIDTH_BASE = isPortrait ? 5.0 : 10.0
+        const WIDTH_MIN = isPortrait ? 1.2 : 2.0
         const widthP = Math.min(1, cycleElapsed / T_SETTLE)
         const tendrilWidth = lerp(WIDTH_BASE, WIDTH_MIN, widthP) * size.dpr
 
