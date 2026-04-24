@@ -8,7 +8,8 @@ import { SpreadLogoReveal } from './SpreadLogoReveal'
 import { HeroCalloutCard } from './HeroCalloutCard'
 import { TourCalloutCard } from './TourCalloutCard'
 import './landing.css'
-import { WaitlistModal, type WaitlistPayload } from '@/ui/WaitlistModal'
+import { WaitlistModal } from '@/ui/WaitlistModal'
+import { WaitlistForm, type WaitlistPayload } from '@/ui/WaitlistForm'
 import { submitWaitlist } from '@/lib/supabase/auth'
 import { cn } from '@/lib/cn'
 
@@ -928,13 +929,18 @@ export function LandingPage() {
   //   `scrollProgress4` — phase 4, 0..1 over the following 6 viewports; drives
   //                       the guided tour across six tour stops (price, paths,
   //                       providers, draw-path, leverage, waitlist).
-  // Pin wrapper sized to 1200vh so the sticky hero stays pinned through all
-  // 11 viewports of travel before releasing. Thresholds: phase-1 0→1.5vh,
-  // phase-2 1.5→3vh, phase-3 3→5vh, phase-4 5→11vh.
+  //   `scrollProgress5` — phase 5, 0..1 over the following 2 viewports; drives
+  //                       the waitlist curtain's rise from the bottom of
+  //                       the viewport, and the staggered fade-in of the
+  //                       waitlist chrome + form inside it.
+  // Pin wrapper sized to 1400vh so the sticky hero stays pinned through all
+  // 13 viewports of scripted travel before releasing. Thresholds: phase-1
+  // 0→1.5vh, phase-2 1.5→3vh, phase-3 3→5vh, phase-4 5→11vh, phase-5 11→13vh.
   const [scrollProgress, setScrollProgress] = useState(0)
   const [scrollProgress2, setScrollProgress2] = useState(0)
   const [scrollProgress3, setScrollProgress3] = useState(0)
   const [scrollProgress4, setScrollProgress4] = useState(0)
+  const [scrollProgress5, setScrollProgress5] = useState(0)
   useEffect(() => {
     const handleScroll = () => {
       const vh = window.innerHeight
@@ -944,6 +950,7 @@ export function LandingPage() {
       setScrollProgress2(Math.max(0, Math.min(1, (y - vh * 1.5) / (vh * 1.5))))
       setScrollProgress3(Math.max(0, Math.min(1, (y - vh * 3) / (vh * 2))))
       setScrollProgress4(Math.max(0, Math.min(1, (y - vh * 5) / (vh * 6))))
+      setScrollProgress5(Math.max(0, Math.min(1, (y - vh * 11) / (vh * 2))))
     }
     window.addEventListener('scroll', handleScroll, { passive: true })
     handleScroll()
@@ -1009,12 +1016,13 @@ export function LandingPage() {
         </div>
       </div>
 
-      {/* Pin wrapper — 1200vh tall. The hero sticks to top:0 for 11
+      {/* Pin wrapper — 1400vh tall. The hero sticks to top:0 for 13
           viewports of sticky travel: 1.5 for phase 1 (hero intro fade)
           + 1.5 for phase 2 (card slide + tilt) + 2 for phase 3 (un-tilt
-          + settle at full view) + 6 for phase 4 (six-stop guided tour).
-          Matches the four scrollProgress divisors above. */}
-      <div className="relative h-[1200vh]">
+          + settle at full view) + 6 for phase 4 (six-stop guided tour)
+          + 2 for phase 5 (waitlist curtain rise). Matches the five
+          scrollProgress divisors above. */}
+      <div className="relative h-[1400vh]">
         {/* z-[1100] lifts the sticky section's stacking context above
             SpreadLogoReveal's z-[1000] — sticky *creates* a stacking
             context even without z-index, so without this the market card
@@ -1208,11 +1216,228 @@ export function LandingPage() {
         </section>
       </div>
 
+      {/* ── Waitlist curtain ──────────────────────────────────
+          Phase-5 handoff. Rather than sliding a panel in from an edge,
+          the transition is a "focus pull": the hero stays in place
+          behind, but a viewport-wide overlay defocuses and desaturates
+          it (backdrop-filter) while a black tint fades in on top. The
+          waitlist composition materializes inside with a subtle scale
+          emergence + register-by-register stagger — the same editorial
+          cadence the HeroIntro uses on entrance, but played in reverse
+          to close the page.
+
+          The sticky hero is pinned throughout phase 5 (pin wrapper
+          extended to 1400vh for this), so there's no competing scroll
+          motion — only the overlay's focus shift. */}
+      <WaitlistCurtain
+        reveal={scrollProgress5}
+        onSubmit={handleWaitlistSubmit}
+      />
+
       <WaitlistModal
         open={waitlistOpen}
         onOpenChange={setWaitlistOpen}
         onSubmit={handleWaitlistSubmit}
       />
     </main>
+  )
+}
+
+/** Focus-pull curtain hosting the inline waitlist form. The panel is
+ * pinned to the viewport (`fixed inset-0`) and never literally slides —
+ * instead, phase-5 scroll drives a cinematic handoff:
+ *
+ *   • Backdrop — blurs + desaturates the hero behind, like a camera
+ *     rack-focus pulling off the near subject.
+ *   • Tint — a black veil fades in on top, settling the hero into deep
+ *     background.
+ *   • Composition — inner content emerges from slight depth (scale
+ *     0.96 → 1) while the HeroIntro-style registers (kicker rule,
+ *     Bricolage title, mono spec strip, form frame) fade in one by
+ *     one, mirroring the page's opening cadence in reverse.
+ *
+ * This reads as "the page shifts its attention" rather than "another
+ * section scrolled in", which gives the close a more premium, editorial
+ * beat than a simple translate. */
+function WaitlistCurtain({
+  reveal,
+  onSubmit,
+}: {
+  reveal: number
+  onSubmit: (payload: WaitlistPayload) => Promise<void> | void
+}) {
+  // Don't mount before phase-5 scroll begins — keeps DOM lean during
+  // phases 1-4 and prevents the form from intercepting stray events
+  // while invisible.
+  if (reveal <= 0) return null
+
+  const clamp01 = (n: number) => Math.max(0, Math.min(1, n))
+  const easeOutCubic = (t: number) => 1 - Math.pow(1 - clamp01(t), 3)
+  const easeInOut = (t: number) => {
+    const x = clamp01(t)
+    return x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2
+  }
+
+  // Focus pull — the backdrop blur + desaturation ramp in first (while
+  // the tint is still thin), so the hero reads as "going out of focus"
+  // before it's hidden by the veil. Both finish by reveal=0.72 so the
+  // last third is pure settling.
+  const defocusT = easeOutCubic(reveal / 0.72)
+  const veilT = easeInOut(reveal / 0.85)
+
+  // Emergent scale on the content wrapper — a small depth cue so the
+  // composition feels like it comes forward as the backdrop recedes.
+  const contentT = easeOutCubic(reveal / 0.9)
+  const contentScale = 0.96 + 0.04 * contentT
+
+  // Inner chrome stagger — begins once the veil has taken hold so the
+  // registers feel like they're printing onto a settled surface rather
+  // than materializing into a still-forming backdrop.
+  const kickerT = easeOutCubic((reveal - 0.32) / 0.45)
+  const titleT = easeOutCubic((reveal - 0.44) / 0.45)
+  const specT = easeOutCubic((reveal - 0.54) / 0.45)
+  const frameT = easeOutCubic((reveal - 0.6) / 0.4)
+  const formT = easeOutCubic((reveal - 0.66) / 0.4)
+
+  const itemStyle = (t: number, lift = 18) => ({
+    opacity: t,
+    transform: `translateY(${(1 - t) * lift}px)`,
+    willChange: 'opacity, transform',
+  })
+
+  // Backdrop filter is the expensive part — skip it entirely before the
+  // user commits to the transition (avoids paying full-viewport blur
+  // cost for an imperceptible amount of filter).
+  const blurPx = 28 * defocusT
+  const saturate = 1 - 0.55 * defocusT
+  const brightness = 1 - 0.35 * defocusT
+  const backdropFilter = defocusT > 0.01
+    ? `blur(${blurPx}px) saturate(${saturate}) brightness(${brightness})`
+    : 'none'
+
+  return (
+    <div
+      className="fixed inset-0 z-[1300] flex items-center justify-center overflow-hidden px-6 py-20 sm:px-10 sm:py-24"
+      style={{
+        // Black veil that thickens as the user scrolls — pure alpha
+        // animation, no translation, so the hero stays in place behind.
+        backgroundColor: `rgba(0, 0, 0, ${veilT})`,
+        backdropFilter,
+        WebkitBackdropFilter: backdropFilter,
+        // Only accept pointer events once the curtain is substantially
+        // present, so the hero stays interactive early in the reveal.
+        pointerEvents: reveal > 0.25 ? 'auto' : 'none',
+        willChange: 'background-color, backdrop-filter',
+      }}
+    >
+      {/* Ambient brand-green dither aura. Same language as the hero's
+          landing-dither, but anchored here to tie the closing composition
+          back to the opening. Its own opacity trails the veil slightly
+          so the glow arrives after the scene has settled to black. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0"
+        style={{ opacity: 0.5 * easeOutCubic((reveal - 0.2) / 0.75) }}
+      >
+        <div className="landing-dither" />
+      </div>
+
+      {/* Soft center vignette — a faint radial fade that adds depth
+          around the form, reading as a spotlight on the composition
+          rather than flat black. Sits above the dither, below content. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0"
+        style={{
+          opacity: 0.85 * veilT,
+          background:
+            'radial-gradient(ellipse 60% 55% at 50% 52%, transparent 0%, rgba(0,0,0,0.65) 70%, rgba(0,0,0,0.9) 100%)',
+        }}
+      />
+
+      <div
+        className="relative z-10 flex w-full max-w-[560px] flex-col items-center text-center"
+        style={{
+          transform: `scale(${contentScale})`,
+          opacity: contentT,
+          willChange: 'transform, opacity',
+        }}
+      >
+        {/* Eyebrow kicker — hairline rules + mono caps, same as HeroIntro. */}
+        <div className="flex items-center gap-3" style={itemStyle(kickerT, 10)}>
+          <span aria-hidden className="hero-intro__rule" />
+          <span className="text-ink-muted text-nano font-mono tracking-[0.32em] uppercase">
+            Early Access <span className="text-ink-dim">·</span> v1 Devnet
+          </span>
+          <span aria-hidden className="hero-intro__rule hero-intro__rule--right" />
+        </div>
+
+        {/* Editorial display title — Bricolage Grotesque, one tier
+            down from hero sizing so the closing doesn't compete. */}
+        <h2
+          className="text-ink-strong mt-7 text-[44px] leading-[0.96] tracking-[-0.035em] sm:text-[56px] md:text-[64px]"
+          style={{
+            fontFamily: 'var(--font-editorial)',
+            fontVariationSettings: '"opsz" 96',
+          }}
+        >
+          <span className="block" style={{ ...itemStyle(titleT, 22), fontWeight: 400 }}>
+            Join the waitlist.
+          </span>
+          <span
+            className="text-ink-muted block"
+            style={{ ...itemStyle(titleT, 22), fontWeight: 360 }}
+          >
+            Get early access.
+          </span>
+        </h2>
+
+        {/* Spec strip — mono-caps facts separated by hairline ticks. */}
+        <div
+          className="mt-8 flex items-center justify-center gap-6 text-nano font-mono tracking-[0.28em] text-white/80 uppercase"
+          style={itemStyle(specT, 12)}
+        >
+          <span>Predict The Path</span>
+          <span aria-hidden="true" className="inline-block h-2 w-px bg-white/60" />
+          <span>Devnet First</span>
+          <span aria-hidden="true" className="inline-block h-2 w-px bg-white/60" />
+          <span>No Order Book</span>
+        </div>
+
+        {/* Form frame — corner ticks draw in ahead of the form itself
+            (frameT starts before formT) so the drafting chrome prints
+            onto the composition before the fields fill it, matching the
+            instrumented feel of the rest of the landing. `tone="dark"`
+            switches the input underline + focus colors to a white set
+            that reads on the now-black backdrop. */}
+        <div className="relative mt-12 w-full px-6 py-10 text-left sm:px-10 sm:py-12">
+          <div style={itemStyle(frameT, 0)} className="pointer-events-none absolute inset-0">
+            <CurtainCornerTick pos="tl" />
+            <CurtainCornerTick pos="tr" />
+            <CurtainCornerTick pos="bl" />
+            <CurtainCornerTick pos="br" />
+          </div>
+
+          <div style={itemStyle(formT, 16)}>
+            <WaitlistForm onSubmit={onSubmit} tone="dark" />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function CurtainCornerTick({ pos }: { pos: 'tl' | 'tr' | 'bl' | 'br' }) {
+  const byPos: Record<typeof pos, string> = {
+    tl: 'top-0 left-0 border-t border-l',
+    tr: 'top-0 right-0 border-t border-r',
+    bl: 'bottom-0 left-0 border-b border-l',
+    br: 'bottom-0 right-0 border-b border-r',
+  }
+  return (
+    <span
+      aria-hidden="true"
+      className={cn('pointer-events-none absolute h-3.5 w-3.5 border-white/60', byPos[pos])}
+    />
   )
 }
