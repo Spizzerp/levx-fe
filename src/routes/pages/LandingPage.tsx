@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { FileText } from 'lucide-react'
 import Lenis from 'lenis'
 
@@ -6,6 +6,7 @@ import { MarketPreview } from '@/features/market/MarketPreview'
 import { MagicCard } from '@/ui/MagicCard'
 import { SpreadLogoReveal } from './SpreadLogoReveal'
 import { HeroCalloutCard } from './HeroCalloutCard'
+import { TourCalloutCard } from './TourCalloutCard'
 import './landing.css'
 import { WaitlistModal, type WaitlistPayload } from '@/ui/WaitlistModal'
 import { submitWaitlist } from '@/lib/supabase/auth'
@@ -295,34 +296,38 @@ interface TourStop {
   /** Viewport position of the tooltip card (vw, vh). Unused when
    *  `tooltip` is null. */
   tooltipAnchor: { x: number; y: number }
+  /** Force which edge of the tooltip the leader line starts from.
+   *  Defaults to automatic selection (nearest edge to the box center). */
+  leaderFrom?: 'top' | 'right' | 'bottom' | 'left'
 }
 
 const TOUR_STOPS: readonly TourStop[] = [
   {
     id: 'price',
-    origin: { x: 14, y: 10 },
+    origin: { x: 16, y: 9.3 },
     scale: 2.2,
     box: { w: 30, h: 14 },
     tooltip: {
       num: '01',
-      kicker: 'Live Price',
-      title: 'BTC tape, streamed from spot.',
-      body: 'The ticker updates in real time from Pyth oracles. Every tick repositions where your paths sit relative to the market.',
+      kicker: 'Token Pairs',
+      title: 'Start with the familiar',
+      body: 'In its early stages, LevX will support common crypto markets like BTC, SOL, and ETH with USDC or USDT parity.',
     },
     tooltipAnchor: { x: 50, y: 48 },
   },
   {
     id: 'paths',
-    origin: { x: 48, y: 42 },
+    origin: { x: 46, y: 40 },
     scale: 1.9,
-    box: { w: 64, h: 38 },
+    box: { w: 52, h: 38 },
     tooltip: {
       num: '02',
-      kicker: 'Forecast Fan',
-      title: 'Each dashed curve is a 168-hour bet.',
-      body: 'Agent paths fan out from market start. P&L accrues for every checkpoint your chosen curve shadows — trade the line, not the strike.',
+      kicker: 'Quantum Reality',
+      title: 'A novel scoring engine.',
+      body: 'Visualize the many possible realities you can wager on. Each line/path is comprised of checkpoints that accrue P&L actively as time persists.',
     },
-    tooltipAnchor: { x: 6, y: 18 },
+    tooltipAnchor: { x: 6, y: 8 },
+    leaderFrom: 'bottom',
   },
   {
     id: 'providers',
@@ -445,7 +450,13 @@ function tooltipVisibility(progress4: number, stopIndex: number): number {
   return 1 - (d - 0.25) / 0.3
 }
 
-function ChartTour({ progress }: { progress: number }) {
+function ChartTour({
+  progress,
+  onMeasure,
+}: {
+  progress: number
+  onMeasure: (id: string, height: number) => void
+}) {
   // Don't mount tooltips at all until phase 4 has started; this keeps
   // the DOM lean during phases 1-3 when no tooltip is visible.
   if (progress <= 0) return null
@@ -456,27 +467,58 @@ function ChartTour({ progress }: { progress: number }) {
         const opacity = tooltipVisibility(progress, i)
         if (opacity < 0.01) return null
         return (
-          <div
+          <TourTooltip
             key={stop.id}
-            className="pointer-events-none absolute w-[min(360px,38vw)]"
-            style={{
-              left: `${stop.tooltipAnchor.x}vw`,
-              top: `${stop.tooltipAnchor.y}vh`,
-              opacity,
-              transform: `translateY(${(1 - opacity) * 16}px)`,
-              willChange: 'opacity, transform',
-            }}
-          >
-            <HeroCalloutCard
-              num={stop.tooltip.num}
-              kicker={stop.tooltip.kicker}
-              title={stop.tooltip.title}
-              body={stop.tooltip.body}
-              leaderOpacity={0}
-            />
-          </div>
+            stop={stop}
+            opacity={opacity}
+            onMeasure={onMeasure}
+          />
         )
       })}
+    </div>
+  )
+}
+
+/** Tooltip wrapper — measures its rendered height on mount + layout and
+ *  reports it up via onMeasure so TourArrow can anchor the leader line
+ *  to the actual bottom edge (not a constant approximation). */
+function TourTooltip({
+  stop,
+  opacity,
+  onMeasure,
+}: {
+  stop: TourStop
+  opacity: number
+  onMeasure: (id: string, height: number) => void
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const report = () => onMeasure(stop.id, el.getBoundingClientRect().height)
+    report()
+    const ro = new ResizeObserver(report)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [stop.id, onMeasure])
+  if (!stop.tooltip) return null
+  return (
+    <div
+      ref={ref}
+      className="pointer-events-none absolute w-[min(360px,38vw)]"
+      style={{
+        left: `${stop.tooltipAnchor.x}vw`,
+        top: `${stop.tooltipAnchor.y}vh`,
+        opacity,
+        willChange: 'opacity',
+      }}
+    >
+      <TourCalloutCard
+        num={stop.tooltip.num}
+        kicker={stop.tooltip.kicker}
+        title={stop.tooltip.title}
+        body={stop.tooltip.body}
+      />
     </div>
   )
 }
@@ -501,9 +543,11 @@ function ChartTour({ progress }: { progress: number }) {
 function TourOverlay({
   progress,
   cardRect,
+  tooltipHeights,
 }: {
   progress: number
   cardRect: DOMRect | null
+  tooltipHeights: Record<string, number>
 }) {
   if (progress <= 0 || !cardRect || cardRect.width === 0) return null
 
@@ -522,7 +566,7 @@ function TourOverlay({
           markerHeight="9"
           orient="auto-start-reverse"
         >
-          <path d="M 0 0 L 10 5 L 0 10 z" fill="#5CF78B" />
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#FFFFFF" />
         </marker>
       </defs>
       {TOUR_STOPS.map((stop, i) => {
@@ -551,11 +595,9 @@ function TourOverlay({
               width={boxW}
               height={boxH}
               fill="none"
-              stroke="#5CF78B"
-              strokeWidth={isWaitlist ? 2 : 1.4}
+              stroke="#FFFFFF"
+              strokeWidth={isWaitlist ? 2.75 : 2}
               strokeDasharray={isWaitlist ? '6 5' : '5 4'}
-              rx={6}
-              ry={6}
               className={isWaitlist ? 'tour-waitlist-pulse' : undefined}
             />
             {/* Corner ticks — four short L-marks at the highlight box's
@@ -573,6 +615,8 @@ function TourOverlay({
               <TourArrow
                 tooltipAnchor={stop.tooltipAnchor}
                 box={{ left: boxLeft, top: boxTop, width: boxW, height: boxH }}
+                leaderFrom={stop.leaderFrom}
+                tipHeight={tooltipHeights[stop.id]}
               />
             )}
           </g>
@@ -599,8 +643,8 @@ function TourCornerTick({
     <path
       d={`M ${x + dx} ${y} L ${x} ${y} L ${x} ${y + dy}`}
       fill="none"
-      stroke="#5CF78B"
-      strokeWidth={1.5}
+      stroke="#FFFFFF"
+      strokeWidth={2}
       strokeLinecap="round"
     />
   )
@@ -619,30 +663,43 @@ function TourCornerTick({
 function TourArrow({
   tooltipAnchor,
   box,
+  leaderFrom,
+  tipHeight,
 }: {
   tooltipAnchor: { x: number; y: number }
   box: { left: number; top: number; width: number; height: number }
+  leaderFrom?: 'top' | 'right' | 'bottom' | 'left'
+  tipHeight?: number
 }) {
   const vw = window.innerWidth
   const vh = window.innerHeight
   const tipX = (tooltipAnchor.x / 100) * vw
   const tipY = (tooltipAnchor.y / 100) * vh
   const tipW = Math.min(360, vw * 0.38)
-  // Matches the HeroCalloutCard header + body padding — approximate.
-  const tipH = 160
+  // Prefer the measured tooltip height so the line anchors to the real
+  // bottom edge regardless of body length. Falls back to 160 only for
+  // the single frame between first render and the first measurement.
+  const tipH = tipHeight ?? 160
 
   const boxCx = box.left + box.width / 2
   const boxCy = box.top + box.height / 2
 
-  // Pick tooltip edge nearest the box center.
+  // Pick tooltip edge: either the explicit override or the nearest to
+  // the box center.
   let startX: number, startY: number
-  if (boxCx > tipX + tipW) {
+  const side = leaderFrom ?? (
+    boxCx > tipX + tipW ? 'right'
+    : boxCx < tipX ? 'left'
+    : boxCy > tipY + tipH ? 'bottom'
+    : 'top'
+  )
+  if (side === 'right') {
     startX = tipX + tipW
     startY = tipY + tipH / 2
-  } else if (boxCx < tipX) {
+  } else if (side === 'left') {
     startX = tipX
     startY = tipY + tipH / 2
-  } else if (boxCy > tipY + tipH) {
+  } else if (side === 'bottom') {
     startX = tipX + tipW / 2
     startY = tipY + tipH
   } else {
@@ -661,11 +718,10 @@ function TourArrow({
       y1={startY}
       x2={endX}
       y2={endY}
-      stroke="#5CF78B"
-      strokeWidth={1.4}
+      stroke="#FFFFFF"
+      strokeWidth={2}
       strokeDasharray="5 4"
-      strokeLinecap="round"
-      markerEnd="url(#tour-arrowhead)"
+      strokeLinecap="butt"
       opacity={0.9}
     />
   )
@@ -785,6 +841,15 @@ export function LandingPage() {
   // returns the current post-transform box. For the tour geometry that's
   // exactly what we want — see TourOverlay for why.
   const [cardRect, setCardRect] = useState<DOMRect | null>(null)
+  // Per-stop tooltip heights — measured by TourTooltip via ResizeObserver
+  // so TourArrow can anchor the leader line to the tooltip's real bottom
+  // edge instead of a constant approximation.
+  const [tooltipHeights, setTooltipHeights] = useState<Record<string, number>>({})
+  const handleTooltipMeasure = useCallback((id: string, height: number) => {
+    setTooltipHeights((prev) =>
+      prev[id] !== undefined && Math.abs(prev[id] - height) < 0.5 ? prev : { ...prev, [id]: height },
+    )
+  }, [])
   useEffect(() => {
     const el = cardRef.current
     if (!el) return
@@ -1100,8 +1165,12 @@ export function LandingPage() {
               next. TourOverlay renders the dashed highlight boxes +
               leader arrows beneath the tooltip cards; ChartTour
               renders the explainer cards themselves. */}
-          <TourOverlay progress={scrollProgress4} cardRect={cardRect} />
-          <ChartTour progress={scrollProgress4} />
+          <TourOverlay
+            progress={scrollProgress4}
+            cardRect={cardRect}
+            tooltipHeights={tooltipHeights}
+          />
+          <ChartTour progress={scrollProgress4} onMeasure={handleTooltipMeasure} />
 
           {/* Editorial scroll cue — hairline rule + mono caps + a green
               tracer that drops down the rule on a 2.4s cycle. Replaces
