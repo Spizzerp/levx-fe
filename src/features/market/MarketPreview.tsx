@@ -352,7 +352,6 @@ export function MarketPreview({
         )}
 
         <Button
-          data-tour="waitlist"
           variant="primary"
           fullWidth
           className="mt-2"

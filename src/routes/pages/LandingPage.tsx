@@ -115,7 +115,7 @@ function HeroIntro({ show, scrollProgress }: { show: boolean; scrollProgress: nu
           style={{ ['--stagger' as string]: '320ms' }}
         >
           <span className="block" style={{ ...itemStyle(exitTitleB), fontWeight: 360 }}>
-            not the outcome.
+            not the outcome
           </span>
         </span>
       </h1>
@@ -256,13 +256,15 @@ function HeroFeatureCallouts({
  * Guided tour through the market preview — phase-4 scroll choreography.
  *
  * After phase-3 settles the card at "full view" (scale 1.0), the camera
- * pans + zooms across six anchor points on the card. Each stop keys a
+ * pans + zooms across five anchor points on the card. Each stop keys a
  * tooltip that explains the feature beneath the zoom: live price, the
- * forecast fan, the provider rail, custom-path draw, leverage, and the
- * waitlist CTA. Because the zoom is driven by `transform-origin`, the
- * focused point stays pinned to its original viewport location while
- * the rest of the card scales away from it — giving each stop a natural
- * "magnifying glass" feel without needing to know card dimensions.
+ * forecast fan, the provider rail, custom-path draw, and leverage. The
+ * waitlist CTA is no longer a tour stop — scrolling past the leverage
+ * stop transitions directly into phase 5 (waitlist curtain rise).
+ * Because the zoom is driven by `transform-origin`, the focused point
+ * stays pinned to its original viewport location while the rest of the
+ * card scales away from it — giving each stop a natural "magnifying
+ * glass" feel without needing to know card dimensions.
  *
  * Tooltip anchors are set in viewport units (vw/vh) so they sit in the
  * empty space opposite the focused element — price tooltip on the right
@@ -279,17 +281,13 @@ interface TourStop {
    *  box is drawn centered on `origin` so the focused element stays framed
    *  even as the camera zooms. */
   box: { w: number; h: number }
-  /** If null, no tooltip card is rendered for this stop — only the
-   *  highlight box + zoom. Used for the waitlist CTA which gets a pulse
-   *  highlight instead of an explainer card. */
   tooltip: {
     num: string
     kicker: string
     title: string
     body: string
-  } | null
-  /** Viewport position of the tooltip card (vw, vh). Unused when
-   *  `tooltip` is null. */
+  }
+  /** Viewport position of the tooltip card (vw, vh). */
   tooltipAnchor: { x: number; y: number }
   /** Force which edge of the tooltip the leader line starts from.
    *  Defaults to automatic selection (nearest edge to the box center). */
@@ -342,10 +340,11 @@ const TOUR_STOPS_FALLBACK: readonly TourStop[] = [
     },
     tooltipAnchor: { x: 6, y: 8 },
     leaderFrom: 'bottom',
-    // ChartFrame spans the full left-column width but its rightmost
-    // band carries axis labels / dead space more than predictions —
-    // trim so the highlight tracks the active plot area.
-    boxAdjust: { right: -0.22 },
+    // Asymmetric trim: more off the left than the right, which narrows
+    // the box AND shifts it toward the right side of the ChartFrame so
+    // it sits over the active forecast-fan area instead of the earlier
+    // history.
+    boxAdjust: { left: -0.20, right: -0.02 },
   },
   {
     id: 'providers',
@@ -391,17 +390,6 @@ const TOUR_STOPS_FALLBACK: readonly TourStop[] = [
     // small breathing-room extension so the highlight doesn't cut
     // flush against the rail edges at zoom.
     boxAdjust: { left: 0.08, right: 0.08, bottom: 1.25 },
-  },
-  {
-    id: 'waitlist',
-    origin: { x: 86, y: 94 },
-    scale: 2.6,
-    box: { w: 28, h: 6 },
-    // No tooltip card — the pulsing highlight + zoomed button is the
-    // whole focus. User wanted a direct "click me" moment here rather
-    // than another explanation.
-    tooltip: null,
-    tooltipAnchor: { x: 0, y: 0 },
   },
 ]
 
@@ -493,7 +481,6 @@ function ChartTour({
   return (
     <div aria-hidden={progress < 0.02} className="pointer-events-none fixed inset-0 z-[1250]">
       {stops.map((stop, i) => {
-        if (!stop.tooltip) return null
         const opacity = tooltipVisibility(progress, i, stops.length)
         if (opacity < 0.01) return null
         return <TourTooltip key={stop.id} stop={stop} opacity={opacity} />
@@ -509,7 +496,6 @@ function TourTooltip({
   stop: TourStop
   opacity: number
 }) {
-  if (!stop.tooltip) return null
   return (
     <div
       className="pointer-events-none absolute w-[min(360px,38vw)]"
@@ -651,28 +637,9 @@ function TourOverlay({
         opacity={focus.intensity}
       />
 
-      {/* Waitlist final beat — same geometry but with the brand-green
-          pulse animation on top of the white rim, so the CTA reads as
-          "click me" rather than just another stop. */}
-      {focus.isWaitlist && (
-        <rect
-          x={focusLeft}
-          y={focusTop}
-          width={focusW}
-          height={focusH}
-          rx={rx}
-          fill="none"
-          stroke={TOUR_BRAND_GREEN}
-          strokeWidth={2}
-          opacity={focus.intensity}
-          className="tour-waitlist-pulse"
-        />
-      )}
     </svg>
   )
 }
-
-const TOUR_BRAND_GREEN = '#5CF78B'
 
 /**
  * Interpolate the current spotlight region from phase-4 progress.
@@ -691,7 +658,6 @@ function resolveFocusBox(
   origin: { x: number; y: number }
   box: { w: number; h: number }
   intensity: number
-  isWaitlist: boolean
 } | null {
   const timeline = progress4 * (stops.length + 0.4)
   if (timeline <= 0) return null
@@ -702,7 +668,6 @@ function resolveFocusBox(
       origin: last.origin,
       box: last.box,
       intensity: 1,
-      isWaitlist: last.tooltip === null,
     }
   }
 
@@ -717,13 +682,10 @@ function resolveFocusBox(
       origin: next.origin,
       box: next.box,
       intensity: t,
-      isWaitlist: next.tooltip === null,
     }
   }
 
   const prev = stops[segment - 1]
-  const isNextWaitlist = next.tooltip === null
-  const isPrevWaitlist = prev.tooltip === null
   return {
     origin: {
       x: lerp(prev.origin.x, next.origin.x, t),
@@ -734,9 +696,6 @@ function resolveFocusBox(
       h: lerp(prev.box.h, next.box.h, t),
     },
     intensity: 1,
-    // Treat the segment as the waitlist beat past the midpoint so the
-    // pulse lights up as the camera commits to the final stop.
-    isWaitlist: t > 0.5 ? isNextWaitlist : isPrevWaitlist,
   }
 }
 
@@ -851,6 +810,15 @@ export function LandingPage() {
   const cardRef = useRef<HTMLDivElement>(null)
   const cardScaleRef = useRef(0.55)
   const [cardScale, setCardScale] = useState(0.55)
+  // Tracks whether any phase-2/3/4 CSS transform is currently applied to
+  // the card's ancestors. `getBoundingClientRect()` returns post-transform
+  // dimensions, so if we recomputed `cardScale` while the card was rotated
+  // or zoomed by the scroll-driven camera, the measured "logical" size
+  // would be inflated by the ancestor scale and we'd feed a wrong scale
+  // back into `zoom`. Freezing recomputation during scroll animations
+  // preserves the scale the card had on entry — and the card's intrinsic
+  // logical size doesn't change mid-tour, so there's nothing to recompute.
+  const scrollXformActiveRef = useRef(false)
 
   // Live bounding rect of the market card — feeds the phase-4 TourOverlay
   // so highlight boxes + arrows can be drawn in viewport pixels over the
@@ -864,6 +832,13 @@ export function LandingPage() {
     if (!el) return
 
     const compute = () => {
+      // Skip while the scroll-driven camera is transforming the card.
+      // `getBoundingClientRect()` would include those ancestor transforms
+      // (e.g. phase-4 `scale(cam.scale)` around an off-center origin) and
+      // feed a distorted aspect ratio back into `zoom`, producing the
+      // wide-and-short collapse when the viewport crosses MarketPreview's
+      // grid breakpoint mid-tour.
+      if (scrollXformActiveRef.current) return
       const rect = el.getBoundingClientRect()
       const currentScale = cardScaleRef.current
       if (rect.width === 0 || rect.height === 0) return
@@ -1039,16 +1014,19 @@ export function LandingPage() {
   //   `scrollProgress3` — phase 3, 0..1 over the following 2 viewports; drives
   //                       the un-tilt and settles the card at "full view"
   //                       (scale 1.0 — MarketPreview fully visible).
-  //   `scrollProgress4` — phase 4, 0..1 over the following 6 viewports; drives
-  //                       the guided tour across six tour stops (price, paths,
-  //                       providers, draw-path, leverage, waitlist).
+  //   `scrollProgress4` — phase 4, 0..1 over the following 5 viewports; drives
+  //                       the guided tour across five tour stops (price, paths,
+  //                       providers, draw-path, leverage).
   //   `scrollProgress5` — phase 5, 0..1 over the following 2 viewports; drives
   //                       the waitlist curtain's rise from the bottom of
   //                       the viewport, and the staggered fade-in of the
   //                       waitlist chrome + form inside it.
-  // Pin wrapper sized to 1400vh so the sticky hero stays pinned through all
-  // 13 viewports of scripted travel before releasing. Thresholds: phase-1
-  // 0→1.5vh, phase-2 1.5→3vh, phase-3 3→5vh, phase-4 5→11vh, phase-5 11→13vh.
+  // Pin wrapper sized to 1400vh — 12 viewports of scripted travel plus a
+  // 100vh dwell past reveal=1 so the fully-staggered waitlist form gets a
+  // resting beat at the bottom of the scroll (otherwise reveal=1 lines up
+  // exactly with max scrollY and the final stagger ticks never settle in
+  // practice). Thresholds: phase-1 0→1.5vh, phase-2 1.5→3vh, phase-3
+  // 3→5vh, phase-4 5→10vh, phase-5 10→12vh, dwell 12→13vh.
   const [scrollProgress, setScrollProgress] = useState(0)
   const [scrollProgress2, setScrollProgress2] = useState(0)
   const [scrollProgress3, setScrollProgress3] = useState(0)
@@ -1059,11 +1037,19 @@ export function LandingPage() {
       const vh = window.innerHeight
       if (vh <= 0) return
       const y = window.scrollY
+      const p2 = Math.max(0, Math.min(1, (y - vh * 1.5) / (vh * 1.5)))
+      const p3 = Math.max(0, Math.min(1, (y - vh * 3) / (vh * 2)))
+      const p4 = Math.max(0, Math.min(1, (y - vh * 5) / (vh * 5)))
       setScrollProgress(Math.max(0, Math.min(1, y / (vh * 1.5))))
-      setScrollProgress2(Math.max(0, Math.min(1, (y - vh * 1.5) / (vh * 1.5))))
-      setScrollProgress3(Math.max(0, Math.min(1, (y - vh * 3) / (vh * 2))))
-      setScrollProgress4(Math.max(0, Math.min(1, (y - vh * 5) / (vh * 6))))
-      setScrollProgress5(Math.max(0, Math.min(1, (y - vh * 11) / (vh * 2))))
+      setScrollProgress2(p2)
+      setScrollProgress3(p3)
+      setScrollProgress4(p4)
+      setScrollProgress5(Math.max(0, Math.min(1, (y - vh * 10) / (vh * 2))))
+      // See `scrollXformActiveRef` declaration: gate the cardScale
+      // ResizeObserver against phases that apply transforms to the card's
+      // ancestors, so a mid-tour window resize doesn't feed distorted
+      // getBoundingClientRect values back into zoom.
+      scrollXformActiveRef.current = p2 > 0 || p3 > 0 || p4 > 0
     }
     window.addEventListener('scroll', handleScroll, { passive: true })
     handleScroll()
@@ -1104,8 +1090,10 @@ export function LandingPage() {
       />
 
       {/* Fixed (not absolute) so it stays pinned to the viewport while the
-          page scrolls. */}
-      <div className="fixed top-0 right-0 left-0 z-20 flex items-center justify-between px-6 py-4">
+          page scrolls. z-[1400] keeps the X link clickable above the
+          phase-5 WaitlistCurtain (z-[1300]), the ChartTour tooltips
+          (z-[1250]), and the sticky hero section (z-[1100]). */}
+      <div className="fixed top-0 right-0 left-0 z-[1400] flex items-center justify-between px-6 py-4">
         <img src="/logo_wordmark.png" alt="LevX" className="h-5 w-auto" />
         <div className="flex items-center gap-4">
           <a
@@ -1117,24 +1105,25 @@ export function LandingPage() {
           >
             <XIcon size={16} />
           </a>
-          <a
-            href="#"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="LevX docs"
-            className="text-ink-strong duration-short ease-levx transition-opacity hover:opacity-70"
+          {/* Docs link placeholder — dimmed + non-interactive until the
+              docs site goes live. Keeps the icon in the nav for visual
+              balance without a broken `href="#"` target. */}
+          <span
+            aria-label="LevX docs (coming soon)"
+            className="text-ink-dim pointer-events-none opacity-50"
           >
             <FileText size={16} strokeWidth={1.5} aria-hidden="true" />
-          </a>
+          </span>
         </div>
       </div>
 
-      {/* Pin wrapper — 1400vh tall. The hero sticks to top:0 for 13
-          viewports of sticky travel: 1.5 for phase 1 (hero intro fade)
-          + 1.5 for phase 2 (card slide + tilt) + 2 for phase 3 (un-tilt
-          + settle at full view) + 6 for phase 4 (six-stop guided tour)
-          + 2 for phase 5 (waitlist curtain rise). Matches the five
-          scrollProgress divisors above. */}
+      {/* Pin wrapper — 1400vh tall. 12 viewports of scripted travel plus
+          a 100vh dwell at the end so the waitlist form has a resting
+          beat with reveal=1 fully settled. 1.5 for phase 1 (hero intro
+          fade) + 1.5 for phase 2 (card slide + tilt) + 2 for phase 3
+          (un-tilt + settle at full view) + 5 for phase 4 (five-stop
+          guided tour) + 2 for phase 5 (waitlist curtain rise) + 1 dwell.
+          Matches the five scrollProgress divisors above. */}
       <div className="relative h-[1400vh]">
         {/* z-[1100] lifts the sticky section's stacking context above
             SpreadLogoReveal's z-[1000] — sticky *creates* a stacking
@@ -1290,14 +1279,14 @@ export function LandingPage() {
               narrow viewports where the tilt composition doesn't read. */}
           <HeroFeatureCallouts progress={scrollProgress2} fadeOut={scrollProgress3} />
 
-          {/* Phase-4 guided tour — six tooltips keyed to the camera
+          {/* Phase-4 guided tour — five tooltips keyed to the camera
               panning/zooming across the card. One per feature: live
-              price, forecast fan, providers, custom-path, leverage,
-              and the waitlist CTA. Each fades in when the camera
-              arrives at its stop and fades out as it moves to the
-              next. TourOverlay renders the dashed highlight boxes +
-              leader arrows beneath the tooltip cards; ChartTour
-              renders the explainer cards themselves. */}
+              price, forecast fan, providers, custom-path, leverage.
+              Each fades in when the camera arrives at its stop and
+              fades out as it moves to the next. TourOverlay renders
+              the dashed highlight boxes + leader arrows beneath the
+              tooltip cards; ChartTour renders the explainer cards
+              themselves. */}
           <TourOverlay
             progress={scrollProgress4}
             stops={resolvedTourStops}
@@ -1405,7 +1394,6 @@ function WaitlistCurtain({
   const kickerT = easeOutCubic((reveal - 0.32) / 0.45)
   const titleT = easeOutCubic((reveal - 0.44) / 0.45)
   const specT = easeOutCubic((reveal - 0.54) / 0.45)
-  const frameT = easeOutCubic((reveal - 0.6) / 0.4)
   const formT = easeOutCubic((reveal - 0.66) / 0.4)
 
   const itemStyle = (t: number, lift = 18) => ({
@@ -1490,42 +1478,29 @@ function WaitlistCurtain({
           }}
         >
           <span className="block" style={{ ...itemStyle(titleT, 22), fontWeight: 400 }}>
-            Join the waitlist.
+            Join the waitlist
           </span>
           <span
             className="text-ink-muted block"
             style={{ ...itemStyle(titleT, 22), fontWeight: 360 }}
           >
-            Get early access.
+            Get early access
           </span>
         </h2>
 
-        {/* Spec strip — mono-caps facts separated by hairline ticks. */}
+        {/* Spec strip — mono-caps facts. */}
         <div
-          className="text-nano mt-8 flex items-center justify-center gap-6 font-mono tracking-[0.28em] text-white/80 uppercase"
+          className="text-nano mt-8 flex items-center justify-center gap-8 font-mono tracking-[0.28em] text-white/80 uppercase"
           style={itemStyle(specT, 12)}
         >
-          <span>Predict The Path</span>
-          <span aria-hidden="true" className="inline-block h-2 w-px bg-white/60" />
-          <span>Devnet First</span>
-          <span aria-hidden="true" className="inline-block h-2 w-px bg-white/60" />
+          <span>Live Scoring</span>
+          <span>AI + Human Predictions</span>
           <span>No Order Book</span>
         </div>
 
-        {/* Form frame — corner ticks draw in ahead of the form itself
-            (frameT starts before formT) so the drafting chrome prints
-            onto the composition before the fields fill it, matching the
-            instrumented feel of the rest of the landing. `tone="dark"`
-            switches the input underline + focus colors to a white set
-            that reads on the now-black backdrop. */}
-        <div className="relative mt-12 w-full px-6 py-10 text-left sm:px-10 sm:py-12">
-          <div style={itemStyle(frameT, 0)} className="pointer-events-none absolute inset-0">
-            <CurtainCornerTick pos="tl" />
-            <CurtainCornerTick pos="tr" />
-            <CurtainCornerTick pos="bl" />
-            <CurtainCornerTick pos="br" />
-          </div>
-
+        {/* Form — `tone="dark"` switches the input underline + focus
+            colors to a white set that reads on the now-black backdrop. */}
+        <div className="mt-12 w-full px-6 py-10 text-left sm:px-10 sm:py-12">
           <div style={itemStyle(formT, 16)}>
             <WaitlistForm onSubmit={onSubmit} tone="dark" />
           </div>
@@ -1535,17 +1510,3 @@ function WaitlistCurtain({
   )
 }
 
-function CurtainCornerTick({ pos }: { pos: 'tl' | 'tr' | 'bl' | 'br' }) {
-  const byPos: Record<typeof pos, string> = {
-    tl: 'top-0 left-0 border-t border-l',
-    tr: 'top-0 right-0 border-t border-r',
-    bl: 'bottom-0 left-0 border-b border-l',
-    br: 'bottom-0 right-0 border-b border-r',
-  }
-  return (
-    <span
-      aria-hidden="true"
-      className={cn('pointer-events-none absolute h-3.5 w-3.5 border-white/60', byPos[pos])}
-    />
-  )
-}

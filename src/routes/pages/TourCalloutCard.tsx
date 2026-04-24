@@ -84,31 +84,8 @@ export function TourCalloutCard({
             aria-hidden="true"
             className="pointer-events-none absolute inset-0 rounded-lg border border-white/15"
           />
-
-          {/* Drafting-style corner marks at the card's four corners —
-              visually echo the overlay brackets so the tooltip and its
-              target read as a single annotation system. */}
-          <CalloutCornerMark pos="tl" />
-          <CalloutCornerMark pos="tr" />
-          <CalloutCornerMark pos="bl" />
-          <CalloutCornerMark pos="br" />
         </div>
       </TiltCard>
     </div>
-  )
-}
-
-function CalloutCornerMark({ pos }: { pos: 'tl' | 'tr' | 'bl' | 'br' }) {
-  const byPos: Record<typeof pos, string> = {
-    tl: 'top-1.5 left-1.5 border-t border-l',
-    tr: 'top-1.5 right-1.5 border-t border-r',
-    bl: 'bottom-1.5 left-1.5 border-b border-l',
-    br: 'bottom-1.5 right-1.5 border-b border-r',
-  }
-  return (
-    <span
-      aria-hidden="true"
-      className={`pointer-events-none absolute h-2 w-2 border-white/80 ${byPos[pos]}`}
-    />
   )
 }
