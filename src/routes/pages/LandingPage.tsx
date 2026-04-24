@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { FileText } from 'lucide-react'
 import Lenis from 'lenis'
 
+import { Button } from '@/ui/Button'
 import { MarketPreview } from '@/features/market/MarketPreview'
 import { MagicCard } from '@/ui/MagicCard'
 import { SpreadLogoReveal } from './SpreadLogoReveal'
@@ -127,8 +128,12 @@ function HeroIntro({ show, scrollProgress }: { show: boolean; scrollProgress: nu
           size in mono caps so it reads as a dek/spec line, not a
           tagline. The tick separators reuse the hairline language of
           the chart's checkpoint marks. */}
+      {/* Desktop position — directly under the title. On mobile/tablet
+          the spec strip is rendered separately below the inline Join
+          Waitlist CTA so the button reads as the next action after
+          the headline, with the spec line as supporting copy. */}
       <div
-        className="hero-intro__item hero-intro__item--spec mt-8 mb-2 flex items-center justify-center gap-4"
+        className="hero-intro__item hero-intro__item--spec mt-8 mb-2 hidden items-center justify-center gap-4 xl:flex"
         style={{ ['--stagger' as string]: '520ms' }}
       >
         <div
@@ -1153,7 +1158,7 @@ export function LandingPage() {
             z-index we put on it directly. */}
         <section
           className={cn(
-            'sticky top-0 flex h-dvh flex-col items-center justify-between overflow-hidden px-6 pt-24 pb-20 sm:px-10 sm:pt-28 sm:pb-24',
+            'sticky top-0 flex h-dvh flex-col items-center justify-between overflow-hidden px-6 pt-24 pb-20 sm:px-10 sm:pt-12 sm:pb-16',
             introOverlayHidden ? 'z-[1100]' : 'z-[900]',
           )}
         >
@@ -1187,6 +1192,39 @@ export function LandingPage() {
           </div>
 
           <HeroIntro show={introDone} scrollProgress={scrollProgress} />
+
+          {/* Mobile/tablet-only CTA — the full market-card story doesn't
+              run on narrow viewports (scroll is locked), so the card's
+              right-rail Join Waitlist button is below the fold. Surface
+              an explicit CTA right under the hero copy so phone users
+              have a one-tap path into the waitlist modal. Hidden at xl
+              where the desktop story handles the conversion path. */}
+          <div className="relative z-[1100] mt-8 flex justify-center xl:hidden">
+            <Button
+              type="button"
+              variant="primary"
+              className="text-caption px-8"
+              onClick={openWaitlist}
+            >
+              Join Waitlist
+            </Button>
+          </div>
+
+          {/* Mobile/tablet spec strip — desktop renders this inside
+              HeroIntro directly under the title; on narrow viewports
+              we relocate it below the CTA so the button reads as the
+              primary next action after the headline. */}
+          <div className="relative z-[1100] mt-6 flex items-center justify-center gap-8 px-6 text-center xl:hidden">
+            <span className="font-mono text-[9px] tracking-[0.28em] text-white uppercase">
+              Live Scoring
+            </span>
+            <span className="font-mono text-[9px] tracking-[0.28em] text-white uppercase">
+              AI + Human Predictions
+            </span>
+            <span className="font-mono text-[9px] tracking-[0.28em] text-white uppercase">
+              No&nbsp;Order Book
+            </span>
+          </div>
 
           <div
             className="mx-auto w-full max-w-[1000px]"
