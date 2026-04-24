@@ -1,6 +1,5 @@
 import { useState } from 'react'
 
-import { Button } from '@/ui/Button'
 import { Modal } from '@/ui/Modal'
 import { WaitlistForm, type WaitlistPayload } from '@/ui/WaitlistForm'
 
@@ -25,7 +24,7 @@ export function WaitlistModal({ open, onOpenChange, onSubmit }: WaitlistModalPro
         if (!next) setMountKey((k) => k + 1)
         onOpenChange(next)
       }}
-      label="[ EARLY ACCESS ]"
+      label="EARLY ACCESS"
       size="md"
     >
       <div className="px-6 pt-6 pb-2">
@@ -42,18 +41,6 @@ export function WaitlistModal({ open, onOpenChange, onSubmit }: WaitlistModalPro
           key={mountKey}
           onSubmit={onSubmit}
           onSuccessClose={() => onOpenChange(false)}
-          renderSecondary={({ disabled }) => (
-            <Modal.Close asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                className="text-caption px-4"
-                disabled={disabled}
-              >
-                Cancel
-              </Button>
-            </Modal.Close>
-          )}
         />
       </div>
     </Modal>

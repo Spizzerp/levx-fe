@@ -147,7 +147,7 @@ export function WaitlistForm({
       <div
         className={cn(
           'text-micro mt-5 min-h-[18px] font-mono tracking-wider uppercase',
-          error ? 'text-accent' : tone === 'dark' ? 'text-white' : 'text-ink-dim',
+          error ? 'text-accent' : 'text-white',
         )}
         role={error ? 'alert' : undefined}
       >
@@ -200,13 +200,7 @@ function Field({
 }: FieldProps) {
   return (
     <div className="flex flex-col">
-      <label
-        htmlFor={id}
-        className={cn(
-          'text-micro font-mono tracking-wider uppercase',
-          tone === 'dark' ? 'text-white' : 'text-ink-muted',
-        )}
-      >
+      <label htmlFor={id} className="text-micro font-mono tracking-wider text-white uppercase">
         {label}
       </label>
       <div
@@ -269,10 +263,7 @@ function WalletField({
       <div className="flex items-center justify-between">
         <label
           htmlFor="waitlist-wallet"
-          className={cn(
-            'text-micro font-mono tracking-wider uppercase',
-            tone === 'dark' ? 'text-white' : 'text-ink-muted',
-          )}
+          className="text-micro font-mono tracking-wider text-white uppercase"
         >
           Wallet Address
         </label>

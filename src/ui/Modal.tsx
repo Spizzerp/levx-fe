@@ -7,8 +7,8 @@ import { cn } from '@/lib/cn'
 
 /**
  * Generic modal shell for LevX. Wraps @radix-ui/react-dialog with the
- * project's Nothing-style chrome: corner crosshairs, instrument label,
- * ESC close button, and motion fade/scale transitions.
+ * project's Nothing-style chrome: instrument label, ESC close button,
+ * and motion fade/scale transitions.
  *
  * Usage:
  *
@@ -88,11 +88,6 @@ export function Modal({
                     className,
                   )}
                 >
-                  <CornerTick pos="tl" />
-                  <CornerTick pos="tr" />
-                  <CornerTick pos="bl" />
-                  <CornerTick pos="br" />
-
                   {!hideHeader && <ModalHeader label={label} indicator={indicator} />}
 
                   {children}
@@ -137,25 +132,6 @@ function ModalHeader({ label, indicator }: { label?: string; indicator: boolean 
         </button>
       </Dialog.Close>
     </header>
-  )
-}
-
-function CornerTick({ pos }: { pos: 'tl' | 'tr' | 'bl' | 'br' }) {
-  const byPos: Record<typeof pos, string> = {
-    tl: 'top-2 left-2 border-t border-l',
-    tr: 'top-2 right-2 border-t border-r',
-    bl: 'bottom-2 left-2 border-b border-l',
-    br: 'bottom-2 right-2 border-b border-r',
-  }
-  return (
-    <span
-      aria-hidden
-      className={cn(
-        'z-above pointer-events-none absolute h-3 w-3',
-        byPos[pos],
-        'border-ink-strong',
-      )}
-    />
   )
 }
 
