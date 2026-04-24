@@ -781,8 +781,13 @@ export function LandingPage() {
 
   // Lenis smooth-scroll. Inertial easing on wheel/trackpad — drives
   // scroll-linked animations as we add sections below the hero.
+  // Desktop-only: on mobile the pin wrapper is capped to one viewport
+  // (no scroll room past the hero), and native touch scrolling beats
+  // Lenis's RAF interpolation on small devices anyway.
   useEffect(() => {
     if (!introOverlayHidden) return
+    if (typeof window === 'undefined') return
+    if (!window.matchMedia('(min-width: 768px)').matches) return
 
     const lenis = new Lenis()
     let rafId = 0
@@ -1078,7 +1083,7 @@ export function LandingPage() {
   const handleIntroComplete = useCallback(() => setIntroDone(true), [])
 
   return (
-    <main className="relative min-h-dvh w-full bg-black">
+    <main className="relative min-h-dvh w-full bg-black max-md:h-dvh max-md:max-h-dvh max-md:overflow-hidden">
       {/* Plays before any hero content is visible. Unmounts itself once
           its own fade-out completes; onComplete fires as the logo begins
           fading so the hero's entrance animations overlap the last tail
@@ -1090,10 +1095,21 @@ export function LandingPage() {
       />
 
       {/* Fixed (not absolute) so it stays pinned to the viewport while the
-          page scrolls. z-[1400] keeps the X link clickable above the
-          phase-5 WaitlistCurtain (z-[1300]), the ChartTour tooltips
-          (z-[1250]), and the sticky hero section (z-[1100]). */}
-      <div className="fixed top-0 right-0 left-0 z-[1400] flex items-center justify-between px-6 py-4">
+          page scrolls. Hidden during the SpreadLogoReveal intro —
+          `introOverlayHidden` flips true once the intro has fully faded
+          out, and the nav eases in afterward so it doesn't compete
+          visually with the logo reveal. z-[1400] keeps the X link
+          clickable above the phase-5 WaitlistCurtain (z-[1300]), the
+          ChartTour tooltips (z-[1250]), and the sticky hero section
+          (z-[1100]). `safe-area-inset-top` padding on top of pb-4
+          pushes the nav below an iOS notch / dynamic island. */}
+      <div
+        className={cn(
+          'pointer-events-none fixed top-0 right-0 left-0 z-[1400] flex items-center justify-between px-6 pt-[max(env(safe-area-inset-top),1rem)] pb-4 transition-opacity duration-700 ease-out',
+          introOverlayHidden ? 'opacity-100' : 'opacity-0',
+          introOverlayHidden && 'pointer-events-auto',
+        )}
+      >
         <img src="/logo_wordmark.png" alt="LevX" className="h-5 w-auto" />
         <div className="flex items-center gap-4">
           <a
@@ -1117,14 +1133,17 @@ export function LandingPage() {
         </div>
       </div>
 
-      {/* Pin wrapper — 1400vh tall. 12 viewports of scripted travel plus
-          a 100vh dwell at the end so the waitlist form has a resting
-          beat with reveal=1 fully settled. 1.5 for phase 1 (hero intro
-          fade) + 1.5 for phase 2 (card slide + tilt) + 2 for phase 3
-          (un-tilt + settle at full view) + 5 for phase 4 (five-stop
-          guided tour) + 2 for phase 5 (waitlist curtain rise) + 1 dwell.
-          Matches the five scrollProgress divisors above. */}
-      <div className="relative h-[1400vh]">
+      {/* Pin wrapper — 1400vh tall on desktop for the full scripted
+          story: 1.5 for phase 1 (hero intro fade) + 1.5 for phase 2
+          (card slide + tilt) + 2 for phase 3 (un-tilt + settle at
+          full view) + 5 for phase 4 (five-stop guided tour) + 2 for
+          phase 5 (waitlist curtain rise) + 1 dwell. On mobile the
+          wrapper caps to one viewport (`h-dvh`) so the user can't
+          scroll past the hero — the zoom/tilt choreography doesn't
+          read on small screens, and native touch scrolling past the
+          card would strand the user in empty phase transitions. The
+          card's "Join Waitlist" CTA still opens the modal. */}
+      <div className="relative h-dvh md:h-[1400vh]">
         {/* z-[1100] lifts the sticky section's stacking context above
             SpreadLogoReveal's z-[1000] — sticky *creates* a stacking
             context even without z-index, so without this the market card
@@ -1303,12 +1322,12 @@ export function LandingPage() {
           <div
             aria-hidden="true"
             className={cn(
-              'pointer-events-none absolute bottom-7 left-1/2 z-[1100] -translate-x-1/2 transition-opacity duration-700 ease-out',
-              marketSettled && scrollProgress < 0.02 ? 'opacity-60' : 'opacity-0',
+              'pointer-events-none absolute bottom-7 left-1/2 z-[1100] hidden -translate-x-1/2 transition-opacity duration-700 ease-out md:block',
+              marketSettled && scrollProgress < 0.02 ? 'opacity-100' : 'opacity-0',
             )}
           >
             <div className="flex flex-col items-center gap-2.5">
-              <span className="text-ink-muted text-nano font-mono tracking-[0.32em] uppercase">
+              <span className="text-nano animate-pulse font-mono tracking-[0.32em] text-white uppercase">
                 Scroll
               </span>
               <span className="hero-scroll-rule" />
