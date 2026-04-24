@@ -151,22 +151,31 @@ export function MarketPreview({
     >
       {/* ── Chart column ─────────────────────────────────────────── */}
       <section>
-        <div className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1">
-          <span className="text-ink-muted font-mono text-xs tracking-widest uppercase">
-            {pair.replace('/', ' / ')}
-          </span>
-          <StatusDot status="active">Active</StatusDot>
-        </div>
+        {/* Pair identifier + price are wrapped together so the landing's
+            TourStop layout measurement can frame the whole "market header"
+            as a single target (see data-tour usage in LandingPage). The
+            wrapper stays a plain full-width block — the landing trims
+            trailing whitespace on the right via `boxAdjust` in the tour
+            config, rather than shrinking the wrapper with `w-fit`, to
+            avoid altering the dashboard's intrinsic flow. */}
+        <div data-tour="price">
+          <div className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1">
+            <span className="text-ink-muted font-mono text-xs tracking-widest uppercase">
+              {pair.replace('/', ' / ')}
+            </span>
+            <StatusDot status="active">Active</StatusDot>
+          </div>
 
-        {/* Price + 24H delta on the same row, baseline-aligned so the smaller
-            caption text hangs off the bottom of the display numerals. */}
-        <div className="my-1.5 mb-2.5 flex flex-wrap items-baseline gap-x-5 gap-y-1">
-          <h1 className="font-display text-ink-strong text-display-lg leading-none font-medium tracking-tighter [font-variation-settings:'ROND'_100]">
-            {formatUSD(latestPrice)}
-          </h1>
-          <div className="text-ink-muted text-caption flex items-baseline gap-3 font-mono">
-            <span className={cn('font-bold', deltaColor)}>{formatDeltaBps(deltaBps)}</span>
-            <span>24H</span>
+          {/* Price + 24H delta on the same row, baseline-aligned so the smaller
+              caption text hangs off the bottom of the display numerals. */}
+          <div className="my-1.5 mb-2.5 flex flex-wrap items-baseline gap-x-5 gap-y-1">
+            <h1 className="font-display text-ink-strong text-display-lg leading-none font-medium tracking-tighter [font-variation-settings:'ROND'_100]">
+              {formatUSD(latestPrice)}
+            </h1>
+            <div className="text-ink-muted text-caption flex items-baseline gap-3 font-mono">
+              <span className={cn('font-bold', deltaColor)}>{formatDeltaBps(deltaBps)}</span>
+              <span>24H</span>
+            </div>
           </div>
         </div>
 
@@ -198,7 +207,7 @@ export function MarketPreview({
           </span>
         </div>
 
-        <ChartFrame glow className="pointer-events-none mt-6 select-none">
+        <ChartFrame data-tour="paths" glow className="pointer-events-none mt-6 select-none">
           {/* pair={null} on the chart itself disables LevXChart's Pyth
               subscription so the mock series doesn't get spliced with the
               real live tick (which would otherwise draw a vertical spike
@@ -275,7 +284,7 @@ export function MarketPreview({
       <aside className="flex flex-col [@media(min-width:1181px)]:mt-[130px]">
         <Label>Select Provider</Label>
 
-        <div className="border-line mt-5 border-0 border-t">
+        <div data-tour="providers" className="border-line mt-5 border-0 border-t">
           {predictions.map((p, idx) => (
             <PathRow
               key={p.id}
@@ -299,6 +308,7 @@ export function MarketPreview({
         </div>
 
         <Button
+          data-tour="drawPath"
           variant="dashed"
           fullWidth
           className="mt-5 gap-2"
@@ -308,7 +318,7 @@ export function MarketPreview({
           Draw Custom Path
         </Button>
 
-        <div className="mt-8 mb-8">
+        <div data-tour="leverage" className="mt-8 mb-8">
           <div className="mb-3.5 flex items-baseline justify-between">
             <Label>Leverage</Label>
             <span className="text-ink-strong text-body-sm font-mono font-bold">
@@ -341,7 +351,13 @@ export function MarketPreview({
           </p>
         )}
 
-        <Button variant="primary" fullWidth className="mt-2" onClick={onCtaClick}>
+        <Button
+          data-tour="waitlist"
+          variant="primary"
+          fullWidth
+          className="mt-2"
+          onClick={onCtaClick}
+        >
           {ctaLabel}
         </Button>
       </aside>

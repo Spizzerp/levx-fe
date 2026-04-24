@@ -106,10 +106,7 @@ function HeroIntro({ show, scrollProgress }: { show: boolean; scrollProgress: nu
           className="hero-intro__item hero-intro__item--title-a block"
           style={{ ['--stagger' as string]: '160ms' }}
         >
-          <span
-            className="block"
-            style={{ ...itemStyle(exitTitleA), fontWeight: 400 }}
-          >
+          <span className="block" style={{ ...itemStyle(exitTitleA), fontWeight: 400 }}>
             Predict the path
           </span>
         </span>
@@ -117,10 +114,7 @@ function HeroIntro({ show, scrollProgress }: { show: boolean; scrollProgress: nu
           className="hero-intro__item hero-intro__item--title-b text-ink-muted block"
           style={{ ['--stagger' as string]: '320ms' }}
         >
-          <span
-            className="block"
-            style={{ ...itemStyle(exitTitleB), fontWeight: 360 }}
-          >
+          <span className="block" style={{ ...itemStyle(exitTitleB), fontWeight: 360 }}>
             not the outcome.
           </span>
         </span>
@@ -137,7 +131,7 @@ function HeroIntro({ show, scrollProgress }: { show: boolean; scrollProgress: nu
       >
         <div
           style={itemStyle(exitSpec)}
-          className="flex items-center gap-8 text-white text-nano font-mono tracking-[0.28em] uppercase"
+          className="text-nano flex items-center gap-8 font-mono tracking-[0.28em] text-white uppercase"
         >
           <span>Live Scoring</span>
           <span>AI + Human Predictions</span>
@@ -300,9 +294,23 @@ interface TourStop {
   /** Force which edge of the tooltip the leader line starts from.
    *  Defaults to automatic selection (nearest edge to the box center). */
   leaderFrom?: 'top' | 'right' | 'bottom' | 'left'
+  /** Optional per-side tuning applied to the DOM-measured box. Each
+   *  value is a fraction of the measured box dimension on that axis —
+   *  positive extends the box outward on that side, negative trims it
+   *  inward. Origin re-centers to the adjusted box so the camera still
+   *  aims at the middle of what's highlighted. Useful when the tagged
+   *  element has trailing whitespace (trim) or when the stop wants to
+   *  cover a wider region than a single marker can express (expand).
+   *  Ignored when no DOM measurement exists for the stop. */
+  boxAdjust?: { left?: number; right?: number; top?: number; bottom?: number }
 }
 
-const TOUR_STOPS: readonly TourStop[] = [
+// Fallback config. The landing measures these targets off the DOM at
+// runtime (`[data-tour]` markers inside MarketPreview) and overrides
+// `origin` + `box` with the live values. The constants here are used
+// (a) before the first measurement lands, and (b) as a safety net if a
+// marker is missing or unmeasurable.
+const TOUR_STOPS_FALLBACK: readonly TourStop[] = [
   {
     id: 'price',
     origin: { x: 16, y: 9.3 },
@@ -315,6 +323,11 @@ const TOUR_STOPS: readonly TourStop[] = [
       body: 'In its early stages, LevX will support common crypto markets like BTC, SOL, and ETH with USDC or USDT parity.',
     },
     tooltipAnchor: { x: 50, y: 48 },
+    // The price wrapper is full-column width but its content (pair +
+    // price + delta) is left-aligned, leaving a lot of trailing
+    // whitespace. Trim most of the right so the highlight hugs the
+    // actual header content.
+    boxAdjust: { right: -0.55 },
   },
   {
     id: 'paths',
@@ -329,6 +342,10 @@ const TOUR_STOPS: readonly TourStop[] = [
     },
     tooltipAnchor: { x: 6, y: 8 },
     leaderFrom: 'bottom',
+    // ChartFrame spans the full left-column width but its rightmost
+    // band carries axis labels / dead space more than predictions —
+    // trim so the highlight tracks the active plot area.
+    boxAdjust: { right: -0.22 },
   },
   {
     id: 'providers',
@@ -359,7 +376,7 @@ const TOUR_STOPS: readonly TourStop[] = [
   {
     id: 'leverage',
     origin: { x: 86, y: 70 },
-    scale: 2.4,
+    scale: 2.0,
     box: { w: 28, h: 14 },
     tooltip: {
       num: '05',
@@ -368,6 +385,12 @@ const TOUR_STOPS: readonly TourStop[] = [
       body: 'Leverage cap scales with market length. Shorter markets carry higher ceilings',
     },
     tooltipAnchor: { x: 18, y: 58 },
+    // The leverage marker tags only the label + slider block, but the
+    // collateral input below it reads as part of the same "sizing"
+    // beat — extend the frame downward to include it. Sides get a
+    // small breathing-room extension so the highlight doesn't cut
+    // flush against the rail edges at zoom.
+    boxAdjust: { left: 0.08, right: 0.08, bottom: 1.25 },
   },
   {
     id: 'waitlist',
@@ -401,19 +424,25 @@ function lerp(a: number, b: number, t: number) {
  *
  * smoothstep on the transition fraction gives each stop a natural dwell
  * at its endpoint, so the tooltip has a steady moment to read.
+ *
+ * `stops` is the runtime-resolved tour config — see `useTourStops` in
+ * LandingPage, which merges DOM measurements into the fallback config.
  */
-function resolveCamera(progress4: number): {
+function resolveCamera(
+  progress4: number,
+  stops: readonly TourStop[],
+): {
   originX: number
   originY: number
   scale: number
 } {
   const FULL_VIEW = { originX: 50, originY: 50, scale: 1 }
   // timeline: 0 at entry, 1 at stop 0, 2 at stop 1, ..., STOPS.length at stop N-1
-  const timeline = progress4 * (TOUR_STOPS.length + 0.4)
+  const timeline = progress4 * (stops.length + 0.4)
 
   if (timeline <= 0) return FULL_VIEW
-  if (timeline >= TOUR_STOPS.length) {
-    const last = TOUR_STOPS[TOUR_STOPS.length - 1]
+  if (timeline >= stops.length) {
+    const last = stops[stops.length - 1]
     return { originX: last.origin.x, originY: last.origin.y, scale: last.scale }
   }
 
@@ -424,11 +453,11 @@ function resolveCamera(progress4: number): {
     segment === 0
       ? FULL_VIEW
       : {
-          originX: TOUR_STOPS[segment - 1].origin.x,
-          originY: TOUR_STOPS[segment - 1].origin.y,
-          scale: TOUR_STOPS[segment - 1].scale,
+          originX: stops[segment - 1].origin.x,
+          originY: stops[segment - 1].origin.y,
+          scale: stops[segment - 1].scale,
         }
-  const next = TOUR_STOPS[segment]
+  const next = stops[segment]
   return {
     originX: lerp(prev.originX, next.origin.x, t),
     originY: lerp(prev.originY, next.origin.y, t),
@@ -442,8 +471,8 @@ function resolveCamera(progress4: number): {
  * Triangular window keeps the fade snappy so stacked tooltips don't
  * bleed into each other.
  */
-function tooltipVisibility(progress4: number, stopIndex: number): number {
-  const timeline = progress4 * (TOUR_STOPS.length + 0.4)
+function tooltipVisibility(progress4: number, stopIndex: number, stopCount: number): number {
+  const timeline = progress4 * (stopCount + 0.4)
   const peak = stopIndex + 1
   const d = Math.abs(timeline - peak)
   if (d < 0.25) return 1
@@ -453,9 +482,11 @@ function tooltipVisibility(progress4: number, stopIndex: number): number {
 
 function ChartTour({
   progress,
+  stops,
   onMeasure,
 }: {
   progress: number
+  stops: readonly TourStop[]
   onMeasure: (id: string, height: number) => void
 }) {
   // Don't mount tooltips at all until phase 4 has started; this keeps
@@ -463,18 +494,11 @@ function ChartTour({
   if (progress <= 0) return null
   return (
     <div aria-hidden={progress < 0.02} className="pointer-events-none fixed inset-0 z-[1250]">
-      {TOUR_STOPS.map((stop, i) => {
+      {stops.map((stop, i) => {
         if (!stop.tooltip) return null
-        const opacity = tooltipVisibility(progress, i)
+        const opacity = tooltipVisibility(progress, i, stops.length)
         if (opacity < 0.01) return null
-        return (
-          <TourTooltip
-            key={stop.id}
-            stop={stop}
-            opacity={opacity}
-            onMeasure={onMeasure}
-          />
-        )
+        return <TourTooltip key={stop.id} stop={stop} opacity={opacity} onMeasure={onMeasure} />
       })}
     </div>
   )
@@ -543,10 +567,12 @@ function TourTooltip({
  */
 function TourOverlay({
   progress,
+  stops,
   cardRect,
   tooltipHeights,
 }: {
   progress: number
+  stops: readonly TourStop[]
   cardRect: DOMRect | null
   tooltipHeights: Record<string, number>
 }) {
@@ -570,8 +596,8 @@ function TourOverlay({
           <path d="M 0 0 L 10 5 L 0 10 z" fill="#FFFFFF" />
         </marker>
       </defs>
-      {TOUR_STOPS.map((stop, i) => {
-        const opacity = tooltipVisibility(progress, i)
+      {stops.map((stop, i) => {
+        const opacity = tooltipVisibility(progress, i, stops.length)
         if (opacity < 0.01) return null
 
         // Target viewport position — invariant during phase-4 zoom
@@ -628,15 +654,7 @@ function TourOverlay({
 }
 
 /** Tiny 8px L-shaped tick drawn at each corner of a highlight box. */
-function TourCornerTick({
-  x,
-  y,
-  kind,
-}: {
-  x: number
-  y: number
-  kind: 'tl' | 'tr' | 'bl' | 'br'
-}) {
+function TourCornerTick({ x, y, kind }: { x: number; y: number; kind: 'tl' | 'tr' | 'bl' | 'br' }) {
   const L = 8
   const dx = kind === 'tr' || kind === 'br' ? -L : L
   const dy = kind === 'bl' || kind === 'br' ? -L : L
@@ -688,12 +706,9 @@ function TourArrow({
   // Pick tooltip edge: either the explicit override or the nearest to
   // the box center.
   let startX: number, startY: number
-  const side = leaderFrom ?? (
-    boxCx > tipX + tipW ? 'right'
-    : boxCx < tipX ? 'left'
-    : boxCy > tipY + tipH ? 'bottom'
-    : 'top'
-  )
+  const side =
+    leaderFrom ??
+    (boxCx > tipX + tipW ? 'right' : boxCx < tipX ? 'left' : boxCy > tipY + tipH ? 'bottom' : 'top')
   if (side === 'right') {
     startX = tipX + tipW
     startY = tipY + tipH / 2
@@ -853,7 +868,9 @@ export function LandingPage() {
   const [tooltipHeights, setTooltipHeights] = useState<Record<string, number>>({})
   const handleTooltipMeasure = useCallback((id: string, height: number) => {
     setTooltipHeights((prev) =>
-      prev[id] !== undefined && Math.abs(prev[id] - height) < 0.5 ? prev : { ...prev, [id]: height },
+      prev[id] !== undefined && Math.abs(prev[id] - height) < 0.5
+        ? prev
+        : { ...prev, [id]: height },
     )
   }, [])
   useEffect(() => {
@@ -916,6 +933,116 @@ export function LandingPage() {
       window.removeEventListener('resize', schedule)
     }
   }, [])
+
+  // Measured per-stop layouts keyed by `data-tour` id — each entry is
+  // the element's center and size expressed as a percentage of the
+  // card's bounding box. Because both the card and its descendants are
+  // scaled by the same phase transforms, these ratios are invariant
+  // under the current camera state, so it's safe to measure at any
+  // time (including during phases 2-4). The measurement overrides the
+  // hardcoded `origin` + `box` in TOUR_STOPS_FALLBACK.
+  const [tourLayouts, setTourLayouts] = useState<
+    Record<string, { origin: { x: number; y: number }; box: { w: number; h: number } }>
+  >({})
+
+  useEffect(() => {
+    const cardEl = cardRef.current
+    if (!cardEl) return
+
+    const measure = () => {
+      const cardRect = cardEl.getBoundingClientRect()
+      if (cardRect.width === 0 || cardRect.height === 0) return
+      const next: Record<
+        string,
+        { origin: { x: number; y: number }; box: { w: number; h: number } }
+      > = {}
+      cardEl.querySelectorAll<HTMLElement>('[data-tour]').forEach((el) => {
+        const id = el.dataset.tour
+        if (!id) return
+        const r = el.getBoundingClientRect()
+        if (r.width === 0 || r.height === 0) return
+        next[id] = {
+          origin: {
+            x: ((r.left + r.width / 2 - cardRect.left) / cardRect.width) * 100,
+            y: ((r.top + r.height / 2 - cardRect.top) / cardRect.height) * 100,
+          },
+          box: {
+            w: (r.width / cardRect.width) * 100,
+            h: (r.height / cardRect.height) * 100,
+          },
+        }
+      })
+      setTourLayouts((prev) => {
+        const prevKeys = Object.keys(prev)
+        const nextKeys = Object.keys(next)
+        if (prevKeys.length !== nextKeys.length) return next
+        for (const k of nextKeys) {
+          const p = prev[k]
+          const n = next[k]
+          if (!p) return next
+          if (
+            Math.abs(p.origin.x - n.origin.x) > 0.1 ||
+            Math.abs(p.origin.y - n.origin.y) > 0.1 ||
+            Math.abs(p.box.w - n.box.w) > 0.1 ||
+            Math.abs(p.box.h - n.box.h) > 0.1
+          ) {
+            return next
+          }
+        }
+        return prev
+      })
+    }
+
+    // Measure on next paint so the MarketPreview children have mounted.
+    const rafId = requestAnimationFrame(measure)
+    const ro = new ResizeObserver(measure)
+    ro.observe(cardEl)
+    // Any child growing/shrinking (e.g., wallet chip appearing, font
+    // swap) changes the layout too — observe descendants as well.
+    cardEl.querySelectorAll<HTMLElement>('[data-tour]').forEach((el) => ro.observe(el))
+    window.addEventListener('resize', measure)
+    return () => {
+      cancelAnimationFrame(rafId)
+      ro.disconnect()
+      window.removeEventListener('resize', measure)
+    }
+  }, [])
+
+  // Merge measurements into the fallback config. Until the first
+  // measurement lands, the hardcoded values carry the camera — that
+  // way we never flash the tour at (0, 0) before the DOM has rendered.
+  //
+  // `boxAdjust` (per-stop, optional) lets a stop extend or trim the
+  // measured box on any side. Positive values extend outward; negative
+  // trim inward. Origin re-centers to the adjusted rectangle so the
+  // camera aims at the middle of the visible highlight.
+  const resolvedTourStops = useMemo<readonly TourStop[]>(
+    () =>
+      TOUR_STOPS_FALLBACK.map((stop) => {
+        const measured = tourLayouts[stop.id]
+        if (!measured) return stop
+        const adj = stop.boxAdjust
+        if (!adj) return { ...stop, origin: measured.origin, box: measured.box }
+
+        const padL = adj.left ?? 0
+        const padR = adj.right ?? 0
+        const padT = adj.top ?? 0
+        const padB = adj.bottom ?? 0
+        const { w, h } = measured.box
+        return {
+          ...stop,
+          origin: {
+            x: measured.origin.x + (w * (padR - padL)) / 2,
+            y: measured.origin.y + (h * (padB - padT)) / 2,
+          },
+          box: {
+            w: w * (1 + padL + padR),
+            h: h * (1 + padT + padB),
+          },
+        }
+      }),
+    [tourLayouts],
+  )
 
   // Four-phase hero scroll progress (all clamp 0-1).
   //   `scrollProgress`  — phase 1, 0..1 over the first 1.5 viewports; drives
@@ -1046,16 +1173,17 @@ export function LandingPage() {
             className="pointer-events-none absolute inset-0 transition-opacity duration-[1000ms] ease-out"
             style={{
               opacity: marketSettled ? 1 : 0,
-              transform: scrollProgress2 > 0 || scrollProgress3 > 0
-                ? (() => {
-                    const uncrunch = easeOutCubic(
-                      Math.max(0, Math.min(1, scrollProgress3 / 0.35)),
-                    )
-                    const tiltX = -easeOutCubic(scrollProgress2) * 13 * (1 - uncrunch)
-                    const tiltY = -easeOutCubic(scrollProgress2) * 3.5
-                    return `translateX(${tiltX}vw) translateY(${tiltY}vh)`
-                  })()
-                : undefined,
+              transform:
+                scrollProgress2 > 0 || scrollProgress3 > 0
+                  ? (() => {
+                      const uncrunch = easeOutCubic(
+                        Math.max(0, Math.min(1, scrollProgress3 / 0.35)),
+                      )
+                      const tiltX = -easeOutCubic(scrollProgress2) * 13 * (1 - uncrunch)
+                      const tiltY = -easeOutCubic(scrollProgress2) * 3.5
+                      return `translateX(${tiltX}vw) translateY(${tiltY}vh)`
+                    })()
+                  : undefined,
             }}
             aria-hidden="true"
           >
@@ -1069,9 +1197,7 @@ export function LandingPage() {
             style={
               scrollProgress2 > 0 || scrollProgress3 > 0
                 ? (() => {
-                    const uncrunch = easeOutCubic(
-                      Math.max(0, Math.min(1, scrollProgress3 / 0.35)),
-                    )
+                    const uncrunch = easeOutCubic(Math.max(0, Math.min(1, scrollProgress3 / 0.35)))
                     const tiltX = -easeOutCubic(scrollProgress2) * 13 * (1 - uncrunch)
                     const tiltY = -easeOutCubic(scrollProgress2) * 3.5
                     return {
@@ -1114,7 +1240,7 @@ export function LandingPage() {
                 style={
                   scrollProgress4 > 0
                     ? (() => {
-                        const cam = resolveCamera(scrollProgress4)
+                        const cam = resolveCamera(scrollProgress4, resolvedTourStops)
                         return {
                           transform: `scale(${cam.scale})`,
                           transformOrigin: `${cam.originX}% ${cam.originY}%`,
@@ -1188,10 +1314,15 @@ export function LandingPage() {
               renders the explainer cards themselves. */}
           <TourOverlay
             progress={scrollProgress4}
+            stops={resolvedTourStops}
             cardRect={cardRect}
             tooltipHeights={tooltipHeights}
           />
-          <ChartTour progress={scrollProgress4} onMeasure={handleTooltipMeasure} />
+          <ChartTour
+            progress={scrollProgress4}
+            stops={resolvedTourStops}
+            onMeasure={handleTooltipMeasure}
+          />
 
           {/* Editorial scroll cue — hairline rule + mono caps + a green
               tracer that drops down the rule on a 2.4s cycle. Replaces
@@ -1207,7 +1338,7 @@ export function LandingPage() {
             )}
           >
             <div className="flex flex-col items-center gap-2.5">
-              <span className="text-ink-muted font-mono text-nano tracking-[0.32em] uppercase">
+              <span className="text-ink-muted text-nano font-mono tracking-[0.32em] uppercase">
                 Scroll
               </span>
               <span className="hero-scroll-rule" />
@@ -1229,10 +1360,7 @@ export function LandingPage() {
           The sticky hero is pinned throughout phase 5 (pin wrapper
           extended to 1400vh for this), so there's no competing scroll
           motion — only the overlay's focus shift. */}
-      <WaitlistCurtain
-        reveal={scrollProgress5}
-        onSubmit={handleWaitlistSubmit}
-      />
+      <WaitlistCurtain reveal={scrollProgress5} onSubmit={handleWaitlistSubmit} />
 
       <WaitlistModal
         open={waitlistOpen}
@@ -1311,9 +1439,8 @@ function WaitlistCurtain({
   const blurPx = 28 * defocusT
   const saturate = 1 - 0.55 * defocusT
   const brightness = 1 - 0.35 * defocusT
-  const backdropFilter = defocusT > 0.01
-    ? `blur(${blurPx}px) saturate(${saturate}) brightness(${brightness})`
-    : 'none'
+  const backdropFilter =
+    defocusT > 0.01 ? `blur(${blurPx}px) saturate(${saturate}) brightness(${brightness})` : 'none'
 
   return (
     <div
@@ -1394,7 +1521,7 @@ function WaitlistCurtain({
 
         {/* Spec strip — mono-caps facts separated by hairline ticks. */}
         <div
-          className="mt-8 flex items-center justify-center gap-6 text-nano font-mono tracking-[0.28em] text-white/80 uppercase"
+          className="text-nano mt-8 flex items-center justify-center gap-6 font-mono tracking-[0.28em] text-white/80 uppercase"
           style={itemStyle(specT, 12)}
         >
           <span>Predict The Path</span>
