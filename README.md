@@ -53,3 +53,5 @@ APP_API_BASE_URL=http://localhost:3000
 ## Shared Docs
 
 - Wireframe document: `docs/wireframe-document.md`
+- Platform technical architecture: `docs/platform-technical-architecture.md`
+- Mode 2 and liquidity architecture: `docs/mode2-liquidity-architecture.md`
