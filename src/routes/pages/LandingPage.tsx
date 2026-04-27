@@ -12,7 +12,7 @@ import './landing.css'
 import { WaitlistModal } from '@/ui/WaitlistModal'
 import { WaitlistForm, type WaitlistPayload } from '@/ui/WaitlistForm'
 import { submitWaitlist } from '@/lib/supabase/auth'
-import { useIsMobile } from '@/lib/hooks/useIsMobile'
+import { useIsBelowDesktop } from '@/lib/hooks/useIsBelowDesktop'
 import { cn } from '@/lib/cn'
 
 /**
@@ -760,12 +760,14 @@ function buildMockHistory(now: number): PricePoint[] {
 export function LandingPage() {
   const [now] = useState(() => Date.now())
   const [waitlistOpen, setWaitlistOpen] = useState(false)
-  // Below the `sm` breakpoint (max-width: 768px), the scripted hero
-  // choreography (1400vh of pin + tilt + 5-stop tour + focus-pull
-  // curtain) doesn't translate — fixed-position rails overflow, vw/vh
-  // tooltip anchors fall off-screen, and the chart at 0.35 zoom reads
-  // as illegible. We swap in a vertical editorial layout instead.
-  const isMobile = useIsMobile()
+  // Below 1180px (the MarketPreview grid breakpoint where the right
+  // rail stacks below the chart), the scripted hero choreography
+  // (1400vh of pin + tilt + 5-stop tour + focus-pull curtain) doesn't
+  // translate — fixed-position rails overflow, the tour stops 03/04/05
+  // target rail DOM that's no longer beside the chart, and the
+  // 0.35-zoom card reads as illegible. We swap in a vertical editorial
+  // layout for that whole range. Above 1180 the desktop story plays.
+  const isBelowDesktop = useIsBelowDesktop()
 
   const handleWaitlistSubmit = async (payload: WaitlistPayload) => {
     await submitWaitlist(payload)
@@ -800,7 +802,7 @@ export function LandingPage() {
   // composition.
   useEffect(() => {
     if (!introOverlayHidden) return
-    if (isMobile) return
+    if (isBelowDesktop) return
 
     const lenis = new Lenis()
     let rafId = 0
@@ -813,7 +815,7 @@ export function LandingPage() {
       cancelAnimationFrame(rafId)
       lenis.destroy()
     }
-  }, [introOverlayHidden, isMobile])
+  }, [introOverlayHidden, isBelowDesktop])
 
   // Dynamic card scale — the market card's `zoom` is driven by the viewport
   // so the whole card (header + chart + comments + sidebar) always fits the
@@ -846,6 +848,15 @@ export function LandingPage() {
   // exactly what we want — see TourOverlay for why.
   const [cardRect, setCardRect] = useState<DOMRect | null>(null)
   useEffect(() => {
+    // Desktop-only — cardRef is null on the mobile branch, and on a
+    // mobile-first load `useIsBelowDesktop` initialises false, so the
+    // desktop DOM mounts for one frame before the hook's effect flips
+    // `isBelowDesktop` true. Without this gate the ResizeObserver would
+    // capture that transient cardRef and never tear down when the
+    // desktop DOM unmounts. Including `isBelowDesktop` in deps means
+    // the effect re-runs on breakpoint flips so observers reattach to
+    // the new desktop card if the user resizes back into range.
+    if (isBelowDesktop) return
     const el = cardRef.current
     if (!el) return
 
@@ -881,13 +892,16 @@ export function LandingPage() {
       ro.disconnect()
       window.removeEventListener('resize', compute)
     }
-  }, [])
+  }, [isBelowDesktop])
 
   // Track the card's viewport rect on scroll + resize so the TourOverlay
   // can position highlight boxes + arrows over it. rAF-throttled so we
   // don't call getBoundingClientRect more than once per frame even under
   // a flood of scroll events.
   useEffect(() => {
+    // Desktop-only — see cardScale ResizeObserver above for the
+    // mobile-first race rationale.
+    if (isBelowDesktop) return
     const el = cardRef.current
     if (!el) return
     let rafId = 0
@@ -911,7 +925,7 @@ export function LandingPage() {
       window.removeEventListener('scroll', schedule)
       window.removeEventListener('resize', schedule)
     }
-  }, [])
+  }, [isBelowDesktop])
 
   // Measured per-stop layouts keyed by `data-tour` id — each entry is
   // the element's center and size expressed as a percentage of the
@@ -925,6 +939,11 @@ export function LandingPage() {
   >({})
 
   useEffect(() => {
+    // Desktop-only — see cardScale ResizeObserver above for the
+    // mobile-first race rationale. Tour DOM (`[data-tour]` markers)
+    // only exists inside the desktop pin wrapper, so on mobile this
+    // would observe nothing and leak the listeners.
+    if (isBelowDesktop) return
     const cardEl = cardRef.current
     if (!cardEl) return
 
@@ -985,7 +1004,7 @@ export function LandingPage() {
       ro.disconnect()
       window.removeEventListener('resize', measure)
     }
-  }, [])
+  }, [isBelowDesktop])
 
   // Merge measurements into the fallback config. Until the first
   // measurement lands, the hardcoded values carry the camera — that
@@ -1069,11 +1088,11 @@ export function LandingPage() {
       // getBoundingClientRect values back into zoom.
       scrollXformActiveRef.current = p2 > 0 || p3 > 0 || p4 > 0
     }
-    if (isMobile) return
+    if (isBelowDesktop) return
     window.addEventListener('scroll', handleScroll, { passive: true })
     handleScroll()
     return () => window.removeEventListener('scroll', handleScroll)
-  }, [isMobile])
+  }, [isBelowDesktop])
   const { history, predictions, marketStart, marketEnd } = useMemo(() => {
     const marketStart = now - 2 * DAY_MS
     const marketEnd = now + 5 * DAY_MS
@@ -1151,7 +1170,7 @@ export function LandingPage() {
           See `MobileLanding` for the rationale; it shares the intro
           overlay and nav rendered above, and dispatches into the same
           WaitlistModal below. */}
-      {isMobile && (
+      {isBelowDesktop && (
         <MobileLanding
           show={introOverlayHidden}
           history={history}
@@ -1173,7 +1192,7 @@ export function LandingPage() {
           (un-tilt + settle at full view) + 5 for phase 4 (five-stop
           guided tour) + 2 for phase 5 (waitlist curtain rise) + 1 dwell.
           Matches the five scrollProgress divisors above. */}
-      {!isMobile && (
+      {!isBelowDesktop && (
       <>
       <div className="relative h-[1400vh]">
         {/* z-[1100] lifts the sticky section's stacking context above
