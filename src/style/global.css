@@ -26,22 +26,6 @@
     overflow-x: hidden;
   }
 
-  /* Mobile/tablet (below the desktop breakpoint defined in
-     customVariants.css — xl: starts at 1367px). Lock vertical scroll
-     at the document level too, so the locked-hero <main> can't be
-     overridden by iOS Safari's 100vh-vs-100dvh discrepancy or any
-     stray flow content. Removed at xl: where the full scroll story
-     plays. */
-  @media (max-width: 1366px) {
-    html,
-    body {
-      height: 100dvh;
-      max-height: 100dvh;
-      overflow-y: hidden;
-      overscroll-behavior-y: none;
-    }
-  }
-
   button {
     cursor: pointer;
   }

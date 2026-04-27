@@ -2,16 +2,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { FileText } from 'lucide-react'
 import Lenis from 'lenis'
 
-import { Button } from '@/ui/Button'
 import { MarketPreview } from '@/features/market/MarketPreview'
 import { MagicCard } from '@/ui/MagicCard'
 import { SpreadLogoReveal } from './SpreadLogoReveal'
 import { HeroCalloutCard } from './HeroCalloutCard'
 import { TourCalloutCard } from './TourCalloutCard'
+import { MobileLanding } from './MobileLanding'
 import './landing.css'
 import { WaitlistModal } from '@/ui/WaitlistModal'
 import { WaitlistForm, type WaitlistPayload } from '@/ui/WaitlistForm'
 import { submitWaitlist } from '@/lib/supabase/auth'
+import { useIsMobile } from '@/lib/hooks/useIsMobile'
 import { cn } from '@/lib/cn'
 
 /**
@@ -81,7 +82,7 @@ function HeroIntro({ show, scrollProgress }: { show: boolean; scrollProgress: nu
           the hairline rules compete visually with the locked hero
           and the row adds no information beyond decoration. */}
       <div
-        className="hero-intro__item hero-intro__item--eyebrow hidden items-center gap-3 xl:flex"
+        className="hero-intro__item hero-intro__item--eyebrow flex items-center gap-3"
         style={{ ['--stagger' as string]: '0ms' }}
       >
         <div style={itemStyle(exitEyebrow)} className="flex items-center gap-3">
@@ -133,7 +134,7 @@ function HeroIntro({ show, scrollProgress }: { show: boolean; scrollProgress: nu
           Waitlist CTA so the button reads as the next action after
           the headline, with the spec line as supporting copy. */}
       <div
-        className="hero-intro__item hero-intro__item--spec mt-8 mb-2 hidden items-center justify-center gap-4 xl:flex"
+        className="hero-intro__item hero-intro__item--spec mt-8 mb-2 flex items-center justify-center gap-4"
         style={{ ['--stagger' as string]: '520ms' }}
       >
         <div
@@ -759,6 +760,12 @@ function buildMockHistory(now: number): PricePoint[] {
 export function LandingPage() {
   const [now] = useState(() => Date.now())
   const [waitlistOpen, setWaitlistOpen] = useState(false)
+  // Below the `sm` breakpoint (max-width: 768px), the scripted hero
+  // choreography (1400vh of pin + tilt + 5-stop tour + focus-pull
+  // curtain) doesn't translate — fixed-position rails overflow, vw/vh
+  // tooltip anchors fall off-screen, and the chart at 0.35 zoom reads
+  // as illegible. We swap in a vertical editorial layout instead.
+  const isMobile = useIsMobile()
 
   const handleWaitlistSubmit = async (payload: WaitlistPayload) => {
     await submitWaitlist(payload)
@@ -788,13 +795,12 @@ export function LandingPage() {
 
   // Lenis smooth-scroll. Inertial easing on wheel/trackpad — drives
   // scroll-linked animations as we add sections below the hero.
-  // Desktop-only: on mobile the pin wrapper is capped to one viewport
-  // (no scroll room past the hero), and native touch scrolling beats
-  // Lenis's RAF interpolation on small devices anyway.
+  // Skipped on mobile because native scroll feels better on touch and
+  // the choreography Lenis was driving isn't rendered in the mobile
+  // composition.
   useEffect(() => {
     if (!introOverlayHidden) return
-    if (typeof window === 'undefined') return
-    if (!window.matchMedia('(min-width: 1367px)').matches) return
+    if (isMobile) return
 
     const lenis = new Lenis()
     let rafId = 0
@@ -807,7 +813,7 @@ export function LandingPage() {
       cancelAnimationFrame(rafId)
       lenis.destroy()
     }
-  }, [introOverlayHidden])
+  }, [introOverlayHidden, isMobile])
 
   // Dynamic card scale — the market card's `zoom` is driven by the viewport
   // so the whole card (header + chart + comments + sidebar) always fits the
@@ -1063,10 +1069,11 @@ export function LandingPage() {
       // getBoundingClientRect values back into zoom.
       scrollXformActiveRef.current = p2 > 0 || p3 > 0 || p4 > 0
     }
+    if (isMobile) return
     window.addEventListener('scroll', handleScroll, { passive: true })
     handleScroll()
     return () => window.removeEventListener('scroll', handleScroll)
-  }, [])
+  }, [isMobile])
   const { history, predictions, marketStart, marketEnd } = useMemo(() => {
     const marketStart = now - 2 * DAY_MS
     const marketEnd = now + 5 * DAY_MS
@@ -1090,7 +1097,7 @@ export function LandingPage() {
   const handleIntroComplete = useCallback(() => setIntroDone(true), [])
 
   return (
-    <main className="relative min-h-dvh w-full bg-black h-dvh max-h-dvh overflow-hidden xl:h-auto xl:max-h-none xl:overflow-visible">
+    <main className="relative min-h-dvh w-full bg-black">
       {/* Plays before any hero content is visible. Unmounts itself once
           its own fade-out completes; onComplete fires as the logo begins
           fading so the hero's entrance animations overlap the last tail
@@ -1140,17 +1147,35 @@ export function LandingPage() {
         </div>
       </div>
 
-      {/* Pin wrapper — 1400vh tall on desktop for the full scripted
-          story: 1.5 for phase 1 (hero intro fade) + 1.5 for phase 2
-          (card slide + tilt) + 2 for phase 3 (un-tilt + settle at
-          full view) + 5 for phase 4 (five-stop guided tour) + 2 for
-          phase 5 (waitlist curtain rise) + 1 dwell. On mobile the
-          wrapper caps to one viewport (`h-dvh`) so the user can't
-          scroll past the hero — the zoom/tilt choreography doesn't
-          read on small screens, and native touch scrolling past the
-          card would strand the user in empty phase transitions. The
-          card's "Join Waitlist" CTA still opens the modal. */}
-      <div className="relative h-dvh xl:h-[1400vh]">
+      {/* Mobile composition replaces the desktop pin wrapper + curtain.
+          See `MobileLanding` for the rationale; it shares the intro
+          overlay and nav rendered above, and dispatches into the same
+          WaitlistModal below. */}
+      {isMobile && (
+        <MobileLanding
+          show={introOverlayHidden}
+          history={history}
+          predictions={predictions}
+          now={now}
+          marketStart={marketStart}
+          marketEnd={marketEnd}
+          checkpointInterval={CHECKPOINT_INTERVAL_SEC}
+          totalCheckpoints={TOTAL_CHECKPOINTS}
+          onWaitlistSubmit={handleWaitlistSubmit}
+          onCtaClick={openWaitlist}
+        />
+      )}
+
+      {/* Pin wrapper — 1400vh tall. 12 viewports of scripted travel plus
+          a 100vh dwell at the end so the waitlist form has a resting
+          beat with reveal=1 fully settled. 1.5 for phase 1 (hero intro
+          fade) + 1.5 for phase 2 (card slide + tilt) + 2 for phase 3
+          (un-tilt + settle at full view) + 5 for phase 4 (five-stop
+          guided tour) + 2 for phase 5 (waitlist curtain rise) + 1 dwell.
+          Matches the five scrollProgress divisors above. */}
+      {!isMobile && (
+      <>
+      <div className="relative h-[1400vh]">
         {/* z-[1100] lifts the sticky section's stacking context above
             SpreadLogoReveal's z-[1000] — sticky *creates* a stacking
             context even without z-index, so without this the market card
@@ -1158,7 +1183,7 @@ export function LandingPage() {
             z-index we put on it directly. */}
         <section
           className={cn(
-            'sticky top-0 flex h-dvh flex-col items-center justify-between overflow-hidden px-6 pt-24 pb-20 sm:px-10 sm:pt-12 sm:pb-16',
+            'sticky top-0 flex h-dvh flex-col items-center justify-between overflow-hidden px-6 pt-24 pb-20 sm:px-10 sm:pt-28 sm:pb-24',
             introOverlayHidden ? 'z-[1100]' : 'z-[900]',
           )}
         >
@@ -1193,38 +1218,6 @@ export function LandingPage() {
 
           <HeroIntro show={introDone} scrollProgress={scrollProgress} />
 
-          {/* Mobile/tablet-only CTA — the full market-card story doesn't
-              run on narrow viewports (scroll is locked), so the card's
-              right-rail Join Waitlist button is below the fold. Surface
-              an explicit CTA right under the hero copy so phone users
-              have a one-tap path into the waitlist modal. Hidden at xl
-              where the desktop story handles the conversion path. */}
-          <div className="relative z-[1100] mt-8 flex justify-center xl:hidden">
-            <Button
-              type="button"
-              variant="primary"
-              className="text-caption px-8"
-              onClick={openWaitlist}
-            >
-              Join Waitlist
-            </Button>
-          </div>
-
-          {/* Mobile/tablet spec strip — desktop renders this inside
-              HeroIntro directly under the title; on narrow viewports
-              we relocate it below the CTA so the button reads as the
-              primary next action after the headline. */}
-          <div className="relative z-[1100] mt-6 flex items-center justify-center gap-8 px-6 text-center xl:hidden">
-            <span className="font-mono text-[9px] tracking-[0.28em] text-white uppercase">
-              Live Scoring
-            </span>
-            <span className="font-mono text-[9px] tracking-[0.28em] text-white uppercase">
-              AI + Human Predictions
-            </span>
-            <span className="font-mono text-[9px] tracking-[0.28em] text-white uppercase">
-              No&nbsp;Order Book
-            </span>
-          </div>
 
           <div
             className="mx-auto w-full max-w-[1000px]"
@@ -1362,7 +1355,7 @@ export function LandingPage() {
           <div
             aria-hidden="true"
             className={cn(
-              'pointer-events-none absolute bottom-7 left-1/2 z-[1100] hidden -translate-x-1/2 transition-opacity duration-700 ease-out xl:block',
+              'pointer-events-none absolute bottom-7 left-1/2 z-[1100] -translate-x-1/2 transition-opacity duration-700 ease-out',
               marketSettled && scrollProgress < 0.02 ? 'opacity-100' : 'opacity-0',
             )}
           >
@@ -1390,6 +1383,8 @@ export function LandingPage() {
           extended to 1400vh for this), so there's no competing scroll
           motion — only the overlay's focus shift. */}
       <WaitlistCurtain reveal={scrollProgress5} onSubmit={handleWaitlistSubmit} />
+      </>
+      )}
 
       <WaitlistModal
         open={waitlistOpen}
