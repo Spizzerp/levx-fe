@@ -107,12 +107,17 @@ export function MobileLanding({
             ))}
           </ul>
 
-          {/* Scroll cue */}
-          <div className="mt-14 flex flex-col items-center gap-2.5 opacity-70">
-            <span className="text-ink-muted text-nano font-mono tracking-[0.32em] uppercase">
+          {/* Scroll cue — matches desktop style: pure white text with
+              a slow pulse instead of muted-ink + dimmed wrapper.
+              Inline `background: #000` blacks out the rule's base
+              gradient on mobile (the desktop palette uses
+              --color-line-strong gray); the green tracer ::after
+              still animates on top. */}
+          <div className="mt-14 flex flex-col items-center gap-2.5">
+            <span className="text-nano animate-pulse font-mono tracking-[0.32em] text-white uppercase">
               Scroll
             </span>
-            <span className="hero-scroll-rule" />
+            <span className="hero-scroll-rule" style={{ background: '#000' }} />
           </div>
         </div>
       </section>
