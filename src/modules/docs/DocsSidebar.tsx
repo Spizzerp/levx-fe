@@ -7,7 +7,6 @@ import type { DocId } from './types'
 
 export function DocsSidebar({
   activeDoc,
-  onSelect,
   query,
   onClose,
 }: {
