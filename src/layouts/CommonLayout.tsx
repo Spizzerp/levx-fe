@@ -1,6 +1,6 @@
 import type { PropsWithChildren } from 'react'
 import { FileText } from 'lucide-react'
-import { useLocation } from '@tanstack/react-router'
+import { Link, useLocation } from '@tanstack/react-router'
 
 import { Nav } from '@/layouts/Nav'
 import { ToastContainer } from '@/ui/ToastContainer'
@@ -22,31 +22,27 @@ export function CommonLayout({ children }: PropsWithChildren) {
     <>
       {showChrome && <Nav />}
       <WrongNetworkBanner />
-      <div style={{ isolation: 'isolate' }} className="flex-1">{children}</div>
+      <div style={{ isolation: 'isolate' }} className="flex-1">
+        {children}
+      </div>
       {showChrome && (
         <div className="mt-auto flex items-center justify-center gap-4 py-8">
           <a
             href="https://x.com/LevXtrade"
             target="_blank"
             rel="noopener noreferrer"
+            aria-label="LevX on X"
             className="text-ink-dim hover:text-ink-strong duration-short ease-levx transition-colors"
           >
             <XIcon size={16} />
           </a>
-          {/* <Link
+          <Link
             to="/docs"
             aria-label="LevX docs"
-            className="text-ink-dim duration-short ease-levx transition-colors hover:text-ink-strong"
+            className="text-ink-dim duration-short ease-levx hover:text-ink-strong transition-colors"
           >
-            <FileText size={16} strokeWidth={1.5} />
-          </Link> */}
-          <span
-            aria-label="LevX docs (coming soon)"
-            title="Coming soon"
-            className="cursor-not-allowed opacity-30"
-          >
-            <FileText size={16} strokeWidth={1.5} />
-          </span>
+            <FileText size={16} strokeWidth={1.5} aria-hidden="true" />
+          </Link>
         </div>
       )}
       <ToastContainer />

@@ -1,4 +1,5 @@
 import {
+  ArrowLeft,
   ArrowRight,
   BookOpen,
   BrainCircuit,
@@ -161,8 +162,24 @@ export function DocsHome() {
                         section.id === 'links' && 'justify-center text-center',
                       )}
                     >
-                      <span className="text-ink group-hover:text-ink-strong text-body-sm duration-short ease-levx font-sans transition-colors">
-                        {item.label}
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span className="text-ink group-hover:text-ink-strong text-body-sm duration-short ease-levx truncate font-sans transition-colors">
+                          {item.label}
+                        </span>
+                        {item.id === 'introduction' && (
+                          <span
+                            aria-label="Start here"
+                            className="inline-flex shrink-0 items-center gap-1.5 font-mono text-[10px] tracking-wider uppercase"
+                          >
+                            <span
+                              aria-hidden="true"
+                              className="text-brand-to inline-flex shrink-0 items-center motion-safe:animate-pulse"
+                            >
+                              <ArrowLeft size={10} strokeWidth={2} />
+                            </span>
+                            <span className="text-brand-gradient">START</span>
+                          </span>
+                        )}
                       </span>
                       <ArrowRight
                         size={12}
