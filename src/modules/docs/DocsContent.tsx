@@ -1,7 +1,6 @@
 import { ChevronRight, ArrowUpRight } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import { cn } from '@/lib/cn'
-import { HyperText } from '@/ui/HyperText'
 import { DOC_META, DOC_ORDER } from './data'
 import { DOC_RENDERERS } from './content'
 import type { DocId } from './types'
@@ -102,7 +101,7 @@ export function DocsContent({
             "[font-variation-settings:'ROND'_100]",
           )}
         >
-          <HyperText>{meta.title}</HyperText>
+          {meta.title}
         </h1>
 
         <p className="text-ink-muted font-editorial mb-10 text-[20px] leading-snug tracking-tight">
