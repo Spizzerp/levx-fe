@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { Link } from '@tanstack/react-router'
-import { Code, CodeBlock, Li, Note, P, Section, Ul } from './primitives'
+import { Code, CodeBlock, Li, ManOption, Note, P, Section, Ul } from './primitives'
 import type { DocId } from './types'
 import { DOC_META } from './data'
 

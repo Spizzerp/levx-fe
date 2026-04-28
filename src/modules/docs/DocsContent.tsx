@@ -1,4 +1,4 @@
-import { ChevronRight, ArrowUpRight } from 'lucide-react'
+import { ChevronRight } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import { cn } from '@/lib/cn'
 import { DOC_META, DOC_ORDER } from './data'
