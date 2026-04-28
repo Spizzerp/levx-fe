@@ -14,6 +14,7 @@ import { ProfilePage } from '@/routes/pages/ProfilePage'
 import { VaultPage } from '@/routes/pages/VaultPage'
 import { RootRouteComponent } from '@/routes/RootRoute'
 import { DocsContent } from '@/modules/docs/DocsContent'
+import { DocsHome } from '@/modules/docs/DocsHome'
 import type { DocId } from '@/modules/docs/types'
 
 const rootRoute = createRootRoute({
@@ -98,7 +99,7 @@ const docsRoute = createRoute({
 const docsIndexRoute = createRoute({
   getParentRoute: () => docsRoute,
   path: '/',
-  component: () => <DocsContent doc="introduction" />,
+  component: DocsHome,
 })
 
 const docsDocRoute = createRoute({
