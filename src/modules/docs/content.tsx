@@ -1,447 +1,698 @@
+/* eslint-disable react-refresh/only-export-components */
 import type { ReactNode } from 'react'
 import { Link } from '@tanstack/react-router'
-import { Code, CodeBlock, Li, ManOption, Note, P, Section, Ul } from './primitives'
+import { Code, CodeBlock, Li, Note, P, Section, Ul } from './primitives'
 import type { DocId } from './types'
-import { DOC_META } from './data'
 
 function IntroductionContent() {
   return (
     <>
       <Section id="what-is-levx" num="01" heading="What is LevX?">
         <P>
-          LevX is a path-prediction market protocol on Solana. Instead of asking
-          you to predict only whether an asset ends higher or lower, LevX lets
-          you trade on the <em>shape</em> of price movement over time. A market
-          is a set of competing routes through the next few hours or days; you
-          back the route you believe the market will follow.
+          LevX is a path-prediction market protocol on Solana. Instead of trading only whether an
+          asset finishes above or below a target, LevX lets users express a view on the route an
+          asset takes through time.
         </P>
         <P>
-          The protocol settles each route against verified oracle checkpoints,
-          so a path can be partially right — close on direction but wrong on
-          volatility — and still earn a graceful payout.
+          Each market contains competing predicted paths. The protocol compares those paths against
+          verified price checkpoints, scores how closely each path tracked reality, and distributes
+          the market pool through deterministic on-chain settlement.
         </P>
       </Section>
 
-      <Section id="why-paths" num="02" heading="Why paths instead of prices?">
+      <Section id="how-it-works" num="02" heading="How it works">
+        <CodeBlock language="flow">{`1. A market is created for a pair and time window.
+2. AI and user-created paths are submitted before activation.
+3. Users back paths with collateral.
+4. Pyth-backed checkpoints record market reality.
+5. LevX scores each path across the full route.
+6. Settled markets allow users to claim payouts on-chain.`}</CodeBlock>
+      </Section>
+
+      <Section id="why-it-matters" num="03" heading="Why it matters">
         <P>
-          Most prediction markets collapse the future into a binary outcome or a
-          single terminal bucket. That throws away almost everything traders
-          actually disagree about: trend, drawdown, recovery shape, timing.
+          Markets are not only about endpoints. Timing, drawdown, volatility, trend shape, and
+          recovery path can be the difference between a useful forecast and a misleading one. LevX
+          makes those dimensions tradable.
+        </P>
+      </Section>
+
+      <Section id="current-scope" num="04" heading="Current scope">
+        <P>
+          The current public scope is Mode 1: fully collateralized path markets in devnet beta. Mode
+          2 liquidity, leverage, and levUSD vault mechanics are roadmap features, not live liquidity
+          products.
+        </P>
+      </Section>
+    </>
+  )
+}
+
+function ProblemContent() {
+  return (
+    <>
+      <Section id="endpoint-loss" num="01" heading="Endpoint loss">
+        <P>
+          Most prediction markets reduce a forecast to a final yes/no result or a terminal price
+          bucket. That misses the behavior that often matters most: how price arrived there.
+        </P>
+        <P>
+          A market can finish at the expected level while taking a route that invalidates the
+          original thesis. A trader who predicted a slow grind up and a trader who predicted a deep
+          crash followed by recovery should not receive identical treatment.
+        </P>
+      </Section>
+
+      <Section id="timing-risk" num="02" heading="Timing and path risk">
+        <P>
+          Directional instruments can be right on destination and wrong on path. They often fail to
+          capture drawdowns, time-to-target, volatility texture, or whether the market briefly moved
+          through a risk zone.
+        </P>
+      </Section>
+
+      <Section id="ai-gap" num="03" heading="AI signal gap">
+        <P>
+          AI systems can generate richer forecasts than a single target price, but most markets have
+          no native way to test or monetize those path-shaped forecasts. LevX gives those forecasts
+          an on-chain evaluation surface.
+        </P>
+      </Section>
+
+      <Section id="settlement-gap" num="04" heading="Settlement gap">
+        <P>
+          A richer market is only useful if settlement stays transparent. LevX solves for that by
+          storing paths on-chain, recording oracle checkpoints, and using deterministic scoring
+          rules rather than subjective review.
+        </P>
+      </Section>
+    </>
+  )
+}
+
+function SolutionContent() {
+  return (
+    <>
+      <Section id="path-markets" num="01" heading="Path markets">
+        <P>
+          A LevX market is a set of routes, not a single final answer. Each route is represented as
+          checkpoint prices on a <Code>PathOutcome</Code> account. Users can back the route they
+          believe best describes the future market path.
+        </P>
+      </Section>
+
+      <Section id="scoring" num="02" heading="Richer scoring">
+        <P>
+          LevX scores the full route. It looks at checkpoint-by-checkpoint price error, velocity
+          error, and higher-level features such as volatility texture, drawdown, endpoint accuracy,
+          and displacement.
+        </P>
+      </Section>
+
+      <Section id="market-design" num="03" heading="Market design">
+        <P>
+          Mode 1 markets are pool-funded and fully collateralized. The market tracks path shares,
+          total pool, oracle progress, amplitudes, and settlement denominators on-chain.
         </P>
         <Note kind="tip">
-          A path is a richer language than a price. Two predictions can share
-          the same endpoint and still tell completely different stories. LevX
-          scores the journey, not just the destination.
+          The result is a market that rewards useful shape information without depending on a
+          centralized judge.
         </Note>
       </Section>
 
-      <Section id="how-it-works" num="03" heading="How it works">
+      <Section id="mode2" num="04" heading="Mode 2 roadmap">
         <P>
-          Every market is composed of five lifecycle phases. The keeper layer
-          advances each phase deterministically; the protocol does not need a
-          centralized referee.
+          Mode 2 is the planned liquidity and leverage layer. It is designed around a senior vault,
+          pair-level buffers, and conservative profit haircuts, but it remains a roadmap feature
+          until implementation and audit work are complete.
         </P>
-        <CodeBlock language="lifecycle">{`Created  →  Sampling  →  Settling  →  Disputable  →  Claimable
-   ·          ·            ·             ·              ·
-seeded     oracle       last         24h grace      pay out
-paths     checkpoints   tick         window        on-chain`}</CodeBlock>
+      </Section>
+    </>
+  )
+}
+
+function GettingStartedContent() {
+  return (
+    <>
+      <Section id="open-app" num="01" heading="Open the app">
         <P>
-          Five AI-generated paths seed each market at creation; users can draw
-          their own paths and stake them alongside. Both kinds are first-class
-          on-chain objects — accounts, not opinions.
+          The current LevX interface is the web app. Start from the market list, then open a market
+          to inspect its path set, chart, checkpoint progress, and available actions.
         </P>
       </Section>
 
-      <Section id="what-you-can-do" num="04" heading="What you can do today">
+      <Section id="browse-markets" num="02" heading="Browse markets">
+        <P>
+          Markets are grouped by lifecycle state: Pending, Active, Sampling, Settling, Maturing,
+          Settled, or Void. Active and Sampling markets are the states where path backing can be
+          available, subject to the market's configuration.
+        </P>
+      </Section>
+
+      <Section id="read-paths" num="03" heading="Read paths">
+        <P>
+          Each path is a forecast curve across the market's checkpoint schedule. The path row shows
+          market activity, while the chart shows how the forecast compares to observed price history
+          and live price context.
+        </P>
+      </Section>
+
+      <Section id="connect-wallet" num="04" heading="Connect a wallet">
+        <P>
+          Wallet-gated actions use the connected Solana wallet to sign Anchor transactions. The
+          frontend fetches market accounts, derives program addresses, builds instructions, and asks
+          the wallet to sign. The web app is the supported user interface today.
+        </P>
+        <Note>
+          Public CLI, npm SDK, and production indexed HTTP API docs should remain planned until
+          those interfaces are released.
+        </Note>
+      </Section>
+
+      <Section id="claim" num="05" heading="Claim settled payouts">
+        <P>
+          After a market reaches Settled, eligible positions can claim directly from
+          program-controlled escrow. If a market is Void, the claim path handles collateral return
+          according to protocol rules.
+        </P>
+      </Section>
+    </>
+  )
+}
+
+function UseCasesContent() {
+  return (
+    <>
+      <Section id="trading" num="01" heading="Path-aware trading">
+        <P>
+          Traders can express views like "range-bound then breakout", "sharp drawdown then
+          recovery", or "steady trend with low volatility" instead of collapsing the thesis into a
+          single terminal price.
+        </P>
+      </Section>
+
+      <Section id="research" num="02" heading="Forecast research">
+        <P>
+          Analysts can compare path forecasts against realized market behavior with more resolution
+          than win/loss. This is useful for studying timing, volatility, drawdown, and regime
+          change.
+        </P>
+      </Section>
+
+      <Section id="ai-benchmarks" num="03" heading="AI path benchmarks">
+        <P>
+          AI-generated forecasts can be evaluated on the full route. A model can be strong on
+          endpoint but weak on volatility texture, or strong on drawdown timing but weak on final
+          displacement. LevX makes those differences measurable.
+        </P>
+      </Section>
+
+      <Section id="risk" num="04" heading="Risk expression">
+        <P>
+          Path markets let users express risk scenarios directly. The market is not only "where will
+          price end", but "what route is most likely, and how much path risk is the market
+          mispricing".
+        </P>
+      </Section>
+    </>
+  )
+}
+
+function ProtocolOverviewContent() {
+  return (
+    <>
+      <Section id="system" num="01" heading="System components">
+        <CodeBlock language="system">{`Anchor program
+  Market, PathOutcome, Position, PriceSample, EigenCache, DisputeBond
+
+Keeper layer
+  activation, price sampling, dissolution, scoring, finalization
+
+AI pipeline
+  candidate path generation and submission
+
+Frontend
+  market discovery, charting, wallet-gated transactions, claims`}</CodeBlock>
+      </Section>
+
+      <Section id="accounts" num="02" heading="Core accounts">
         <Ul>
           <Li>
-            Discover open path markets on the{' '}
-            <Link
-              to="/markets"
+            <Code>Market</Code> stores timing, state, pool accounting, amplitudes, scoring config,
+            and settlement fields.
+          </Li>
+          <Li>
+            <Code>PathOutcome</Code> stores predicted checkpoint prices and per-path scoring state.
+          </Li>
+          <Li>
+            <Code>Position</Code> stores a user's path exposure, shares, collateral, payout, and
+            claim state.
+          </Li>
+          <Li>
+            <Code>PriceSample</Code> stores a market-level oracle checkpoint.
+          </Li>
+        </Ul>
+      </Section>
+
+      <Section id="lifecycle" num="03" heading="Lifecycle">
+        <CodeBlock language="state-machine">{`Pending -> Active -> Sampling -> Settling -> Maturing -> Settled
+                                      \\-> Void`}</CodeBlock>
+        <P>
+          The lifecycle is deterministic. Keepers advance the market, but the program verifies
+          account relationships, state constraints, checkpoint counts, and finalization rules.
+        </P>
+      </Section>
+
+      <Section id="trust-boundary" num="04" heading="Trust boundary">
+        <P>
+          AI and keepers are useful services, not settlement authorities. The AI proposes paths.
+          Keepers relay data and crank state. The Solana program controls which state transitions,
+          scores, disputes, and claims are valid.
+        </P>
+      </Section>
+    </>
+  )
+}
+
+function QuantumScoringEngineContent() {
+  return (
+    <>
+      <Section id="path-scoring" num="01" heading="Path scoring">
+        <P>
+          LevX uses an action-style scoring model. At each checkpoint, it compares predicted price
+          and predicted velocity against the observed oracle price and realized velocity.
+        </P>
+        <CodeBlock language="math">{`delta_p = abs(predicted_price - actual_price) / actual_price
+delta_v = abs(predicted_velocity - actual_velocity) / actual_price
+
+checkpoint_action = alpha * delta_p^2 + beta * delta_v^2
+cumulative_action += checkpoint_action
+
+action_score = SCALE * exp(-cumulative_action / reference_action)`}</CodeBlock>
+      </Section>
+
+      <Section id="amplitudes" num="02" heading="Amplitudes">
+        <P>
+          Every path carries an amplitude. As observed prices diverge from a path, that path loses
+          amplitude. If its Born probability falls below the minimum threshold, it dissolves and can
+          receive a graceful partial payout based on survival time and peak popularity.
+        </P>
+      </Section>
+
+      <Section id="pricing" num="03" heading="Pricing">
+        <P>
+          The baseline pricing layer is LS-LMSR. When <Code>lambda = 0</Code>, or when no fresh
+          quantum cache is supplied, the protocol falls back to standard LS-LMSR behavior with no
+          inter-path correlation.
+        </P>
+      </Section>
+
+      <Section id="quantum-cache" num="04" heading="Quantum cache">
+        <P>
+          When <Code>lambda &gt; 0</Code> and a fresh <Code>EigenCache</Code> is available, the
+          protocol can use a quantum-inspired correlated-path pricing layer. A keeper computes an
+          eigendecomposition off-chain, submits it, and the program verifies it before the cache is
+          used.
+        </P>
+        <CodeBlock language="dispatch">{`Fresh EigenCache and lambda > 0:
+  correlated-path pricing with cached eigendecomposition
+
+No fresh cache or lambda = 0:
+  LS-LMSR fallback`}</CodeBlock>
+      </Section>
+
+      <Section id="not-quantum-computer" num="05" heading="What it is not">
+        <P>
+          LevX is not running on a physical quantum computer. The protocol uses quantum-inspired
+          math: amplitudes, Born-probability-style dissolution, and an optional correlated-pricing
+          cache. This keeps execution feasible on Solana while preserving a richer path-market
+          model.
+        </P>
+      </Section>
+    </>
+  )
+}
+
+function AiPipelineContent() {
+  return (
+    <>
+      <Section id="role" num="01" heading="Role of AI">
+        <P>
+          AI is used to generate candidate price paths. It does not decide market outcomes, control
+          payouts, or replace the oracle. Once a path is submitted, it competes under the same
+          scoring rules as every other path.
+        </P>
+      </Section>
+
+      <Section id="generation" num="02" heading="Path generation">
+        <P>
+          The intended generation process is regime-aware. The pipeline can propose trend, range,
+          high-volatility, drawdown, and recovery-shaped routes so markets start with a useful set
+          of differentiated forecasts.
+        </P>
+      </Section>
+
+      <Section id="onchain-boundary" num="03" heading="On-chain boundary">
+        <P>
+          AI-origin paths are timestamped and freshness-checked at activation. The program validates
+          path coverage and rejects stale or future AI timestamps. Settlement still depends on
+          oracle checkpoints and deterministic scoring, not AI trust.
+        </P>
+      </Section>
+
+      <Section id="feedback-loop" num="04" heading="Feedback loop">
+        <P>
+          LevX produces feature-level errors: endpoint, displacement, drawdown, volatility texture,
+          and checkpoint action. Those outputs can become a cleaner training signal for future path
+          generators than a binary correct/incorrect label.
+        </P>
+      </Section>
+    </>
+  )
+}
+
+function CoreArchitectureContent() {
+  return (
+    <>
+      <Section id="account-model" num="01" heading="Account model">
+        <CodeBlock language="pda">{`ProtocolState: ["protocol"]
+Market:        ["market", market_id]
+PathOutcome:   ["path", market_id, path_index]
+Position:      ["position", market_id, user, path_index]
+PriceSample:   ["sample", market_id, checkpoint_index]
+EigenCache:    ["eigen", market_id]`}</CodeBlock>
+      </Section>
+
+      <Section id="state-machine" num="02" heading="State machine">
+        <P>
+          Markets move through Pending, Active, Sampling, Settling, Maturing, Settled, and Void. The
+          maturity window creates time for settlement verification before claims open.
+        </P>
+      </Section>
+
+      <Section id="keepers" num="03" heading="Keepers and oracles">
+        <P>
+          Keepers activate markets, submit checkpoint samples, run dissolution and scoring work, and
+          finalize markets. Pyth-backed samples provide the price data that settlement consumes.
+        </P>
+      </Section>
+
+      <Section id="settlement" num="04" heading="Settlement and disputes">
+        <P>
+          Settlement computes path scores, allocates the distributable pool, and opens claims after
+          maturity. Bonded disputes can pause finalization for governance review, and timeout
+          finalization prevents unresolved disputes from freezing the market indefinitely.
+        </P>
+      </Section>
+    </>
+  )
+}
+
+function WhitepaperContent() {
+  return (
+    <>
+      <Section id="scope" num="01" heading="Scope">
+        <P>
+          The LevX whitepaper will cover the path-market thesis, protocol design, scoring model,
+          AI-path architecture, and planned Mode 2 liquidity system.
+        </P>
+      </Section>
+
+      <Section id="contents" num="02" heading="Planned contents">
+        <Ul>
+          <Li>Path-prediction market model.</Li>
+          <Li>Quantum-inspired scoring and amplitude mechanics.</Li>
+          <Li>LS-LMSR and optional correlated-path pricing.</Li>
+          <Li>AI path-generation and evaluation loop.</Li>
+          <Li>Mode 2 vault and risk-control roadmap.</Li>
+        </Ul>
+      </Section>
+
+      <Section id="availability" num="03" heading="Availability">
+        <P>
+          The whitepaper is in drafting. Until publication, these docs are the public technical
+          reference for the current beta surface.
+        </P>
+      </Section>
+    </>
+  )
+}
+
+function RoadmapContent() {
+  return (
+    <>
+      <Section id="mode1" num="01" heading="Mode 1">
+        <P>
+          Mode 1 focuses on fully collateralized path markets: market creation, path submission,
+          oracle checkpoint sampling, scoring, disputes, settlement, and claims.
+        </P>
+      </Section>
+
+      <Section id="hardening" num="02" heading="Hardening">
+        <P>
+          The next workstream is production hardening: dependency remediation, monitoring,
+          operational runbooks, more public docs, frontend polish, and expanded test coverage.
+        </P>
+      </Section>
+
+      <Section id="mode2" num="03" heading="Mode 2 liquidity">
+        <P>
+          Mode 2 introduces vault-backed leverage, levUSD-style LP exposure, pair buffers, health
+          checks, liquidation, and pro-rata profit haircuts. It should activate only after
+          implementation, testing, and audit coverage.
+        </P>
+      </Section>
+
+      <Section id="mainnet" num="04" heading="Mainnet readiness">
+        <P>
+          Mainnet readiness requires a final program address, external audit scope, operational
+          monitoring, deployed keeper infrastructure, incident procedures, and public risk
+          disclosures.
+        </P>
+      </Section>
+    </>
+  )
+}
+
+function SecurityAuditsContent() {
+  return (
+    <>
+      <Section id="guardrails" num="01" heading="Protocol guardrails">
+        <Ul>
+          <Li>State transitions are enforced on-chain.</Li>
+          <Li>Path ownership, PDA derivation, uniqueness, and full coverage are validated.</Li>
+          <Li>AI freshness checks reject stale and future timestamps.</Li>
+          <Li>Disputes require a bonded account and configurable dispute policy.</Li>
+          <Li>Fees and claims use protocol state rather than frontend constants.</Li>
+        </Ul>
+      </Section>
+
+      <Section id="testing" num="02" heading="Testing">
+        <P>
+          The current codebase includes Rust protocol tests, TypeScript keeper checks, frontend
+          typechecking, frontend tests, and dependency audit tooling. Public claims should always
+          distinguish passing internal verification from an external third-party audit.
+        </P>
+      </Section>
+
+      <Section id="audits" num="03" heading="Audit status">
+        <P>
+          LevX has undergone internal security review and remediation. A completed external
+          third-party audit has not yet been published. Mainnet-facing documentation should update
+          this page when external audit reports are available.
+        </P>
+      </Section>
+
+      <Section id="disclosures" num="04" heading="Disclosures">
+        <P>
+          Security issues should be reported through the official project channels once they are
+          published. Until then, do not assume mainnet readiness or external audit coverage.
+        </P>
+      </Section>
+    </>
+  )
+}
+
+function FaqContent() {
+  return (
+    <>
+      <Section id="what-is-path" num="01" heading="What is a path?">
+        <P>
+          A path is a sequence of predicted prices across a market's checkpoint schedule. LevX
+          scores how closely the path tracks realized prices over time.
+        </P>
+      </Section>
+
+      <Section id="is-ai-trusted" num="02" heading="Is the AI trusted?">
+        <P>
+          No. AI can propose paths, but it does not control settlement. Paths are evaluated against
+          oracle checkpoints by deterministic program logic.
+        </P>
+      </Section>
+
+      <Section id="is-quantum" num="03" heading="Is this a quantum computer?">
+        <P>
+          No. LevX uses quantum-inspired math, not physical quantum hardware. The design borrows
+          concepts like amplitudes, Born probabilities, and correlated-state pricing while staying
+          executable on Solana.
+        </P>
+      </Section>
+
+      <Section id="is-leverage-live" num="04" heading="Is leverage live?">
+        <P>
+          No. Leverage and the levUSD vault are Mode 2 roadmap features. Current docs should treat
+          them as planned until the full implementation, risk controls, and audits are complete.
+        </P>
+      </Section>
+
+      <Section id="mainnet" num="05" heading="Is LevX on mainnet?">
+        <P>
+          The current documentation describes the devnet beta surface. Mainnet status should be
+          updated only after deployment, operational readiness, and audit disclosures are complete.
+        </P>
+      </Section>
+    </>
+  )
+}
+
+function RisksContent() {
+  return (
+    <>
+      <Section id="market-risk" num="01" heading="Market risk">
+        <P>
+          Path markets can settle against outcomes that differ sharply from user expectations.
+          Backing a path can result in partial loss or loss of collateral according to market rules.
+        </P>
+      </Section>
+
+      <Section id="oracle-risk" num="02" heading="Oracle risk">
+        <P>
+          LevX depends on oracle checkpoints for settlement. Oracle downtime, low-confidence
+          samples, delayed cranks, or extreme market conditions can affect market progression.
+        </P>
+      </Section>
+
+      <Section id="smart-contract-risk" num="03" heading="Smart contract risk">
+        <P>
+          Smart contracts can contain bugs. Internal review and tests reduce risk, but they do not
+          eliminate it and are not a substitute for published external audit coverage.
+        </P>
+      </Section>
+
+      <Section id="liquidity-risk" num="04" heading="Liquidity risk">
+        <P>
+          Mode 1 markets depend on participant-funded pools. Mode 2 liquidity is not live; future
+          vault and leverage features would introduce additional liquidity, utilization, and loss
+          waterfall risks.
+        </P>
+      </Section>
+
+      <Section id="stage-risk" num="05" heading="Beta-stage risk">
+        <P>
+          LevX is in beta-stage development. Features, interfaces, parameters, and documentation may
+          change as the protocol is hardened.
+        </P>
+      </Section>
+    </>
+  )
+}
+
+function LaunchAppContent() {
+  return (
+    <>
+      <Section id="app" num="01" heading="App">
+        <P>Open the LevX web app from the main application route.</P>
+        <Ul>
+          <Li>
+            <Link to="/" className="text-ink-strong underline underline-offset-4">
+              Launch app
+            </Link>
+          </Li>
+        </Ul>
+      </Section>
+
+      <Section id="markets" num="02" heading="Markets">
+        <P>To go directly to market discovery, open the markets page.</P>
+        <Ul>
+          <Li>
+            <Link to="/markets" className="text-ink-strong underline underline-offset-4">
+              Browse markets
+            </Link>
+          </Li>
+        </Ul>
+      </Section>
+    </>
+  )
+}
+
+function GithubContent() {
+  return (
+    <>
+      <Section id="protocol-repo" num="01" heading="Protocol repository">
+        <P>
+          The protocol repository contains the Solana program, keeper, pipeline code, tests, and
+          technical docs.
+        </P>
+        <Ul>
+          <Li>
+            <a
+              href="https://github.com/Spizzerp/LevXv2"
+              target="_blank"
+              rel="noopener noreferrer"
               className="text-ink-strong underline underline-offset-4"
             >
-              Markets
-            </Link>{' '}
-            page.
-          </Li>
-          <Li>Place a wager on any AI-generated path with one click.</Li>
-          <Li>
-            Draw your own path on the chart and back it against the AI rail.
-          </Li>
-          <Li>Watch your position score live as oracle checkpoints arrive.</Li>
-          <Li>
-            Provide passive liquidity to the vault and earn from market spread.
+              github.com/Spizzerp/LevXv2
+            </a>
           </Li>
         </Ul>
       </Section>
 
-      <Section id="further-reading" num="05" heading="Further reading">
+      <Section id="frontend-repo" num="02" heading="Frontend repository">
         <P>
-          The rest of these docs are organized like a Git man page. Skim the{' '}
-          <Code>00 — Getting Started</Code> rail to ship your first wager, or
-          jump to <Code>01 — Protocol</Code> for the mechanics.
+          The frontend repository contains the web app and docs surface. Public repository access
+          should be linked here once the canonical frontend URL is confirmed.
         </P>
       </Section>
     </>
   )
 }
 
-function QuickStartContent() {
+function CommunityContent() {
   return (
     <>
-      <Section id="install" num="01" heading="Install the CLI">
+      <Section id="official-links" num="01" heading="Official links">
         <P>
-          The <Code>levx</Code> CLI ships as a single binary. Install with your
-          favorite package manager — the Solana toolchain is the only system
-          dependency.
-        </P>
-        <CodeBlock language="bash">{`# macOS / Linux
-curl -fsSL https://get.levx.trade | sh
-
-# Verify
-levx --version
-# levx 0.1.0 (devnet · build a3f902e)`}</CodeBlock>
-        <Note>
-          The binary is unsigned during the devnet phase. Read the install
-          script before piping it to your shell — it lives in the public{' '}
-          <Code>levx-protocol/install</Code> repo.
-        </Note>
-      </Section>
-
-      <Section id="connect" num="02" heading="Connect a wallet">
-        <P>
-          LevX uses standard Solana keypairs. Either point the CLI at an
-          existing keypair file or generate a fresh one for devnet.
-        </P>
-        <CodeBlock>{`levx wallet use ~/.config/solana/id.json
-# or
-levx wallet new --network devnet`}</CodeBlock>
-      </Section>
-
-      <Section id="fund" num="03" heading="Fund the devnet account">
-        <P>
-          Devnet wagers settle in test USDC. The faucet drips up to 100 USDC at
-          a time and refills every 24 hours.
-        </P>
-        <CodeBlock>{`levx faucet --amount 50
-# Airdropping 50 USDC to 7Xa…q9F
-# Confirmed in slot 312_874_021`}</CodeBlock>
-      </Section>
-
-      <Section id="discover" num="04" heading="Discover a market">
-        <P>
-          List the open markets, then inspect a specific pair. Output is
-          machine-friendly TSV by default; pass <Code>--format table</Code> for
-          the readable Nothing-style print-out.
-        </P>
-        <CodeBlock>{`levx markets list --status open --format table
-
-  PAIR        OPENS      MATURES     LEV    PATHS
-  BTC/USDC    -2d 03h    +5d 21h     ×25      6
-  SOL/USDC    -1d 11h    +6d 13h     ×40      5
-  ETH/USDC    -0d 08h    +6d 16h     ×25      6`}</CodeBlock>
-      </Section>
-
-      <Section id="wager" num="05" heading="Place your first wager">
-        <P>
-          Pick a path id from the listing, choose a leverage, and confirm. The
-          CLI prints the on-chain signature and a link to the market view.
-        </P>
-        <CodeBlock>{`levx wager \\
-  --market BTC/USDC \\
-  --path 03 \\
-  --collateral 25 \\
-  --leverage 5
-
-  · pre-trade quote     +0.0124 USDC per tick
-  · entry checkpoint    312_874_412
-  · signature           5h2K…9eF
-  · open in browser     https://levx.trade/market/0xabc…`}</CodeBlock>
-        <Note kind="tip">
-          The protocol scores your position continuously. Run{' '}
-          <Code>levx positions watch</Code> to stream live P&amp;L until the
-          market matures.
-        </Note>
-      </Section>
-    </>
-  )
-}
-
-function ConceptsContent() {
-  return (
-    <>
-      <Section id="lexicon" num="01" heading="Lexicon">
-        <Ul>
-          <Li>
-            <strong className="text-ink-strong">Market</strong> — a token pair,
-            a start, a maturity, and a set of competing paths.
-          </Li>
-          <Li>
-            <strong className="text-ink-strong">Path</strong> — a sequence of
-            predicted prices at fixed checkpoint intervals.
-          </Li>
-          <Li>
-            <strong className="text-ink-strong">Checkpoint</strong> — an oracle
-            attestation of the actual price at a specific slot.
-          </Li>
-          <Li>
-            <strong className="text-ink-strong">Wager</strong> — a stake in
-            USDC against a single path, with optional leverage.
-          </Li>
-          <Li>
-            <strong className="text-ink-strong">Amplitude</strong> — a path's
-            current standing, decayed by checkpoint divergence.
-          </Li>
-        </Ul>
-      </Section>
-
-      <Section id="lifecycle" num="02" heading="Market lifecycle">
-        <P>
-          Markets move through five deterministic phases driven by the keeper
-          layer. Each transition is on-chain and verifiable.
-        </P>
-        <CodeBlock language="phases">{`Created      paths seeded, market accepts wagers
-Sampling     oracle checkpoints arrive each interval
-Settling     final checkpoint observed, scores frozen
-Disputable   24h window for bonded objections
-Claimable    wagers paid out from escrow`}</CodeBlock>
-      </Section>
-
-      <Section id="roles" num="03" heading="Roles in the system">
-        <Ul>
-          <Li>
-            <strong className="text-ink-strong">Trader</strong> — places wagers,
-            draws paths, claims payouts.
-          </Li>
-          <Li>
-            <strong className="text-ink-strong">Keeper</strong> — relays oracle
-            updates and cranks scoring.
-          </Li>
-          <Li>
-            <strong className="text-ink-strong">LP</strong> — provides vault
-            liquidity to the LS-LMSR maker.
-          </Li>
-          <Li>
-            <strong className="text-ink-strong">Disputer</strong> — bonds
-            collateral to challenge a settlement.
-          </Li>
-        </Ul>
-      </Section>
-    </>
-  )
-}
-
-function PathMarketsContent() {
-  return (
-    <>
-      <Section id="shape" num="01" heading="The shape of a market">
-        <P>
-          A path market is a small constellation of on-chain accounts: the{' '}
-          <Code>PathMarket</Code> root, one <Code>Path</Code> per route, and one{' '}
-          <Code>Checkpoint</Code> per oracle observation. The root holds escrow;
-          the paths hold predictions; the checkpoints hold reality.
-        </P>
-        <CodeBlock language="layout">{`PathMarket  ─┬─  Path 01  ─┬─ Checkpoint 0
-             │            ├─ Checkpoint 1
-             │            └─ … (n)
-             ├─  Path 02  ─┬─ Checkpoint 0
-             │            └─ …
-             └─  Path 03  ─┬─ Checkpoint 0
-                          └─ …`}</CodeBlock>
-      </Section>
-
-      <Section id="paths" num="02" heading="Paths">
-        <P>
-          A path is just a sorted list of price points at the market's checkpoint
-          interval. Five are seeded by the AI generator at creation; users can
-          add their own by drawing on the chart and submitting an{' '}
-          <Code>add_path</Code> instruction.
-        </P>
-        <Note>
-          AI-seeded and user-drawn paths are indistinguishable at the program
-          level. The protocol does not privilege the AI rail — it only publishes
-          a baseline so the market is liquid on day one.
-        </Note>
-      </Section>
-
-      <Section id="checkpoints" num="03" heading="Checkpoints">
-        <P>
-          Each checkpoint is a Pyth attestation written into a per-path account.
-          The interval is fixed at market creation (typically 1h) and cannot be
-          changed retroactively. A market with 168 checkpoints over 7 days
-          produces a 168-element score vector per path.
+          Official community links will be added when the project publishes canonical social and
+          support channels.
         </P>
       </Section>
 
-      <Section id="amplitudes" num="04" heading="Path amplitudes">
+      <Section id="updates" num="02" heading="Updates">
         <P>
-          Every path carries an amplitude — a value in <Code>[0, 1]</Code> that
-          decays as observed prices diverge from the prediction. Settled payouts
-          are proportional to the integral of this amplitude over the market's
-          life, not just its terminal value.
+          Until those channels are published, rely on the application, repository, and project team
+          communications for official updates.
         </P>
       </Section>
     </>
-  )
-}
-
-function ScoringEngineContent() {
-  return (
-    <>
-      <Section id="inputs" num="01" heading="Inputs">
-        <Ul>
-          <Li>
-            The path's predicted price at checkpoint <Code>t</Code>.
-          </Li>
-          <Li>
-            The oracle's observed price at checkpoint <Code>t</Code>.
-          </Li>
-          <Li>The pair's reference volatility window.</Li>
-        </Ul>
-      </Section>
-      <Section id="formula" num="02" heading="Scoring formula">
-        <P>
-          The per-checkpoint score is an exponential of the squared z-score
-          divergence between prediction and observation:
-        </P>
-        <CodeBlock language="math">{`score_t = exp(- (Δ_t / σ)²)
-  Δ_t = predicted_t - observed_t
-  σ   = pair volatility window`}</CodeBlock>
-      </Section>
-      <Section id="decay" num="03" heading="Decoherence and decay">
-        <P>
-          Repeated divergence multiplies down a path's amplitude through a
-          decoherence coefficient. A path that misses the first few checkpoints
-          is not eliminated, but its weight in final settlement shrinks
-          proportionally.
-        </P>
-      </Section>
-    </>
-  )
-}
-
-function CliReferenceContent() {
-  return (
-    <>
-      <Section id="name" num="01" heading="Name">
-        <P>
-          <Code>levx</Code> — command-line interface for the LevX
-          path-prediction market protocol.
-        </P>
-      </Section>
-
-      <Section id="synopsis" num="02" heading="Synopsis">
-        <CodeBlock>{`levx <command> [<args>]
-levx [--version] [--network <network>] [--wallet <path>]
-
-  COMMANDS
-    markets      list, inspect, watch path markets
-    paths        list and inspect paths within a market
-    wager        place a wager against a path
-    positions    inspect or close open positions
-    vault        deposit, withdraw, inspect vault shares
-    wallet       configure the active keypair
-    faucet       request devnet USDC`}</CodeBlock>
-      </Section>
-
-      <Section id="description" num="03" heading="Description">
-        <P>
-          The <Code>levx</Code> command is the primary tool for interacting with
-          the protocol from a terminal. It speaks the same RPC endpoints as the
-          web app, signs with a local keypair, and prints machine-friendly output
-          by default.
-        </P>
-        <P>
-          Every subcommand accepts the global options below. Subcommand-specific
-          options follow on the same line.
-        </P>
-      </Section>
-
-      <Section id="options" num="04" heading="Options">
-        <dl className="border-line mt-2 border-b">
-          <ManOption flag="--network" arg="network">
-            One of <Code>devnet</Code>, <Code>testnet</Code>,{' '}
-            <Code>mainnet-beta</Code>. Defaults to the network bound to the
-            active wallet, falling back to <Code>devnet</Code>.
-          </ManOption>
-          <ManOption flag="--wallet" arg="path">
-            Path to a Solana keypair JSON file. Overrides the active wallet for
-            the duration of the command.
-          </ManOption>
-          <ManOption flag="--format" arg="format">
-            Output format. One of <Code>tsv</Code> (default), <Code>json</Code>,
-            or <Code>table</Code>. The Nothing-style <Code>table</Code> renderer
-            is intended for human reading only.
-          </ManOption>
-          <ManOption flag="--rpc" arg="url" required>
-            Override the cluster RPC endpoint. Required when{' '}
-            <Code>--network</Code> is not one of the named clusters.
-          </ManOption>
-          <ManOption flag="--no-color">
-            Disable ANSI styling. Implied when stdout is not a TTY.
-          </ManOption>
-        </dl>
-      </Section>
-
-      <Section id="examples" num="05" heading="Examples">
-        <P>List active BTC markets in human-readable form:</P>
-        <CodeBlock>{`levx markets list --pair BTC/USDC --status open --format table`}</CodeBlock>
-        <P>Watch a position update on every checkpoint:</P>
-        <CodeBlock>{`levx positions watch --market BTC/USDC --path 03`}</CodeBlock>
-        <P>Deposit 250 USDC into the vault on devnet:</P>
-        <CodeBlock>{`levx vault deposit --amount 250 --network devnet`}</CodeBlock>
-      </Section>
-
-      <Section id="see-also" num="06" heading="See also">
-        <Ul>
-          <Li>
-            <Code>@levx/sdk</Code> — TypeScript bindings used internally by the
-            CLI.
-          </Li>
-          <Li>
-            <Code>levx-keeper</Code> — the daemon that cranks scoring and
-            settlement.
-          </Li>
-        </Ul>
-      </Section>
-    </>
-  )
-}
-
-function DraftingContent({ doc }: { doc: DocId }) {
-  const meta = DOC_META[doc]
-  return (
-    <Section id="overview" num="01" heading="Overview">
-      <P>
-        <Code>{meta.title}</Code> is being typeset.
-      </P>
-      <Note kind="tip">
-        This page is reserved space — the section is part of the planned
-        documentation surface but the canonical text has not yet shipped. Track
-        the <Code>{`docs/${doc}.md`}</Code> file in the protocol repository to
-        watch the draft land.
-      </Note>
-      <P>
-        In the meantime, the <Code>00 — Getting Started</Code> and{' '}
-        <Code>01 — Protocol</Code> rails contain the pages that drove the current
-        devnet release.
-      </P>
-    </Section>
   )
 }
 
 export const DOC_RENDERERS: Record<DocId, () => ReactNode> = {
   introduction: IntroductionContent,
-  'quick-start': QuickStartContent,
-  concepts: ConceptsContent,
-  'path-markets': PathMarketsContent,
-  'scoring-engine': ScoringEngineContent,
-  settlement: () => <DraftingContent doc="settlement" />,
-  vault: () => <DraftingContent doc="vault" />,
-  cli: CliReferenceContent,
-  sdk: () => <DraftingContent doc="sdk" />,
-  api: () => <DraftingContent doc="api" />,
-  whitepaper: () => <DraftingContent doc="whitepaper" />,
-  audit: () => <DraftingContent doc="audit" />,
-  changelog: () => <DraftingContent doc="changelog" />,
+  problem: ProblemContent,
+  solution: SolutionContent,
+  'getting-started': GettingStartedContent,
+  'use-cases': UseCasesContent,
+  'protocol-overview': ProtocolOverviewContent,
+  'quantum-scoring-engine': QuantumScoringEngineContent,
+  'ai-pipeline': AiPipelineContent,
+  'core-architecture': CoreArchitectureContent,
+  whitepaper: WhitepaperContent,
+  roadmap: RoadmapContent,
+  'security-audits': SecurityAuditsContent,
+  faq: FaqContent,
+  risks: RisksContent,
+  'launch-app': LaunchAppContent,
+  github: GithubContent,
+  community: CommunityContent,
 }

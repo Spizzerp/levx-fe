@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { FileText } from 'lucide-react'
-import { Link } from '@tanstack/react-router'
 import Lenis from 'lenis'
 
 import { MarketPreview } from '@/features/market/MarketPreview'

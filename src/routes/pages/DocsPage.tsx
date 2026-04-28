@@ -1,17 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 import { Outlet, useParams } from '@tanstack/react-router'
 import { cn } from '@/lib/cn'
-import { DOC_META } from '@/modules/docs/data'
+import { DOC_META, isDocId } from '@/modules/docs/data'
 import { DocsHeader } from '@/modules/docs/DocsHeader'
 import { DocsSidebar } from '@/modules/docs/DocsSidebar'
 import { DocsTOC } from '@/modules/docs/DocsTOC'
 import type { DocId } from '@/modules/docs/types'
 
-/** Shell — mounts once, never remounts on doc navigation. */
+/** Shell - mounts once, never remounts on doc navigation. */
 export function DocsLayout() {
   const { id } = useParams({ strict: false })
   const isHome = !id
-  const activeDoc: DocId = (id as DocId) ?? 'introduction'
+  const activeDoc: DocId = isDocId(id) ? id : 'introduction'
 
   const [query, setQuery] = useState('')
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -23,11 +23,12 @@ export function DocsLayout() {
 
   // Reset scroll + anchor on doc change
   useEffect(() => {
-    setActiveAnchor(DOC_META[activeDoc].sections[0]?.id ?? null)
-    setMobileOpen(false)
-    requestAnimationFrame(() => {
+    const frame = requestAnimationFrame(() => {
+      setActiveAnchor(DOC_META[activeDoc].sections[0]?.id ?? null)
+      setMobileOpen(false)
       contentRef.current?.scrollTo({ top: 0 })
     })
+    return () => cancelAnimationFrame(frame)
   }, [activeDoc])
 
   // Scroll-spy (skip on home)
@@ -83,9 +84,9 @@ export function DocsLayout() {
           {mobileOpen && (
             <div
               className={cn(
-                'fixed inset-0 z-overlay',
+                'z-overlay fixed inset-0',
                 'bg-surface/95 backdrop-blur',
-                'md:flex hidden',
+                'hidden md:flex',
               )}
             >
               <div className="bg-surface w-72">
@@ -104,7 +105,7 @@ export function DocsLayout() {
             </div>
           )}
 
-          {/* content area — Outlet renders the active doc, ref passed via context */}
+          {/* content area - Outlet renders the active doc, ref passed via context */}
           <article
             ref={contentRef}
             className={cn('h-full overflow-y-auto', 'pt-12 pr-12 pb-24 pl-12')}
@@ -115,11 +116,7 @@ export function DocsLayout() {
           </article>
 
           <div className="md:hidden">
-            <DocsTOC
-              doc={activeDoc}
-              activeAnchor={activeAnchor}
-              contentRef={contentRef}
-            />
+            <DocsTOC doc={activeDoc} activeAnchor={activeAnchor} contentRef={contentRef} />
           </div>
         </div>
       )}

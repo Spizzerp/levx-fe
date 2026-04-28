@@ -1,35 +1,45 @@
-import { ArrowRight, BookOpen, Code2, FileText, Layers, Terminal, Zap } from 'lucide-react'
+import {
+  ArrowRight,
+  BookOpen,
+  BrainCircuit,
+  Compass,
+  FileText,
+  Layers,
+  LinkIcon,
+  Map,
+} from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import { cn } from '@/lib/cn'
 import { SIDEBAR_SECTIONS } from './data'
 import type { DocId } from './types'
 
 const SECTION_ICONS: Record<string, React.ReactNode> = {
-  'getting-started': <Zap size={16} />,
+  overview: <BookOpen size={16} />,
+  guide: <Compass size={16} />,
   protocol: <Layers size={16} />,
-  reference: <Code2 size={16} />,
   resources: <FileText size={16} />,
+  links: <LinkIcon size={16} />,
 }
 
 // Hero quick-links
 const QUICK_LINKS: { label: string; desc: string; to: DocId; icon: React.ReactNode }[] = [
   {
-    label: 'Quick Start',
-    desc: 'From zero to your first wager in 8 minutes.',
-    to: 'quick-start',
-    icon: <Terminal size={18} />,
+    label: 'Getting Started',
+    desc: 'Explore the current devnet beta app and market flow.',
+    to: 'getting-started',
+    icon: <Compass size={18} />,
   },
   {
-    label: 'Core Concepts',
-    desc: 'The vocabulary you need before diving deeper.',
-    to: 'concepts',
-    icon: <BookOpen size={18} />,
+    label: 'Quantum Engine',
+    desc: 'Path scoring, amplitudes, pricing, and the quantum-inspired cache.',
+    to: 'quantum-scoring-engine',
+    icon: <BrainCircuit size={18} />,
   },
   {
-    label: 'SDK Reference',
-    desc: 'TypeScript bindings for the LevX protocol.',
-    to: 'sdk',
-    icon: <Code2 size={18} />,
+    label: 'Roadmap',
+    desc: 'Mode 1 hardening, Mode 2 liquidity, and mainnet readiness.',
+    to: 'roadmap',
+    icon: <Map size={18} />,
   },
 ]
 
@@ -51,20 +61,19 @@ export function DocsHome() {
           Build on LevX
         </h1>
         <p className="text-ink-muted font-editorial max-w-[520px] text-[20px] leading-snug tracking-tight">
-          A path-prediction market protocol on Solana. Predict the route, not just the
-          destination.
+          A path-prediction market protocol on Solana. Predict the route, not just the destination.
         </p>
       </div>
 
       {/* Quick-link bento row */}
-      <div className="mb-12 grid grid-cols-3 gap-px border border-line bg-line md:grid-cols-1">
+      <div className="border-line bg-line mb-12 grid grid-cols-3 gap-px border md:grid-cols-1">
         {QUICK_LINKS.map((item) => (
           <Link
             key={item.to}
             to="/docs/$id"
             params={{ id: item.to }}
             className={cn(
-              'group flex flex-col gap-3 bg-surface p-6',
+              'group bg-surface flex flex-col gap-3 p-6',
               'duration-short ease-levx transition-colors',
               'hover:bg-surface-1',
             )}
@@ -78,28 +87,26 @@ export function DocsHome() {
                 <ArrowRight
                   size={13}
                   className={cn(
-                    'text-ink-dim opacity-0 -translate-x-1',
+                    'text-ink-dim -translate-x-1 opacity-0',
                     'duration-short ease-levx transition-all',
-                    'group-hover:opacity-100 group-hover:translate-x-0',
+                    'group-hover:translate-x-0 group-hover:opacity-100',
                   )}
                 />
               </div>
-              <p className="text-ink-dim text-body-sm font-sans leading-relaxed">
-                {item.desc}
-              </p>
+              <p className="text-ink-dim text-body-sm font-sans leading-relaxed">{item.desc}</p>
             </div>
           </Link>
         ))}
       </div>
 
       {/* Section bento grid */}
-      <div className="grid grid-cols-2 gap-px border border-line bg-line md:grid-cols-1">
+      <div className="border-line bg-line grid grid-cols-2 gap-px border md:grid-cols-1">
         {SIDEBAR_SECTIONS.map((section) => (
-          <div key={section.id} className="flex flex-col bg-surface p-6">
+          <div key={section.id} className="bg-surface flex flex-col p-6">
             {/* Section header */}
             <div className="mb-5 flex items-center gap-2.5">
               <span className="text-ink-dim">{SECTION_ICONS[section.id]}</span>
-              <span className="text-nano font-mono tracking-wider uppercase text-ink-dim">
+              <span className="text-nano text-ink-dim font-mono tracking-wider uppercase">
                 {section.num}
               </span>
               <span className="text-ink-strong font-sans text-[15px] font-medium">
@@ -120,15 +127,15 @@ export function DocsHome() {
                       'duration-short ease-levx px-3 py-2.5 transition-colors',
                     )}
                   >
-                    <span className="text-ink group-hover:text-ink-strong text-body-sm font-sans duration-short ease-levx transition-colors">
+                    <span className="text-ink group-hover:text-ink-strong text-body-sm duration-short ease-levx font-sans transition-colors">
                       {item.label}
                     </span>
                     <ArrowRight
                       size={12}
                       className={cn(
-                        'text-ink-dim opacity-0 -translate-x-1',
+                        'text-ink-dim -translate-x-1 opacity-0',
                         'duration-short ease-levx transition-all',
-                        'group-hover:opacity-100 group-hover:translate-x-0',
+                        'group-hover:translate-x-0 group-hover:opacity-100',
                       )}
                     />
                   </Link>
@@ -142,7 +149,7 @@ export function DocsHome() {
       {/* Footer strip */}
       <div className="border-line mt-12 flex items-center justify-between border-t pt-8">
         <span className="text-ink-dim text-nano font-mono tracking-wider uppercase">
-          v0.1.0 · Solana Devnet
+          v0.1.0 - Solana Devnet
         </span>
         <a
           href="https://github.com/levx-protocol"
@@ -154,7 +161,7 @@ export function DocsHome() {
             'font-mono tracking-wider uppercase transition-colors',
           )}
         >
-          GitHub ↗
+          GitHub -&gt;
         </a>
       </div>
     </div>
