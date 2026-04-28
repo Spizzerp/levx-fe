@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { FileText } from 'lucide-react'
+import { Link } from '@tanstack/react-router'
 import Lenis from 'lenis'
 
 import { MarketPreview } from '@/features/market/MarketPreview'
@@ -352,7 +353,7 @@ const TOUR_STOPS_FALLBACK: readonly TourStop[] = [
     // the box AND shifts it toward the right side of the ChartFrame so
     // it sits over the active forecast-fan area instead of the earlier
     // history.
-    boxAdjust: { left: -0.20, right: -0.02 },
+    boxAdjust: { left: -0.2, right: -0.02 },
   },
   {
     id: 'providers',
@@ -476,13 +477,7 @@ function tooltipVisibility(progress4: number, stopIndex: number, stopCount: numb
   return 1 - (d - 0.25) / 0.3
 }
 
-function ChartTour({
-  progress,
-  stops,
-}: {
-  progress: number
-  stops: readonly TourStop[]
-}) {
+function ChartTour({ progress, stops }: { progress: number; stops: readonly TourStop[] }) {
   // Don't mount tooltips at all until phase 4 has started; this keeps
   // the DOM lean during phases 1-3 when no tooltip is visible.
   if (progress <= 0) return null
@@ -497,13 +492,7 @@ function ChartTour({
   )
 }
 
-function TourTooltip({
-  stop,
-  opacity,
-}: {
-  stop: TourStop
-  opacity: number
-}) {
+function TourTooltip({ stop, opacity }: { stop: TourStop; opacity: number }) {
   return (
     <div
       className="pointer-events-none absolute w-[min(360px,38vw)]"
@@ -644,7 +633,6 @@ function TourOverlay({
         strokeWidth={1.75}
         opacity={focus.intensity}
       />
-
     </svg>
   )
 }
@@ -1154,15 +1142,13 @@ export function LandingPage() {
           >
             <XIcon size={16} />
           </a>
-          {/* Docs link placeholder — dimmed + non-interactive until the
-              docs site goes live. Keeps the icon in the nav for visual
-              balance without a broken `href="#"` target. */}
-          <span
-            aria-label="LevX docs (coming soon)"
-            className="text-ink-dim pointer-events-none opacity-50"
+          <Link
+            to="/docs"
+            aria-label="LevX docs"
+            className="duration-short ease-levx transition-opacity hover:opacity-70"
           >
             <FileText size={16} strokeWidth={1.5} aria-hidden="true" />
-          </span>
+          </Link>
         </div>
       </div>
 
@@ -1193,20 +1179,20 @@ export function LandingPage() {
           guided tour) + 2 for phase 5 (waitlist curtain rise) + 1 dwell.
           Matches the five scrollProgress divisors above. */}
       {!isBelowDesktop && (
-      <>
-      <div className="relative h-[1400vh]">
-        {/* z-[1100] lifts the sticky section's stacking context above
+        <>
+          <div className="relative h-[1400vh]">
+            {/* z-[1100] lifts the sticky section's stacking context above
             SpreadLogoReveal's z-[1000] — sticky *creates* a stacking
             context even without z-index, so without this the market card
             inside gets painted below the intro overlay regardless of any
             z-index we put on it directly. */}
-        <section
-          className={cn(
-            'sticky top-0 flex h-dvh flex-col items-center justify-between overflow-hidden px-6 pt-24 pb-20 sm:px-10 sm:pt-28 sm:pb-24',
-            introOverlayHidden ? 'z-[1100]' : 'z-[900]',
-          )}
-        >
-          {/* Pulsating brand-green dither aura — scoped to the hero only so
+            <section
+              className={cn(
+                'sticky top-0 flex h-dvh flex-col items-center justify-between overflow-hidden px-6 pt-24 pb-20 sm:px-10 sm:pt-28 sm:pb-24',
+                introOverlayHidden ? 'z-[1100]' : 'z-[900]',
+              )}
+            >
+              {/* Pulsating brand-green dither aura — scoped to the hero only so
               it doesn't bleed into sections below when the page scrolls.
               Wrapped with an opacity transition so it smoothly fades in
               after the market card lands (marketSettled) rather than
@@ -1214,89 +1200,90 @@ export function LandingPage() {
               when the intro unmounts. Intentionally static — it doesn't
               translate or scale with the card's scroll-tilt, so the aura
               stays centered on the viewport as the card slides over it. */}
-          <div
-            className="pointer-events-none absolute inset-0 transition-opacity duration-[1000ms] ease-out"
-            style={{
-              opacity: marketSettled ? 1 : 0,
-              transform:
-                scrollProgress2 > 0 || scrollProgress3 > 0
-                  ? (() => {
-                      const uncrunch = easeOutCubic(
-                        Math.max(0, Math.min(1, scrollProgress3 / 0.35)),
-                      )
-                      const tiltX = -easeOutCubic(scrollProgress2) * 13 * (1 - uncrunch)
-                      const tiltY = -easeOutCubic(scrollProgress2) * 3.5
-                      return `translateX(${tiltX}vw) translateY(${tiltY}vh)`
-                    })()
-                  : undefined,
-            }}
-            aria-hidden="true"
-          >
-            {marketSettled && <div className="landing-dither" aria-hidden="true" />}
-          </div>
-
-          <HeroIntro show={introDone} scrollProgress={scrollProgress} />
-
-
-          <div
-            className="mx-auto w-full max-w-[1000px]"
-            style={
-              scrollProgress2 > 0 || scrollProgress3 > 0
-                ? (() => {
-                    const uncrunch = easeOutCubic(Math.max(0, Math.min(1, scrollProgress3 / 0.35)))
-                    const tiltX = -easeOutCubic(scrollProgress2) * 13 * (1 - uncrunch)
-                    const tiltY = -easeOutCubic(scrollProgress2) * 3.5
-                    return {
-                      perspective: '1600px',
-                      transform: `translateX(${tiltX}vw) translateY(${tiltY}vh)`,
-                    }
-                  })()
-                : undefined
-            }
-          >
-            <div
-              style={
-                scrollProgress2 > 0 || scrollProgress3 > 0
-                  ? (() => {
-                      const uncrunch = easeOutCubic(
-                        Math.max(0, Math.min(1, scrollProgress3 / 0.35)),
-                      )
-                      const zoomP = easeInOutCubic(
-                        Math.max(0, Math.min(1, (scrollProgress3 - 0.25) / 0.65)),
-                      )
-                      const rot = easeOutCubic(scrollProgress2) * 16 * (1 - uncrunch)
-                      const basePhase2Scale = 1 - easeOutCubic(scrollProgress2) * 0.08
-                      // Settle at 1.0 (full MarketPreview visible) by end
-                      // of phase 3 — was 1.95 previously, which zoomed
-                      // past the card's natural fit.
-                      const scale = basePhase2Scale + zoomP * (1.0 - basePhase2Scale)
-                      return {
-                        transform: `rotateY(${rot}deg) scale(${scale})`,
-                        transformOrigin: 'center center',
-                      }
-                    })()
-                  : undefined
-              }
-            >
-              {/* Phase-4 zoom-into-point wrapper. Applies `transform-origin`
-                  + `scale` to magnify a specific region of the card per
-                  tour stop. Sits inside the phase-2/3 rotation wrapper
-                  so its origin is independent of the rotateY pivot. */}
               <div
+                className="pointer-events-none absolute inset-0 transition-opacity duration-[1000ms] ease-out"
+                style={{
+                  opacity: marketSettled ? 1 : 0,
+                  transform:
+                    scrollProgress2 > 0 || scrollProgress3 > 0
+                      ? (() => {
+                          const uncrunch = easeOutCubic(
+                            Math.max(0, Math.min(1, scrollProgress3 / 0.35)),
+                          )
+                          const tiltX = -easeOutCubic(scrollProgress2) * 13 * (1 - uncrunch)
+                          const tiltY = -easeOutCubic(scrollProgress2) * 3.5
+                          return `translateX(${tiltX}vw) translateY(${tiltY}vh)`
+                        })()
+                      : undefined,
+                }}
+                aria-hidden="true"
+              >
+                {marketSettled && <div className="landing-dither" aria-hidden="true" />}
+              </div>
+
+              <HeroIntro show={introDone} scrollProgress={scrollProgress} />
+
+              <div
+                className="mx-auto w-full max-w-[1000px]"
                 style={
-                  scrollProgress4 > 0
+                  scrollProgress2 > 0 || scrollProgress3 > 0
                     ? (() => {
-                        const cam = resolveCamera(scrollProgress4, resolvedTourStops)
+                        const uncrunch = easeOutCubic(
+                          Math.max(0, Math.min(1, scrollProgress3 / 0.35)),
+                        )
+                        const tiltX = -easeOutCubic(scrollProgress2) * 13 * (1 - uncrunch)
+                        const tiltY = -easeOutCubic(scrollProgress2) * 3.5
                         return {
-                          transform: `scale(${cam.scale})`,
-                          transformOrigin: `${cam.originX}% ${cam.originY}%`,
-                          willChange: 'transform',
+                          perspective: '1600px',
+                          transform: `translateX(${tiltX}vw) translateY(${tiltY}vh)`,
                         }
                       })()
                     : undefined
                 }
               >
-                {/* MagicCard owns the surface fill, the 1px gradient
+                <div
+                  style={
+                    scrollProgress2 > 0 || scrollProgress3 > 0
+                      ? (() => {
+                          const uncrunch = easeOutCubic(
+                            Math.max(0, Math.min(1, scrollProgress3 / 0.35)),
+                          )
+                          const zoomP = easeInOutCubic(
+                            Math.max(0, Math.min(1, (scrollProgress3 - 0.25) / 0.65)),
+                          )
+                          const rot = easeOutCubic(scrollProgress2) * 16 * (1 - uncrunch)
+                          const basePhase2Scale = 1 - easeOutCubic(scrollProgress2) * 0.08
+                          // Settle at 1.0 (full MarketPreview visible) by end
+                          // of phase 3 — was 1.95 previously, which zoomed
+                          // past the card's natural fit.
+                          const scale = basePhase2Scale + zoomP * (1.0 - basePhase2Scale)
+                          return {
+                            transform: `rotateY(${rot}deg) scale(${scale})`,
+                            transformOrigin: 'center center',
+                          }
+                        })()
+                      : undefined
+                  }
+                >
+                  {/* Phase-4 zoom-into-point wrapper. Applies `transform-origin`
+                  + `scale` to magnify a specific region of the card per
+                  tour stop. Sits inside the phase-2/3 rotation wrapper
+                  so its origin is independent of the rotateY pivot. */}
+                  <div
+                    style={
+                      scrollProgress4 > 0
+                        ? (() => {
+                            const cam = resolveCamera(scrollProgress4, resolvedTourStops)
+                            return {
+                              transform: `scale(${cam.scale})`,
+                              transformOrigin: `${cam.originX}% ${cam.originY}%`,
+                              willChange: 'transform',
+                            }
+                          })()
+                        : undefined
+                    }
+                  >
+                    {/* MagicCard owns the surface fill, the 1px gradient
                     border-ring that tracks the cursor, and the soft inner
                     spotlight that fades in on hover. We keep the card's
                     existing responsibilities on the wrapper itself:
@@ -1318,39 +1305,39 @@ export function LandingPage() {
                     an inner div because MagicCard's z-stack needs direct
                     ownership of its outer edges (padding there would pull
                     the z-20 surface + z-30 spotlight layers inward). */}
-                <MagicCard
-                  ref={cardRef}
-                  className={`landing-card-glow relative z-[1100] mx-auto rounded-2xl ${
-                    introDone ? 'landing-rise' : 'opacity-0'
-                  } ${markersReady ? '' : 'hide-chart-markers'}`}
-                  style={{ zoom: cardScale }}
-                >
-                  <div className="p-5 sm:p-7">
-                    <MarketPreview
-                      pair="BTC/USDC"
-                      history={history}
-                      predictions={predictions}
-                      now={now}
-                      marketStart={marketStart}
-                      marketEnd={marketEnd}
-                      checkpointInterval={CHECKPOINT_INTERVAL_SEC}
-                      totalCheckpoints={TOTAL_CHECKPOINTS}
-                      chartHeight={420}
-                      onCtaClick={openWaitlist}
-                    />
+                    <MagicCard
+                      ref={cardRef}
+                      className={`landing-card-glow relative z-[1100] mx-auto rounded-2xl ${
+                        introDone ? 'landing-rise' : 'opacity-0'
+                      } ${markersReady ? '' : 'hide-chart-markers'}`}
+                      style={{ zoom: cardScale }}
+                    >
+                      <div className="p-5 sm:p-7">
+                        <MarketPreview
+                          pair="BTC/USDC"
+                          history={history}
+                          predictions={predictions}
+                          now={now}
+                          marketStart={marketStart}
+                          marketEnd={marketEnd}
+                          checkpointInterval={CHECKPOINT_INTERVAL_SEC}
+                          totalCheckpoints={TOTAL_CHECKPOINTS}
+                          chartHeight={420}
+                          onCtaClick={openWaitlist}
+                        />
+                      </div>
+                    </MagicCard>
                   </div>
-                </MagicCard>
+                </div>
               </div>
-            </div>
-          </div>
 
-          {/* Right-rail feature callouts — reveal as the card tilts away
+              {/* Right-rail feature callouts — reveal as the card tilts away
               during phase 2 of hero scroll. Pointer-events disabled so
               they never intercept clicks on the card behind. Hidden on
               narrow viewports where the tilt composition doesn't read. */}
-          <HeroFeatureCallouts progress={scrollProgress2} fadeOut={scrollProgress3} />
+              <HeroFeatureCallouts progress={scrollProgress2} fadeOut={scrollProgress3} />
 
-          {/* Phase-4 guided tour — five tooltips keyed to the camera
+              {/* Phase-4 guided tour — five tooltips keyed to the camera
               panning/zooming across the card. One per feature: live
               price, forecast fan, providers, custom-path, leverage.
               Each fades in when the camera arrives at its stop and
@@ -1358,37 +1345,37 @@ export function LandingPage() {
               the dashed highlight boxes + leader arrows beneath the
               tooltip cards; ChartTour renders the explainer cards
               themselves. */}
-          <TourOverlay
-            progress={scrollProgress4}
-            stops={resolvedTourStops}
-            cardRect={cardRect}
-          />
-          <ChartTour progress={scrollProgress4} stops={resolvedTourStops} />
+              <TourOverlay
+                progress={scrollProgress4}
+                stops={resolvedTourStops}
+                cardRect={cardRect}
+              />
+              <ChartTour progress={scrollProgress4} stops={resolvedTourStops} />
 
-          {/* Editorial scroll cue — hairline rule + mono caps + a green
+              {/* Editorial scroll cue — hairline rule + mono caps + a green
               tracer that drops down the rule on a 2.4s cycle. Replaces
               the previous bare chevron with a piece of typographic
               instrumentation that matches the rest of the page's
               drafting language. Fades out the moment the user starts
               scrolling so it never competes with the title's fade. */}
-          <div
-            aria-hidden="true"
-            className={cn(
-              'pointer-events-none absolute bottom-7 left-1/2 z-[1100] -translate-x-1/2 transition-opacity duration-700 ease-out',
-              marketSettled && scrollProgress < 0.02 ? 'opacity-100' : 'opacity-0',
-            )}
-          >
-            <div className="flex flex-col items-center gap-2.5">
-              <span className="text-nano animate-pulse font-mono tracking-[0.32em] text-white uppercase">
-                Scroll
-              </span>
-              <span className="hero-scroll-rule" />
-            </div>
+              <div
+                aria-hidden="true"
+                className={cn(
+                  'pointer-events-none absolute bottom-7 left-1/2 z-[1100] -translate-x-1/2 transition-opacity duration-700 ease-out',
+                  marketSettled && scrollProgress < 0.02 ? 'opacity-100' : 'opacity-0',
+                )}
+              >
+                <div className="flex flex-col items-center gap-2.5">
+                  <span className="text-nano animate-pulse font-mono tracking-[0.32em] text-white uppercase">
+                    Scroll
+                  </span>
+                  <span className="hero-scroll-rule" />
+                </div>
+              </div>
+            </section>
           </div>
-        </section>
-      </div>
 
-      {/* ── Waitlist curtain ──────────────────────────────────
+          {/* ── Waitlist curtain ──────────────────────────────────
           Phase-5 handoff. Rather than sliding a panel in from an edge,
           the transition is a "focus pull": the hero stays in place
           behind, but a viewport-wide overlay defocuses and desaturates
@@ -1401,8 +1388,8 @@ export function LandingPage() {
           The sticky hero is pinned throughout phase 5 (pin wrapper
           extended to 1400vh for this), so there's no competing scroll
           motion — only the overlay's focus shift. */}
-      <WaitlistCurtain reveal={scrollProgress5} onSubmit={handleWaitlistSubmit} />
-      </>
+          <WaitlistCurtain reveal={scrollProgress5} onSubmit={handleWaitlistSubmit} />
+        </>
       )}
 
       <WaitlistModal
@@ -1582,4 +1569,3 @@ function WaitlistCurtain({
     </div>
   )
 }
-

@@ -1,6 +1,6 @@
 import type { PropsWithChildren } from 'react'
 import { FileText } from 'lucide-react'
-import { useLocation } from '@tanstack/react-router'
+import { Link, useLocation } from '@tanstack/react-router'
 
 import { Nav } from '@/layouts/Nav'
 import { ToastContainer } from '@/ui/ToastContainer'
@@ -16,7 +16,7 @@ function XIcon({ size = 16 }: { size?: number }) {
 
 export function CommonLayout({ children }: PropsWithChildren) {
   const { pathname } = useLocation()
-  const showChrome = pathname !== '/'
+  const showChrome = pathname !== '/' && pathname !== '/docs'
 
   return (
     <>
@@ -33,14 +33,13 @@ export function CommonLayout({ children }: PropsWithChildren) {
           >
             <XIcon size={16} />
           </a>
-          <a
-            href="#"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-ink-dim hover:text-ink-strong duration-short ease-levx transition-colors"
+          <Link
+            to="/docs"
+            aria-label="LevX docs"
+            className="text-ink-dim duration-short ease-levx transition-colors hover:text-ink-strong"
           >
             <FileText size={16} strokeWidth={1.5} />
-          </a>
+          </Link>
         </div>
       )}
       <ToastContainer />

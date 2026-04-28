@@ -2,6 +2,7 @@ import { createRootRoute, createRoute, createRouter, redirect } from '@tanstack/
 
 import { AdminPage } from '@/routes/pages/AdminPage'
 import { AdminMarketsPage } from '@/routes/pages/AdminMarketsPage'
+import { DocsPage } from '@/routes/pages/DocsPage'
 import { LabsChartPage } from '@/routes/pages/LabsChartPage'
 import { LandingPage } from '@/routes/pages/LandingPage'
 import { LeaderboardPage } from '@/routes/pages/LeaderboardPage'
@@ -86,6 +87,12 @@ const labsChartRoute = createRoute({
   component: LabsChartPage,
 })
 
+const docsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/docs',
+  component: DocsPage,
+})
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   marketsRoute,
@@ -98,6 +105,7 @@ const routeTree = rootRoute.addChildren([
   adminRoute,
   adminCreateRoute,
   labsChartRoute,
+  docsRoute,
 ])
 
 export const router = createRouter({
