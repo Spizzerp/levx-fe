@@ -1,16 +1,36 @@
 import { useEffect, useRef } from 'react'
 import { Link } from '@tanstack/react-router'
-import { ArrowLeft, ArrowUpRight, Menu, Search, X } from 'lucide-react'
+import { Menu, Search, X } from 'lucide-react'
 import { cn } from '@/lib/cn'
-import { Kbd } from './primitives'
+import { ThemeToggle } from '@/ui/ThemeToggle'
 
-function DocsSearch({
-  query,
-  onChange,
-}: {
-  query: string
-  onChange: (v: string) => void
-}) {
+const ICON_ACTION = cn(
+  'relative z-10 flex size-10 items-center justify-center',
+  'text-ink-muted transition-colors duration-short ease-levx',
+  'hover:text-ink-strong',
+)
+
+function GitHubIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M12 .5C5.65.5.5 5.77.5 12.28c0 5.21 3.29 9.62 7.86 11.18.57.11.78-.25.78-.57 0-.28-.01-1.02-.02-2-3.2.71-3.87-1.58-3.87-1.58-.52-1.36-1.28-1.72-1.28-1.72-1.05-.73.08-.72.08-.72 1.15.08 1.76 1.22 1.76 1.22 1.03 1.8 2.7 1.28 3.35.98.1-.76.4-1.28.73-1.58-2.55-.3-5.23-1.31-5.23-5.82 0-1.29.45-2.34 1.18-3.16-.12-.3-.51-1.5.11-3.12 0 0 .97-.32 3.17 1.2A10.72 10.72 0 0 1 12 5.7c.98 0 1.97.14 2.89.4 2.2-1.52 3.16-1.2 3.16-1.2.63 1.62.23 2.82.12 3.12.74.82 1.18 1.87 1.18 3.16 0 4.52-2.68 5.52-5.24 5.81.41.37.78 1.09.78 2.19 0 1.58-.01 2.86-.01 3.25 0 .32.2.68.79.57 4.55-1.56 7.83-5.97 7.83-11.18C23.5 5.77 18.35.5 12 .5Z"
+      />
+    </svg>
+  )
+}
+
+function XIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+    </svg>
+  )
+}
+
+function DocsSearch({ query, onChange }: { query: string; onChange: (v: string) => void }) {
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -27,25 +47,29 @@ function DocsSearch({
   return (
     <div
       className={cn(
-        'group flex w-full max-w-[420px] items-center gap-2',
-        'border-line focus-within:border-line-strong',
-        'h-9 border px-3',
+        'group relative z-10 flex h-10 w-full max-w-[420px] items-center gap-2',
+        'border-line bg-surface-1 rounded-full border px-3',
         'duration-short ease-levx transition-colors',
+        'focus-within:border-line-strong',
       )}
     >
-      <Search size={13} className="text-ink-dim shrink-0" />
+      <Search size={13} className="text-ink-dim shrink-0" aria-hidden="true" />
       <input
         ref={inputRef}
         value={query}
         onChange={(e) => onChange(e.target.value)}
+        aria-label="Search documentation"
         placeholder="Search docs"
-        className={cn(
-          'flex-1',
-          'text-ink placeholder:text-ink-dim text-ui font-sans',
-        )}
+        className={cn('min-w-0 flex-1', 'text-ink placeholder:text-ink-dim text-ui font-sans')}
       />
-      <Kbd>⌘</Kbd>
-      <Kbd>K</Kbd>
+      <span
+        aria-hidden="true"
+        className="text-ink-dim text-ui flex shrink-0 items-center gap-1 font-mono sm:hidden"
+      >
+        <span>⌘</span>
+        <span>+</span>
+        <span>K</span>
+      </span>
     </div>
   )
 }
@@ -64,65 +88,96 @@ export function DocsHeader({
   return (
     <header
       className={cn(
-        'sticky top-0 z-nav',
-        'border-line bg-surface/90 border-b backdrop-blur',
+        'z-nav sticky top-0 w-full',
+        'from-surface bg-gradient-to-b from-60% to-transparent',
+        'px-6 pt-3 pb-3',
+        'sm:px-3 sm:pt-2',
       )}
     >
-      <div className="flex h-14 w-full items-center gap-4 px-6">
-        <Link to="/" className="flex items-center gap-3">
-          <img src="/logo_wordmark.png" alt="LevX" className="h-4 w-auto" />
-        </Link>
-
-        <span className="text-success text-label font-mono tracking-wider uppercase">
-          Docs
-        </span>
-
-        <button
-          type="button"
-          onClick={onMobileToggle}
-          className={cn(
-            'border-line text-ink hover:text-ink-strong hover:border-line-strong',
-            'duration-short ease-levx flex size-9 items-center justify-center',
-            'border transition-colors',
-            'md:flex hidden',
-          )}
-          aria-label={mobileOpen ? 'Close navigation' : 'Open navigation'}
-        >
-          {mobileOpen ? <X size={16} /> : <Menu size={16} />}
-        </button>
-
-        <div className="flex flex-1 items-center justify-center px-4">
-          <DocsSearch query={query} onChange={onQueryChange} />
+      <nav
+        aria-label="Documentation top navigation"
+        className={cn(
+          'pill-glow relative mx-auto flex w-full max-w-[1400px] items-center justify-between gap-4',
+          'border-line-strong bg-surface rounded-full border',
+          'px-6 py-3',
+          'sm:flex-wrap sm:rounded-2xl sm:px-4 sm:py-3',
+        )}
+      >
+        <div className={cn('relative z-10 flex shrink-0 items-center gap-3', 'min-h-10')}>
+          <Link
+            to="/"
+            className={cn(
+              'flex items-center',
+              'duration-short ease-levx transition-opacity',
+              'hover:opacity-80',
+            )}
+          >
+            <img src="/logo_color.png" alt="LevX" className="-my-1 h-12 w-auto" />
+          </Link>
+          <span className="text-ink-strong text-label font-mono tracking-wider uppercase">
+            Docs
+          </span>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div
+          className={cn(
+            'pointer-events-none absolute inset-0 z-10 flex items-center justify-center',
+            'px-72',
+            'lg:px-64',
+            'md:static md:flex-1 md:justify-start md:px-0',
+            'sm:order-3 sm:w-full sm:flex-none',
+          )}
+        >
+          <div
+            className={cn(
+              'pointer-events-auto flex w-full max-w-[420px] items-center',
+              'sm:max-w-none',
+            )}
+          >
+            <DocsSearch query={query} onChange={onQueryChange} />
+          </div>
+        </div>
+
+        <div className="relative z-10 flex shrink-0 items-center gap-2 sm:ml-auto">
+          <button
+            type="button"
+            onClick={onMobileToggle}
+            className={cn(
+              'hidden size-10 items-center justify-center',
+              'border-line text-ink rounded-full border',
+              'duration-short ease-levx transition-colors',
+              'hover:border-line-strong hover:text-ink-strong',
+              'md:flex',
+            )}
+            aria-label={mobileOpen ? 'Close navigation' : 'Open navigation'}
+          >
+            {mobileOpen ? (
+              <X size={16} aria-hidden="true" />
+            ) : (
+              <Menu size={16} aria-hidden="true" />
+            )}
+          </button>
           <a
             href="https://github.com/levx-protocol"
             target="_blank"
             rel="noopener noreferrer"
-            className={cn(
-              'text-ink-dim hover:text-ink-strong',
-              'duration-short ease-levx text-nano flex items-center gap-1.5',
-              'font-mono tracking-wider uppercase transition-colors',
-            )}
+            aria-label="LevX GitHub"
+            className={ICON_ACTION}
           >
-            GitHub
-            <ArrowUpRight size={11} />
+            <GitHubIcon size={16} />
           </a>
-          <Link
-            to="/"
-            className={cn(
-              'border-line text-ink hover:text-ink-strong hover:border-line-strong',
-              'duration-short ease-levx flex items-center gap-2',
-              'border px-3 py-1.5 transition-colors',
-              'text-nano font-mono tracking-wider uppercase',
-            )}
+          <a
+            href="https://x.com/LevXtrade"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="LevX on X"
+            className={ICON_ACTION}
           >
-            <ArrowLeft size={11} />
-            Back to LevX
-          </Link>
+            <XIcon size={15} />
+          </a>
+          <ThemeToggle aria-label="Toggle theme" className={ICON_ACTION} />
         </div>
-      </div>
+      </nav>
     </header>
   )
 }

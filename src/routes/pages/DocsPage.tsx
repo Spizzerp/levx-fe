@@ -65,19 +65,19 @@ export function DocsLayout() {
 
       {isHome ? (
         // Home: full-width, no sidebar/TOC
-        <div ref={contentRef} className="min-h-0 flex-1 overflow-y-auto px-8 md:px-4">
+        <div ref={contentRef} className="min-h-0 flex-1 overflow-y-auto px-8 pb-16 md:px-4">
           <Outlet />
         </div>
       ) : (
         <div
           className={cn(
-            'grid min-h-0 flex-1',
+            'grid min-h-0 flex-1 overflow-hidden',
             'grid-cols-[260px_minmax(0,1fr)_240px]',
             'lg:grid-cols-[240px_minmax(0,1fr)_220px]',
             'md:grid-cols-1',
           )}
         >
-          <div className="md:hidden">
+          <div className="min-h-0 md:hidden">
             <DocsSidebar activeDoc={activeDoc} query={query} />
           </div>
 
@@ -108,14 +108,18 @@ export function DocsLayout() {
           {/* content area - Outlet renders the active doc, ref passed via context */}
           <article
             ref={contentRef}
-            className={cn('h-full overflow-y-auto', 'pt-12 pr-12 pb-24 pl-12')}
+            className={cn(
+              'h-full min-h-0 overflow-y-auto',
+              'pt-12 pr-12 pb-32 pl-12',
+              'md:px-6 md:pb-32',
+            )}
           >
             <div className="mx-auto max-w-[760px]">
               <Outlet />
             </div>
           </article>
 
-          <div className="md:hidden">
+          <div className="min-h-0 md:hidden">
             <DocsTOC doc={activeDoc} activeAnchor={activeAnchor} contentRef={contentRef} />
           </div>
         </div>

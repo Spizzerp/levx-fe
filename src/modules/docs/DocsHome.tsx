@@ -9,7 +9,9 @@ import {
   Map,
 } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
+import { ChartFrame } from '@/features/chart/ChartFrame'
 import { cn } from '@/lib/cn'
+import { HyperText } from '@/ui/HyperText'
 import { SIDEBAR_SECTIONS } from './data'
 import type { DocId } from './types'
 
@@ -43,6 +45,12 @@ const QUICK_LINKS: { label: string; desc: string; to: DocId; icon: React.ReactNo
   },
 ]
 
+const QUICK_LINK_PILL_CLASSES = [
+  'w-[72%] self-start',
+  'w-[86%] self-start',
+  'w-full self-start',
+] as const
+
 export function DocsHome() {
   return (
     <div className="mx-auto max-w-[900px] pt-12 pb-24">
@@ -58,93 +66,120 @@ export function DocsHome() {
             "[font-variation-settings:'ROND'_100]",
           )}
         >
-          Build on LevX
+          <HyperText>Predict with LevX</HyperText>
         </h1>
-        <p className="text-ink-muted font-editorial max-w-[520px] text-[20px] leading-snug tracking-tight">
+        <p className="text-ink-muted font-editorial text-[20px] leading-snug tracking-tight whitespace-nowrap md:whitespace-normal">
           A path-prediction market protocol on Solana. Predict the route, not just the destination.
         </p>
       </div>
 
-      {/* Quick-link bento row */}
-      <div className="border-line bg-line mb-12 grid grid-cols-3 gap-px border md:grid-cols-1">
-        {QUICK_LINKS.map((item) => (
+      {/* Quick-link pill stack */}
+      <div className="mb-12 flex flex-col gap-4">
+        {QUICK_LINKS.map((item, index) => (
           <Link
             key={item.to}
             to="/docs/$id"
             params={{ id: item.to }}
             className={cn(
-              'group bg-surface flex flex-col gap-3 p-6',
+              'group flex min-h-16 items-center gap-4',
+              'px-5 py-3',
+              'border-line bg-surface rounded-full border',
               'duration-short ease-levx transition-colors',
               'hover:bg-surface-1',
+              'md:w-full md:self-stretch',
+              QUICK_LINK_PILL_CLASSES[index],
             )}
           >
-            <div className="text-ink-dim group-hover:text-ink-strong duration-short ease-levx transition-colors">
+            <div
+              className={cn(
+                'flex size-10 shrink-0 items-center justify-center',
+                'border-line rounded-full border',
+                'text-ink-dim group-hover:text-ink-strong',
+                'duration-short ease-levx transition-colors',
+              )}
+            >
               {item.icon}
             </div>
-            <div>
-              <div className="text-ink-strong mb-1 flex items-center gap-2 font-sans text-[15px] font-medium">
+            <div className="min-w-0 flex-1">
+              <div className="text-ink-strong mb-1 font-sans text-[15px] font-medium">
                 {item.label}
-                <ArrowRight
-                  size={13}
-                  className={cn(
-                    'text-ink-dim -translate-x-1 opacity-0',
-                    'duration-short ease-levx transition-all',
-                    'group-hover:translate-x-0 group-hover:opacity-100',
-                  )}
-                />
               </div>
               <p className="text-ink-dim text-body-sm font-sans leading-relaxed">{item.desc}</p>
             </div>
+            <ArrowRight
+              size={15}
+              className={cn(
+                'text-ink-dim shrink-0 -translate-x-1 opacity-0',
+                'duration-short ease-levx transition-all',
+                'group-hover:translate-x-0 group-hover:opacity-100',
+              )}
+              aria-hidden="true"
+            />
           </Link>
         ))}
       </div>
 
       {/* Section bento grid */}
-      <div className="border-line bg-line grid grid-cols-2 gap-px border md:grid-cols-1">
-        {SIDEBAR_SECTIONS.map((section) => (
-          <div key={section.id} className="bg-surface flex flex-col p-6">
-            {/* Section header */}
-            <div className="mb-5 flex items-center gap-2.5">
-              <span className="text-ink-dim">{SECTION_ICONS[section.id]}</span>
-              <span className="text-nano text-ink-dim font-mono tracking-wider uppercase">
-                {section.num}
-              </span>
-              <span className="text-ink-strong font-sans text-[15px] font-medium">
-                {section.label}
-              </span>
-            </div>
+      <ChartFrame glow>
+        <div className="bg-line grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-px md:grid-cols-1">
+          {SIDEBAR_SECTIONS.map((section) => (
+            <div
+              key={section.id}
+              className={cn(
+                'bg-surface flex min-w-0 flex-col p-6',
+                section.id === 'links' && 'col-span-2 md:col-span-1',
+              )}
+            >
+              {/* Section header */}
+              <div className="mb-5 flex items-center gap-2.5">
+                <span className="text-ink-dim">{SECTION_ICONS[section.id]}</span>
+                <span className="text-nano text-ink-dim font-mono tracking-wider uppercase">
+                  {section.num}
+                </span>
+                <span className="text-ink-strong font-sans text-[15px] font-medium">
+                  {section.label}
+                </span>
+              </div>
 
-            {/* Items */}
-            <ul className="flex flex-col gap-px">
-              {section.items.map((item) => (
-                <li key={item.id}>
-                  <Link
-                    to="/docs/$id"
-                    params={{ id: item.id }}
-                    className={cn(
-                      'group flex items-center justify-between',
-                      'border-line hover:bg-surface-1',
-                      'duration-short ease-levx px-3 py-2.5 transition-colors',
-                    )}
-                  >
-                    <span className="text-ink group-hover:text-ink-strong text-body-sm duration-short ease-levx font-sans transition-colors">
-                      {item.label}
-                    </span>
-                    <ArrowRight
-                      size={12}
+              {/* Items */}
+              <ul
+                className={cn(
+                  'flex flex-col gap-px',
+                  section.id === 'links' && 'grid grid-cols-3 items-center md:grid-cols-1',
+                )}
+              >
+                {section.items.map((item) => (
+                  <li key={item.id}>
+                    <Link
+                      to="/docs/$id"
+                      params={{ id: item.id }}
                       className={cn(
-                        'text-ink-dim -translate-x-1 opacity-0',
-                        'duration-short ease-levx transition-all',
-                        'group-hover:translate-x-0 group-hover:opacity-100',
+                        'group flex items-center justify-between',
+                        'px-3 py-2.5',
+                        'border-line hover:bg-surface-1',
+                        'duration-short ease-levx transition-colors',
+                        section.id === 'links' && 'justify-center text-center',
                       )}
-                    />
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
-      </div>
+                    >
+                      <span className="text-ink group-hover:text-ink-strong text-body-sm duration-short ease-levx font-sans transition-colors">
+                        {item.label}
+                      </span>
+                      <ArrowRight
+                        size={12}
+                        className={cn(
+                          'text-ink-dim -translate-x-1 opacity-0',
+                          'duration-short ease-levx transition-all',
+                          'group-hover:translate-x-0 group-hover:opacity-100',
+                        )}
+                      />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </ChartFrame>
 
       {/* Footer strip */}
       <div className="border-line mt-12 flex items-center justify-between border-t pt-8">
