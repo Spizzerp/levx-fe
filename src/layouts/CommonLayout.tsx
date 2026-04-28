@@ -1,6 +1,6 @@
 import type { PropsWithChildren } from 'react'
 import { FileText } from 'lucide-react'
-import { Link, useLocation } from '@tanstack/react-router'
+import { useLocation } from '@tanstack/react-router'
 
 import { Nav } from '@/layouts/Nav'
 import { ToastContainer } from '@/ui/ToastContainer'
@@ -33,13 +33,20 @@ export function CommonLayout({ children }: PropsWithChildren) {
           >
             <XIcon size={16} />
           </a>
-          <Link
+          {/* <Link
             to="/docs"
             aria-label="LevX docs"
             className="text-ink-dim duration-short ease-levx transition-colors hover:text-ink-strong"
           >
             <FileText size={16} strokeWidth={1.5} />
-          </Link>
+          </Link> */}
+          <span
+            aria-label="LevX docs (coming soon)"
+            title="Coming soon"
+            className="cursor-not-allowed opacity-30"
+          >
+            <FileText size={16} strokeWidth={1.5} />
+          </span>
         </div>
       )}
       <ToastContainer />

@@ -1142,13 +1142,20 @@ export function LandingPage() {
           >
             <XIcon size={16} />
           </a>
-          <Link
+          {/* <Link
             to="/docs"
             aria-label="LevX docs"
             className="duration-short ease-levx transition-opacity hover:opacity-70"
           >
             <FileText size={16} strokeWidth={1.5} aria-hidden="true" />
-          </Link>
+          </Link> */}
+          <span
+            aria-label="LevX docs (coming soon)"
+            title="Coming soon"
+            className="cursor-not-allowed opacity-30"
+          >
+            <FileText size={16} strokeWidth={1.5} aria-hidden="true" />
+          </span>
         </div>
       </div>
 
