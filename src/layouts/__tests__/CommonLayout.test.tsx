@@ -1,8 +1,18 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import type { ComponentPropsWithoutRef, ReactNode } from 'react'
 
 let mockPathname = '/'
 vi.mock('@tanstack/react-router', () => ({
+  Link: ({
+    children,
+    to,
+    ...props
+  }: ComponentPropsWithoutRef<'a'> & { children: ReactNode; to: string }) => (
+    <a href={to} {...props}>
+      {children}
+    </a>
+  ),
   useLocation: () => ({ pathname: mockPathname }),
 }))
 

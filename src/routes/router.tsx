@@ -106,6 +106,15 @@ const docsIndexRoute = createRoute({
 const docsDocRoute = createRoute({
   getParentRoute: () => docsRoute,
   path: '$id',
+  beforeLoad: ({ params }) => {
+    if (!isDocId(params.id)) {
+      throw redirect({
+        to: '/docs/$id',
+        params: { id: 'introduction' },
+        replace: true,
+      })
+    }
+  },
   component: function DocsDocPage() {
     const { id } = docsDocRoute.useParams()
     const doc: DocId = isDocId(id) ? id : 'introduction'
