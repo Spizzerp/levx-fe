@@ -20,9 +20,7 @@ export function DocsSidebar({
     if (!q) return SIDEBAR_SECTIONS
     return SIDEBAR_SECTIONS.map((s) => ({
       ...s,
-      items: s.items.filter(
-        (it) => it.label.toLowerCase().includes(q) || it.id.includes(q),
-      ),
+      items: s.items.filter((it) => it.label.toLowerCase().includes(q) || it.id.includes(q)),
     })).filter((s) => s.items.length > 0)
   }, [query])
 
@@ -30,9 +28,9 @@ export function DocsSidebar({
     <nav
       aria-label="Documentation"
       className={cn(
-        'h-full overflow-y-auto',
+        'h-full min-h-0 overflow-y-auto',
         'border-line border-r',
-        'pt-8 pr-4 pb-12 pl-6',
+        'pt-8 pr-4 pb-24 pl-6',
       )}
     >
       <div className="mb-8 flex items-baseline justify-between">
@@ -43,7 +41,7 @@ export function DocsSidebar({
           <button
             type="button"
             onClick={onClose}
-            className="text-ink-dim hover:text-ink-strong md:block hidden"
+            className="text-ink-dim hover:text-ink-strong hidden md:block"
             aria-label="Close navigation"
           >
             <X size={14} />
@@ -79,7 +77,7 @@ export function DocsSidebar({
                       className={cn(
                         'flex w-full items-center gap-2.5',
                         'border-line border-l py-1.5 pr-2 pl-3',
-                        'text-left text-[13px] font-sans tracking-tight',
+                        'text-left font-sans text-[13px] tracking-tight',
                         'duration-short ease-levx transition-colors',
                         active
                           ? 'border-success text-ink-strong'

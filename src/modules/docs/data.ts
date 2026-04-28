@@ -2,34 +2,33 @@ import type { DocId, DocMeta, SidebarSection } from './types'
 
 export const SIDEBAR_SECTIONS: readonly SidebarSection[] = [
   {
-    id: 'getting-started',
+    id: 'overview',
     num: '00',
-    label: 'Getting Started',
+    label: 'Overview',
     items: [
       { id: 'introduction', label: 'Introduction', status: 'stable' },
-      { id: 'quick-start', label: 'Quick Start', status: 'stable' },
-      { id: 'concepts', label: 'Core Concepts', status: 'stable' },
+      { id: 'problem', label: 'Problem', status: 'stable' },
+      { id: 'solution', label: 'Solution', status: 'stable' },
+    ],
+  },
+  {
+    id: 'guide',
+    num: '01',
+    label: 'Guide',
+    items: [
+      { id: 'getting-started', label: 'Getting Started', status: 'beta' },
+      { id: 'use-cases', label: 'Use Cases', status: 'stable' },
     ],
   },
   {
     id: 'protocol',
-    num: '01',
+    num: '02',
     label: 'Protocol',
     items: [
-      { id: 'path-markets', label: 'Path Markets', status: 'stable' },
-      { id: 'scoring-engine', label: 'Scoring Engine', status: 'stable' },
-      { id: 'settlement', label: 'Settlement', status: 'beta' },
-      { id: 'vault', label: 'Vault', status: 'alpha' },
-    ],
-  },
-  {
-    id: 'reference',
-    num: '02',
-    label: 'Reference',
-    items: [
-      { id: 'cli', label: 'CLI', status: 'beta' },
-      { id: 'sdk', label: 'SDK', status: 'beta' },
-      { id: 'api', label: 'HTTP API', status: 'alpha' },
+      { id: 'protocol-overview', label: 'Overview', status: 'stable' },
+      { id: 'quantum-scoring-engine', label: 'Quantum Path Engine', status: 'stable' },
+      { id: 'ai-pipeline', label: 'AI Pipeline', status: 'alpha' },
+      { id: 'core-architecture', label: 'Core Logic & Architecture', status: 'stable' },
     ],
   },
   {
@@ -38,197 +37,326 @@ export const SIDEBAR_SECTIONS: readonly SidebarSection[] = [
     label: 'Resources',
     items: [
       { id: 'whitepaper', label: 'Whitepaper', status: 'draft' },
-      { id: 'audit', label: 'Audit Trail', status: 'draft' },
-      { id: 'changelog', label: 'Changelog', status: 'stable' },
+      { id: 'roadmap', label: 'Roadmap', status: 'draft' },
+      { id: 'security-audits', label: 'Security & Audits', status: 'beta' },
+      { id: 'faq', label: 'FAQ', status: 'stable' },
+      { id: 'risks', label: 'Risks', status: 'stable' },
+    ],
+  },
+  {
+    id: 'links',
+    num: '04',
+    label: 'Links',
+    items: [
+      { id: 'launch-app', label: 'Launch App', status: 'stable' },
+      { id: 'github', label: 'GitHub', status: 'stable' },
+      { id: 'community', label: 'Community', status: 'draft' },
     ],
   },
 ]
 
 /** Flat ordered sequence used for prev/next pagination. */
-export const DOC_ORDER: readonly DocId[] = SIDEBAR_SECTIONS.flatMap((s) =>
-  s.items.map((i) => i.id),
-)
+export const DOC_ORDER: readonly DocId[] = SIDEBAR_SECTIONS.flatMap((s) => s.items.map((i) => i.id))
 
 export const DOC_META: Record<DocId, DocMeta> = {
   introduction: {
-    category: '00 — Getting Started',
+    category: '00 - Overview',
     title: 'Introduction',
     tagline:
-      'A path-prediction market protocol. Predict the route, not just the destination.',
+      'LevX is a Solana path-prediction protocol for trading the route an asset takes through time.',
     meta: [
+      { label: 'NETWORK', value: 'Solana Devnet' },
       { label: 'VERSION', value: 'v0.1.0' },
-      { label: 'NETWORK', value: 'Solana · Devnet' },
       { label: 'UPDATED', value: '2026-04-28' },
-      { label: 'STATUS', value: 'Stable' },
+      { label: 'STATUS', value: 'Public beta docs' },
     ],
     sections: [
       { id: 'what-is-levx', num: '01', heading: 'What is LevX?' },
-      { id: 'why-paths', num: '02', heading: 'Why paths instead of prices?' },
-      { id: 'how-it-works', num: '03', heading: 'How it works' },
-      { id: 'what-you-can-do', num: '04', heading: 'What you can do today' },
-      { id: 'further-reading', num: '05', heading: 'Further reading' },
+      { id: 'how-it-works', num: '02', heading: 'How it works' },
+      { id: 'why-it-matters', num: '03', heading: 'Why it matters' },
+      { id: 'current-scope', num: '04', heading: 'Current scope' },
     ],
   },
-  'quick-start': {
-    category: '00 — Getting Started',
-    title: 'Quick Start',
-    tagline: 'Five steps from zero to your first wager on a live LevX market.',
-    meta: [
-      { label: 'VERSION', value: 'v0.1.0' },
-      { label: 'EST. TIME', value: '8 min' },
-      { label: 'PREREQUISITES', value: 'Solana wallet · USDC' },
-      { label: 'STATUS', value: 'Stable' },
-    ],
-    sections: [
-      { id: 'install', num: '01', heading: 'Install the CLI' },
-      { id: 'connect', num: '02', heading: 'Connect a wallet' },
-      { id: 'fund', num: '03', heading: 'Fund the devnet account' },
-      { id: 'discover', num: '04', heading: 'Discover a market' },
-      { id: 'wager', num: '05', heading: 'Place your first wager' },
-    ],
-  },
-  concepts: {
-    category: '00 — Getting Started',
-    title: 'Core Concepts',
+  problem: {
+    category: '00 - Overview',
+    title: 'Problem',
     tagline:
-      'The vocabulary you need to read the rest of these docs without backtracking.',
+      'Most market products compress rich price behavior into a single endpoint or binary result.',
     meta: [
-      { label: 'VERSION', value: 'v0.1.0' },
-      { label: 'READING', value: '6 min' },
+      { label: 'FOCUS', value: 'Prediction markets' },
       { label: 'STATUS', value: 'Stable' },
     ],
     sections: [
-      { id: 'lexicon', num: '01', heading: 'Lexicon' },
-      { id: 'lifecycle', num: '02', heading: 'Market lifecycle' },
-      { id: 'roles', num: '03', heading: 'Roles in the system' },
+      { id: 'endpoint-loss', num: '01', heading: 'Endpoint loss' },
+      { id: 'timing-risk', num: '02', heading: 'Timing and path risk' },
+      { id: 'ai-gap', num: '03', heading: 'AI signal gap' },
+      { id: 'settlement-gap', num: '04', heading: 'Settlement gap' },
     ],
   },
-  'path-markets': {
-    category: '01 — Protocol',
-    title: 'Path Markets',
+  solution: {
+    category: '00 - Overview',
+    title: 'Solution',
     tagline:
-      'A market is a set of competing routes through time. Each route is a first-class on-chain object.',
+      'LevX turns paths into first-class market objects and scores them against oracle checkpoints.',
     meta: [
-      { label: 'VERSION', value: 'v0.1.0' },
-      { label: 'PROGRAM', value: 'levx_protocol' },
-      { label: 'ACCOUNT', value: 'PathMarket' },
+      { label: 'MODEL', value: 'Path markets' },
+      { label: 'SETTLEMENT', value: 'Oracle checkpoint scoring' },
       { label: 'STATUS', value: 'Stable' },
     ],
     sections: [
-      { id: 'shape', num: '01', heading: 'The shape of a market' },
-      { id: 'paths', num: '02', heading: 'Paths' },
-      { id: 'checkpoints', num: '03', heading: 'Checkpoints' },
-      { id: 'amplitudes', num: '04', heading: 'Path amplitudes' },
+      { id: 'path-markets', num: '01', heading: 'Path markets' },
+      { id: 'scoring', num: '02', heading: 'Richer scoring' },
+      { id: 'market-design', num: '03', heading: 'Market design' },
+      { id: 'mode2', num: '04', heading: 'Mode 2 roadmap' },
     ],
   },
-  'scoring-engine': {
-    category: '01 — Protocol',
-    title: 'Scoring Engine',
-    tagline: 'How LevX turns a continuous price feed into a payout schedule.',
+  'getting-started': {
+    category: '01 - Guide',
+    title: 'Getting Started',
+    tagline: 'How to explore LevX during the current devnet beta phase.',
     meta: [
-      { label: 'VERSION', value: 'v0.1.0' },
-      { label: 'STATUS', value: 'Stable' },
-    ],
-    sections: [
-      { id: 'inputs', num: '01', heading: 'Inputs' },
-      { id: 'formula', num: '02', heading: 'Scoring formula' },
-      { id: 'decay', num: '03', heading: 'Decoherence and decay' },
-    ],
-  },
-  settlement: {
-    category: '01 — Protocol',
-    title: 'Settlement',
-    tagline: 'From the last checkpoint to a claimable payout.',
-    meta: [
-      { label: 'VERSION', value: 'v0.1.0' },
+      { label: 'INTERFACE', value: 'Web app' },
+      { label: 'NETWORK', value: 'Devnet' },
       { label: 'STATUS', value: 'Beta' },
     ],
     sections: [
-      { id: 'finalize', num: '01', heading: 'Finalize' },
-      { id: 'dispute', num: '02', heading: 'Dispute window' },
-      { id: 'claim', num: '03', heading: 'Claim' },
+      { id: 'open-app', num: '01', heading: 'Open the app' },
+      { id: 'browse-markets', num: '02', heading: 'Browse markets' },
+      { id: 'read-paths', num: '03', heading: 'Read paths' },
+      { id: 'connect-wallet', num: '04', heading: 'Connect a wallet' },
+      { id: 'claim', num: '05', heading: 'Claim settled payouts' },
     ],
   },
-  vault: {
-    category: '01 — Protocol',
-    title: 'Vault',
+  'use-cases': {
+    category: '01 - Guide',
+    title: 'Use Cases',
     tagline:
-      'Passive liquidity for the LS-LMSR market maker. Earn from spread, take inventory risk.',
+      'Where path-level prediction can create richer markets, benchmarks, and forecasting products.',
     meta: [
-      { label: 'VERSION', value: 'v0.0.4' },
+      { label: 'AUDIENCE', value: 'Traders, analysts, builders, AI providers' },
+      { label: 'STATUS', value: 'Stable' },
+    ],
+    sections: [
+      { id: 'trading', num: '01', heading: 'Path-aware trading' },
+      { id: 'prediction-portfolios', num: '02', heading: 'Prediction portfolios' },
+      { id: 'ai-benchmarks', num: '03', heading: 'AI path benchmarks' },
+      { id: 'research', num: '04', heading: 'Forecast research' },
+      { id: 'risk', num: '05', heading: 'Risk expression' },
+      { id: 'non-crypto', num: '06', heading: 'Beyond crypto' },
+      { id: 'requirements', num: '07', heading: 'Requirements' },
+    ],
+  },
+  'protocol-overview': {
+    category: '02 - Protocol',
+    title: 'Overview',
+    tagline:
+      'How the on-chain program, math engine, path-state model, oracle layer, AI service, and verification work fit together.',
+    meta: [
+      { label: 'PROGRAM', value: 'Anchor' },
+      { label: 'ORACLE', value: 'Pyth' },
+      { label: 'STATUS', value: 'Stable' },
+    ],
+    sections: [
+      { id: 'foundation', num: '01', heading: 'Foundation' },
+      { id: 'onchain-engine', num: '02', heading: 'On-chain engine' },
+      { id: 'math-engine', num: '03', heading: 'Math and pricing engine' },
+      { id: 'service-layer', num: '04', heading: 'Service layer' },
+      { id: 'verification', num: '05', heading: 'Verification and trust boundary' },
+    ],
+  },
+  'quantum-scoring-engine': {
+    category: '02 - Protocol',
+    title: 'Quantum Path Engine',
+    tagline:
+      'How LevX combines path scoring, amplitudes, thin-liquidity LS-LMSR, and optional correlated-path pricing.',
+    meta: [
+      { label: 'TYPE', value: 'Quantum-inspired' },
+      { label: 'FALLBACK', value: 'LS-LMSR' },
+      { label: 'STATUS', value: 'Stable' },
+    ],
+    sections: [
+      { id: 'path-scoring', num: '01', heading: 'Path scoring' },
+      { id: 'amplitudes', num: '02', heading: 'Amplitudes' },
+      { id: 'pricing', num: '03', heading: 'Pricing' },
+      { id: 'thin-liquidity', num: '04', heading: 'Thin-liquidity adaptations' },
+      { id: 'quantum-cache', num: '05', heading: 'Quantum cache' },
+      { id: 'not-quantum-computer', num: '06', heading: 'What it is not' },
+    ],
+  },
+  'ai-pipeline': {
+    category: '02 - Protocol',
+    title: 'AI Pipeline',
+    tagline:
+      'How LevX uses internal foundation-model path generation today, and how external AI providers can compete in future markets.',
+    meta: [
+      { label: 'MODELS', value: 'TimesFM 2.5 + Chronos-2' },
+      { label: 'HOSTING', value: 'RunPod Serverless' },
       { label: 'STATUS', value: 'Alpha' },
     ],
-    sections: [{ id: 'overview', num: '01', heading: 'Overview' }],
+    sections: [
+      { id: 'role', num: '01', heading: 'Role of AI' },
+      { id: 'internal-providers', num: '02', heading: 'Internal providers' },
+      { id: 'market-flow', num: '03', heading: 'Market generation flow' },
+      { id: 'onchain-boundary', num: '04', heading: 'On-chain boundary' },
+      { id: 'provider-roadmap', num: '05', heading: 'Provider roadmap' },
+      { id: 'feedback-loop', num: '06', heading: 'Feedback loop' },
+    ],
   },
-  cli: {
-    category: '02 — Reference',
-    title: 'levx',
+  'core-architecture': {
+    category: '02 - Protocol',
+    title: 'Core Logic & Architecture',
     tagline:
-      'Command-line interface for inspecting markets, drawing paths, and submitting wagers.',
+      'How markets are created, priced, sampled, dissolved, scored, disputed, and claimed on-chain.',
     meta: [
-      { label: 'NAME', value: 'levx' },
-      { label: 'SECTION', value: '1' },
-      { label: 'VERSION', value: 'v0.1.0' },
-      { label: 'STATUS', value: 'Beta' },
+      { label: 'MODE', value: 'Mode 1 beta' },
+      { label: 'PATHS', value: '3-16' },
+      { label: 'CHECKPOINTS', value: '4-120' },
+      { label: 'STATUS', value: 'Stable' },
     ],
     sections: [
-      { id: 'name', num: '01', heading: 'Name' },
-      { id: 'synopsis', num: '02', heading: 'Synopsis' },
-      { id: 'description', num: '03', heading: 'Description' },
-      { id: 'options', num: '04', heading: 'Options' },
-      { id: 'examples', num: '05', heading: 'Examples' },
-      { id: 'see-also', num: '06', heading: 'See also' },
+      { id: 'account-model', num: '01', heading: 'Account model' },
+      { id: 'market-setup', num: '02', heading: 'Market setup' },
+      { id: 'lifecycle', num: '03', heading: 'Lifecycle and keepers' },
+      { id: 'trading-pricing', num: '04', heading: 'Trading and pricing' },
+      { id: 'checkpoints', num: '05', heading: 'Checkpoints and path evolution' },
+      { id: 'settlement', num: '06', heading: 'Settlement, disputes, and claims' },
+      { id: 'boundaries', num: '07', heading: 'Current boundaries' },
     ],
-  },
-  sdk: {
-    category: '02 — Reference',
-    title: 'SDK',
-    tagline: 'TypeScript bindings for the LevX protocol.',
-    meta: [
-      { label: 'PACKAGE', value: '@levx/sdk' },
-      { label: 'VERSION', value: 'v0.1.0' },
-      { label: 'STATUS', value: 'Beta' },
-    ],
-    sections: [{ id: 'overview', num: '01', heading: 'Overview' }],
-  },
-  api: {
-    category: '02 — Reference',
-    title: 'HTTP API',
-    tagline: 'Read-only endpoints for indexed market data.',
-    meta: [
-      { label: 'VERSION', value: 'v0.0.7' },
-      { label: 'STATUS', value: 'Alpha' },
-    ],
-    sections: [{ id: 'overview', num: '01', heading: 'Overview' }],
   },
   whitepaper: {
-    category: '03 — Resources',
+    category: '03 - Resources',
     title: 'Whitepaper',
-    tagline: 'The long-form spec. Currently being typeset.',
+    tagline:
+      'A public draft of the LevX thesis, mechanism design, protocol architecture, and roadmap.',
     meta: [
-      { label: 'STATUS', value: 'Drafting' },
-      { label: 'TARGET', value: 'Q3 2026' },
+      { label: 'VERSION', value: 'v0.1 public draft' },
+      { label: 'SCOPE', value: 'Mode 1 beta' },
+      { label: 'STATUS', value: 'Draft' },
     ],
-    sections: [{ id: 'overview', num: '01', heading: 'Overview' }],
-  },
-  audit: {
-    category: '03 — Resources',
-    title: 'Audit Trail',
-    tagline: 'Public record of program audits, scope, and remediations.',
-    meta: [
-      { label: 'STATUS', value: 'Drafting' },
-      { label: 'NEXT', value: 'Mainnet candidate' },
+    sections: [
+      { id: 'abstract', num: '01', heading: 'Abstract' },
+      { id: 'thesis', num: '02', heading: 'Thesis' },
+      { id: 'market-model', num: '03', heading: 'Market model' },
+      { id: 'protocol-architecture', num: '04', heading: 'Protocol architecture' },
+      { id: 'pricing', num: '05', heading: 'Pricing' },
+      { id: 'scoring', num: '06', heading: 'Scoring and settlement' },
+      { id: 'ai-layer', num: '07', heading: 'AI path layer' },
+      { id: 'trust-security', num: '08', heading: 'Trust and security' },
+      { id: 'roadmap', num: '09', heading: 'Roadmap' },
     ],
-    sections: [{ id: 'overview', num: '01', heading: 'Overview' }],
   },
-  changelog: {
-    category: '03 — Resources',
-    title: 'Changelog',
-    tagline: 'A reverse-chronological log of protocol and CLI releases.',
+  roadmap: {
+    category: '03 - Resources',
+    title: 'Roadmap',
+    tagline:
+      'A staged path from Mode 1 path markets toward validated AI competition, deeper liquidity, and production readiness.',
     meta: [
-      { label: 'LATEST', value: 'v0.1.0' },
+      { label: 'CURRENT', value: 'Mode 1 beta' },
+      { label: 'NEXT', value: 'Hardening + AI validation' },
+      { label: 'FUTURE', value: 'Provider marketplace + Mode 2' },
+      { label: 'STATUS', value: 'Draft' },
+    ],
+    sections: [
+      { id: 'mode1-beta', num: '01', heading: 'Mode 1 beta' },
+      { id: 'hardening', num: '02', heading: 'Production hardening' },
+      { id: 'ai-validation', num: '03', heading: 'AI validation' },
+      { id: 'provider-marketplace', num: '04', heading: 'Provider marketplace' },
+      { id: 'liquidity', num: '05', heading: 'Liquidity expansion' },
+      { id: 'mode2', num: '06', heading: 'Mode 2 leverage' },
+      { id: 'mainnet-governance', num: '07', heading: 'Mainnet and governance' },
+    ],
+  },
+  'security-audits': {
+    category: '03 - Resources',
+    title: 'Security & Audits',
+    tagline: 'Security posture, completed remediation work, current guardrails, and audit status.',
+    meta: [
+      { label: 'SCOPE', value: 'Protocol, keeper, frontend' },
+      { label: 'EXTERNAL AUDIT', value: 'Not yet completed' },
+      { label: 'STATUS', value: 'Beta' },
+    ],
+    sections: [
+      { id: 'guardrails', num: '01', heading: 'Protocol guardrails' },
+      { id: 'testing', num: '02', heading: 'Testing' },
+      { id: 'audits', num: '03', heading: 'Audit status' },
+      { id: 'disclosures', num: '04', heading: 'Disclosures' },
+    ],
+  },
+  faq: {
+    category: '03 - Resources',
+    title: 'FAQ',
+    tagline: 'Short answers to common LevX protocol and product questions.',
+    meta: [
+      { label: 'STATUS', value: 'Stable' },
+      { label: 'UPDATED', value: '2026-04-28' },
+    ],
+    sections: [
+      { id: 'what-is-path', num: '01', heading: 'What is a path?' },
+      { id: 'is-ai-trusted', num: '02', heading: 'Is the AI trusted?' },
+      { id: 'is-quantum', num: '03', heading: 'Is this a quantum computer?' },
+      { id: 'is-leverage-live', num: '04', heading: 'Is leverage live?' },
+      { id: 'mainnet', num: '05', heading: 'Is LevX on mainnet?' },
+    ],
+  },
+  risks: {
+    category: '03 - Resources',
+    title: 'Risks',
+    tagline:
+      'Important protocol, oracle, liquidity, operational, and product-stage risks to understand.',
+    meta: [
+      { label: 'TYPE', value: 'Risk disclosure' },
       { label: 'STATUS', value: 'Stable' },
     ],
-    sections: [{ id: 'releases', num: '01', heading: 'Releases' }],
+    sections: [
+      { id: 'market-risk', num: '01', heading: 'Market risk' },
+      { id: 'oracle-risk', num: '02', heading: 'Oracle risk' },
+      { id: 'smart-contract-risk', num: '03', heading: 'Smart contract risk' },
+      { id: 'liquidity-risk', num: '04', heading: 'Liquidity risk' },
+      { id: 'stage-risk', num: '05', heading: 'Beta-stage risk' },
+    ],
   },
+  'launch-app': {
+    category: '04 - Links',
+    title: 'Launch App',
+    tagline: 'Open the LevX web application and explore active devnet markets.',
+    meta: [
+      { label: 'DESTINATION', value: 'Web app' },
+      { label: 'STATUS', value: 'Stable' },
+    ],
+    sections: [
+      { id: 'app', num: '01', heading: 'App' },
+      { id: 'markets', num: '02', heading: 'Markets' },
+    ],
+  },
+  github: {
+    category: '04 - Links',
+    title: 'GitHub',
+    tagline: 'Explore the LevX protocol codebase and public development history.',
+    meta: [
+      { label: 'REPOSITORIES', value: 'Protocol, FE, Infra' },
+      { label: 'STATUS', value: 'Stable' },
+    ],
+    sections: [
+      { id: 'protocol-repo', num: '01', heading: 'Protocol repository' },
+      { id: 'frontend-repo', num: '02', heading: 'Frontend repository' },
+      { id: 'infra-repo', num: '03', heading: 'Infrastructure repository' },
+    ],
+  },
+  community: {
+    category: '04 - Links',
+    title: 'Community',
+    tagline: 'Official community links and announcements.',
+    meta: [
+      { label: 'STATUS', value: 'Live' },
+      { label: 'CHANNELS', value: 'X' },
+    ],
+    sections: [
+      { id: 'official-links', num: '01', heading: 'Official links' },
+      { id: 'updates', num: '02', heading: 'Updates' },
+    ],
+  },
+}
+
+export function isDocId(value: string | undefined): value is DocId {
+  return typeof value === 'string' && value in DOC_META
 }

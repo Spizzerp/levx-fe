@@ -1,17 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 import { Outlet, useParams } from '@tanstack/react-router'
 import { cn } from '@/lib/cn'
-import { DOC_META } from '@/modules/docs/data'
+import { DOC_META, isDocId } from '@/modules/docs/data'
 import { DocsHeader } from '@/modules/docs/DocsHeader'
 import { DocsSidebar } from '@/modules/docs/DocsSidebar'
 import { DocsTOC } from '@/modules/docs/DocsTOC'
 import type { DocId } from '@/modules/docs/types'
 
-/** Shell — mounts once, never remounts on doc navigation. */
+/** Shell - mounts once, never remounts on doc navigation. */
 export function DocsLayout() {
   const { id } = useParams({ strict: false })
   const isHome = !id
-  const activeDoc: DocId = (id as DocId) ?? 'introduction'
+  const activeDoc: DocId = isDocId(id) ? id : 'introduction'
 
   const [query, setQuery] = useState('')
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -23,11 +23,12 @@ export function DocsLayout() {
 
   // Reset scroll + anchor on doc change
   useEffect(() => {
-    setActiveAnchor(DOC_META[activeDoc].sections[0]?.id ?? null)
-    setMobileOpen(false)
-    requestAnimationFrame(() => {
+    const frame = requestAnimationFrame(() => {
+      setActiveAnchor(DOC_META[activeDoc].sections[0]?.id ?? null)
+      setMobileOpen(false)
       contentRef.current?.scrollTo({ top: 0 })
     })
+    return () => cancelAnimationFrame(frame)
   }, [activeDoc])
 
   // Scroll-spy (skip on home)
@@ -64,28 +65,28 @@ export function DocsLayout() {
 
       {isHome ? (
         // Home: full-width, no sidebar/TOC
-        <div ref={contentRef} className="min-h-0 flex-1 overflow-y-auto px-8 md:px-4">
+        <div ref={contentRef} className="min-h-0 flex-1 overflow-y-auto px-8 pb-16 md:px-4">
           <Outlet />
         </div>
       ) : (
         <div
           className={cn(
-            'grid min-h-0 flex-1',
+            'grid min-h-0 flex-1 overflow-hidden',
             'grid-cols-[260px_minmax(0,1fr)_240px]',
             'lg:grid-cols-[240px_minmax(0,1fr)_220px]',
             'md:grid-cols-1',
           )}
         >
-          <div className="md:hidden">
+          <div className="min-h-0 md:hidden">
             <DocsSidebar activeDoc={activeDoc} query={query} />
           </div>
 
           {mobileOpen && (
             <div
               className={cn(
-                'fixed inset-0 z-overlay',
+                'z-overlay fixed inset-0',
                 'bg-surface/95 backdrop-blur',
-                'md:flex hidden',
+                'hidden md:flex',
               )}
             >
               <div className="bg-surface w-72">
@@ -104,22 +105,22 @@ export function DocsLayout() {
             </div>
           )}
 
-          {/* content area — Outlet renders the active doc, ref passed via context */}
+          {/* content area - Outlet renders the active doc, ref passed via context */}
           <article
             ref={contentRef}
-            className={cn('h-full overflow-y-auto', 'pt-12 pr-12 pb-24 pl-12')}
+            className={cn(
+              'h-full min-h-0 overflow-y-auto',
+              'pt-12 pr-12 pb-32 pl-12',
+              'md:px-6 md:pb-32',
+            )}
           >
             <div className="mx-auto max-w-[760px]">
               <Outlet />
             </div>
           </article>
 
-          <div className="md:hidden">
-            <DocsTOC
-              doc={activeDoc}
-              activeAnchor={activeAnchor}
-              contentRef={contentRef}
-            />
+          <div className="min-h-0 md:hidden">
+            <DocsTOC doc={activeDoc} activeAnchor={activeAnchor} contentRef={contentRef} />
           </div>
         </div>
       )}

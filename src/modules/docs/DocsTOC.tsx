@@ -16,9 +16,9 @@ export function DocsTOC({
     <aside
       aria-label="On this page"
       className={cn(
-        'h-full overflow-y-auto',
+        'h-full min-h-0 overflow-y-auto',
         'border-line border-l',
-        'pt-12 pr-6 pb-12 pl-6',
+        'pt-12 pr-6 pb-24 pl-6',
       )}
     >
       <div className="text-ink-dim text-nano mb-4 font-mono tracking-wider uppercase">
@@ -33,9 +33,7 @@ export function DocsTOC({
                 href={`#${s.id}`}
                 onClick={(e) => {
                   e.preventDefault()
-                  const target = contentRef.current?.querySelector(
-                    `#${CSS.escape(s.id)}`,
-                  )
+                  const target = contentRef.current?.querySelector(`#${CSS.escape(s.id)}`)
                   if (target instanceof HTMLElement) {
                     contentRef.current?.scrollTo({
                       top: target.offsetTop - 32,
@@ -46,7 +44,7 @@ export function DocsTOC({
                 className={cn(
                   'flex items-baseline gap-2',
                   'border-line border-l py-1 pl-3',
-                  'text-[12.5px] font-sans tracking-tight',
+                  'font-sans text-[12.5px] tracking-tight',
                   'duration-short ease-levx transition-colors',
                   active
                     ? 'border-success text-ink-strong'

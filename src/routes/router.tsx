@@ -15,6 +15,7 @@ import { VaultPage } from '@/routes/pages/VaultPage'
 import { RootRouteComponent } from '@/routes/RootRoute'
 import { DocsContent } from '@/modules/docs/DocsContent'
 import { DocsHome } from '@/modules/docs/DocsHome'
+import { isDocId } from '@/modules/docs/data'
 import type { DocId } from '@/modules/docs/types'
 
 const rootRoute = createRootRoute({
@@ -105,9 +106,19 @@ const docsIndexRoute = createRoute({
 const docsDocRoute = createRoute({
   getParentRoute: () => docsRoute,
   path: '$id',
+  beforeLoad: ({ params }) => {
+    if (!isDocId(params.id)) {
+      throw redirect({
+        to: '/docs/$id',
+        params: { id: 'introduction' },
+        replace: true,
+      })
+    }
+  },
   component: function DocsDocPage() {
     const { id } = docsDocRoute.useParams()
-    return <DocsContent doc={id as DocId} />
+    const doc: DocId = isDocId(id) ? id : 'introduction'
+    return <DocsContent doc={doc} />
   },
 })
 

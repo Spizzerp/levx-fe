@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import type { ComponentPropsWithoutRef, ReactNode } from 'react'
 
 vi.mock('@/env/env.config', () => ({
   env: {
@@ -14,6 +15,15 @@ vi.mock('@/env/env.config', () => ({
 
 const navigateSpy = vi.fn()
 vi.mock('@tanstack/react-router', () => ({
+  Link: ({
+    children,
+    to,
+    ...props
+  }: ComponentPropsWithoutRef<'a'> & { children: ReactNode; to: string }) => (
+    <a href={to} {...props}>
+      {children}
+    </a>
+  ),
   useNavigate: () => navigateSpy,
 }))
 
