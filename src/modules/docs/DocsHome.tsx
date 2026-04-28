@@ -32,8 +32,8 @@ const QUICK_LINKS: { label: string; desc: string; to: DocId; icon: React.ReactNo
     icon: <Compass size={18} />,
   },
   {
-    label: 'Quantum Engine',
-    desc: 'Path scoring, amplitudes, pricing, and the quantum-inspired cache.',
+    label: 'Quantum Path Engine',
+    desc: 'Scoring, amplitudes, thin-market pricing, and correlated paths.',
     to: 'quantum-scoring-engine',
     icon: <BrainCircuit size={18} />,
   },
