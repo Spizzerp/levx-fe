@@ -16,7 +16,7 @@ function XIcon({ size = 16 }: { size?: number }) {
 
 export function CommonLayout({ children }: PropsWithChildren) {
   const { pathname } = useLocation()
-  const showChrome = pathname !== '/' && pathname !== '/docs'
+  const showChrome = pathname !== '/' && !pathname.startsWith('/docs')
 
   return (
     <>

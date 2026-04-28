@@ -1,42 +1,35 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { Outlet, useParams } from '@tanstack/react-router'
 import { cn } from '@/lib/cn'
 import { DOC_META } from '@/modules/docs/data'
-import { DocsContent } from '@/modules/docs/DocsContent'
 import { DocsHeader } from '@/modules/docs/DocsHeader'
 import { DocsSidebar } from '@/modules/docs/DocsSidebar'
 import { DocsTOC } from '@/modules/docs/DocsTOC'
 import type { DocId } from '@/modules/docs/types'
 
-export function DocsPage() {
-  const [activeDoc, setActiveDocState] = useState<DocId>('introduction')
+/** Shell — mounts once, never remounts on doc navigation. */
+export function DocsLayout() {
+  const { id } = useParams({ strict: false })
+  const activeDoc: DocId = (id as DocId) ?? 'introduction'
+
   const [query, setQuery] = useState('')
   const [mobileOpen, setMobileOpen] = useState(false)
   const [activeAnchor, setActiveAnchor] = useState<string | null>(
-    () => DOC_META.introduction.sections[0]?.id ?? null,
+    () => DOC_META[activeDoc].sections[0]?.id ?? null,
   )
 
   const contentRef = useRef<HTMLDivElement>(null)
 
-  const selectDoc = useCallback((id: DocId) => {
-    setActiveDocState(id)
+  // Reset scroll + anchor on doc change
+  useEffect(() => {
+    setActiveAnchor(DOC_META[activeDoc].sections[0]?.id ?? null)
     setMobileOpen(false)
-    setActiveAnchor(DOC_META[id].sections[0]?.id ?? null)
     requestAnimationFrame(() => {
       contentRef.current?.scrollTo({ top: 0 })
     })
-  }, [])
+  }, [activeDoc])
 
-  // Listen for prev/next selection — keeps PrevNextLink decoupled.
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const detail = (e as CustomEvent<{ id: DocId }>).detail
-      if (detail?.id) selectDoc(detail.id)
-    }
-    window.addEventListener('levx-docs-select', handler)
-    return () => window.removeEventListener('levx-docs-select', handler)
-  }, [selectDoc])
-
-  // Scroll-spy: track which section is in the upper third of the content viewport.
+  // Scroll-spy
   useEffect(() => {
     const root = contentRef.current
     if (!root) return
@@ -54,18 +47,12 @@ export function DocsPage() {
       },
       { root, rootMargin: '-10% 0px -65% 0px', threshold: [0, 1] },
     )
-
     sections.forEach((s) => observer.observe(s))
     return () => observer.disconnect()
   }, [activeDoc])
 
   return (
-    <main
-      className={cn(
-        'flex h-dvh flex-col overflow-hidden',
-        'bg-surface text-ink',
-      )}
-    >
+    <main className={cn('flex h-dvh flex-col overflow-hidden', 'bg-surface text-ink')}>
       <DocsHeader
         query={query}
         onQueryChange={setQuery}
@@ -82,7 +69,7 @@ export function DocsPage() {
         )}
       >
         <div className="md:hidden">
-          <DocsSidebar activeDoc={activeDoc} onSelect={selectDoc} query={query} />
+          <DocsSidebar activeDoc={activeDoc} query={query} />
         </div>
 
         {mobileOpen && (
@@ -96,7 +83,6 @@ export function DocsPage() {
             <div className="bg-surface w-72">
               <DocsSidebar
                 activeDoc={activeDoc}
-                onSelect={selectDoc}
                 query={query}
                 onClose={() => setMobileOpen(false)}
               />
@@ -110,7 +96,15 @@ export function DocsPage() {
           </div>
         )}
 
-        <DocsContent doc={activeDoc} contentRef={contentRef} />
+        {/* content area — Outlet renders the active doc, ref passed via context */}
+        <article
+          ref={contentRef}
+          className={cn('h-full overflow-y-auto', 'pt-12 pr-12 pb-24 pl-12')}
+        >
+          <div className="mx-auto max-w-[760px]">
+            <Outlet />
+          </div>
+        </article>
 
         <div className="md:hidden">
           <DocsTOC

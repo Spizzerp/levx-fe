@@ -27,13 +27,9 @@ function PrevNextLink({ direction, to }: { direction: 'prev' | 'next'; to: DocId
   const meta = DOC_META[to]
   const isNext = direction === 'next'
   return (
-    <button
-      type="button"
-      onClick={() => {
-        window.dispatchEvent(
-          new CustomEvent('levx-docs-select', { detail: { id: to } }),
-        )
-      }}
+    <Link
+      to="/docs/$id"
+      params={{ id: to }}
       className={cn(
         'group flex flex-col gap-2 py-4',
         'duration-short ease-levx transition-colors',
@@ -62,17 +58,11 @@ function PrevNextLink({ direction, to }: { direction: 'prev' | 'next'; to: DocId
       <span className="text-ink-strong group-hover:text-ink-strong text-body-sm font-sans">
         {meta.title}
       </span>
-    </button>
+    </Link>
   )
 }
 
-export function DocsContent({
-  doc,
-  contentRef,
-}: {
-  doc: DocId
-  contentRef: React.RefObject<HTMLDivElement | null>
-}) {
+export function DocsContent({ doc }: { doc: DocId }) {
   const meta = DOC_META[doc]
   const Renderer = DOC_RENDERERS[doc]
 
@@ -84,52 +74,31 @@ export function DocsContent({
       : null
 
   return (
-    <article
-      ref={contentRef}
-      className={cn(
-        'h-full overflow-y-auto',
-        'pt-12 pr-12 pb-24 pl-12',
-      )}
-    >
-      <div className="mx-auto max-w-[760px]">
-        <DocsBreadcrumb doc={doc} />
+    <>
+      <DocsBreadcrumb doc={doc} />
 
-        <h1
-          className={cn(
-            'text-ink-strong mb-6',
-            'font-display text-[44px] leading-none font-medium tracking-tighter',
-            "[font-variation-settings:'ROND'_100]",
-          )}
-        >
-          {meta.title}
-        </h1>
+      <h1
+        className={cn(
+          'text-ink-strong mb-6',
+          'font-display text-[44px] leading-none font-medium tracking-tighter',
+          "[font-variation-settings:'ROND'_100]",
+        )}
+      >
+        {meta.title}
+      </h1>
 
-        <p className="text-ink-muted font-editorial mb-10 text-[20px] leading-snug tracking-tight">
-          {meta.tagline}
-        </p>
+      <p className="text-ink-muted font-editorial mb-10 text-[20px] leading-snug tracking-tight">
+        {meta.tagline}
+      </p>
 
-        <div className="mt-12">
-          <Renderer />
-        </div>
-
-        <div className="border-line mt-20 grid grid-cols-2 gap-px border-t pt-8">
-          {prev ? <PrevNextLink direction="prev" to={prev} /> : <span />}
-          {next ? <PrevNextLink direction="next" to={next} /> : <span />}
-        </div>
-
-        {/* <div className="border-line text-ink-dim text-nano mt-8 flex items-center justify-between border-t pt-6 font-mono tracking-wider uppercase">
-          <a
-            href={`https://github.com/levx-protocol/docs/edit/main/${doc}.md`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:text-ink-strong duration-short ease-levx flex items-center gap-1.5 transition-colors"
-          >
-            Edit this page
-            <ArrowUpRight size={11} />
-          </a>
-          <span>levx-protocol / docs / {doc}.md</span>
-        </div> */}
+      <div className="mt-12">
+        <Renderer />
       </div>
-    </article>
+
+      <div className="border-line mt-20 grid grid-cols-2 gap-px border-t pt-8">
+        {prev ? <PrevNextLink direction="prev" to={prev} /> : <span />}
+        {next ? <PrevNextLink direction="next" to={next} /> : <span />}
+      </div>
+    </>
   )
 }

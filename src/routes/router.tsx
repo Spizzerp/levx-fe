@@ -2,7 +2,7 @@ import { createRootRoute, createRoute, createRouter, redirect } from '@tanstack/
 
 import { AdminPage } from '@/routes/pages/AdminPage'
 import { AdminMarketsPage } from '@/routes/pages/AdminMarketsPage'
-import { DocsPage } from '@/routes/pages/DocsPage'
+import { DocsLayout } from '@/routes/pages/DocsPage'
 import { LabsChartPage } from '@/routes/pages/LabsChartPage'
 import { LandingPage } from '@/routes/pages/LandingPage'
 import { LeaderboardPage } from '@/routes/pages/LeaderboardPage'
@@ -13,6 +13,8 @@ import { PortfolioPage } from '@/routes/pages/PortfolioPage'
 import { ProfilePage } from '@/routes/pages/ProfilePage'
 import { VaultPage } from '@/routes/pages/VaultPage'
 import { RootRouteComponent } from '@/routes/RootRoute'
+import { DocsContent } from '@/modules/docs/DocsContent'
+import type { DocId } from '@/modules/docs/types'
 
 const rootRoute = createRootRoute({
   component: RootRouteComponent,
@@ -90,7 +92,22 @@ const labsChartRoute = createRoute({
 const docsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/docs',
-  component: DocsPage,
+  component: DocsLayout,
+})
+
+const docsIndexRoute = createRoute({
+  getParentRoute: () => docsRoute,
+  path: '/',
+  component: () => <DocsContent doc="introduction" />,
+})
+
+const docsDocRoute = createRoute({
+  getParentRoute: () => docsRoute,
+  path: '$id',
+  component: function DocsDocPage() {
+    const { id } = docsDocRoute.useParams()
+    return <DocsContent doc={id as DocId} />
+  },
 })
 
 const routeTree = rootRoute.addChildren([
@@ -105,7 +122,7 @@ const routeTree = rootRoute.addChildren([
   adminRoute,
   adminCreateRoute,
   labsChartRoute,
-  docsRoute,
+  docsRoute.addChildren([docsIndexRoute, docsDocRoute]),
 ])
 
 export const router = createRouter({

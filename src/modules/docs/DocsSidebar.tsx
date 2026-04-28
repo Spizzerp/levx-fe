@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { Link } from '@tanstack/react-router'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { SIDEBAR_SECTIONS } from './data'
@@ -11,7 +12,7 @@ export function DocsSidebar({
   onClose,
 }: {
   activeDoc: DocId
-  onSelect: (id: DocId) => void
+  onSelect?: (id: DocId) => void
   query: string
   onClose?: () => void
 }) {
@@ -73,11 +74,11 @@ export function DocsSidebar({
                 const active = item.id === activeDoc
                 return (
                   <li key={item.id}>
-                    <button
-                      type="button"
-                      onClick={() => onSelect(item.id)}
+                    <Link
+                      to="/docs/$id"
+                      params={{ id: item.id }}
                       className={cn(
-                        'group flex w-full items-center gap-2.5',
+                        'flex w-full items-center gap-2.5',
                         'border-line border-l py-1.5 pr-2 pl-3',
                         'text-left text-[13px] font-sans tracking-tight',
                         'duration-short ease-levx transition-colors',
@@ -87,7 +88,7 @@ export function DocsSidebar({
                       )}
                     >
                       <span className="flex-1 truncate">{item.label}</span>
-                    </button>
+                    </Link>
                   </li>
                 )
               })}
