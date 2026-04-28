@@ -24,30 +24,6 @@ function DocsBreadcrumb({ doc }: { doc: DocId }) {
   )
 }
 
-function DocMetaStrip({ items }: { items: { label: string; value: string }[] }) {
-  return (
-    <dl
-      className={cn(
-        'flex flex-wrap items-baseline',
-        'border-line border-y',
-        'gap-x-6 gap-y-2 px-1 py-3',
-      )}
-    >
-      {items.map((it, idx) => (
-        <div key={it.label} className="flex items-baseline gap-2">
-          {idx > 0 && (
-            <span aria-hidden className="bg-line h-2 w-px translate-y-px" />
-          )}
-          <dt className="text-ink-dim text-nano font-mono tracking-wider uppercase">
-            {it.label}
-          </dt>
-          <dd className="text-ink-strong font-mono text-[13px]">{it.value}</dd>
-        </div>
-      ))}
-    </dl>
-  )
-}
-
 function PrevNextLink({ direction, to }: { direction: 'prev' | 'next'; to: DocId }) {
   const meta = DOC_META[to]
   const isNext = direction === 'next'
@@ -132,8 +108,6 @@ export function DocsContent({
         <p className="text-ink-muted font-editorial mb-10 text-[20px] leading-snug tracking-tight">
           {meta.tagline}
         </p>
-
-        <DocMetaStrip items={meta.meta} />
 
         <div className="mt-12">
           <Renderer />

@@ -68,12 +68,15 @@ export function DocsHeader({
         'border-line bg-surface/90 border-b backdrop-blur',
       )}
     >
-      <div
-        className={cn(
-          'mx-auto flex items-center gap-4',
-          'h-14 max-w-[1480px] px-6',
-        )}
-      >
+      <div className="flex h-14 w-full items-center gap-4 px-6">
+        <Link to="/" className="flex items-center gap-3">
+          <img src="/logo_wordmark.png" alt="LevX" className="h-4 w-auto" />
+        </Link>
+
+        <span className="text-success text-label font-mono tracking-wider uppercase">
+          Docs
+        </span>
+
         <button
           type="button"
           onClick={onMobileToggle}
@@ -87,20 +90,6 @@ export function DocsHeader({
         >
           {mobileOpen ? <X size={16} /> : <Menu size={16} />}
         </button>
-
-        <Link to="/" className="flex items-center gap-3">
-          <img src="/logo_wordmark.png" alt="LevX" className="h-4 w-auto" />
-        </Link>
-
-        <span aria-hidden className="bg-line h-4 w-px" />
-
-        <div className="text-ink-dim text-nano flex items-center gap-2 font-mono tracking-wider uppercase">
-          <span className="text-ink-muted">Docs</span>
-          <span>·</span>
-          <span>v0.1.0</span>
-          <span className="text-ink-dim">·</span>
-          <span className="text-success">Devnet</span>
-        </div>
 
         <div className="flex flex-1 items-center justify-center px-4">
           <DocsSearch query={query} onChange={onQueryChange} />
