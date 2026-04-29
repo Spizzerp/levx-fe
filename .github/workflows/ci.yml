@@ -53,3 +53,19 @@ jobs:
           # access and the chain test (chain.test.ts) asserts mock data shape.
           APP_USE_MOCK: 'true'
         run: pnpm test:run
+
+      # Notify Discord on build outcomes. Requires DISCORD_WEBHOOK_URL secret
+      # to be configured in the GitHub repository settings.
+      - name: Notify Discord - Success
+        if: success()
+        run: |
+          curl -H "Content-Type: application/json" \
+            -d "{\"username\":\"levx-ci\",\"content\":\"✅ **CI passed**\n**Repository:** ${{ github.repository }}\n**Branch:** ${{ github.ref_name }}\n**Triggered by:** ${{ github.actor }}\n**Commit:** ${{ github.sha }}\n**Message:** ${{ github.event.head_commit.message }}\n**Run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" \
+            ${{ secrets.DISCORD_WEBHOOK_URL }}
+
+      - name: Notify Discord - Failure
+        if: failure()
+        run: |
+          curl -H "Content-Type: application/json" \
+            -d "{\"username\":\"levx-ci\",\"content\":\"❌ **CI failed**\n**Repository:** ${{ github.repository }}\n**Branch:** ${{ github.ref_name }}\n**Triggered by:** ${{ github.actor }}\n**Commit:** ${{ github.sha }}\n**Message:** ${{ github.event.head_commit.message }}\n**Run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" \
+            ${{ secrets.DISCORD_WEBHOOK_URL }}
