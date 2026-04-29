@@ -63,7 +63,7 @@ export const DOC_META: Record<DocId, DocMeta> = {
     category: '00 - Overview',
     title: 'Introduction',
     tagline:
-      'LevX is a Solana path-prediction protocol for trading the route an asset takes through time.',
+      'LevX is a quantum-inspired path prediction engine for trading possible futures on Solana.',
     meta: [
       { label: 'NETWORK', value: 'Solana Devnet' },
       { label: 'VERSION', value: 'v1' },
@@ -73,8 +73,9 @@ export const DOC_META: Record<DocId, DocMeta> = {
     sections: [
       { id: 'what-is-levx', num: '01', heading: 'What is LevX?' },
       { id: 'how-it-works', num: '02', heading: 'How it works' },
-      { id: 'why-it-matters', num: '03', heading: 'Why it matters' },
-      { id: 'current-scope', num: '04', heading: 'Current scope' },
+      { id: 'quantum-inspired-engine', num: '03', heading: 'Quantum-inspired engine' },
+      { id: 'why-it-matters', num: '04', heading: 'Why it matters' },
+      { id: 'current-scope', num: '05', heading: 'Current scope' },
     ],
   },
   problem: {

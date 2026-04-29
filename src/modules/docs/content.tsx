@@ -9,18 +9,21 @@ function IntroductionContent() {
     <>
       <Section id="what-is-levx" num="01" heading="What is LevX?">
         <P>
-          LevX is a path-prediction market protocol on Solana. Instead of trading only whether an
-          asset finishes above or below a target, LevX lets users express a view on the route an
-          asset takes through time.
+          LevX is a quantum-inspired path prediction engine on Solana. It applies quantum-style
+          probability, path dissolution, and correlated pricing to prediction markets.
         </P>
         <P>
-          Each market contains competing predicted paths. The protocol compares those paths against
-          verified price checkpoints, scores how closely each path tracked reality, and distributes
-          the market pool through deterministic on-chain settlement.
+          Most prediction markets ask, "Where will price be at expiry?" LevX asks something harder:
+          "What path will price take to get there?"
         </P>
       </Section>
 
       <Section id="how-it-works" num="02" heading="How it works">
+        <P>
+          Instead of betting on a binary outcome, users choose or draw full future price paths.
+          Every market becomes a set of competing possible futures. As real price data arrives, the
+          protocol scores which future is closest to reality.
+        </P>
         <CodeBlock language="flow">{`1. A market is created for a pair and time window.
 2. AI and user-created paths are submitted before activation.
 3. Users back paths with collateral.
@@ -29,15 +32,33 @@ function IntroductionContent() {
 6. Settled markets allow users to claim payouts on-chain.`}</CodeBlock>
       </Section>
 
-      <Section id="why-it-matters" num="03" heading="Why it matters">
+      <Section id="quantum-inspired-engine" num="03" heading="Quantum-inspired engine">
         <P>
-          Markets are not only about endpoints. Timing, drawdown, volatility, trend shape, and
-          recovery path can be the difference between a useful forecast and a misleading one. LevX
-          makes those dimensions tradable.
+          Each path has an amplitude. Its probability is derived from a Born-rule-style model. As
+          paths deviate from reality, they lose amplitude. If probability drops too far, they
+          dissolve.
+        </P>
+        <P>
+          This creates graceful failure. Being wrong early hurts, but being mostly right for most of
+          the market can still have value. A path that survives deep into the market can remain
+          eligible for partial payout even if it ultimately diverges.
+        </P>
+        <P>
+          The pricing engine can also use correlated-price pathing. Similar paths can influence each
+          other, making the market behave more like a distribution of possible futures than a set of
+          isolated bets.
         </P>
       </Section>
 
-      <Section id="current-scope" num="04" heading="Current scope">
+      <Section id="why-it-matters" num="04" heading="Why it matters">
+        <P>
+          The result is a new primitive for prediction markets: not "up or down", not only "price
+          above X", but trading the shape of price action itself.
+        </P>
+        <P>LevX turns market prediction into a competition between possible futures.</P>
+      </Section>
+
+      <Section id="current-scope" num="05" heading="Current scope">
         <P>
           The current public scope is Mode 1: fully collateralized path markets in devnet beta. Mode
           2 liquidity, leverage, and levUSD vault mechanics are roadmap features, not live liquidity
