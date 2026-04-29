@@ -6,6 +6,7 @@ import { Button } from '@/ui/Button'
 import { ChartFrame } from '@/features/chart/ChartFrame'
 import { ConnectGate } from '@/features/wallet/ConnectGate'
 import { DataTable, NUM_CELL, type DataTableColumn } from '@/ui/DataTable'
+import { SlippageSelector } from '@/ui/SlippageSelector'
 import { TokenPairIcon } from '@/ui/TokenPairIcon'
 import { cn } from '@/lib/cn'
 import { DOT_GRADIENT } from '@/lib/constants'
@@ -415,10 +416,13 @@ export function PortfolioPage() {
       }
     >
       <section>
-        <div className="mb-5">
+        <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
           <h2 className="text-ink-strong font-mono text-caption font-bold tracking-wide uppercase">
             Active Positions
           </h2>
+          <div className="w-full max-w-xs">
+            <SlippageSelector label="Exit slippage" />
+          </div>
         </div>
 
         <ChartFrame glow>

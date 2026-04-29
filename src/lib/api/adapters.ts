@@ -76,6 +76,7 @@ export function anchorMarketToFE(raw: any, id: string): Market {
     numPaths,
     amplitudes: (raw.amplitudes as BN[]).slice(0, numPaths).map((a) => bn(a, true)),
     lmsrShareQuantities: (raw.lmsrShareQuantities as BN[]).slice(0, numPaths).map((q) => i64(q)),
+    lmsrAlpha: bn(raw.lmsrAlpha, true),
     lambda: bn(raw.lambda, true),
     decoherenceRate: bn(raw.decoherenceRate, true),
     minimumProbability: bn(raw.minimumProbability, true),

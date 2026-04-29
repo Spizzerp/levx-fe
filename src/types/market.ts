@@ -143,6 +143,8 @@ export interface Market {
   amplitudes: number[]
   /** LMSR share quantities per path (up to 16, signed) */
   lmsrShareQuantities: number[]
+  /** LMSR liquidity parameter `b` (already divided by SCALE). Drives cost-function curvature. */
+  lmsrAlpha: number
   /** Quantum coupling strength (0 = pure LMSR) */
   lambda: number
   /** Rate at which deviating paths decohere */

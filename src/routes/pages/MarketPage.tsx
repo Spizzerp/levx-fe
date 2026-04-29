@@ -17,6 +17,7 @@ import { QueryErrorState } from '@/ui/QueryErrorState'
 import { TimeRangePicker, type CandleInterval } from '@/features/chart/TimeRangePicker'
 import { PathRow } from '@/features/market/PathRow'
 import { SegmentedSlider } from '@/ui/SegmentedSlider'
+import { SlippageSelector } from '@/ui/SlippageSelector'
 import { Stub } from '@/ui/Stub'
 import { UserPositionCard } from '@/features/market/UserPositionCard'
 import { cn } from '@/lib/cn'
@@ -547,6 +548,8 @@ export function MarketPage() {
               {numWagerable} paths
             </p>
           )}
+
+          <SlippageSelector className="mb-6" />
 
           <ConnectGate>
             <Button

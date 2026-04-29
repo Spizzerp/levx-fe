@@ -28,9 +28,15 @@ import type { Levx } from '@/idl/levx'
 import { useProgram } from './program'
 import { CU_LIMITS, MAX_CU_PER_TX, SCALE } from '@/lib/constants'
 import { toast } from '@/stores/toastStore'
+import { getSlippageTolerance } from '@/stores/slippageStore'
 import { deriveMarketPda, derivePathPda, derivePositionPda, deriveProtocolPda } from './pda'
 import { buildTransaction } from '@/lib/chain/buildTransaction'
 import { getPriorityFee } from '@/lib/chain/priorityFee'
+import {
+  applySlippageFloor,
+  estimateLmsrExitPayout,
+  estimateLmsrSharesOut,
+} from './lmsr'
 
 const MAX_BATCH_SIZE = 4
 
@@ -89,6 +95,116 @@ async function sendInstructions(
     throw translateError(err, parseIdlErrors(program.idl))
   }
 }
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
+interface LmsrSnapshot {
+  numPaths: number
+  shareQuantities: number[]
+  lmsrAlpha: number
+  activeMask: boolean[]
+}
+
+function readLmsrSnapshot(marketAcc: any): LmsrSnapshot {
+  const numPaths = marketAcc.numPaths as number
+  const shareQuantities = (marketAcc.lmsrShareQuantities as BN[])
+    .slice(0, numPaths)
+    .map((q) => q.toNumber() / SCALE)
+  const amplitudes = (marketAcc.amplitudes as BN[]).slice(0, numPaths).map((a) => a.toNumber())
+  const activeMask = amplitudes.map((a) => a > 0)
+  const lmsrAlpha = (marketAcc.lmsrAlpha as BN).toNumber() / SCALE
+  return { numPaths, shareQuantities, lmsrAlpha, activeMask }
+}
+
+function entryFeeBps(marketAcc: any, protocolAcc: any): number {
+  const override = marketAcc.feeEntryBpsOverride
+  return override !== null && override !== undefined
+    ? (override as number)
+    : (protocolAcc.defaultFeeEntryBps as number)
+}
+
+function settleFeeBps(marketAcc: any, protocolAcc: any): number {
+  const override = marketAcc.feeSettleBpsOverride
+  return override !== null && override !== undefined
+    ? (override as number)
+    : (protocolAcc.defaultFeeSettleBps as number)
+}
+
+/**
+ * Compute `min_shares_out` for `place_wager` honoring the user's
+ * configured slippage tolerance. Returns `BN(0)` (no protection) when
+ * tolerance is 0 or the LMSR estimate is unavailable — the program
+ * still validates and would surface a real on-chain error instead.
+ */
+function placeWagerMinSharesOut(
+  marketAcc: any,
+  protocolAcc: any,
+  pathIndex: number,
+  amountHuman: number,
+): BN {
+  const tol = getSlippageTolerance()
+  if (tol <= 0) return new BN(0)
+  const snap = readLmsrSnapshot(marketAcc)
+  const feeBps = entryFeeBps(marketAcc, protocolAcc)
+  const collateralHuman = amountHuman * (1 - feeBps / 10_000)
+  const expected = estimateLmsrSharesOut({
+    shareQuantities: snap.shareQuantities,
+    numPaths: snap.numPaths,
+    lmsrAlpha: snap.lmsrAlpha,
+    pathIndex,
+    amountScaled: collateralHuman,
+    activeMask: snap.activeMask,
+  })
+  const minHuman = applySlippageFloor(expected, tol)
+  return new BN(Math.floor(minHuman * SCALE))
+}
+
+/**
+ * Compute `min_payout_out` for `exit_position` against post-rake
+ * proceeds. Mirrors the program's slippage check, which is enforced
+ * on `user_payout` after the settlement rake. Returns `BN(0)` if
+ * tolerance is 0 or the position has no shares to sell.
+ */
+function exitPositionMinPayoutOut(
+  marketAcc: any,
+  protocolAcc: any,
+  positionAcc: any,
+): BN {
+  const tol = getSlippageTolerance()
+  if (tol <= 0) return new BN(0)
+  const sharesHuman = (positionAcc.lmsrShares as BN).toNumber() / SCALE
+  if (sharesHuman <= 0) return new BN(0)
+  const snap = readLmsrSnapshot(marketAcc)
+  const feeBps = settleFeeBps(marketAcc, protocolAcc)
+  const grossPayout = estimateLmsrExitPayout({
+    shareQuantities: snap.shareQuantities,
+    numPaths: snap.numPaths,
+    lmsrAlpha: snap.lmsrAlpha,
+    pathIndex: positionAcc.pathIndex as number,
+    sharesScaled: sharesHuman,
+    activeMask: snap.activeMask,
+  })
+  const userPayout = grossPayout * (1 - feeBps / 10_000)
+  const minHuman = applySlippageFloor(userPayout, tol)
+  return new BN(Math.floor(minHuman * SCALE))
+}
+
+/**
+ * Map an Anchor-translated error into a user-facing string, with a
+ * specific, actionable line for `SlippageExceeded` so the user can
+ * decide whether to widen tolerance or refresh.
+ */
+function describeTxError(err: unknown, fallback: string): string {
+  const e = err as { error?: { errorCode?: { code?: string } }; message?: string }
+  const code = e?.error?.errorCode?.code
+  const msg = e?.message ?? ''
+  if (code === 'SlippageExceeded' || /slippage exceeded/i.test(msg)) {
+    return 'Slippage exceeded — price moved beyond your tolerance. Increase slippage in settings or refresh.'
+  }
+  return msg || fallback
+}
+
+/* eslint-enable @typescript-eslint/no-explicit-any */
 
 export function useAddPath() {
   const program = useProgram()
@@ -175,8 +291,10 @@ export function usePlaceWager() {
       const insuranceFund = protocolAcc.insuranceFund
       const userTokenAccount = await getAssociatedTokenAddress(quoteMint, user)
 
+      const minSharesOut = placeWagerMinSharesOut(marketAcc, protocolAcc, pathIndex, amount)
+
       const ix = await program.methods
-        .placeWager(pathIndex, scaledAmount)
+        .placeWager(pathIndex, scaledAmount, minSharesOut)
         .accountsPartial({
           protocolState: protocolPda,
           market: marketPda,
@@ -201,7 +319,9 @@ export function usePlaceWager() {
       toast.success('Position opened', { txSig: sig })
     },
     onError: (err) => {
-      toast.error('Failed to open position', { message: (err as Error).message })
+      toast.error('Failed to open position', {
+        message: describeTxError(err, 'Unknown error'),
+      })
     },
   })
 }
@@ -238,9 +358,10 @@ export function usePlaceBatchWager() {
         pathIndices.map(async (pathIndex) => {
           const [pathPda] = derivePathPda(marketId, pathIndex)
           const [positionPda] = derivePositionPda(marketId, user, pathIndex)
+          const minSharesOut = placeWagerMinSharesOut(marketAcc, protocolAcc, pathIndex, amount)
 
           return program.methods
-            .placeWager(pathIndex, scaledAmount)
+            .placeWager(pathIndex, scaledAmount, minSharesOut)
             .accountsPartial({
               protocolState: protocolPda,
               market: marketPda,
@@ -269,7 +390,9 @@ export function usePlaceBatchWager() {
       toast.success(label, { txSig: sig })
     },
     onError: (err) => {
-      toast.error('Failed to open positions', { message: (err as Error).message })
+      toast.error('Failed to open positions', {
+        message: describeTxError(err, 'Unknown error'),
+      })
     },
   })
 }
@@ -283,17 +406,24 @@ export function useExitPosition() {
       if (!program) throw new Error('Wallet not connected')
 
       const user = program.provider.publicKey!
+      const [protocolPda] = deriveProtocolPda()
       const [marketPda] = deriveMarketPda(marketId)
       const [pathPda] = derivePathPda(marketId, pathIndex)
       const [positionPda] = derivePositionPda(marketId, user, pathIndex)
 
-      const marketAcc = await program.account.market.fetch(marketPda)
+      const [marketAcc, protocolAcc, positionAcc] = await Promise.all([
+        program.account.market.fetch(marketPda),
+        program.account.protocolState.fetch(protocolPda),
+        program.account.position.fetch(positionPda),
+      ])
       const vault = marketAcc.vault
       const quoteMint = marketAcc.quoteMint
       const userTokenAccount = await getAssociatedTokenAddress(quoteMint, user)
 
+      const minPayoutOut = exitPositionMinPayoutOut(marketAcc, protocolAcc, positionAcc)
+
       const ix = await program.methods
-        .exitPosition()
+        .exitPosition(minPayoutOut)
         .accountsPartial({
           market: marketPda,
           pathOutcome: pathPda,
@@ -314,7 +444,9 @@ export function useExitPosition() {
       toast.success('Position closed', { txSig: sig })
     },
     onError: (err) => {
-      toast.error('Failed to close position', { message: (err as Error).message })
+      toast.error('Failed to close position', {
+        message: describeTxError(err, 'Unknown error'),
+      })
     },
   })
 }
