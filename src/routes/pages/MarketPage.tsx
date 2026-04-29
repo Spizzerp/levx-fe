@@ -446,6 +446,7 @@ export function MarketPage() {
                 name={p.label}
                 multiplier={`${p.multiplier.toFixed(2)}×`}
                 wagered={p.totalWagered}
+                compositeScore={p.compositeScore}
                 active={selectedPathIds.has(p.id)}
                 pending={p.origin === 'user' && p.onChainStatus === 'pending'}
                 onMouseEnter={() => setHoveredPathId(p.id)}

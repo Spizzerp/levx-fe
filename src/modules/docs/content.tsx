@@ -30,6 +30,12 @@ function IntroductionContent() {
 4. Pyth-backed checkpoints record market reality.
 5. LevX scores each path across the full route.
 6. Settled markets allow users to claim payouts on-chain.`}</CodeBlock>
+        <P>
+          After settlement, the interface presents each scored path with a simple{' '}
+          <Code>Path Accuracy Score</Code> from 0 to 100. That public score is a readable version of
+          the on-chain composite score, which remains stored at fixed-point precision for
+          deterministic settlement.
+        </P>
       </Section>
 
       <Section id="quantum-inspired-engine" num="03" heading="Quantum-inspired engine">
@@ -127,6 +133,12 @@ function SolutionContent() {
           LevX scores the full route. It looks at checkpoint-by-checkpoint price error, velocity
           error, and higher-level features such as volatility texture, drawdown, endpoint accuracy,
           and displacement.
+        </P>
+        <P>
+          The public result is a <Code>Path Accuracy Score</Code> out of 100. Under the hood, the
+          Solana program stores the same result as a fixed-point composite score from 0 to
+          1,000,000, so payouts use precise deterministic math while users see a familiar scoring
+          scale.
         </P>
       </Section>
 
@@ -843,6 +855,11 @@ action_score = SCALE * exp(-cumulative_action / reference_action)`}</CodeBlock>
           The action score is then modulated by feature-level errors: quadratic variation, maximum
           drawdown, endpoint error, and displacement error. These features reward routes that track
           the realized market shape, not only the final price.
+        </P>
+        <P>
+          For users, this is displayed as a <Code>Path Accuracy Score</Code> from 0 to 100. For the
+          program, the same value remains a fixed-point <Code>compositeScore</Code> from 0 to
+          1,000,000, preserving settlement precision.
         </P>
         <P>
           Path state also evolves through amplitudes. If a path's Born-style probability falls below

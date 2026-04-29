@@ -7,6 +7,17 @@ export function formatUSD(n: number, opts: Intl.NumberFormatOptions = {}): strin
   return n.toLocaleString('en-US', { maximumFractionDigits: 0, ...opts })
 }
 
+/** On-chain composite score (0..1_000_000) -> user-facing Path Accuracy Score (0..100). */
+export function pathAccuracyScoreFromComposite(compositeScore: number): number {
+  const boundedScore = Math.max(0, Math.min(1_000_000, compositeScore))
+  return boundedScore / 10_000
+}
+
+/** Format a Path Accuracy Score for UI labels. */
+export function formatPathAccuracyScore(compositeScore: number): string {
+  return pathAccuracyScoreFromComposite(compositeScore).toFixed(1)
+}
+
 /** Basis points → "+3.52%" or "-1.18%" */
 export function formatDeltaBps(bps: number): string {
   const pct = bps / 100

@@ -1,5 +1,5 @@
 import { cn } from '@/lib/cn'
-import { formatUSD } from '@/lib/format'
+import { formatPathAccuracyScore, formatUSD } from '@/lib/format'
 
 interface PathRowProps {
   index: number
@@ -7,6 +7,8 @@ interface PathRowProps {
   multiplier: string
   /** Total USDC wagered on this path by all users */
   wagered?: number
+  /** On-chain composite score, rendered as a user-facing 0-100 accuracy score. */
+  compositeScore?: number
   active?: boolean
   pending?: boolean
   onClick?: () => void
@@ -19,6 +21,7 @@ export function PathRow({
   name,
   multiplier,
   wagered,
+  compositeScore,
   active = false,
   pending = false,
   onClick,
@@ -26,6 +29,9 @@ export function PathRow({
   onMouseLeave,
 }: PathRowProps) {
   const idx = String(index).padStart(2, '0')
+  const hasWagered = wagered != null && wagered > 0
+  const hasAccuracyScore = compositeScore != null && compositeScore > 0
+
   return (
     <button
       type="button"
@@ -41,18 +47,20 @@ export function PathRow({
       )}
     >
       <span className="text-label text-ink-dim tracking-snug font-mono">[ {idx} ]</span>
-      <div className="flex flex-col gap-0.5">
+      <div className="flex min-w-0 flex-col gap-0.5">
         <span
           className={cn(
-            'font-mono text-xs tracking-wide uppercase',
+            'truncate font-mono text-xs tracking-wide uppercase',
             active ? 'text-ink-strong' : 'text-ink',
           )}
         >
           {pending ? `${name} — confirming…` : name}
         </span>
-        {wagered != null && wagered > 0 && (
-          <span className="text-ink-dim text-label font-mono tracking-wide">
-            {formatUSD(wagered)} wagered
+        {(hasWagered || hasAccuracyScore) && (
+          <span className="text-ink-dim text-label truncate font-mono tracking-wide">
+            {hasAccuracyScore && `${formatPathAccuracyScore(compositeScore)}/100 accuracy`}
+            {hasAccuracyScore && hasWagered && ' · '}
+            {hasWagered && `${formatUSD(wagered)} wagered`}
           </span>
         )}
       </div>

@@ -73,7 +73,7 @@ export interface PredictionPath {
 
   /** Cumulative action S = Σ[α(Δp)² + β(Δv)²]. Lower = better fit. */
   cumulativeAction: number
-  /** Final composite score (0–1_000_000). Set during settling. */
+  /** Final composite score (0-1_000_000). Displayed to users as a 0-100 Path Accuracy Score. */
   compositeScore: number
   /** Highest amplitude this path reached */
   peakAmplitude: number

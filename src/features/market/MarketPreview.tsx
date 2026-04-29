@@ -11,12 +11,7 @@ import { LevXChart } from '@/features/chart/LevXChart'
 import { TimeRangePicker, type CandleInterval } from '@/features/chart/TimeRangePicker'
 import { PathRow } from '@/features/market/PathRow'
 import { cn } from '@/lib/cn'
-import {
-  formatCountdown,
-  formatDeltaBps,
-  formatUSD,
-  maxLeverageByDuration,
-} from '@/lib/format'
+import { formatCountdown, formatDeltaBps, formatUSD, maxLeverageByDuration } from '@/lib/format'
 import type { PredictionPath, PricePoint } from '@/types/market'
 
 const META_SEP = <span className="text-line-strong mx-0.5">·</span>
@@ -202,8 +197,7 @@ export function MarketPreview({
           </span>
           {META_SEP}
           <span>
-            ENTRY FEE{' '}
-            <span className="text-ink-muted ml-1">{(entryFeeBps / 100).toFixed(1)}%</span>
+            ENTRY FEE <span className="text-ink-muted ml-1">{(entryFeeBps / 100).toFixed(1)}%</span>
           </span>
         </div>
 
@@ -292,6 +286,7 @@ export function MarketPreview({
               name={p.label}
               multiplier={`${p.multiplier.toFixed(2)}×`}
               wagered={p.totalWagered}
+              compositeScore={p.compositeScore}
               active={selectedPathIds.has(p.id)}
               onMouseEnter={() => setHoveredPathId(p.id)}
               onMouseLeave={() => setHoveredPathId(null)}
@@ -351,12 +346,7 @@ export function MarketPreview({
           </p>
         )}
 
-        <Button
-          variant="primary"
-          fullWidth
-          className="mt-2"
-          onClick={onCtaClick}
-        >
+        <Button variant="primary" fullWidth className="mt-2" onClick={onCtaClick}>
           {ctaLabel}
         </Button>
       </aside>
