@@ -159,7 +159,8 @@ export function DocsHome() {
                         'px-3 py-2.5',
                         'border-line hover:bg-surface-1',
                         'duration-short ease-levx transition-colors',
-                        section.id === 'links' && 'justify-center text-center',
+                        section.id === 'links' &&
+                          'justify-center text-center md:justify-between md:text-left',
                       )}
                     >
                       <span className="flex min-w-0 items-center gap-2">
