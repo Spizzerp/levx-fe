@@ -18,7 +18,7 @@ export function DocsTOC({
       className={cn(
         'h-full min-h-0 overflow-y-auto',
         'border-line border-l',
-        'pt-12 pr-6 pb-24 pl-6',
+        'pt-32 pr-6 pb-24 pl-6',
       )}
     >
       <div className="text-ink-dim text-nano mb-4 font-mono tracking-wider uppercase">

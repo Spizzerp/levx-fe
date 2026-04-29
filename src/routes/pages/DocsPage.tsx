@@ -14,7 +14,6 @@ export function DocsLayout() {
   const activeDoc: DocId = isDocId(id) ? id : 'introduction'
 
   const [query, setQuery] = useState('')
-  const [mobileOpen, setMobileOpen] = useState(false)
   const [activeAnchor, setActiveAnchor] = useState<string | null>(
     () => DOC_META[activeDoc].sections[0]?.id ?? null,
   )
@@ -25,8 +24,8 @@ export function DocsLayout() {
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
       setActiveAnchor(DOC_META[activeDoc].sections[0]?.id ?? null)
-      setMobileOpen(false)
       contentRef.current?.scrollTo({ top: 0 })
+      window.scrollTo({ top: 0 })
     })
     return () => cancelAnimationFrame(frame)
   }, [activeDoc])
@@ -55,17 +54,26 @@ export function DocsLayout() {
   }, [activeDoc, isHome])
 
   return (
-    <main className={cn('flex h-dvh flex-col overflow-hidden', 'bg-surface text-ink')}>
-      <DocsHeader
-        query={query}
-        onQueryChange={setQuery}
-        onMobileToggle={() => setMobileOpen((v) => !v)}
-        mobileOpen={mobileOpen}
-      />
+    <main
+      className={cn(
+        'flex h-dvh flex-col overflow-hidden',
+        'bg-surface text-ink',
+        'md:block md:h-auto md:min-h-dvh md:overflow-visible',
+      )}
+    >
+      <DocsHeader query={query} onQueryChange={setQuery} />
 
       {isHome ? (
         // Home: full-width, no sidebar/TOC
-        <div ref={contentRef} className="min-h-0 flex-1 overflow-y-auto px-8 pb-16 md:px-4">
+        <div
+          ref={contentRef}
+          className={cn(
+            'min-h-0 flex-1 overflow-y-auto',
+            'px-8 pt-32 pb-16',
+            'md:flex-none md:overflow-visible md:px-4',
+            'sm:px-5 sm:pt-56',
+          )}
+        >
           <Outlet />
         </div>
       ) : (
@@ -74,47 +82,24 @@ export function DocsLayout() {
             'grid min-h-0 flex-1 overflow-hidden',
             'grid-cols-[260px_minmax(0,1fr)_240px]',
             'lg:grid-cols-[240px_minmax(0,1fr)_220px]',
-            'md:grid-cols-1',
+            'md:block md:overflow-visible',
           )}
         >
           <div className="min-h-0 md:hidden">
             <DocsSidebar activeDoc={activeDoc} query={query} />
           </div>
 
-          {mobileOpen && (
-            <div
-              className={cn(
-                'z-overlay fixed inset-0',
-                'bg-surface/95 backdrop-blur',
-                'hidden md:flex',
-              )}
-            >
-              <div className="bg-surface w-72">
-                <DocsSidebar
-                  activeDoc={activeDoc}
-                  query={query}
-                  onClose={() => setMobileOpen(false)}
-                />
-              </div>
-              <button
-                type="button"
-                aria-label="Close navigation"
-                onClick={() => setMobileOpen(false)}
-                className="flex-1"
-              />
-            </div>
-          )}
-
           {/* content area - Outlet renders the active doc, ref passed via context */}
           <article
             ref={contentRef}
             className={cn(
               'h-full min-h-0 overflow-y-auto',
-              'pt-12 pr-12 pb-32 pl-12',
-              'md:px-6 md:pb-32',
+              'pt-32 pr-12 pb-32 pl-12',
+              'md:h-auto md:overflow-visible md:px-6 md:pb-24',
+              'sm:px-5 sm:pt-56',
             )}
           >
-            <div className="mx-auto max-w-[760px]">
+            <div className="mx-auto max-w-[760px] md:max-w-none">
               <Outlet />
             </div>
           </article>

@@ -57,7 +57,7 @@ export function CodeBlock({
           {copied ? 'Copied' : 'Copy'}
         </button>
       </div>
-      <pre className="text-ink-strong overflow-x-auto px-4 py-4 font-mono text-[13px] leading-relaxed">
+      <pre className="text-ink-strong overflow-x-auto px-4 py-4 font-mono text-[13px] leading-relaxed sm:text-[12px]">
         <code>{children}</code>
       </pre>
     </div>
@@ -79,11 +79,7 @@ export function Note({
   const tone = TONE[kind]
   return (
     <aside
-      className={cn(
-        'my-6 flex gap-4',
-        'border-l-2 py-2 pl-4',
-        tone.rule,
-      )}
+      className={cn('my-6 flex gap-4', 'border-l-2 py-2 pl-4', 'sm:flex-col sm:gap-2', tone.rule)}
     >
       <span
         className={cn(
@@ -94,9 +90,7 @@ export function Note({
       >
         {tone.label}
       </span>
-      <div className="text-ink text-body-sm font-sans leading-relaxed">
-        {children}
-      </div>
+      <div className="text-ink text-body-sm font-sans leading-relaxed">{children}</div>
     </aside>
   )
 }
@@ -131,20 +125,12 @@ export function ManOption({
     <div className="border-line border-t py-4">
       <dt className="mb-2 flex flex-wrap items-baseline gap-2">
         <span className="text-ink-strong text-body-sm font-mono">{flag}</span>
-        {arg && (
-          <span className="text-ink-muted font-mono text-[13px]">
-            &lt;{arg}&gt;
-          </span>
-        )}
+        {arg && <span className="text-ink-muted font-mono text-[13px]">&lt;{arg}&gt;</span>}
         {required && (
-          <span className="text-accent text-nano font-mono tracking-wider uppercase">
-            Required
-          </span>
+          <span className="text-accent text-nano font-mono tracking-wider uppercase">Required</span>
         )}
       </dt>
-      <dd className="text-ink-muted text-body-sm font-sans leading-relaxed">
-        {children}
-      </dd>
+      <dd className="text-ink-muted text-body-sm font-sans leading-relaxed">{children}</dd>
     </div>
   )
 }
@@ -161,7 +147,7 @@ export function Section({
   children: ReactNode
 }) {
   return (
-    <section id={id} className="scroll-mt-32 pt-12 first:pt-0">
+    <section id={id} className="scroll-mt-32 pt-12 first:pt-0 sm:scroll-mt-56 sm:pt-10">
       <header className="mb-6">
         <div className="text-ink-dim text-nano mb-3 font-mono tracking-wider uppercase">
           § {num}
@@ -185,9 +171,7 @@ export function Section({
           />
         </h2>
       </header>
-      <div className="text-ink text-body-sm font-sans leading-relaxed">
-        {children}
-      </div>
+      <div className="text-ink text-body-sm font-sans leading-relaxed">{children}</div>
     </section>
   )
 }

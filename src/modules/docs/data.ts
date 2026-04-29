@@ -66,8 +66,8 @@ export const DOC_META: Record<DocId, DocMeta> = {
       'LevX is a Solana path-prediction protocol for trading the route an asset takes through time.',
     meta: [
       { label: 'NETWORK', value: 'Solana Devnet' },
-      { label: 'VERSION', value: 'v0.1.0' },
-      { label: 'UPDATED', value: '2026-04-28' },
+      { label: 'VERSION', value: 'v1' },
+      { label: 'UPDATED', value: '2026-04-29' },
       { label: 'STATUS', value: 'Public beta docs' },
     ],
     sections: [
@@ -229,7 +229,7 @@ export const DOC_META: Record<DocId, DocMeta> = {
     tagline:
       'A public draft of the LevX thesis, mechanism design, protocol architecture, and roadmap.',
     meta: [
-      { label: 'VERSION', value: 'v0.1 public draft' },
+      { label: 'VERSION', value: 'v1 public draft' },
       { label: 'SCOPE', value: 'Mode 1 beta' },
       { label: 'STATUS', value: 'Draft' },
     ],
@@ -288,7 +288,7 @@ export const DOC_META: Record<DocId, DocMeta> = {
     tagline: 'Short answers to common LevX protocol and product questions.',
     meta: [
       { label: 'STATUS', value: 'Stable' },
-      { label: 'UPDATED', value: '2026-04-28' },
+      { label: 'UPDATED', value: '2026-04-29' },
     ],
     sections: [
       { id: 'what-is-path', num: '01', heading: 'What is a path?' },

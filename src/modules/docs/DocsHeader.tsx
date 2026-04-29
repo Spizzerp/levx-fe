@@ -1,13 +1,24 @@
 import { useEffect, useRef } from 'react'
 import { Link } from '@tanstack/react-router'
-import { Menu, Search, X } from 'lucide-react'
+import { Search } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { ThemeToggle } from '@/ui/ThemeToggle'
 
+const FOCUS_RING = cn(
+  'focus-visible:ring-ink-strong focus-visible:ring-offset-surface',
+  'focus-visible:ring-1 focus-visible:ring-offset-2 focus-visible:outline-none',
+)
+
+const FOCUS_WITHIN_RING = cn(
+  'focus-within:ring-ink-strong focus-within:ring-offset-surface',
+  'focus-within:ring-1 focus-within:ring-offset-2',
+)
+
 const ICON_ACTION = cn(
-  'relative z-10 flex size-10 items-center justify-center',
+  'relative z-10 flex size-10 shrink-0 items-center justify-center rounded-full',
   'text-ink-muted transition-colors duration-short ease-levx',
   'hover:text-ink-strong',
+  FOCUS_RING,
 )
 
 function GitHubIcon({ size = 16 }: { size?: number }) {
@@ -51,6 +62,8 @@ function DocsSearch({ query, onChange }: { query: string; onChange: (v: string) 
         'border-line bg-surface-1 rounded-full border px-3',
         'duration-short ease-levx transition-colors',
         'focus-within:border-line-strong',
+        FOCUS_WITHIN_RING,
+        'sm:max-w-none',
       )}
     >
       <Search size={13} className="text-ink-dim shrink-0" aria-hidden="true" />
@@ -60,7 +73,11 @@ function DocsSearch({ query, onChange }: { query: string; onChange: (v: string) 
         onChange={(e) => onChange(e.target.value)}
         aria-label="Search documentation"
         placeholder="Search docs"
-        className={cn('min-w-0 flex-1', 'text-ink placeholder:text-ink-dim text-ui font-sans')}
+        className={cn(
+          'min-w-0 flex-1',
+          'text-ink placeholder:text-ink-dim text-ui font-sans',
+          'focus:outline-none',
+        )}
       />
       <span
         aria-hidden="true"
@@ -77,21 +94,16 @@ function DocsSearch({ query, onChange }: { query: string; onChange: (v: string) 
 export function DocsHeader({
   query,
   onQueryChange,
-  onMobileToggle,
-  mobileOpen,
 }: {
   query: string
   onQueryChange: (v: string) => void
-  onMobileToggle: () => void
-  mobileOpen: boolean
 }) {
   return (
     <header
       className={cn(
-        'z-nav sticky top-0 w-full',
-        'from-surface bg-gradient-to-b from-60% to-transparent',
+        'z-nav pointer-events-none fixed top-0 left-0 w-full',
         'px-6 pt-3 pb-3',
-        'sm:px-3 sm:pt-2',
+        'sm:px-2 sm:pt-2 sm:pb-2',
       )}
     >
       <nav
@@ -99,22 +111,30 @@ export function DocsHeader({
         className={cn(
           'pill-glow relative mx-auto flex w-full max-w-[1400px] items-center justify-between gap-4',
           'border-line-strong bg-surface rounded-full border',
+          'pointer-events-auto',
           'px-6 py-3',
-          'sm:flex-wrap sm:rounded-2xl sm:px-4 sm:py-3',
+          'sm:grid sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-x-2 sm:gap-y-2 sm:rounded-[28px] sm:px-3 sm:py-2',
         )}
       >
-        <div className={cn('relative z-10 flex shrink-0 items-center gap-3', 'min-h-10')}>
+        <div
+          className={cn(
+            'relative z-10 flex shrink-0 items-center gap-3',
+            'min-h-10',
+            'sm:col-start-1 sm:row-start-1 sm:min-w-0 sm:shrink sm:gap-2',
+          )}
+        >
           <Link
             to="/"
             className={cn(
-              'flex items-center',
+              'flex shrink-0 items-center rounded-full',
               'duration-short ease-levx transition-opacity',
               'hover:opacity-80',
+              FOCUS_RING,
             )}
           >
-            <img src="/logo_color.png" alt="LevX" className="-my-1 h-12 w-auto" />
+            <img src="/logo_color.png" alt="LevX" className="-my-1 h-12 w-auto sm:h-10" />
           </Link>
-          <span className="text-ink-strong text-label font-mono tracking-wider uppercase">
+          <span className="text-ink-strong text-label min-w-0 font-mono tracking-wider uppercase">
             Docs
           </span>
         </div>
@@ -125,7 +145,7 @@ export function DocsHeader({
             'px-72',
             'lg:px-64',
             'md:static md:flex-1 md:justify-start md:px-0',
-            'sm:order-3 sm:w-full sm:flex-none',
+            'sm:hidden',
           )}
         >
           <div
@@ -138,25 +158,12 @@ export function DocsHeader({
           </div>
         </div>
 
-        <div className="relative z-10 flex shrink-0 items-center gap-2 sm:ml-auto">
-          <button
-            type="button"
-            onClick={onMobileToggle}
-            className={cn(
-              'hidden size-10 items-center justify-center',
-              'border-line text-ink rounded-full border',
-              'duration-short ease-levx transition-colors',
-              'hover:border-line-strong hover:text-ink-strong',
-              'md:flex',
-            )}
-            aria-label={mobileOpen ? 'Close navigation' : 'Open navigation'}
-          >
-            {mobileOpen ? (
-              <X size={16} aria-hidden="true" />
-            ) : (
-              <Menu size={16} aria-hidden="true" />
-            )}
-          </button>
+        <div
+          className={cn(
+            'relative z-10 flex shrink-0 items-center gap-2',
+            'sm:col-start-2 sm:row-start-1 sm:gap-1 sm:justify-self-end',
+          )}
+        >
           <a
             href="https://github.com/levx-protocol"
             target="_blank"
@@ -176,6 +183,10 @@ export function DocsHeader({
             <XIcon size={15} />
           </a>
           <ThemeToggle aria-label="Toggle theme" className={ICON_ACTION} />
+        </div>
+
+        <div className="relative z-10 hidden min-w-0 sm:col-span-2 sm:row-start-2 sm:block">
+          <DocsSearch query={query} onChange={onQueryChange} />
         </div>
       </nav>
     </header>

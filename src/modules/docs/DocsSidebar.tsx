@@ -30,7 +30,7 @@ export function DocsSidebar({
       className={cn(
         'h-full min-h-0 overflow-y-auto',
         'border-line border-r',
-        'pt-8 pr-4 pb-24 pl-6',
+        'pt-32 pr-4 pb-24 pl-6',
       )}
     >
       <div className="mb-8 flex items-baseline justify-between">
