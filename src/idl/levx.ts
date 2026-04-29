@@ -14,6 +14,54 @@ export type Levx = {
   },
   "instructions": [
     {
+      "name": "acceptAuthority",
+      "docs": [
+        "F17 Step 2: the proposed pubkey signs to atomically swap itself into",
+        "the authority slot and clear pending_authority."
+      ],
+      "discriminator": [
+        107,
+        86,
+        198,
+        91,
+        33,
+        12,
+        107,
+        160
+      ],
+      "accounts": [
+        {
+          "name": "protocolState",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "newAuthority",
+          "docs": [
+            "The previously-proposed pubkey, signing to accept the rotation."
+          ],
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "activateMarket",
       "discriminator": [
         10,
@@ -74,6 +122,26 @@ export type Levx = {
         117
       ],
       "accounts": [
+        {
+          "name": "protocolState",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
         {
           "name": "market",
           "writable": true,
@@ -226,7 +294,9 @@ export type Levx = {
         {
           "name": "priceSample",
           "docs": [
-            "The most recent PriceSample for this market."
+            "The most recent PriceSample for this market.",
+            "F19: `completed_checkpoints - 1` is safe because the `market` account",
+            "constraint above rejects calls where completed_checkpoints == 0."
           ]
         },
         {
@@ -305,7 +375,10 @@ export type Levx = {
         },
         {
           "name": "vault",
-          "writable": true
+          "writable": true,
+          "relations": [
+            "market"
+          ]
         },
         {
           "name": "userTokenAccount",
@@ -316,14 +389,20 @@ export type Levx = {
           "docs": [
             "Treasury — receives settlement rake share"
           ],
-          "writable": true
+          "writable": true,
+          "relations": [
+            "protocolState"
+          ]
         },
         {
           "name": "insuranceFund",
           "docs": [
             "Insurance fund — receives settlement rake share"
           ],
-          "writable": true
+          "writable": true,
+          "relations": [
+            "protocolState"
+          ]
         },
         {
           "name": "user",
@@ -332,6 +411,214 @@ export type Levx = {
         {
           "name": "tokenProgram",
           "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "closePathOutcome",
+      "docs": [
+        "F7: the path's original creator closes a PathOutcome belonging to a",
+        "Settled/Void market. Creator-only (NOT permissionless) to prevent",
+        "griefing-DoS on unclaimed positions. Rent returns to the creator."
+      ],
+      "discriminator": [
+        242,
+        16,
+        245,
+        165,
+        86,
+        213,
+        120,
+        244
+      ],
+      "accounts": [
+        {
+          "name": "market",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pathOutcome",
+          "writable": true
+        },
+        {
+          "name": "creator",
+          "docs": [
+            "Rent destination AND signer — creator-only closure. See module",
+            "docstring for why this isn't permissionless."
+          ],
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "pathOutcome"
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "closePosition",
+      "docs": [
+        "F7: user closes their own claimed Position. Rent returns to the user."
+      ],
+      "discriminator": [
+        123,
+        134,
+        81,
+        0,
+        49,
+        68,
+        98,
+        98
+      ],
+      "accounts": [
+        {
+          "name": "market",
+          "docs": [
+            "Passed so the handler can reconstruct the Position PDA's original",
+            "seeds (which use `market.market_id.to_le_bytes()` — 8 bytes, NOT the",
+            "32-byte market pubkey). Market is self-authenticating via its own",
+            "seed derivation, so a user can't supply a spoofed Market here."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "position",
+          "writable": true
+        },
+        {
+          "name": "user",
+          "docs": [
+            "Rent destination — must match the user stored in the position."
+          ],
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "position"
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "closePriceSample",
+      "docs": [
+        "F7: anyone closes a PriceSample belonging to a Settled/Void market.",
+        "Permissionless — PriceSample isn't read post-settlement. Rent returns",
+        "to the keeper that originally posted the sample."
+      ],
+      "discriminator": [
+        8,
+        4,
+        73,
+        10,
+        57,
+        38,
+        32,
+        46
+      ],
+      "accounts": [
+        {
+          "name": "market",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "priceSample",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  109,
+                  112,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "market"
+              },
+              {
+                "kind": "account",
+                "path": "price_sample.checkpoint_index",
+                "account": "priceSample"
+              }
+            ]
+          }
+        },
+        {
+          "name": "sampledBy",
+          "docs": [
+            "Rent destination — the keeper that originally posted this sample.",
+            "Permissionless: no post-settlement handler reads PriceSample, so",
+            "there's no DoS risk from closing early. Any caller can trigger",
+            "closure; the `constraint` above pins rent flow to the original keeper.",
+            "PriceSample's `sampled_by` field doesn't match the Accounts field",
+            "name, so we use an explicit constraint rather than `has_one`."
+          ],
+          "writable": true
         }
       ],
       "args": []
@@ -400,14 +687,20 @@ export type Levx = {
           "signer": true
         },
         {
-          "name": "collateralMint"
+          "name": "collateralMint",
+          "relations": [
+            "protocolState"
+          ]
         },
         {
           "name": "insuranceFund",
           "docs": [
             "Insurance fund receives the market creation fee"
           ],
-          "writable": true
+          "writable": true,
+          "relations": [
+            "protocolState"
+          ]
         },
         {
           "name": "creatorTokenAccount",
@@ -459,6 +752,52 @@ export type Levx = {
       ],
       "accounts": [
         {
+          "name": "protocolState",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "disputeConfig",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  105,
+                  115,
+                  112,
+                  117,
+                  116,
+                  101,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
           "name": "market",
           "writable": true,
           "pda": {
@@ -483,17 +822,106 @@ export type Levx = {
           }
         },
         {
+          "name": "disputeBond",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  105,
+                  115,
+                  112,
+                  117,
+                  116,
+                  101,
+                  95,
+                  98,
+                  111,
+                  110,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "bondVault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  105,
+                  115,
+                  112,
+                  117,
+                  116,
+                  101,
+                  95,
+                  98,
+                  111,
+                  110,
+                  100,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "collateralMint",
+          "relations": [
+            "protocolState"
+          ]
+        },
+        {
+          "name": "disputerTokenAccount",
+          "writable": true
+        },
+        {
           "name": "disputer",
-          "docs": [
-            "Anyone can dispute"
-          ],
+          "writable": true,
           "signer": true
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "tokenProgram",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "rent",
+          "address": "SysvarRent111111111111111111111111111111111"
         }
       ],
       "args": []
     },
     {
       "name": "exitPosition",
+      "docs": [
+        "`min_payout_out` — F4 slippage floor. Reverts with `SlippageExceeded`",
+        "if the LMSR sell value net of settlement rake would be less than",
+        "requested. Pass 0 to opt out."
+      ],
       "discriminator": [
         130,
         193,
@@ -505,6 +933,26 @@ export type Levx = {
         111
       ],
       "accounts": [
+        {
+          "name": "protocolState",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
         {
           "name": "market",
           "writable": true,
@@ -539,11 +987,34 @@ export type Levx = {
         },
         {
           "name": "vault",
-          "writable": true
+          "writable": true,
+          "relations": [
+            "market"
+          ]
         },
         {
           "name": "userTokenAccount",
           "writable": true
+        },
+        {
+          "name": "treasury",
+          "docs": [
+            "Treasury — receives settlement rake share (same account as ProtocolState.treasury)"
+          ],
+          "writable": true,
+          "relations": [
+            "protocolState"
+          ]
+        },
+        {
+          "name": "insuranceFund",
+          "docs": [
+            "Insurance fund — receives settlement rake share"
+          ],
+          "writable": true,
+          "relations": [
+            "protocolState"
+          ]
         },
         {
           "name": "user",
@@ -555,6 +1026,135 @@ export type Levx = {
             "remaining_accounts[0]: Optional EigenCache (mut) — for quantum-correlated",
             "pricing and perturbation. Loaded via eigen_utils::load_eigen_cache()."
           ],
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "minPayoutOut",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "finalizeDisputedMarketAfterTimeout",
+      "discriminator": [
+        33,
+        34,
+        168,
+        27,
+        175,
+        212,
+        104,
+        126
+      ],
+      "accounts": [
+        {
+          "name": "protocolState",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "market"
+              }
+            ]
+          },
+          "relations": [
+            "disputeBond"
+          ]
+        },
+        {
+          "name": "disputeBond",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  105,
+                  115,
+                  112,
+                  117,
+                  116,
+                  101,
+                  95,
+                  98,
+                  111,
+                  110,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "bondVault",
+          "writable": true
+        },
+        {
+          "name": "collateralMint",
+          "relations": [
+            "protocolState"
+          ]
+        },
+        {
+          "name": "insuranceFund",
+          "writable": true,
+          "relations": [
+            "protocolState"
+          ]
+        },
+        {
+          "name": "disputer",
+          "writable": true
+        },
+        {
+          "name": "cranker",
+          "docs": [
+            "Permissionless"
+          ],
+          "signer": true
+        },
+        {
+          "name": "tokenProgram",
           "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         }
       ],
@@ -679,6 +1279,90 @@ export type Levx = {
       "args": []
     },
     {
+      "name": "initializeDisputeConfig",
+      "discriminator": [
+        162,
+        84,
+        147,
+        254,
+        220,
+        60,
+        174,
+        65
+      ],
+      "accounts": [
+        {
+          "name": "protocolState",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "disputeConfig",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  105,
+                  115,
+                  112,
+                  117,
+                  116,
+                  101,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "protocolState"
+          ]
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "params",
+          "type": {
+            "defined": {
+              "name": "disputeConfigParams"
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "initializeProtocol",
       "discriminator": [
         188,
@@ -798,7 +1482,83 @@ export type Levx = {
       "args": []
     },
     {
+      "name": "migrateProtocolStateV2",
+      "docs": [
+        "One-time ProtocolState v1 → v2 migration. Appends the three new fields",
+        "(pending_authority, collateral_mint, keeper_authority) and sets them to",
+        "caller-supplied values. Admin-gated by protocol_state.authority AND by",
+        "the hardcoded EXPECTED_DEPLOYER check (test-mode disables the latter).",
+        "Safe to call exactly once per ProtocolState lifecycle."
+      ],
+      "discriminator": [
+        219,
+        187,
+        36,
+        138,
+        164,
+        173,
+        246,
+        18
+      ],
+      "accounts": [
+        {
+          "name": "protocolState",
+          "docs": [
+            "compiled `ProtocolState::INIT_SPACE` (v1 = 909 bytes vs v2 = 1006),",
+            "so we can't use `Account<ProtocolState>` — Anchor's auto-deser fails",
+            "before anything else runs. Anchor 0.31 also rejects `realloc` on",
+            "`UncheckedAccount`. Solution: do the realloc manually inside the",
+            "handler and validate ownership + discriminator + stored-authority",
+            "there too. Canonical PDA derivation is still enforced by the",
+            "`seeds`/`bump` attributes below."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "collateralMint",
+          "type": "pubkey"
+        },
+        {
+          "name": "keeperAuthority",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
       "name": "placeWager",
+      "docs": [
+        "`min_shares_out` — F4 slippage floor. Reverts with `SlippageExceeded`",
+        "if LMSR quantities move between submit+land such that the caller would",
+        "receive fewer shares than requested. Pass 0 to opt out."
+      ],
       "discriminator": [
         225,
         163,
@@ -864,21 +1624,30 @@ export type Levx = {
         },
         {
           "name": "vault",
-          "writable": true
+          "writable": true,
+          "relations": [
+            "market"
+          ]
         },
         {
           "name": "treasury",
           "docs": [
             "Treasury token account — receives 80% of entry fee"
           ],
-          "writable": true
+          "writable": true,
+          "relations": [
+            "protocolState"
+          ]
         },
         {
           "name": "insuranceFund",
           "docs": [
             "Insurance fund token account — receives 20% of entry fee"
           ],
-          "writable": true
+          "writable": true,
+          "relations": [
+            "protocolState"
+          ]
         },
         {
           "name": "userTokenAccount",
@@ -911,6 +1680,63 @@ export type Levx = {
         {
           "name": "amount",
           "type": "u64"
+        },
+        {
+          "name": "minSharesOut",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "proposeAuthority",
+      "docs": [
+        "F17 Step 1: current authority proposes a new authority. Stages the new",
+        "pubkey in pending_authority; no effect on live authority yet."
+      ],
+      "discriminator": [
+        20,
+        148,
+        236,
+        198,
+        76,
+        119,
+        99,
+        142
+      ],
+      "accounts": [
+        {
+          "name": "protocolState",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "protocolState"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "newAuthority",
+          "type": "pubkey"
         }
       ]
     },
@@ -969,11 +1795,76 @@ export type Levx = {
                 "account": "market"
               }
             ]
+          },
+          "relations": [
+            "disputeBond"
+          ]
+        },
+        {
+          "name": "disputeBond",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  105,
+                  115,
+                  112,
+                  117,
+                  116,
+                  101,
+                  95,
+                  98,
+                  111,
+                  110,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
           }
+        },
+        {
+          "name": "bondVault",
+          "writable": true
+        },
+        {
+          "name": "collateralMint",
+          "relations": [
+            "protocolState"
+          ]
+        },
+        {
+          "name": "insuranceFund",
+          "writable": true,
+          "relations": [
+            "protocolState"
+          ]
+        },
+        {
+          "name": "disputer",
+          "writable": true
         },
         {
           "name": "authority",
           "signer": true
+        },
+        {
+          "name": "tokenProgram",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "disputerTokenAccount",
+          "docs": [
+            "Required only when `uphold = true`."
+          ],
+          "writable": true,
+          "optional": true
         }
       ],
       "args": [
@@ -1344,6 +2235,143 @@ export type Levx = {
       ]
     },
     {
+      "name": "updateCollateralMint",
+      "docs": [
+        "F11 governance escape hatch: rotate the allowlisted collateral mint.",
+        "Admin-only (has_one = authority). Required because migrate is",
+        "one-shot — this gives us a recovery path for typos and a migration",
+        "path if the canonical mint ever changes (e.g. USDC → USDG)."
+      ],
+      "discriminator": [
+        191,
+        190,
+        143,
+        38,
+        133,
+        195,
+        254,
+        65
+      ],
+      "accounts": [
+        {
+          "name": "protocolState",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "protocolState"
+          ]
+        },
+        {
+          "name": "newCollateralMint",
+          "docs": [
+            "Validated by Anchor: must be owned by SPL Token program and decode",
+            "as a real `Mint`. Rejects System Program pubkeys, token accounts,",
+            "arbitrary data accounts."
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "updateDisputeConfig",
+      "discriminator": [
+        35,
+        236,
+        172,
+        134,
+        151,
+        139,
+        134,
+        30
+      ],
+      "accounts": [
+        {
+          "name": "protocolState",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "disputeConfig",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  105,
+                  115,
+                  112,
+                  117,
+                  116,
+                  101,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "protocolState"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "params",
+          "type": {
+            "defined": {
+              "name": "disputeConfigParams"
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "voidMarket",
       "discriminator": [
         243,
@@ -1457,6 +2485,32 @@ export type Levx = {
   ],
   "accounts": [
     {
+      "name": "disputeBond",
+      "discriminator": [
+        52,
+        102,
+        115,
+        175,
+        111,
+        220,
+        8,
+        79
+      ]
+    },
+    {
+      "name": "disputeConfig",
+      "discriminator": [
+        230,
+        88,
+        200,
+        99,
+        12,
+        93,
+        56,
+        156
+      ]
+    },
+    {
       "name": "eigenCache",
       "discriminator": [
         211,
@@ -1545,6 +2599,359 @@ export type Levx = {
         140,
         195,
         248
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "authorityAccepted",
+      "discriminator": [
+        166,
+        192,
+        219,
+        188,
+        41,
+        209,
+        195,
+        26
+      ]
+    },
+    {
+      "name": "authorityProposed",
+      "discriminator": [
+        244,
+        117,
+        94,
+        112,
+        53,
+        151,
+        35,
+        89
+      ]
+    },
+    {
+      "name": "checkpointSampled",
+      "discriminator": [
+        14,
+        162,
+        133,
+        89,
+        147,
+        206,
+        245,
+        166
+      ]
+    },
+    {
+      "name": "claimPaid",
+      "discriminator": [
+        212,
+        155,
+        88,
+        118,
+        128,
+        99,
+        132,
+        42
+      ]
+    },
+    {
+      "name": "collateralMintUpdated",
+      "discriminator": [
+        23,
+        150,
+        96,
+        105,
+        211,
+        200,
+        250,
+        240
+      ]
+    },
+    {
+      "name": "disputeConfigUpdated",
+      "discriminator": [
+        231,
+        168,
+        142,
+        115,
+        107,
+        235,
+        60,
+        4
+      ]
+    },
+    {
+      "name": "disputeRaised",
+      "discriminator": [
+        246,
+        167,
+        109,
+        37,
+        142,
+        45,
+        38,
+        176
+      ]
+    },
+    {
+      "name": "disputeResolved",
+      "discriminator": [
+        121,
+        64,
+        249,
+        153,
+        139,
+        128,
+        236,
+        187
+      ]
+    },
+    {
+      "name": "disputedMarketFinalized",
+      "discriminator": [
+        52,
+        124,
+        146,
+        230,
+        55,
+        21,
+        217,
+        139
+      ]
+    },
+    {
+      "name": "eigendecompSubmitted",
+      "discriminator": [
+        225,
+        21,
+        145,
+        189,
+        95,
+        225,
+        155,
+        42
+      ]
+    },
+    {
+      "name": "marketActivated",
+      "discriminator": [
+        196,
+        73,
+        78,
+        48,
+        187,
+        132,
+        107,
+        11
+      ]
+    },
+    {
+      "name": "marketCreated",
+      "discriminator": [
+        88,
+        184,
+        130,
+        231,
+        226,
+        84,
+        6,
+        58
+      ]
+    },
+    {
+      "name": "marketFinalized",
+      "discriminator": [
+        83,
+        62,
+        66,
+        204,
+        37,
+        76,
+        234,
+        179
+      ]
+    },
+    {
+      "name": "marketSettled",
+      "discriminator": [
+        237,
+        212,
+        22,
+        175,
+        201,
+        117,
+        215,
+        99
+      ]
+    },
+    {
+      "name": "marketVoided",
+      "discriminator": [
+        217,
+        12,
+        138,
+        39,
+        108,
+        75,
+        89,
+        26
+      ]
+    },
+    {
+      "name": "pathAdded",
+      "discriminator": [
+        190,
+        15,
+        221,
+        10,
+        151,
+        77,
+        232,
+        7
+      ]
+    },
+    {
+      "name": "pathDissolved",
+      "discriminator": [
+        134,
+        11,
+        79,
+        64,
+        44,
+        58,
+        110,
+        12
+      ]
+    },
+    {
+      "name": "pathOutcomeClosed",
+      "discriminator": [
+        185,
+        94,
+        201,
+        142,
+        115,
+        12,
+        61,
+        119
+      ]
+    },
+    {
+      "name": "pathScored",
+      "discriminator": [
+        184,
+        94,
+        225,
+        17,
+        203,
+        209,
+        230,
+        18
+      ]
+    },
+    {
+      "name": "positionClosed",
+      "discriminator": [
+        157,
+        163,
+        227,
+        228,
+        13,
+        97,
+        138,
+        121
+      ]
+    },
+    {
+      "name": "positionExited",
+      "discriminator": [
+        157,
+        47,
+        238,
+        226,
+        42,
+        152,
+        228,
+        17
+      ]
+    },
+    {
+      "name": "priceSampleClosed",
+      "discriminator": [
+        52,
+        77,
+        224,
+        140,
+        109,
+        225,
+        243,
+        175
+      ]
+    },
+    {
+      "name": "protocolInitialized",
+      "discriminator": [
+        173,
+        122,
+        168,
+        254,
+        9,
+        118,
+        76,
+        132
+      ]
+    },
+    {
+      "name": "protocolMigratedV2",
+      "discriminator": [
+        124,
+        46,
+        209,
+        9,
+        203,
+        30,
+        13,
+        228
+      ]
+    },
+    {
+      "name": "supportedPairAdded",
+      "discriminator": [
+        91,
+        137,
+        12,
+        204,
+        73,
+        156,
+        85,
+        248
+      ]
+    },
+    {
+      "name": "vaultInitialized",
+      "discriminator": [
+        180,
+        43,
+        207,
+        2,
+        18,
+        71,
+        3,
+        75
+      ]
+    },
+    {
+      "name": "wagerPlaced",
+      "discriminator": [
+        11,
+        99,
+        79,
+        96,
+        254,
+        4,
+        72,
+        11
       ]
     }
   ],
@@ -1681,76 +3088,111 @@ export type Levx = {
     },
     {
       "code": 6026,
+      "name": "invalidProbability",
+      "msg": "Initial probability must be in basis-point range [0, 10_000]"
+    },
+    {
+      "code": 6027,
+      "name": "duplicateConfigAccount",
+      "msg": "Treasury and insurance_fund must be distinct accounts"
+    },
+    {
+      "code": 6028,
+      "name": "alreadyMigrated",
+      "msg": "ProtocolState has already been migrated to v2"
+    },
+    {
+      "code": 6029,
+      "name": "invalidCollateralMint",
+      "msg": "Collateral mint does not match the protocol allowlist"
+    },
+    {
+      "code": 6030,
+      "name": "slippageExceeded",
+      "msg": "Slippage exceeded: received fewer shares/less payout than min_out"
+    },
+    {
+      "code": 6031,
       "name": "maturityNotElapsed",
       "msg": "Maturity window has not elapsed; cannot finalize"
     },
     {
-      "code": 6027,
+      "code": 6032,
       "name": "marketDisputed",
       "msg": "Market is disputed; paused for governance review"
     },
     {
-      "code": 6028,
+      "code": 6033,
+      "name": "invalidDisputeConfig",
+      "msg": "Invalid dispute bond policy or account"
+    },
+    {
+      "code": 6034,
+      "name": "invalidDisputeBond",
+      "msg": "Invalid dispute bond account"
+    },
+    {
+      "code": 6035,
       "name": "mathOverflow",
       "msg": "Arithmetic overflow"
     },
     {
-      "code": 6029,
+      "code": 6036,
       "name": "feeExceedsCap",
       "msg": "Fee exceeds maximum cap (5%)"
     },
     {
-      "code": 6030,
+      "code": 6037,
       "name": "leverageNotEnabled",
       "msg": "Leverage is not enabled for this market"
     },
     {
-      "code": 6031,
+      "code": 6038,
       "name": "leverageExceedsMaximum",
       "msg": "Leverage exceeds maximum for this market's timeframe"
     },
     {
-      "code": 6032,
+      "code": 6039,
       "name": "vaultInsufficientCapacity",
       "msg": "Insufficient vault capacity for this leveraged position"
     },
     {
-      "code": 6033,
+      "code": 6040,
       "name": "vaultUtilizationExceeded",
       "msg": "Vault utilization would exceed maximum after this borrow"
     },
     {
-      "code": 6034,
+      "code": 6041,
       "name": "leveragedOiCapExceeded",
       "msg": "Market leveraged open interest cap would be exceeded"
     },
     {
-      "code": 6035,
+      "code": 6042,
       "name": "positionUnderwater",
       "msg": "Position health factor below liquidation threshold"
     },
     {
-      "code": 6036,
+      "code": 6043,
       "name": "positionHealthy",
       "msg": "Position health factor is above liquidation threshold; cannot liquidate"
     },
     {
-      "code": 6037,
+      "code": 6044,
       "name": "unauthorizedBackstopLiquidator",
       "msg": "Caller is not the configured backstop liquidator"
     },
     {
-      "code": 6038,
+      "code": 6045,
       "name": "backstopLiquidatorDisabled",
       "msg": "Backstop liquidator is disabled"
     },
     {
-      "code": 6039,
+      "code": 6046,
       "name": "backstopGracePeriodActive",
       "msg": "Backstop grace period has not elapsed; regular keepers have priority"
     },
     {
-      "code": 6040,
+      "code": 6047,
       "name": "bucketGuardCooldown",
       "msg": "Operation rate-limited; cooldown period has not elapsed"
     }
@@ -1786,6 +3228,130 @@ export type Levx = {
           {
             "name": "generationTimestamp",
             "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "authorityAccepted",
+      "docs": [
+        "F17 step 2. `previous` is the authority that existed before this tx."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "previous",
+            "type": "pubkey"
+          },
+          {
+            "name": "new",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "authorityProposed",
+      "docs": [
+        "F17 step 1."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "current",
+            "type": "pubkey"
+          },
+          {
+            "name": "pending",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "checkpointSampled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "marketId",
+            "type": "u64"
+          },
+          {
+            "name": "checkpointIndex",
+            "type": "u16"
+          },
+          {
+            "name": "price",
+            "type": "u64"
+          },
+          {
+            "name": "confidence",
+            "type": "u64"
+          },
+          {
+            "name": "lowConfidence",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "claimPaid",
+      "docs": [
+        "Emitted by `claim` (sealed, Phase 6.2)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "marketId",
+            "type": "u64"
+          },
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "pathIndex",
+            "type": "u8"
+          },
+          {
+            "name": "userPayout",
+            "type": "u64"
+          },
+          {
+            "name": "treasuryShare",
+            "type": "u64"
+          },
+          {
+            "name": "insuranceShare",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "collateralMintUpdated",
+      "docs": [
+        "F11 governance escape hatch."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "old",
+            "type": "pubkey"
+          },
+          {
+            "name": "new",
+            "type": "pubkey"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
           }
         ]
       }
@@ -1904,6 +3470,215 @@ export type Levx = {
       }
     },
     {
+      "name": "disputeBond",
+      "docs": [
+        "Per-market bond locked by the account that raised a dispute."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "disputer",
+            "type": "pubkey"
+          },
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "createdAt",
+            "type": "i64"
+          },
+          {
+            "name": "reviewTimeoutAt",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "disputeConfig",
+      "docs": [
+        "Governance-managed dispute-bond policy.",
+        "",
+        "Kept in its own PDA so we can add bonded disputes without resizing the live",
+        "ProtocolState account layout."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "minBondAmount",
+            "docs": [
+              "Minimum bond in the protocol collateral mint's base units."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "bondBps",
+            "docs": [
+              "Market-pool percentage in basis points."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "maxBondAmount",
+            "docs": [
+              "Maximum bond in the protocol collateral mint's base units."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "reviewGracePeriod",
+            "docs": [
+              "Extra review period after maturity_end_time before timeout finalization."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "disputeConfigParams",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "minBondAmount",
+            "type": "u64"
+          },
+          {
+            "name": "bondBps",
+            "type": "u16"
+          },
+          {
+            "name": "maxBondAmount",
+            "type": "u64"
+          },
+          {
+            "name": "reviewGracePeriod",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "disputeConfigUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "minBondAmount",
+            "type": "u64"
+          },
+          {
+            "name": "bondBps",
+            "type": "u16"
+          },
+          {
+            "name": "maxBondAmount",
+            "type": "u64"
+          },
+          {
+            "name": "reviewGracePeriod",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "disputeRaised",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "marketId",
+            "type": "u64"
+          },
+          {
+            "name": "disputer",
+            "type": "pubkey"
+          },
+          {
+            "name": "bondAmount",
+            "type": "u64"
+          },
+          {
+            "name": "bondVault",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "disputeResolved",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "marketId",
+            "type": "u64"
+          },
+          {
+            "name": "upheld",
+            "type": "bool"
+          },
+          {
+            "name": "resolver",
+            "type": "pubkey"
+          },
+          {
+            "name": "bondAmount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "disputedMarketFinalized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "marketId",
+            "type": "u64"
+          },
+          {
+            "name": "finalizedAt",
+            "type": "i64"
+          },
+          {
+            "name": "disputer",
+            "type": "pubkey"
+          },
+          {
+            "name": "slashedBondAmount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
       "name": "eigenCache",
       "docs": [
         "Cached eigendecomposition for a market's quantum cost function.",
@@ -1989,6 +3764,26 @@ export type Levx = {
           {
             "name": "bump",
             "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "eigendecompSubmitted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "marketId",
+            "type": "u64"
+          },
+          {
+            "name": "keeper",
+            "type": "pubkey"
+          },
+          {
+            "name": "version",
+            "type": "u64"
           }
         ]
       }
@@ -2441,6 +4236,110 @@ export type Levx = {
       }
     },
     {
+      "name": "marketActivated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "marketId",
+            "type": "u64"
+          },
+          {
+            "name": "numPaths",
+            "type": "u8"
+          },
+          {
+            "name": "activatedAt",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "marketCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "marketId",
+            "type": "u64"
+          },
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "baseMint",
+            "type": "pubkey"
+          },
+          {
+            "name": "quoteMint",
+            "type": "pubkey"
+          },
+          {
+            "name": "startTime",
+            "type": "i64"
+          },
+          {
+            "name": "endTime",
+            "type": "i64"
+          },
+          {
+            "name": "totalCheckpoints",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "marketFinalized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "marketId",
+            "type": "u64"
+          },
+          {
+            "name": "finalizedAt",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "marketSettled",
+      "docs": [
+        "Emitted by `settle_market` (sealed, Phase 6.3) when settling transitions",
+        "Settling → Maturing or Settling → Settled (all-dissolved)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "marketId",
+            "type": "u64"
+          },
+          {
+            "name": "pathsScored",
+            "type": "u8"
+          },
+          {
+            "name": "pathsDissolved",
+            "type": "u8"
+          },
+          {
+            "name": "totalPool",
+            "type": "u64"
+          },
+          {
+            "name": "partialPayoutsDistributed",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
       "name": "marketState",
       "type": {
         "kind": "enum",
@@ -2465,6 +4364,85 @@ export type Levx = {
           },
           {
             "name": "void"
+          }
+        ]
+      }
+    },
+    {
+      "name": "marketVoided",
+      "docs": [
+        "Emitted by both oracle-triggered `void_market` and admin `void_market_governance`.",
+        "`reason`: 0 = oracle skip threshold exceeded, 1 = governance emergency."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "marketId",
+            "type": "u64"
+          },
+          {
+            "name": "reason",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "pathAdded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "marketId",
+            "type": "u64"
+          },
+          {
+            "name": "pathIndex",
+            "type": "u8"
+          },
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "origin",
+            "docs": [
+              "0 = Ai, 1 = UserDrawn (matches `PathOrigin` enum ordering)."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "generationTimestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "pathDissolved",
+      "docs": [
+        "Emitted by `sample_and_dissolve` (sealed, Phase 6.4), once per path",
+        "that transitions to `dissolved == true` inside the batch."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "marketId",
+            "type": "u64"
+          },
+          {
+            "name": "pathIndex",
+            "type": "u8"
+          },
+          {
+            "name": "atCheckpoint",
+            "type": "u16"
+          },
+          {
+            "name": "partialPayout",
+            "type": "u64"
           }
         ]
       }
@@ -2667,6 +4645,53 @@ export type Levx = {
       }
     },
     {
+      "name": "pathOutcomeClosed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "marketId",
+            "type": "u64"
+          },
+          {
+            "name": "pathIndex",
+            "type": "u8"
+          },
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "rentRefunded",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "pathScored",
+      "docs": [
+        "Emitted by `score_path` (sealed, Phase 6.5)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "marketId",
+            "type": "u64"
+          },
+          {
+            "name": "pathIndex",
+            "type": "u8"
+          },
+          {
+            "name": "compositeScore",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
       "name": "position",
       "type": {
         "kind": "struct",
@@ -2772,6 +4797,69 @@ export type Levx = {
       }
     },
     {
+      "name": "positionClosed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "marketId",
+            "type": "u64"
+          },
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "pathIndex",
+            "type": "u8"
+          },
+          {
+            "name": "rentRefunded",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "positionExited",
+      "docs": [
+        "Phase 7: F4 + F9 rework. `user_payout` is the post-rake amount sent to",
+        "the user; `treasury_share` + `insurance_share` together are the",
+        "settlement rake (same 90/10 split as `ClaimPaid`). For a pre-settlement",
+        "exit in a healthy market, both rake shares are non-zero; for edge cases",
+        "where `payout == 0` all three are zero."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "marketId",
+            "type": "u64"
+          },
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "pathIndex",
+            "type": "u8"
+          },
+          {
+            "name": "userPayout",
+            "type": "u64"
+          },
+          {
+            "name": "treasuryShare",
+            "type": "u64"
+          },
+          {
+            "name": "insuranceShare",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
       "name": "priceSample",
       "type": {
         "kind": "struct",
@@ -2828,6 +4916,73 @@ export type Levx = {
           {
             "name": "bump",
             "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "priceSampleClosed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "marketId",
+            "type": "u64"
+          },
+          {
+            "name": "checkpointIndex",
+            "type": "u16"
+          },
+          {
+            "name": "sampledBy",
+            "type": "pubkey"
+          },
+          {
+            "name": "rentRefunded",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "protocolInitialized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "treasury",
+            "type": "pubkey"
+          },
+          {
+            "name": "insuranceFund",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "protocolMigratedV2",
+      "docs": [
+        "F11 foundation (Phase 2). Emitted once at v1→v2 migrate."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "collateralMint",
+            "type": "pubkey"
+          },
+          {
+            "name": "keeperAuthority",
+            "type": "pubkey"
           }
         ]
       }
@@ -2910,6 +5065,64 @@ export type Levx = {
           {
             "name": "bump",
             "type": "u8"
+          },
+          {
+            "name": "pendingAuthority",
+            "docs": [
+              "F17: pending authority for the two-step rotation pattern. Set by",
+              "`propose_authority` from the current authority; consumed by",
+              "`accept_authority` which must be signed by the proposed key.",
+              "Zero-initialized (`None`) immediately after migrate."
+            ],
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "collateralMint",
+            "docs": [
+              "F11: the sole mint accepted as collateral by `create_market`. Stops",
+              "attacker-run \"shadow markets\" that pair real fees with a fake mint.",
+              "Zero-initialized to `Pubkey::default()` immediately after migrate;",
+              "must be set to the production USDC mint before F11 lands."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "keeperAuthority",
+            "docs": [
+              "F21: pubkey authorized to call `add_path` with",
+              "`generation_method = PathOrigin::Ai`. User-drawn paths remain",
+              "permissionless. Zero-initialized to `Pubkey::default()` immediately",
+              "after migrate; must be set to the infra keeper pubkey before F21",
+              "lands."
+            ],
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "supportedPairAdded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "baseMint",
+            "type": "pubkey"
+          },
+          {
+            "name": "quoteMint",
+            "type": "pubkey"
+          },
+          {
+            "name": "pythFeedId",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
           }
         ]
       }
@@ -2942,6 +5155,49 @@ export type Levx = {
           {
             "name": "active",
             "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "vaultInitialized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "wagerPlaced",
+      "docs": [
+        "Emitted by `place_wager` (sealed, Phase 6.1)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "marketId",
+            "type": "u64"
+          },
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "pathIndex",
+            "type": "u8"
+          },
+          {
+            "name": "collateral",
+            "type": "u64"
+          },
+          {
+            "name": "shares",
+            "type": "i64"
           }
         ]
       }
