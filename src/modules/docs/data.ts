@@ -63,18 +63,19 @@ export const DOC_META: Record<DocId, DocMeta> = {
     category: '00 - Overview',
     title: 'Introduction',
     tagline:
-      'LevX is a Solana path-prediction protocol for trading the route an asset takes through time.',
+      'LevX is a quantum-inspired path prediction engine for trading possible futures on Solana.',
     meta: [
       { label: 'NETWORK', value: 'Solana Devnet' },
-      { label: 'VERSION', value: 'v0.1.0' },
-      { label: 'UPDATED', value: '2026-04-28' },
+      { label: 'VERSION', value: 'v1' },
+      { label: 'UPDATED', value: '2026-04-29' },
       { label: 'STATUS', value: 'Public beta docs' },
     ],
     sections: [
       { id: 'what-is-levx', num: '01', heading: 'What is LevX?' },
       { id: 'how-it-works', num: '02', heading: 'How it works' },
-      { id: 'why-it-matters', num: '03', heading: 'Why it matters' },
-      { id: 'current-scope', num: '04', heading: 'Current scope' },
+      { id: 'quantum-inspired-engine', num: '03', heading: 'Quantum-inspired engine' },
+      { id: 'why-it-matters', num: '04', heading: 'Why it matters' },
+      { id: 'current-scope', num: '05', heading: 'Current scope' },
     ],
   },
   problem: {
@@ -229,7 +230,7 @@ export const DOC_META: Record<DocId, DocMeta> = {
     tagline:
       'A public draft of the LevX thesis, mechanism design, protocol architecture, and roadmap.',
     meta: [
-      { label: 'VERSION', value: 'v0.1 public draft' },
+      { label: 'VERSION', value: 'v1 public draft' },
       { label: 'SCOPE', value: 'Mode 1 beta' },
       { label: 'STATUS', value: 'Draft' },
     ],
@@ -288,7 +289,7 @@ export const DOC_META: Record<DocId, DocMeta> = {
     tagline: 'Short answers to common LevX protocol and product questions.',
     meta: [
       { label: 'STATUS', value: 'Stable' },
-      { label: 'UPDATED', value: '2026-04-28' },
+      { label: 'UPDATED', value: '2026-04-29' },
     ],
     sections: [
       { id: 'what-is-path', num: '01', heading: 'What is a path?' },

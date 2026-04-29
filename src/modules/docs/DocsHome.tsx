@@ -54,7 +54,7 @@ const QUICK_LINK_PILL_CLASSES = [
 
 export function DocsHome() {
   return (
-    <div className="mx-auto max-w-[900px] pt-12 pb-24">
+    <div className="mx-auto max-w-[900px] pb-24">
       {/* Hero */}
       <div className="mb-16">
         <p className="text-success text-nano mb-4 font-mono tracking-wider uppercase">
@@ -159,7 +159,8 @@ export function DocsHome() {
                         'px-3 py-2.5',
                         'border-line hover:bg-surface-1',
                         'duration-short ease-levx transition-colors',
-                        section.id === 'links' && 'justify-center text-center',
+                        section.id === 'links' &&
+                          'justify-center text-center md:justify-between md:text-left',
                       )}
                     >
                       <span className="flex min-w-0 items-center gap-2">
@@ -200,21 +201,8 @@ export function DocsHome() {
 
       {/* Footer strip */}
       <div className="border-line mt-12 flex items-center justify-between border-t pt-8">
-        <span className="text-ink-dim text-nano font-mono tracking-wider uppercase">
-          v0.1.0 - Solana Devnet
-        </span>
-        <a
-          href="https://github.com/levx-protocol"
-          target="_blank"
-          rel="noopener noreferrer"
-          className={cn(
-            'text-ink-dim hover:text-ink-strong',
-            'duration-short ease-levx text-nano flex items-center gap-1.5',
-            'font-mono tracking-wider uppercase transition-colors',
-          )}
-        >
-          GitHub -&gt;
-        </a>
+        <span className="text-ink-dim text-nano font-mono tracking-wider">v1 - Solana Devnet</span>
+        <span className="text-ink-dim text-nano font-mono tracking-wider">NotYourBusiness LLC</span>
       </div>
     </div>
   )
