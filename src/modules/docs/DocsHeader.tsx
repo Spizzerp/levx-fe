@@ -1,8 +1,9 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useId, useMemo, useRef } from 'react'
 import { Link } from '@tanstack/react-router'
-import { Search } from 'lucide-react'
+import { Search, X as ClearIcon } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { ThemeToggle } from '@/ui/ThemeToggle'
+import { searchDocs } from './search'
 
 const FOCUS_RING = cn(
   'focus-visible:ring-ink-strong focus-visible:ring-offset-surface',
@@ -43,12 +44,18 @@ function XIcon({ size = 16 }: { size?: number }) {
 
 function DocsSearch({ query, onChange }: { query: string; onChange: (v: string) => void }) {
   const inputRef = useRef<HTMLInputElement>(null)
+  const resultsId = useId()
+  const trimmedQuery = query.trim()
+  const results = useMemo(() => searchDocs(query), [query])
+  const showResults = trimmedQuery.length > 0
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        const input = inputRef.current
+        if (!input || input.getClientRects().length === 0) return
         e.preventDefault()
-        inputRef.current?.focus()
+        input.focus()
       }
     }
     window.addEventListener('keydown', onKey)
@@ -56,37 +63,117 @@ function DocsSearch({ query, onChange }: { query: string; onChange: (v: string) 
   }, [])
 
   return (
-    <div
-      className={cn(
-        'group relative z-10 flex h-10 w-full max-w-[420px] items-center gap-2',
-        'border-line bg-surface-1 rounded-full border px-3',
-        'duration-short ease-levx transition-colors',
-        'focus-within:border-line-strong',
-        FOCUS_WITHIN_RING,
-        'sm:max-w-none',
-      )}
-    >
-      <Search size={13} className="text-ink-dim shrink-0" aria-hidden="true" />
-      <input
-        ref={inputRef}
-        value={query}
-        onChange={(e) => onChange(e.target.value)}
-        aria-label="Search documentation"
-        placeholder="Search docs"
+    <div className="relative z-20 w-full max-w-[420px] sm:max-w-none">
+      <div
         className={cn(
-          'min-w-0 flex-1',
-          'text-ink placeholder:text-ink-dim text-ui font-sans',
-          'focus:outline-none',
+          'group relative flex h-10 w-full items-center gap-2',
+          'border-line bg-surface-1 rounded-full border px-3',
+          'duration-short ease-levx transition-colors',
+          'focus-within:border-line-strong',
+          FOCUS_WITHIN_RING,
         )}
-      />
-      <span
-        aria-hidden="true"
-        className="text-ink-dim text-ui flex shrink-0 items-center gap-1 font-mono sm:hidden"
       >
-        <span>⌘</span>
-        <span>+</span>
-        <span>K</span>
-      </span>
+        <Search size={13} className="text-ink-dim shrink-0" aria-hidden="true" />
+        <input
+          ref={inputRef}
+          value={query}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape' && query) {
+              e.preventDefault()
+              onChange('')
+            }
+          }}
+          aria-label="Search documentation"
+          aria-controls={showResults ? resultsId : undefined}
+          aria-expanded={showResults}
+          placeholder="Search docs"
+          className={cn(
+            'min-w-0 flex-1',
+            'text-ink placeholder:text-ink-dim text-ui font-sans',
+            'focus:outline-none',
+          )}
+        />
+        {query ? (
+          <button
+            type="button"
+            onClick={() => {
+              onChange('')
+              inputRef.current?.focus()
+            }}
+            aria-label="Clear docs search"
+            className={cn(
+              'text-ink-dim hover:text-ink-strong',
+              'flex size-6 shrink-0 items-center justify-center rounded-full',
+              'duration-short ease-levx transition-colors',
+              FOCUS_RING,
+            )}
+          >
+            <ClearIcon size={13} aria-hidden="true" />
+          </button>
+        ) : (
+          <span
+            aria-hidden="true"
+            className="text-ink-dim text-ui flex shrink-0 items-center gap-1 font-mono sm:hidden"
+          >
+            <span>⌘</span>
+            <span>+</span>
+            <span>K</span>
+          </span>
+        )}
+      </div>
+
+      {showResults && (
+        <div
+          id={resultsId}
+          className={cn(
+            'absolute top-full right-0 left-0 mt-2 overflow-hidden',
+            'border-line-strong bg-surface rounded-md border',
+            'shadow-[0_16px_48px_rgba(0,0,0,0.18)]',
+          )}
+        >
+          {results.length > 0 ? (
+            <div className="max-h-[360px] overflow-y-auto py-1 sm:max-h-[min(360px,45vh)]">
+              {results.map((result) => (
+                <Link
+                  key={result.id}
+                  to="/docs/$id"
+                  params={{ id: result.doc }}
+                  hash={result.anchor}
+                  onClick={() => onChange('')}
+                  className={cn(
+                    'group/search flex min-w-0 flex-col gap-1 px-3 py-2.5 text-left',
+                    'duration-short ease-levx transition-colors',
+                    'hover:bg-surface-1',
+                    FOCUS_RING,
+                  )}
+                >
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="text-ink-strong text-body-sm truncate font-sans">
+                      {result.title}
+                    </span>
+                    <span className="text-ink-dim text-nano shrink-0 font-mono tracking-wider uppercase">
+                      {result.kind}
+                    </span>
+                  </span>
+                  <span className="text-ink-dim text-nano truncate font-mono tracking-wider uppercase">
+                    {result.subtitle}
+                  </span>
+                  <span className="text-ink-muted text-caption line-clamp-2 font-sans leading-snug">
+                    {result.excerpt}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <div className="px-3 py-4">
+              <p className="text-ink-dim text-caption font-sans">
+                No docs results for <span className="text-ink">{trimmedQuery}</span>.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
