@@ -8,15 +8,13 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useConnection } from '@solana/wallet-adapter-react'
 import { useQueryClient } from '@tanstack/react-query'
-import { PublicKey } from '@solana/web3.js'
 
 import idlJson from '@/idl/levx.json'
 import type { Idl } from '@coral-xyz/anchor'
 import { ProgramEventStream } from './events'
 import { EventStreamContext } from './eventStreamContext'
+import { PROGRAM_ID } from './pda'
 import { dispatchEventInvalidation } from '@/lib/api/eventInvalidation'
-
-const PROGRAM_ID = new PublicKey(idlJson.address)
 
 export function EventStreamProvider({ children }: { children: ReactNode }) {
   const { connection } = useConnection()

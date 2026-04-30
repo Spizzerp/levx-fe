@@ -3,8 +3,11 @@
  * invalidated when that event lands. Keeps the FE's reads in sync with
  * the program without a polling-only floor.
  *
- * Event names match the IDL (PascalCase). Field names on the payload
- * follow Anchor's camelCase convention.
+ * Event names match the IDL (PascalCase). **Field names on the payload
+ * are snake_case** — Anchor's `BorshEventCoder` returns IDL field names
+ * verbatim (unlike the account decoder, which camelCases). Verified
+ * directly: `coder.decode(...).data` for `WagerPlaced` yields
+ * `{ market_id, user, path_index, collateral, shares }`.
  *
  * Keys here mirror the conventions used by the read hooks in
  * `src/lib/api/hooks.ts`. `['userPositions']` is a prefix that matches
@@ -25,14 +28,41 @@ function isBNLike(v: unknown): v is BNLike {
 }
 
 /**
+ * Read a payload field by its IDL (snake_case) name with a camelCase
+ * fallback. Defensive against future Anchor versions that flip the
+ * convention or against mixed-shape payloads from custom decoders.
+ */
+export function readField(data: AnyData, snakeName: string): unknown {
+  if (snakeName in data) return data[snakeName]
+  const camel = snakeName.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())
+  return data[camel]
+}
+
+/**
  * Normalize an Anchor-decoded marketId (BN | number | string) to the
  * string form used by React Query keys (e.g. `['market', '7']`).
+ * Returns empty string for missing/unrecognized inputs so we don't
+ * accidentally produce `['market', '']` and silently miss real keys —
+ * callers should guard against this when extracting from event data.
  */
 export function marketKey(marketId: unknown): string {
   if (typeof marketId === 'number') return String(marketId)
   if (typeof marketId === 'string') return marketId
   if (isBNLike(marketId)) return String(marketId.toNumber())
   return ''
+}
+
+/**
+ * Pull `market_id` (or `marketId` fallback) off a decoded payload and
+ * normalize to a query-key-friendly string. Returns null when no
+ * recognizable id is present so callers can early-exit instead of
+ * invalidating `['market', '']`.
+ */
+function eventMarketKey(data: AnyData): string | null {
+  const raw = readField(data, 'market_id')
+  if (raw === undefined || raw === null) return null
+  const key = marketKey(raw)
+  return key === '' ? null : key
 }
 
 type InvalidationFactory = (data: AnyData) => QueryKey[]
@@ -43,49 +73,61 @@ type InvalidationFactory = (data: AnyData) => QueryKey[]
  * or rent-reclaim notifications like `PathOutcomeClosed` —
  * `getUserPositions` already gracefully handles closed paths).
  */
+/**
+ * Wrap a factory so events with no resolvable `market_id` short-circuit
+ * to a markets-only invalidation instead of producing `['market', '']`.
+ */
+function withMarket(fn: (mk: string) => QueryKey[]): InvalidationFactory {
+  return (data) => {
+    const mk = eventMarketKey(data)
+    if (mk === null) return [['markets']]
+    return fn(mk)
+  }
+}
+
 export const EVENT_INVALIDATION_MAP: Readonly<Record<string, InvalidationFactory>> = {
   // ── Market lifecycle ──────────────────────────────────────────────
   MarketCreated: () => [['markets']],
-  MarketActivated: (d) => [['market', marketKey(d.marketId)], ['markets']],
-  MarketSettled: (d) => [['market', marketKey(d.marketId)], ['markets'], ['userPositions']],
-  MarketFinalized: (d) => [['market', marketKey(d.marketId)], ['markets'], ['userPositions']],
-  MarketVoided: (d) => [['market', marketKey(d.marketId)], ['markets'], ['userPositions']],
-  DisputedMarketFinalized: (d) => [
-    ['market', marketKey(d.marketId)],
+  MarketActivated: withMarket((mk) => [['market', mk], ['markets']]),
+  MarketSettled: withMarket((mk) => [['market', mk], ['markets'], ['userPositions']]),
+  MarketFinalized: withMarket((mk) => [['market', mk], ['markets'], ['userPositions']]),
+  MarketVoided: withMarket((mk) => [['market', mk], ['markets'], ['userPositions']]),
+  DisputedMarketFinalized: withMarket((mk) => [
+    ['market', mk],
     ['markets'],
     ['userPositions'],
-  ],
+  ]),
 
   // ── User-driven (wager / exit / claim) ────────────────────────────
-  WagerPlaced: (d) => [
-    ['market', marketKey(d.marketId)],
-    ['userPosition', marketKey(d.marketId)],
+  WagerPlaced: withMarket((mk) => [
+    ['market', mk],
+    ['userPosition', mk],
     ['userPositions'],
     ['markets'],
-  ],
-  PositionExited: (d) => [
-    ['market', marketKey(d.marketId)],
-    ['userPosition', marketKey(d.marketId)],
+  ]),
+  PositionExited: withMarket((mk) => [
+    ['market', mk],
+    ['userPosition', mk],
     ['userPositions'],
     ['markets'],
-  ],
-  ClaimPaid: (d) => [
-    ['market', marketKey(d.marketId)],
-    ['userPosition', marketKey(d.marketId)],
+  ]),
+  ClaimPaid: withMarket((mk) => [
+    ['market', mk],
+    ['userPosition', mk],
     ['userPositions'],
-  ],
+  ]),
 
   // ── Path lifecycle ────────────────────────────────────────────────
-  PathAdded: (d) => [['market', marketKey(d.marketId)], ['markets']],
-  PathScored: (d) => [['market', marketKey(d.marketId)]],
-  PathDissolved: (d) => [['market', marketKey(d.marketId)], ['userPositions']],
+  PathAdded: withMarket((mk) => [['market', mk], ['markets']]),
+  PathScored: withMarket((mk) => [['market', mk]]),
+  PathDissolved: withMarket((mk) => [['market', mk], ['userPositions']]),
 
   // ── Sampling progress ─────────────────────────────────────────────
-  CheckpointSampled: (d) => [['market', marketKey(d.marketId)]],
+  CheckpointSampled: withMarket((mk) => [['market', mk]]),
 
   // ── Disputes ──────────────────────────────────────────────────────
-  DisputeRaised: (d) => [['market', marketKey(d.marketId)], ['markets']],
-  DisputeResolved: (d) => [['market', marketKey(d.marketId)], ['markets'], ['userPositions']],
+  DisputeRaised: withMarket((mk) => [['market', mk], ['markets']]),
+  DisputeResolved: withMarket((mk) => [['market', mk], ['markets'], ['userPositions']]),
 }
 
 /**

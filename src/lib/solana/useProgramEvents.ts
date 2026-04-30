@@ -12,6 +12,7 @@
 
 import { useEffect } from 'react'
 
+import { readField } from '@/lib/api/eventInvalidation'
 import { useEventStream } from './eventStreamContext'
 import type { ProgramEvent } from './events'
 
@@ -52,7 +53,10 @@ export function useProgramEvents({ name, marketId, onEvent }: UseProgramEventsOp
     const unregister = stream.addListener((event) => {
       if (name !== undefined && event.name !== name) return
       if (marketId !== undefined) {
-        const eventMarketId = asNumeric((event.data as { marketId?: unknown })?.marketId)
+        // BorshEventCoder returns IDL field names verbatim (snake_case).
+        // readField checks both shapes so this stays correct if Anchor
+        // ever flips its convention.
+        const eventMarketId = asNumeric(readField((event.data as Record<string, unknown>) ?? {}, 'market_id'))
         if (eventMarketId !== marketId) return
       }
       onEvent(event)
