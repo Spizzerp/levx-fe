@@ -1,18 +1,26 @@
 import { useCallback, useEffect, useMemo, useRef, type PropsWithChildren } from 'react'
 import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react'
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui'
-import { SolflareWalletAdapter } from '@solana/wallet-adapter-wallets'
+import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adapter-wallets'
 import { clusterApiUrl } from '@solana/web3.js'
 import { env, toSolanaCluster } from '@/env'
 import { AnchorProgramProvider } from '@/lib/chain'
 import { EventStreamProvider } from '@/lib/solana/EventStreamProvider'
 import { SupabaseAuthProvider } from '@/lib/supabase/provider'
+import { KeeperHealthDot } from '@/features/wallet/KeeperHealthDot'
 import { WalletSync } from '@/stores/walletStore'
 import '@/style/wallet.css'
 
-// Wallet Standard auto-detects Phantom/Backpack. Solflare needs explicit adapter
-// due to WalletAccountError in StandardWalletAdapter._connect (known issue).
-const WALLETS = [new SolflareWalletAdapter()]
+// Phantom + Solflare get explicit adapters because Wallet Standard auto-
+// detection is unreliable in some browser/private-window combinations
+// (Brave with strict shields, Firefox containers, fresh-install Phantom
+// before its content script registers). Solflare in particular has a
+// known WalletAccountError in StandardWalletAdapter._connect.
+//
+// Backpack and other Wallet Standard wallets continue to auto-detect on
+// supported browsers — `WalletProvider` discovers them at mount time
+// without explicit registration here.
+const WALLETS = [new PhantomWalletAdapter(), new SolflareWalletAdapter()]
 
 // Drop any wallet name persisted from a previous session so the mount-time
 // silent reconnect never runs against a stale selection (some wallets, notably
@@ -48,7 +56,14 @@ export function UIRoot({ children }: PropsWithChildren) {
           <AnchorProgramProvider>
             <WalletSync />
             <SupabaseAuthProvider>
-              <EventStreamProvider>{children}</EventStreamProvider>
+              <EventStreamProvider>
+                {children}
+                {/* Global liveness indicator — fixed bottom-right so every
+                    page sees the same dot without each layout opting in. */}
+                <div className="pointer-events-none fixed right-4 bottom-4 z-50">
+                  <KeeperHealthDot className="pointer-events-auto" />
+                </div>
+              </EventStreamProvider>
             </SupabaseAuthProvider>
           </AnchorProgramProvider>
         </WalletModalProvider>

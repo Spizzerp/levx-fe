@@ -167,6 +167,43 @@ function SolutionContent() {
 function GettingStartedContent() {
   return (
     <>
+      <Section id="devnet-setup" num="00" heading="Devnet quick start">
+        <P>
+          LevX is currently live on Solana devnet for waitlisted testers. Five steps take you from
+          a fresh wallet to a working position:
+        </P>
+        <P>
+          <strong>1. Install a Solana wallet.</strong> Phantom or Solflare both work. Most browser
+          extensions auto-detect via Wallet Standard.
+        </P>
+        <P>
+          <strong>2. Switch the wallet to devnet.</strong> Phantom: Settings → Developer settings →
+          Change network → Devnet. Solflare: Settings → Network → Devnet.
+        </P>
+        <P>
+          <strong>3. Get devnet SOL.</strong> You need a small amount of SOL for transaction fees.
+          Use <code>solana airdrop 1</code> from the Solana CLI, or visit{' '}
+          <a href="https://faucet.solana.com" target="_blank" rel="noreferrer noopener">
+            faucet.solana.com
+          </a>{' '}
+          and paste your wallet address.
+        </P>
+        <P>
+          <strong>4. Get test USDC.</strong> Open the Markets page, connect your wallet, sign the
+          one-time verification message, then click <em>Request test USDC</em>. The faucet mints
+          1,000 test USDC to your wallet (rate-limited to once per 24h).
+        </P>
+        <P>
+          <strong>5. Place a wager and exit/claim.</strong> Open any Active market, pick a path,
+          set your collateral, confirm. After settlement, your position appears in the Portfolio
+          page where you can claim winnings.
+        </P>
+        <Note>
+          Devnet is a test environment. Funds are not real, and the protocol may be redeployed or
+          state may be reset between releases.
+        </Note>
+      </Section>
+
       <Section id="open-app" num="01" heading="Open the app">
         <P>
           The current LevX interface is the web app. Start from the market list, then open a market
