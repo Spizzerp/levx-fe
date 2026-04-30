@@ -203,28 +203,21 @@ export function DocsHeader({
           'sm:grid sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-x-2 sm:gap-y-2 sm:rounded-[28px] sm:px-3 sm:py-2',
         )}
       >
-        <div
+        <Link
+          to="/docs"
           className={cn(
             'relative z-10 flex shrink-0 items-center gap-3',
             'min-h-10',
             'sm:col-start-1 sm:row-start-1 sm:min-w-0 sm:shrink sm:gap-2',
+            'duration-short ease-levx transition-opacity',
+            FOCUS_RING,
           )}
         >
-          <Link
-            to="/"
-            className={cn(
-              'flex shrink-0 items-center rounded-full',
-              'duration-short ease-levx transition-opacity',
-              'hover:opacity-80',
-              FOCUS_RING,
-            )}
-          >
-            <img src="/logo_color.png" alt="LevX" className="-my-1 h-12 w-auto sm:h-10" />
-          </Link>
+          <img src="/logo_color.png" alt="LevX" className="-my-1 h-12 w-auto sm:h-10" />
           <span className="text-ink-strong text-label min-w-0 font-mono tracking-wider uppercase">
             Docs
           </span>
-        </div>
+        </Link>
 
         <div
           className={cn(
