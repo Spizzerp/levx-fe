@@ -18,8 +18,6 @@ export interface RawPosition {
   finalPayout: number
   /** True if the user has called `claim` and the program wrote `final_payout`. */
   claimed: boolean
-  /** True if the path was dissolved (position is worthless). */
-  dissolved: boolean
 }
 
 interface Aggregate {
@@ -47,12 +45,11 @@ function truncate(pubkey: string): string {
 }
 
 /**
- * Aggregate per-user. P&L = `realizedPayout - totalWagered`. Accuracy =
- * `settledWins / settledCount` (0 when no settled positions yet, so a
- * fresh wallet doesn't display NaN%). Sorted by realized P&L desc.
- *
- * `score` is realized P&L (in dollars, post-SCALE) — surfaced in the
- * existing `Podium` and `LeaderboardTable` columns.
+ * Aggregate per-user. Score = `realizedPayout - realizedWagered`
+ * (claimed positions only — open positions don't drag rank until they
+ * claim). Accuracy = `settledWins / settledCount` (0 when no settled
+ * positions yet, so a fresh wallet doesn't display NaN%). Sorted by
+ * score desc.
  */
 export function aggregatePositions(
   positions: ReadonlyArray<RawPosition & { marketId: string }>,
@@ -60,10 +57,6 @@ export function aggregatePositions(
   const byUser = new Map<string, Aggregate>()
 
   for (const pos of positions) {
-    if (pos.dissolved) {
-      // Dissolved positions still count toward "wagered" (capital was
-      // committed) but contribute zero payout.
-    }
     let agg = byUser.get(pos.user)
     if (!agg) {
       agg = {

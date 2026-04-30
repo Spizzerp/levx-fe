@@ -11,7 +11,6 @@ function pos(opts: {
   collateral: number
   finalPayout?: number
   claimed?: boolean
-  dissolved?: boolean
 }) {
   return {
     user: opts.user,
@@ -19,7 +18,6 @@ function pos(opts: {
     collateral: opts.collateral,
     finalPayout: opts.finalPayout ?? 0,
     claimed: opts.claimed ?? false,
-    dissolved: opts.dissolved ?? false,
   }
 }
 

@@ -30,18 +30,17 @@ export function useLeaderboard() {
       for (const a of accs) {
         const r = a.account
         try {
+          // Use `BN.toNumber()` rather than `Number(BN)` for consistency
+          // with the rest of the read layer (see `src/lib/api/adapters.ts`)
+          // and to avoid the silent precision loss when amounts approach
+          // 2^53. SCALE is 1e6, so positions up to ~9 PB collateral are
+          // safe — well past anything we'll see at devnet scale.
           raws.push({
             user: r.user.toBase58(),
             marketId: r.market.toBase58(),
-            collateral: Number(r.collateral) / SCALE,
-            finalPayout: Number(r.finalPayout) / SCALE,
+            collateral: r.collateral.toNumber() / SCALE,
+            finalPayout: r.finalPayout.toNumber() / SCALE,
             claimed: !!r.claimed,
-            // The Position account doesn't carry a per-position
-            // `dissolved` bit; the path's `dissolved` is the source of
-            // truth. For leaderboard P&L, treating non-claimed as
-            // un-realized (regardless of dissolved) is simpler and
-            // doesn't punish unclaimed losers in the standings.
-            dissolved: false,
           })
         } catch {
           // Skip positions we can't deserialize cleanly.
