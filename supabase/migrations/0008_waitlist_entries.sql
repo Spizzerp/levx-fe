@@ -1,3 +1,14 @@
+-- Renamed from 0002_waitlist_entries.sql → 0008 to resolve a version
+-- collision with 0002_users.sql. Both files were authored at version
+-- 0002 in the early dev period; the Supabase CLI's `_supabase_migrations`
+-- history table treats version as a unique key, so only one of the
+-- two could be marked applied. Bumping waitlist_entries to 0008 makes
+-- both files distinguishable in history without changing schema. The
+-- table's content already exists on remote (applied during the
+-- pre-history-tracking period), so this rename is paired with
+-- `migration repair --status applied 0008` rather than re-running
+-- the CREATE TABLE.
+
 create table public.waitlist_entries (
   id                 uuid        primary key default gen_random_uuid(),
   email              text        not null,
