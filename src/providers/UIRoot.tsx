@@ -5,6 +5,7 @@ import { SolflareWalletAdapter } from '@solana/wallet-adapter-wallets'
 import { clusterApiUrl } from '@solana/web3.js'
 import { env, toSolanaCluster } from '@/env'
 import { AnchorProgramProvider } from '@/lib/chain'
+import { EventStreamProvider } from '@/lib/solana/EventStreamProvider'
 import { SupabaseAuthProvider } from '@/lib/supabase/provider'
 import { WalletSync } from '@/stores/walletStore'
 import '@/style/wallet.css'
@@ -47,7 +48,7 @@ export function UIRoot({ children }: PropsWithChildren) {
           <AnchorProgramProvider>
             <WalletSync />
             <SupabaseAuthProvider>
-              {children}
+              <EventStreamProvider>{children}</EventStreamProvider>
             </SupabaseAuthProvider>
           </AnchorProgramProvider>
         </WalletModalProvider>
