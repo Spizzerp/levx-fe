@@ -5,7 +5,7 @@
 // directly here and rely on manual smoke testing for the on-chain leg.
 
 import { assertEquals, assertNotEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts'
-import { tryReserve } from './_shared/rateLimit.ts'
+import { tryReserve, releaseReservation } from './_shared/rateLimit.ts'
 
 interface Row {
   wallet: string
@@ -21,12 +21,16 @@ function makeFakeAdmin(seed: Row[] = []) {
     let filterWallet: string | null = null
     let filterCutoff: string | null = null
     let updatePayload: Partial<Row> | null = null
-    let intent: 'select' | 'update' | 'insert' = 'select'
+    let intent: 'select' | 'update' | 'insert' | 'delete' = 'select'
 
     const builder = {
       select: () => builder,
       eq: (_col: string, val: string) => {
         filterWallet = val
+        if (intent === 'delete') {
+          if (filterWallet) rows.delete(filterWallet)
+          return Promise.resolve({ error: null })
+        }
         return builder
       },
       lt: (_col: string, val: string) => {
@@ -51,6 +55,10 @@ function makeFakeAdmin(seed: Row[] = []) {
       update: (payload: Partial<Row>) => {
         intent = 'update'
         updatePayload = payload
+        return builder
+      },
+      delete: () => {
+        intent = 'delete'
         return builder
       },
       insert: async (payload: Row) => {
@@ -104,4 +112,33 @@ Deno.test('tryReserve at exactly cooldown=24h is still blocked (strict inequalit
   const admin = makeFakeAdmin([{ wallet: WALLET, last_minted_at: exact, count: 1 }])
   const r = await tryReserve(admin, WALLET)
   assertEquals(r.allowed, false)
+})
+
+Deno.test('releaseReservation deletes the row when there was no prior reservation', async () => {
+  const admin = makeFakeAdmin()
+  const reserved = await tryReserve(admin, WALLET)
+  assertEquals(reserved.allowed, true)
+  assertEquals(reserved.priorLastMintedAt, null)
+  assertEquals(admin._rows.size, 1)
+
+  await releaseReservation(admin, WALLET, reserved.priorLastMintedAt ?? null)
+  assertEquals(admin._rows.size, 0)
+  // After rollback, the next request must be allowed (i.e. the wallet
+  // isn't blocked for 24h despite an upstream mint failure).
+  const retry = await tryReserve(admin, WALLET)
+  assertEquals(retry.allowed, true)
+})
+
+Deno.test('releaseReservation restores the prior last_minted_at on update path', async () => {
+  // Simulate: wallet successfully minted 25h ago (so the next reserve
+  // succeeds via the UPDATE path, not the INSERT path), then mint
+  // fails and we roll back.
+  const old = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString()
+  const admin = makeFakeAdmin([{ wallet: WALLET, last_minted_at: old, count: 3 }])
+  const reserved = await tryReserve(admin, WALLET)
+  assertEquals(reserved.allowed, true)
+  assertEquals(reserved.priorLastMintedAt, old)
+
+  await releaseReservation(admin, WALLET, reserved.priorLastMintedAt ?? null)
+  assertEquals(admin._rows.get(WALLET)!.last_minted_at, old)
 })

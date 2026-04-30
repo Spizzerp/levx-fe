@@ -33,7 +33,7 @@ import {
 } from '@solana/spl-token'
 
 import { corsHeaders } from './_shared/cors.ts'
-import { tryReserve } from './_shared/rateLimit.ts'
+import { tryReserve, releaseReservation } from './_shared/rateLimit.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -117,7 +117,38 @@ async function handle(req: Request): Promise<Response> {
     return json({ error: 'malformed_wallet' }, 400)
   }
 
-  // ── 2. Rate limit ─────────────────────────────────────────────────
+  // ── 2. Validate config BEFORE reserving the rate-limit slot ──────
+  // Reserving first then bailing on missing config would block the
+  // wallet for 24h despite the operator-side error. Resolve every env
+  // var the mint flow needs and bail with 503 before touching state.
+  const mintStr = Deno.env.get('FAUCET_USDC_MINT')
+  if (!mintStr) return json({ error: 'faucet_misconfigured' }, 503)
+  let mint: PublicKey
+  try {
+    mint = new PublicKey(mintStr)
+  } catch {
+    return json({ error: 'faucet_misconfigured' }, 503)
+  }
+
+  const amountStr = Deno.env.get('FAUCET_AMOUNT_BASE') ?? '1000000000' // 1000 USDC @ 6dp
+  let amount: bigint
+  try {
+    amount = BigInt(amountStr)
+  } catch {
+    return json({ error: 'faucet_misconfigured' }, 503)
+  }
+
+  const rpcUrl = Deno.env.get('FAUCET_RPC_URL')
+  if (!rpcUrl) return json({ error: 'faucet_misconfigured' }, 503)
+
+  let authority: Keypair
+  try {
+    authority = getAuthorityKeypair()
+  } catch {
+    return json({ error: 'faucet_misconfigured' }, 503)
+  }
+
+  // ── 3. Rate limit ─────────────────────────────────────────────────
   const reservation = await tryReserve(admin, wallet)
   if (!reservation.allowed) {
     return json(
@@ -127,45 +158,42 @@ async function handle(req: Request): Promise<Response> {
     )
   }
 
-  // ── 3. Mint config ────────────────────────────────────────────────
-  const mintStr = Deno.env.get('FAUCET_USDC_MINT')
-  if (!mintStr) return json({ error: 'faucet_misconfigured' }, 503)
-  const mint = new PublicKey(mintStr)
-
-  const amountStr = Deno.env.get('FAUCET_AMOUNT_BASE') ?? '1000000000' // 1000 USDC @ 6dp
-  const amount = BigInt(amountStr)
-
-  const rpcUrl = Deno.env.get('FAUCET_RPC_URL')
-  if (!rpcUrl) return json({ error: 'faucet_misconfigured' }, 503)
-
   // ── 4. Build + send mintTo tx ─────────────────────────────────────
-  const authority = getAuthorityKeypair()
   const connection = new Connection(rpcUrl, 'confirmed')
 
-  const ata = await getAssociatedTokenAddress(mint, walletKey, true)
-  const tx = new Transaction().add(
-    createAssociatedTokenAccountIdempotentInstruction(
-      authority.publicKey, // payer
-      ata,
-      walletKey,
-      mint,
-    ),
-    createMintToInstruction(mint, ata, authority.publicKey, amount),
-  )
-  tx.feePayer = authority.publicKey
-  const { blockhash } = await connection.getLatestBlockhash('confirmed')
-  tx.recentBlockhash = blockhash
-  tx.sign(authority)
-
   let sig: string
+  let ata: PublicKey
   try {
+    ata = await getAssociatedTokenAddress(mint, walletKey, true)
+    const tx = new Transaction().add(
+      createAssociatedTokenAccountIdempotentInstruction(
+        authority.publicKey, // payer
+        ata,
+        walletKey,
+        mint,
+      ),
+      createMintToInstruction(mint, ata, authority.publicKey, amount),
+    )
+    tx.feePayer = authority.publicKey
+    const latest = await connection.getLatestBlockhash('confirmed')
+    tx.recentBlockhash = latest.blockhash
+    tx.sign(authority)
+
     sig = await connection.sendRawTransaction(tx.serialize())
-    await connection.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight: (await connection.getLatestBlockhash('confirmed')).lastValidBlockHeight }, 'confirmed')
+    await connection.confirmTransaction(
+      {
+        signature: sig,
+        blockhash: latest.blockhash,
+        lastValidBlockHeight: latest.lastValidBlockHeight,
+      },
+      'confirmed',
+    )
   } catch (e) {
     console.error('[request-test-usdc] mint failed', e)
-    // Don't penalize the user's rate-limit slot for a transient on-chain
-    // failure — the row is already updated, but a retry after 24h is
-    // acceptable. Future improvement: refund the slot on send failure.
+    // Roll back the rate-limit reservation so the user isn't blocked
+    // for 24h on a transient on-chain failure. Best-effort — logged
+    // if it fails so operators can manually unblock if needed.
+    await releaseReservation(admin, wallet, reservation.priorLastMintedAt ?? null)
     return json({ error: 'mint_failed', detail: (e as Error).message }, 502)
   }
 

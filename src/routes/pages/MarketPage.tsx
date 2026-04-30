@@ -576,10 +576,15 @@ export function MarketPage() {
                 if (numWagerable === 0) return
                 const wager = parseFloat(collateral) || 0
                 const total = wager * numWagerable
-                const balance = usdcBalance?.balance ?? 0
-                if (total > balance) {
+                // Pre-tx guard only fires when the balance is actually
+                // known. If the query is still loading or hit a
+                // transient RPC error, fall through and let the on-chain
+                // validation surface insufficient-funds — better than
+                // blocking a valid wager because we couldn't read the
+                // ATA.
+                if (usdcBalance && total > usdcBalance.balance) {
                   toast.error('Insufficient USDC', {
-                    message: `Wager total ${total.toFixed(2)} USDC exceeds your balance of ${balance.toFixed(2)}. Use "Request test USDC" above.`,
+                    message: `Wager total ${total.toFixed(2)} USDC exceeds your balance of ${usdcBalance.balance.toFixed(2)}. Use "Request test USDC" above.`,
                   })
                   return
                 }

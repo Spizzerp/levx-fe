@@ -13,6 +13,13 @@ export interface RateLimitResult {
   allowed: boolean
   /** Seconds until the wallet can request again (only set when blocked). */
   retryAfter?: number
+  /**
+   * The row's `last_minted_at` BEFORE this reservation took effect, or
+   * null if there was no prior row. Pass this to `releaseReservation`
+   * if the downstream operation fails — without it we'd block the
+   * wallet for 24h despite never minting.
+   */
+  priorLastMintedAt?: string | null
 }
 
 /**
@@ -58,7 +65,7 @@ export async function tryReserve(admin: any, wallet: string): Promise<RateLimitR
     .select('wallet')
     .maybeSingle()
 
-  if (!updErr && updated) return { allowed: true }
+  if (!updErr && updated) return { allowed: true, priorLastMintedAt: existing!.last_minted_at }
 
   // Insert path (no existing row). On race, `wallet` PK constraint will
   // block the second concurrent insert with a `23505` error — caller can
@@ -75,12 +82,42 @@ export async function tryReserve(admin: any, wallet: string): Promise<RateLimitR
       }
       throw insErr
     }
-    return { allowed: true }
+    return { allowed: true, priorLastMintedAt: null }
   }
 
   // Existing row, still inside cooldown — treat as blocked.
   return {
     allowed: false,
     retryAfter: Math.ceil(COOLDOWN_MS / 1000),
+  }
+}
+
+/**
+ * Best-effort rollback of a previously-successful `tryReserve`. Used
+ * when the on-chain mint fails after we've already recorded the
+ * reservation — without this the user would be blocked for 24h
+ * despite never receiving USDC. Restores the prior `last_minted_at`
+ * (or deletes the row if there was no prior row) so the next request
+ * is gated by the original cooldown, not the failed attempt's
+ * timestamp.
+ */
+export async function releaseReservation(
+  admin: any,
+  wallet: string,
+  priorLastMintedAt: string | null,
+): Promise<void> {
+  try {
+    if (priorLastMintedAt === null) {
+      await admin.from('faucet_requests').delete().eq('wallet', wallet)
+    } else {
+      await admin
+        .from('faucet_requests')
+        .update({ last_minted_at: priorLastMintedAt })
+        .eq('wallet', wallet)
+    }
+  } catch (e) {
+    // Reservation rollback is best-effort. Logged so operators can
+    // see when a wallet got stuck due to rollback failure.
+    console.warn('[releaseReservation] failed', wallet, e)
   }
 }
