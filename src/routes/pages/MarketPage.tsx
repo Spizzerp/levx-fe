@@ -5,6 +5,8 @@ import { Plus } from 'lucide-react'
 import { Button } from '@/ui/Button'
 import { ChartFrame } from '@/features/chart/ChartFrame'
 import { ConnectGate } from '@/features/wallet/ConnectGate'
+import { RequestUsdcButton } from '@/features/wallet/RequestUsdcButton'
+import { UsdcBalance } from '@/features/wallet/UsdcBalance'
 import { DrawingLayer } from '@/features/chart/DrawingLayer'
 import { MarketComments } from '@/features/market/MarketComments'
 import { Input } from '@/ui/Input'
@@ -25,6 +27,8 @@ import { useMarket, useUserPosition } from '@/lib/chain'
 import { useProgram } from '@/lib/solana/program'
 import { deriveMarketPda } from '@/lib/solana/pda'
 import { useAddPath, usePlaceBatchWager, useClaim } from '@/lib/solana/transactions'
+import { useUsdcBalance } from '@/lib/api/useUsdcBalance'
+import { toast } from '@/stores/toastStore'
 import { usePythFeed, useLatestPrice } from '@/lib/pyth/hooks'
 import { feedIdForPair } from '@/lib/pyth/feedIds'
 import { useBenchmarksHistory, useLazyHistoryTrigger } from '@/lib/pyth/useBenchmarksHistory'
@@ -109,6 +113,7 @@ export function MarketPage() {
   const program = useProgram()
   const addPath = useAddPath()
   const placeBatchWager = usePlaceBatchWager()
+  const { data: usdcBalance } = useUsdcBalance()
 
   const drawingState = useDrawingStore((s) => s.state)
   const drawingPhase = drawingState.phase
@@ -549,6 +554,11 @@ export function MarketPage() {
             </p>
           )}
 
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <UsdcBalance />
+            <RequestUsdcButton />
+          </div>
+
           <SlippageSelector className="mb-6" />
 
           <ConnectGate>
@@ -564,10 +574,19 @@ export function MarketPage() {
               }
               onClick={() => {
                 if (numWagerable === 0) return
+                const wager = parseFloat(collateral) || 0
+                const total = wager * numWagerable
+                const balance = usdcBalance?.balance ?? 0
+                if (total > balance) {
+                  toast.error('Insufficient USDC', {
+                    message: `Wager total ${total.toFixed(2)} USDC exceeds your balance of ${balance.toFixed(2)}. Use "Request test USDC" above.`,
+                  })
+                  return
+                }
                 placeBatchWager.mutate({
                   marketId: market.marketId,
                   pathIndices: wagerablePaths.map((p) => p.pathIndex),
-                  amount: parseFloat(collateral) || 0,
+                  amount: wager,
                 })
               }}
             >
