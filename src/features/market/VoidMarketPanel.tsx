@@ -47,7 +47,8 @@ export function VoidMarketPanel({ market, className }: VoidMarketPanelProps) {
       </div>
       <p className="text-ink-muted font-mono text-caption">
         This market was voided before settlement (typically oracle gaps or governance
-        emergency). All wagers are refundable in full.
+        emergency). Your collateral is refundable. Entry fees are not refunded — those
+        were paid to the protocol when you placed the wager.
       </p>
 
       {position && !position.claimed && (

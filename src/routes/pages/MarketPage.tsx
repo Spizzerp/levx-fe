@@ -651,7 +651,11 @@ export function MarketPage() {
               userPosition ? parseInt(userPosition.pathId.replace('path-', ''), 10) : undefined
             }
           />
-          {userPosition && <UserPositionCard position={userPosition} marketState={market.state} />}
+          {/* hideAction: ClaimButton above already drives the claim flow;
+              the card's in-built "Claim Payout" button is dead (no onClick). */}
+          {userPosition && (
+            <UserPositionCard position={userPosition} marketState={market.state} hideAction />
+          )}
         </aside>
       )}
 
@@ -659,7 +663,11 @@ export function MarketPage() {
       {showVoidPanel && (
         <aside className="flex flex-col gap-6">
           <VoidMarketPanel market={market} />
-          {userPosition && <UserPositionCard position={userPosition} marketState={market.state} />}
+          {/* hideAction: VoidMarketPanel drives the reclaim flow; the
+              card's in-built "Claim Refund" button is dead (no onClick). */}
+          {userPosition && (
+            <UserPositionCard position={userPosition} marketState={market.state} hideAction />
+          )}
         </aside>
       )}
 
