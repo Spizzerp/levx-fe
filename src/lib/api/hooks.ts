@@ -1,12 +1,23 @@
 import { useQuery } from '@tanstack/react-query'
+import type { PublicKey } from '@solana/web3.js'
 
 import type { CurrentPrice, Market, UserPosition } from '@/types/market'
+import { useWalletStore } from '@/stores/walletStore'
 
 /**
  * When true, all data hooks use the mock layer instead of on-chain RPC.
  * Set APP_USE_MOCK=true in your .env to enable during development.
  */
 const USE_MOCK = import.meta.env.APP_USE_MOCK === 'true'
+
+/**
+ * Polling baseline. Markets list and per-market detail revalidate on this
+ * cadence as a floor; PR2 will layer event-driven invalidation on top.
+ */
+const MARKETS_REFETCH_MS = 15_000
+const MARKET_REFETCH_MS = 10_000
+const POSITIONS_REFETCH_MS = 15_000
+const STALE_MS = 5_000
 
 async function getApi() {
   if (USE_MOCK) {
@@ -22,6 +33,8 @@ export function useMarkets() {
       const api = await getApi()
       return api.getMarkets()
     },
+    refetchInterval: MARKETS_REFETCH_MS,
+    staleTime: STALE_MS,
   })
 }
 
@@ -33,17 +46,50 @@ export function useMarket(id: string | undefined) {
       return api.getMarket(id!)
     },
     enabled: !!id,
+    refetchInterval: MARKET_REFETCH_MS,
+    staleTime: STALE_MS,
   })
 }
 
+/**
+ * The connected wallet's position on a single market (or null). A wallet
+ * can technically hold positions on multiple paths in the same market;
+ * this hook returns the first match for back-compat with `MarketPage`'s
+ * `<UserPositionCard>`. Use `useUserPositions` for the full list.
+ */
 export function useUserPosition(marketId: string | undefined) {
+  const wallet = useWalletStore((s) => s.publicKey)
+  const walletKey = wallet?.toBase58() ?? null
   return useQuery({
-    queryKey: ['userPosition', marketId],
+    queryKey: ['userPosition', marketId, walletKey],
     queryFn: async (): Promise<UserPosition | null> => {
       const api = await getApi()
-      return api.getUserPosition(marketId!)
+      return api.getUserPosition(marketId!, wallet as PublicKey | null)
     },
-    enabled: !!marketId,
+    enabled: !!marketId && (USE_MOCK || !!wallet),
+    refetchInterval: POSITIONS_REFETCH_MS,
+    staleTime: STALE_MS,
+  })
+}
+
+/**
+ * All on-chain positions held by the connected wallet, joined with their
+ * market + path context for direct display in PortfolioPage. Disabled
+ * until a wallet is connected (other than in mock mode, which serves a
+ * deterministic fixture set).
+ */
+export function useUserPositions() {
+  const wallet = useWalletStore((s) => s.publicKey)
+  const walletKey = wallet?.toBase58() ?? null
+  return useQuery({
+    queryKey: ['userPositions', walletKey],
+    queryFn: async (): Promise<UserPosition[]> => {
+      const api = await getApi()
+      return api.getUserPositions(wallet as PublicKey | null)
+    },
+    enabled: USE_MOCK || !!wallet,
+    refetchInterval: POSITIONS_REFETCH_MS,
+    staleTime: STALE_MS,
   })
 }
 

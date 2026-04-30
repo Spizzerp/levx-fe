@@ -7,22 +7,12 @@
 
 import { PublicKey } from '@solana/web3.js'
 
-import type { Market, UserPosition } from '@/types/market'
+import type { Market, MarketState, UserPosition } from '@/types/market'
 
-import { anchorMarketToFE, anchorPathToFE, anchorPositionToFE } from './adapters'
+import { anchorMarketToFE, anchorPathToFE, anchorPositionToFE, parseMarketState } from './adapters'
+import { resolveBaseMintLabel } from './pairLabels'
 import { getReadOnlyProgram } from '../solana/program'
 import { deriveMarketPda, derivePathPda, derivePositionPda } from '../solana/pda'
-
-/** Known pair labels mapped by base mint address (devnet). Extend as pairs are added. */
-const PAIR_LABELS: Record<string, { pair: string; base: string; quote: string }> = {
-  // Add known devnet mint → label mappings here as markets are created.
-  // Fallback logic below handles unknown mints.
-}
-
-function resolvePairLabel(baseMint: PublicKey): { pair: string; base: string; quote: string } {
-  const key = baseMint.toBase58()
-  return PAIR_LABELS[key] ?? { pair: `${key.slice(0, 4)}…/USDC`, base: key.slice(0, 4), quote: 'USDC' }
-}
 
 /**
  * Derive a PathTone from a path's predicted price trajectory.
@@ -60,7 +50,7 @@ export async function getMarkets(): Promise<Market[]> {
       const raw = acc.account
       const marketId = raw.marketId.toNumber()
       const market = anchorMarketToFE(raw, String(marketId))
-      const pairInfo = resolvePairLabel(raw.baseMint)
+      const pairInfo = resolveBaseMintLabel(raw.baseMint)
       market.pair = pairInfo.pair
       market.base = pairInfo.base
       market.quote = pairInfo.quote
@@ -80,7 +70,7 @@ export async function getMarket(id: string): Promise<Market> {
   const raw: any = await program.account.market.fetch(marketPda)
   const market = anchorMarketToFE(raw, id)
 
-  const pairInfo = resolvePairLabel(raw.baseMint)
+  const pairInfo = resolveBaseMintLabel(raw.baseMint)
   market.pair = pairInfo.pair
   market.base = pairInfo.base
   market.quote = pairInfo.quote
@@ -105,10 +95,20 @@ export async function getMarket(id: string): Promise<Market> {
   return market
 }
 
-export async function getUserPosition(_marketId: string): Promise<UserPosition | null> {
-  // Requires a connected wallet — the hooks layer will pass wallet context.
-  // Returning null here for the basic hook interface; use getPosition() for direct queries.
-  return null
+/**
+ * Returns the connected wallet's first position on the given market — or
+ * `null` when the wallet has no position there. A wallet can technically
+ * hold multiple positions per market (one per path); use `getUserPositions`
+ * + filter when you need them all. The single-position shape here is
+ * what `MarketPage` consumes via `UserPositionCard`.
+ */
+export async function getUserPosition(
+  marketId: string,
+  wallet: PublicKey | null,
+): Promise<UserPosition | null> {
+  if (!wallet) return null
+  const all = await getUserPositions(wallet)
+  return all.find((p) => p.marketId === marketId) ?? null
 }
 
 /**
@@ -118,15 +118,31 @@ export async function getPosition(
   marketId: number,
   wallet: PublicKey,
   pathIndex: number,
-  pathLabel: string,
-  pathTone: 'ultra-bull' | 'bull' | 'neutral' | 'bear' | 'ultra-bear',
-  pathDissolved: boolean,
 ): Promise<UserPosition | null> {
   const program = getReadOnlyProgram()
   const [positionPda] = derivePositionPda(marketId, wallet, pathIndex)
   try {
-    const raw: any = await program.account.position.fetch(positionPda)
-    return anchorPositionToFE(raw, String(marketId), pathLabel, pathTone, pathDissolved)
+    const positionRaw: any = await program.account.position.fetch(positionPda)
+    const [marketPda] = deriveMarketPda(marketId)
+    const marketRaw: any = await program.account.market.fetch(marketPda)
+    const [pathPda] = derivePathPda(marketId, pathIndex)
+    const pathRaw: any = await program.account.pathOutcome.fetch(pathPda)
+    const startTimeMs = marketRaw.startTime.toNumber() * 1000
+    const checkpointInterval = marketRaw.checkpointInterval as number
+    const path = anchorPathToFE(pathRaw, startTimeMs, checkpointInterval)
+    path.tone = deriveTone(path.predictedPrices)
+    const pairInfo = resolveBaseMintLabel(marketRaw.baseMint)
+    const marketState = parseMarketState(marketRaw.state) as MarketState
+    return anchorPositionToFE(positionRaw, {
+      marketIdNum: marketId,
+      marketState,
+      pair: pairInfo.pair,
+      base: pairInfo.base,
+      quote: pairInfo.quote,
+      pathLabel: path.label,
+      pathTone: path.tone,
+      pathDissolved: path.dissolved,
+    })
   } catch {
     // Account doesn't exist — user has no position on this path
     return null
@@ -136,8 +152,13 @@ export async function getPosition(
 /**
  * Fetch all positions for a wallet across all markets.
  * Uses getProgramAccounts with a filter on the user pubkey field.
+ *
+ * Caches the per-market context (pair label, state) so we don't refetch
+ * the Market account once per position when a user holds multiple
+ * positions on the same market.
  */
-export async function getUserPositions(wallet: PublicKey): Promise<UserPosition[]> {
+export async function getUserPositions(wallet: PublicKey | null): Promise<UserPosition[]> {
+  if (!wallet) return []
   const program = getReadOnlyProgram()
 
   // Position account layout: 8 (discriminator) + 32 (market) + 32 (user) + ...
@@ -146,27 +167,66 @@ export async function getUserPositions(wallet: PublicKey): Promise<UserPosition[
     { memcmp: { offset: 40, bytes: wallet.toBase58() } },
   ])
 
-  // For each position, we need the corresponding path data for labels/tones.
-  // This is expensive — in production, use an indexer. For devnet, it's fine.
   const positions: UserPosition[] = []
+  const marketCache = new Map<string, { marketIdNum: number; marketState: MarketState; pair: string; base: string; quote: string; startTimeMs: number; checkpointInterval: number; baseMint: PublicKey } | null>()
+  const pathCache = new Map<string, { label: string; tone: ReturnType<typeof deriveTone>; dissolved: boolean }>()
 
   for (const acc of accounts) {
     const raw = acc.account
     const pathIndex = raw.pathIndex as number
     const marketPubkey = raw.market as PublicKey
-    try {
-      const marketRaw: any = await program.account.market.fetch(marketPubkey)
-      const mktId = marketRaw.marketId.toNumber()
-      const [pathPda] = derivePathPda(mktId, pathIndex)
-      const pathRaw: any = await program.account.pathOutcome.fetch(pathPda)
-      const startTimeMs = marketRaw.startTime.toNumber() * 1000
-      const checkpointInterval = marketRaw.checkpointInterval as number
-      const path = anchorPathToFE(pathRaw, startTimeMs, checkpointInterval)
-      path.tone = deriveTone(path.predictedPrices)
-      positions.push(anchorPositionToFE(raw, String(mktId), path.label, path.tone, path.dissolved))
-    } catch {
-      // Skip positions we can't fully resolve
+    const marketKey = marketPubkey.toBase58()
+
+    let mkt = marketCache.get(marketKey)
+    if (mkt === undefined) {
+      try {
+        const marketRaw: any = await program.account.market.fetch(marketPubkey)
+        const pairInfo = resolveBaseMintLabel(marketRaw.baseMint)
+        mkt = {
+          marketIdNum: marketRaw.marketId.toNumber(),
+          marketState: parseMarketState(marketRaw.state) as MarketState,
+          pair: pairInfo.pair,
+          base: pairInfo.base,
+          quote: pairInfo.quote,
+          startTimeMs: marketRaw.startTime.toNumber() * 1000,
+          checkpointInterval: marketRaw.checkpointInterval as number,
+          baseMint: marketRaw.baseMint,
+        }
+        marketCache.set(marketKey, mkt)
+      } catch {
+        marketCache.set(marketKey, null)
+        continue
+      }
     }
+    if (!mkt) continue
+
+    const pathKey = `${mkt.marketIdNum}-${pathIndex}`
+    let pathInfo = pathCache.get(pathKey)
+    if (!pathInfo) {
+      try {
+        const [pathPda] = derivePathPda(mkt.marketIdNum, pathIndex)
+        const pathRaw: any = await program.account.pathOutcome.fetch(pathPda)
+        const path = anchorPathToFE(pathRaw, mkt.startTimeMs, mkt.checkpointInterval)
+        const tone = deriveTone(path.predictedPrices)
+        pathInfo = { label: path.label, tone, dissolved: path.dissolved }
+        pathCache.set(pathKey, pathInfo)
+      } catch {
+        continue
+      }
+    }
+
+    positions.push(
+      anchorPositionToFE(raw, {
+        marketIdNum: mkt.marketIdNum,
+        marketState: mkt.marketState,
+        pair: mkt.pair,
+        base: mkt.base,
+        quote: mkt.quote,
+        pathLabel: pathInfo.label,
+        pathTone: pathInfo.tone,
+        pathDissolved: pathInfo.dissolved,
+      }),
+    )
   }
 
   return positions

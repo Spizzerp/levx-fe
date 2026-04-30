@@ -123,18 +123,32 @@ export function anchorPathToFE(raw: any, marketStartTime: number, checkpointInte
   }
 }
 
-export function anchorPositionToFE(
-  raw: any,
-  marketId: string,
-  pathLabel: string,
-  pathTone: PredictionPath['tone'],
-  pathDissolved: boolean,
-): UserPosition {
+export interface PositionContext {
+  marketIdNum: number
+  marketState: MarketState
+  pair: string
+  base: string
+  quote: string
+  pathLabel: string
+  pathTone: PredictionPath['tone']
+  pathDissolved: boolean
+}
+
+export function anchorPositionToFE(raw: any, ctx: PositionContext): UserPosition {
+  const pathIndex = raw.pathIndex as number
+  const marketId = String(ctx.marketIdNum)
   return {
+    id: `${ctx.marketIdNum}-${pathIndex}`,
     marketId,
-    pathId: `path-${raw.pathIndex}`,
-    pathLabel,
-    pathTone,
+    marketIdNum: ctx.marketIdNum,
+    marketState: ctx.marketState,
+    pair: ctx.pair,
+    base: ctx.base,
+    quote: ctx.quote,
+    pathId: `path-${pathIndex}`,
+    pathIndex,
+    pathLabel: ctx.pathLabel,
+    pathTone: ctx.pathTone,
     collateral: bn(raw.collateral, true),
     leverage: raw.leverage,
     exposure: bn(raw.notionalExposure, true),
@@ -143,7 +157,7 @@ export function anchorPositionToFE(
       : 0,
     entryTime: 0, // not directly stored on-chain; could derive from entered_at_checkpoint
     estimatedPayout: bn(raw.finalPayout, true),
-    dissolved: pathDissolved,
+    dissolved: ctx.pathDissolved,
     claimed: raw.claimed,
   }
 }

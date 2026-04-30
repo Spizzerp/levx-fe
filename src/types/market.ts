@@ -172,9 +172,20 @@ export interface Market {
  * label/tone for display.
  */
 export interface UserPosition {
+  /** Stable composite key for React lists. `${marketIdNum}-${pathIndex}`. */
+  id: string
   marketId: string
+  /** Numeric on-chain market_id used by transaction hooks. */
+  marketIdNum: number
+  /** Snapshotted at read time so the row can render without a join against the market query. */
+  marketState: MarketState
+  /** Pair label for table display (resolved via @/lib/api/pairLabels). */
+  pair: string
+  base: string
+  quote: string
   /** Path the user wagered on */
   pathId: string
+  pathIndex: number
   pathLabel: string
   pathTone: PathTone
   /** USDC committed (collateral) */

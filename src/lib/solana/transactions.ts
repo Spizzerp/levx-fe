@@ -315,6 +315,7 @@ export function usePlaceWager() {
     onSuccess: (sig, { marketId }) => {
       queryClient.invalidateQueries({ queryKey: ['market', String(marketId)] })
       queryClient.invalidateQueries({ queryKey: ['userPosition', String(marketId)] })
+      queryClient.invalidateQueries({ queryKey: ['userPositions'] })
       queryClient.invalidateQueries({ queryKey: ['markets'] })
       toast.success('Position opened', { txSig: sig })
     },
@@ -385,6 +386,7 @@ export function usePlaceBatchWager() {
     onSuccess: (sig, { marketId, pathIndices }) => {
       queryClient.invalidateQueries({ queryKey: ['market', String(marketId)] })
       queryClient.invalidateQueries({ queryKey: ['userPosition', String(marketId)] })
+      queryClient.invalidateQueries({ queryKey: ['userPositions'] })
       queryClient.invalidateQueries({ queryKey: ['markets'] })
       const label = pathIndices.length === 1 ? 'Position opened' : `${pathIndices.length} positions opened`
       toast.success(label, { txSig: sig })
@@ -440,6 +442,7 @@ export function useExitPosition() {
     onSuccess: (sig, { marketId }) => {
       queryClient.invalidateQueries({ queryKey: ['market', String(marketId)] })
       queryClient.invalidateQueries({ queryKey: ['userPosition', String(marketId)] })
+      queryClient.invalidateQueries({ queryKey: ['userPositions'] })
       queryClient.invalidateQueries({ queryKey: ['markets'] })
       toast.success('Position closed', { txSig: sig })
     },
@@ -497,6 +500,7 @@ export function useClaim() {
     onSuccess: (sig, { marketId }) => {
       queryClient.invalidateQueries({ queryKey: ['market', String(marketId)] })
       queryClient.invalidateQueries({ queryKey: ['userPosition', String(marketId)] })
+      queryClient.invalidateQueries({ queryKey: ['userPositions'] })
       queryClient.invalidateQueries({ queryKey: ['markets'] })
       toast.success('Payout claimed', { txSig: sig })
     },

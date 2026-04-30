@@ -193,8 +193,15 @@ const MARKETS: Market[] = [
 
 const USER_POSITIONS: UserPosition[] = [
   {
-    marketId: 'eth',           // sampling
+    id: '1-1',
+    marketId: '1', // eth (sampling)
+    marketIdNum: 1,
+    marketState: 'sampling',
+    pair: 'ETH/USDC',
+    base: 'ETH',
+    quote: 'USDC',
     pathId: 'ai-bull',
+    pathIndex: 1,
     pathLabel: 'Bull',
     pathTone: 'bull',
     collateral: 250,
@@ -207,8 +214,15 @@ const USER_POSITIONS: UserPosition[] = [
     claimed: false,
   },
   {
-    marketId: 'eth-maturing',  // maturing — awaiting dispute window close
+    id: '4-2',
+    marketId: '4', // eth-maturing
+    marketIdNum: 4,
+    marketState: 'maturing',
+    pair: 'ETH/USDC',
+    base: 'ETH',
+    quote: 'USDC',
     pathId: 'ai-neutral',
+    pathIndex: 2,
     pathLabel: 'Neutral',
     pathTone: 'neutral',
     collateral: 100,
@@ -221,8 +235,15 @@ const USER_POSITIONS: UserPosition[] = [
     claimed: false,
   },
   {
-    marketId: 'sol-settled',   // settled — claim ready
+    id: '6-0',
+    marketId: '6', // sol-settled
+    marketIdNum: 6,
+    marketState: 'settled',
+    pair: 'SOL/USDC',
+    base: 'SOL',
+    quote: 'USDC',
     pathId: 'ai-ultra-bull',
+    pathIndex: 0,
     pathLabel: 'Ultra Bull',
     pathTone: 'ultra-bull',
     collateral: 50,
@@ -254,8 +275,16 @@ export async function getMarket(id: string): Promise<Market> {
   return delay(match)
 }
 
-export async function getUserPosition(marketId: string): Promise<UserPosition | null> {
+export async function getUserPosition(
+  marketId: string,
+  // wallet pubkey is unused in mock mode; kept for signature parity with onchain.ts
+  _wallet?: unknown,
+): Promise<UserPosition | null> {
   return delay(USER_POSITIONS.find((p) => p.marketId === marketId) ?? null)
+}
+
+export async function getUserPositions(_wallet?: unknown): Promise<UserPosition[]> {
+  return delay(USER_POSITIONS)
 }
 
 export async function getCurrentPrice(pair: string): Promise<CurrentPrice> {

@@ -1,3 +1,3 @@
-export { useMarkets, useMarket, useUserPosition } from './hooks'
+export { useMarkets, useMarket, useUserPosition, useUserPositions } from './hooks'
 export { AnchorProgramProvider, useAnchorProgram } from './AnchorProgramProvider'
 export { buildTransaction, type BuildTransactionOptions } from './buildTransaction'
