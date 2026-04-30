@@ -16,9 +16,13 @@ create table public.keeper_heartbeat (
   updated_at  timestamptz not null default now()
 );
 
--- Seed the singleton row so the FE's first read always succeeds.
+-- Seed the singleton row at epoch so the FE's first read always
+-- succeeds AND the keeper-health dot shows "offline" until the keeper
+-- actually writes a heartbeat. Seeding with `now()` would briefly show
+-- "online" on a fresh deploy before the keeper-side writer lands —
+-- false-positive worse than starting red.
 insert into public.keeper_heartbeat (id, updated_at)
-  values (1, now())
+  values (1, to_timestamp(0))
   on conflict (id) do nothing;
 
 alter table public.keeper_heartbeat enable row level security;
