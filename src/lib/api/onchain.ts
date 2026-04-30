@@ -132,7 +132,7 @@ export async function getUserPosition(
  * tolerance on the actual exit/claim still goes through the real on-chain
  * computation.
  */
-function computeEstimatedPayout(args: {
+export function computeEstimatedPayout(args: {
   positionRaw: { collateral: { toNumber(): number }; lmsrShares: { toNumber(): number }; finalPayout: { toNumber(): number }; claimed: boolean }
   pathDissolved: boolean
   pathIndex: number
@@ -302,10 +302,20 @@ export async function getUserPositions(wallet: PublicKey | null): Promise<UserPo
         const path = anchorPathToFE(pathRaw, mkt.startTimeMs, mkt.checkpointInterval)
         const tone = deriveTone(path.predictedPrices)
         pathInfo = { label: path.label, tone, dissolved: path.dissolved }
-        pathCache.set(pathKey, pathInfo)
       } catch {
-        continue
+        // The keeper's `close_path_outcome` rent-reclaim sweep closes
+        // PathOutcome PDAs once a market reaches a terminal state. The
+        // user's Position PDA still exists and may still be claimable, so
+        // we degrade gracefully with a stub label instead of dropping
+        // the row from the portfolio. `dissolved=false` keeps the row
+        // eligible for the Claim/Reclaim button.
+        pathInfo = {
+          label: `Path ${String.fromCharCode(65 + pathIndex)}`,
+          tone: 'neutral' as const,
+          dissolved: false,
+        }
       }
+      pathCache.set(pathKey, pathInfo)
     }
 
     const estimatedPayout = computeEstimatedPayout({
@@ -333,6 +343,11 @@ export async function getUserPositions(wallet: PublicKey | null): Promise<UserPo
       }),
     )
   }
+
+  // `getProgramAccounts` ordering isn't part of the API. Sort by
+  // (marketIdNum, pathIndex) so the portfolio and `useUserPosition`'s
+  // first-match semantics are stable across polls.
+  positions.sort((a, b) => a.marketIdNum - b.marketIdNum || a.pathIndex - b.pathIndex)
 
   return positions
 }
