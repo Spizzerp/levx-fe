@@ -13,12 +13,19 @@ vi.mock('@/env/env.config', () => ({
     APP_HERMES_URL: 'https://hermes.pyth.network',
     APP_RPC_URL: 'https://api.mainnet-beta.solana.com',
     APP_NETWORK: 'mainnet',
+    APP_PROGRAM_ID: 'LEVXqi1Z2XujBw2jAEP15Dv8LyrDetDR95KZGGQNobV',
+    APP_SUPABASE_URL: 'http://localhost:54321',
+    APP_SUPABASE_ANON_KEY: 'test-anon-key',
   },
 }))
 
 vi.mock('@/lib/solana/transactions', () => ({
   useExitPosition: () => ({ mutate: vi.fn(), isPending: false, isError: false }),
   useClaim: () => ({ mutate: vi.fn(), isPending: false, isError: false }),
+}))
+
+vi.mock('@/lib/api/useUsdcBalance', () => ({
+  useUsdcBalance: () => ({ data: null, isLoading: false }),
 }))
 
 vi.mock('@solana/wallet-adapter-react', () => ({

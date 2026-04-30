@@ -43,3 +43,17 @@ jobs:
         # need a nonce before they have a JWT). The function does its own
         # wallet-signature auth.
         run: supabase functions deploy verify-wallet --no-verify-jwt
+
+      - name: Deploy request-test-usdc edge function
+        # --no-verify-jwt: the function verifies the verify-wallet JWT itself
+        # (HS256 against EDGE_JWT_SECRET). Letting Supabase's gateway also
+        # verify would require the caller to send a separate Supabase JWT
+        # we don't issue.
+        #
+        # Required Edge secrets (set once via `supabase secrets set …`):
+        #   FAUCET_AUTHORITY_SECRET   base58 keypair, mints the collateral mint
+        #   FAUCET_USDC_MINT          collateral mint pubkey
+        #   FAUCET_RPC_URL            Solana RPC endpoint
+        #   FAUCET_AMOUNT_BASE        amount in base units (e.g. 1000000000)
+        #   EDGE_JWT_SECRET           HS256 secret matching verify-wallet
+        run: supabase functions deploy request-test-usdc --no-verify-jwt

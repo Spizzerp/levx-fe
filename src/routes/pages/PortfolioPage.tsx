@@ -12,9 +12,11 @@ import { cn } from '@/lib/cn'
 import { DOT_GRADIENT } from '@/lib/constants'
 import { formatUSD } from '@/lib/format'
 import { useUserPositions } from '@/lib/chain'
+import { useUsdcBalance } from '@/lib/api/useUsdcBalance'
 import { useExitPosition, useClaim } from '@/lib/solana/transactions'
 import { PageLayout } from '@/layouts/PageLayout'
 import { useWalletStore } from '@/stores/walletStore'
+import { RequestUsdcButton } from '@/features/wallet/RequestUsdcButton'
 import type { MarketState, UserPosition } from '@/types/market'
 
 const PORTFOLIO_SUBTITLE = 'Active & settled positions · P&L · Claims'
@@ -75,6 +77,7 @@ function PositionStatusDot({ state }: { state: MarketState }) {
 export function PortfolioPage() {
   const connected = useWalletStore((s) => s.connected)
   const { data: positions = [], isLoading } = useUserPositions()
+  const { data: usdcBalance } = useUsdcBalance()
   const exitPosition = useExitPosition()
   const claim = useClaim()
   const [action, setAction] = useState<ActionStatus>({ id: null, kind: null })
@@ -336,11 +339,20 @@ export function PortfolioPage() {
               {active.length}
             </div>
           </div>
-          <div className="ml-auto text-right">
+          <div>
             <div className="text-label text-ink-muted mb-2 font-mono uppercase">Total Wagered</div>
             <div className="text-ink-strong font-mono text-3xl font-bold tracking-[0.02em]">
               {formatUSD(totalWagered)}
             </div>
+          </div>
+          <div className="ml-auto flex flex-col items-end gap-2">
+            <div>
+              <div className="text-label text-ink-muted mb-2 font-mono uppercase">USDC Balance</div>
+              <div className="text-ink-strong font-mono text-3xl font-bold tracking-[0.02em]">
+                {usdcBalance ? formatUSD(usdcBalance.balance) : '—'}
+              </div>
+            </div>
+            <RequestUsdcButton />
           </div>
         </div>
       }

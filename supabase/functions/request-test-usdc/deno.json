@@ -1,0 +1,10 @@
+{
+  "imports": {
+    "std/http/server":  "https://deno.land/std@0.224.0/http/server.ts",
+    "supabase-js":      "npm:@supabase/supabase-js@2.45.4",
+    "djwt":             "https://deno.land/x/djwt@v3.0.2/mod.ts",
+    "bs58":             "npm:bs58@5.0.0",
+    "@solana/web3.js":  "npm:@solana/web3.js@1.95.4",
+    "@solana/spl-token":"npm:@solana/spl-token@0.4.9"
+  }
+}
