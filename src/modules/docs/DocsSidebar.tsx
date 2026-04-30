@@ -9,11 +9,15 @@ export function DocsSidebar({
   activeDoc,
   query,
   onClose,
+  className,
+  hideCloseButton,
 }: {
   activeDoc: DocId
   onSelect?: (id: DocId) => void
   query: string
   onClose?: () => void
+  className?: string
+  hideCloseButton?: boolean
 }) {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -31,13 +35,14 @@ export function DocsSidebar({
         'h-full min-h-0 overflow-y-auto',
         'border-line border-r',
         'pt-32 pr-4 pb-24 pl-6',
+        className
       )}
     >
       <div className="mb-8 flex items-baseline justify-between">
         <span className="text-ink-dim text-nano font-mono tracking-wider uppercase">
           Reference Manual
         </span>
-        {onClose && (
+        {onClose && !hideCloseButton && (
           <button
             type="button"
             onClick={onClose}
@@ -74,6 +79,7 @@ export function DocsSidebar({
                     <Link
                       to="/docs/$id"
                       params={{ id: item.id }}
+                      onClick={() => onClose?.()}
                       className={cn(
                         'flex w-full items-center gap-2.5',
                         'border-line border-l py-1.5 pr-2 pl-3',
