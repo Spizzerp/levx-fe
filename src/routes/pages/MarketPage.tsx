@@ -15,6 +15,8 @@ import { LevXChart } from '@/features/chart/LevXChart'
 import { MarketMetaPanel } from '@/features/market/MarketMetaPanel'
 import { MarketStateBadge } from '@/features/market/MarketStateBadge'
 import { MaturityCountdownCard } from '@/features/market/MaturityCountdownCard'
+import { PendingPathsBanner } from '@/features/market/PendingPathsBanner'
+import { VoidMarketPanel } from '@/features/market/VoidMarketPanel'
 import { QueryErrorState } from '@/ui/QueryErrorState'
 import { TimeRangePicker, type CandleInterval } from '@/features/chart/TimeRangePicker'
 import { PathRow } from '@/features/market/PathRow'
@@ -153,18 +155,20 @@ export function MarketPage() {
   // Live price from Pyth tick; fall back to last history point
   const priceDisplay = latestTick?.value ?? chartHistory[chartHistory.length - 1]?.value ?? 0
 
-  // Use on-chain paths when available (active markets always have AI paths assigned).
-  // Fall back to fixture paths for display when market.paths is empty (mock mode).
+  // Use on-chain paths when available. Fall back to fixture paths only
+  // in mock mode (APP_USE_MOCK=true) — in real-chain mode an empty
+  // market.paths array is meaningful (Pending market awaiting pipeline,
+  // or a market with all paths dissolved). Fixture-painting those would
+  // mislead the user into thinking AI submissions exist when they
+  // don't; PendingPathsBanner / VoidMarketPanel handle the real states.
+  const useMockPaths = import.meta.env.APP_USE_MOCK === 'true'
   const aiPaths = useMemo(() => {
     const marketPaths = market?.paths ?? []
     if (marketPaths.length > 0) return marketPaths
+    if (!useMockPaths) return []
 
-    // Fallback: generate fixture paths for mock/demo
-    // Paths span from market start to market end, anchored at the price
-    // where the history line crosses the START marker
+    // Fixture path generation — mock mode only.
     if (chartTotalCheckpoints <= 0 || priceDisplay <= 0) return []
-
-    // Find the price closest to marketStart from history
     let startPrice = priceDisplay
     if (chartHistory.length > 0) {
       let closest = chartHistory[0]
@@ -190,6 +194,7 @@ export function MarketPage() {
     paths[3].totalWagered = 1_900
     return paths
   }, [
+    useMockPaths,
     market?.paths,
     chartHistory,
     chartMarketStart,
@@ -325,8 +330,17 @@ export function MarketPage() {
   const showWagerRail = market.state === 'active' || market.state === 'sampling'
   const showMaturityCard = market.state === 'maturing'
   const showClaimCard = market.state === 'settled'
-  const showPositionRail = !showWagerRail && !!userPosition
-  const showRail = showWagerRail || showMaturityCard || showClaimCard || showPositionRail
+  const showVoidPanel = market.state === 'void'
+  const showPendingPaths = market.state === 'pending' && market.numPaths < 3
+  const showPositionRail =
+    !showWagerRail && !showVoidPanel && !showPendingPaths && !!userPosition
+  const showRail =
+    showWagerRail ||
+    showMaturityCard ||
+    showClaimCard ||
+    showVoidPanel ||
+    showPendingPaths ||
+    showPositionRail
 
   return (
     <main
@@ -483,11 +497,21 @@ export function MarketPage() {
           <div data-testid="draw-button-wrapper" className="block md:hidden">
             {isInDrawMode ? (
               <div className="mt-5 flex gap-3">
-                <Button variant="secondary" fullWidth onClick={() => exitDrawMode()}>
+                <Button
+                  variant="secondary"
+                  fullWidth
+                  onClick={() => exitDrawMode()}
+                  disabled={addPath.isPending}
+                >
                   Cancel
                 </Button>
-                <Button variant="primary" fullWidth onClick={handleConfirmDrawing}>
-                  Confirm
+                <Button
+                  variant="primary"
+                  fullWidth
+                  onClick={handleConfirmDrawing}
+                  disabled={addPath.isPending}
+                >
+                  {addPath.isPending ? 'Submitting…' : 'Confirm'}
                 </Button>
               </div>
             ) : (
@@ -631,8 +655,23 @@ export function MarketPage() {
         </aside>
       )}
 
+      {/* ── Right rail (Void) — refund / reclaim panel ── */}
+      {showVoidPanel && (
+        <aside className="flex flex-col gap-6">
+          <VoidMarketPanel market={market} />
+          {userPosition && <UserPositionCard position={userPosition} marketState={market.state} />}
+        </aside>
+      )}
+
+      {/* ── Right rail (Pending) — AI-paths-arriving banner ── */}
+      {showPendingPaths && (
+        <aside className="flex flex-col gap-6">
+          <PendingPathsBanner market={market} />
+        </aside>
+      )}
+
       {/* ── Right rail (non-Active markets with a user position) ── */}
-      {showPositionRail && !showMaturityCard && !showClaimCard && userPosition && (
+      {showPositionRail && userPosition && (
         <aside className="flex flex-col">
           <UserPositionCard position={userPosition} marketState={market.state} />
         </aside>
