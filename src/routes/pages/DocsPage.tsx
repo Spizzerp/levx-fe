@@ -61,7 +61,7 @@ export function DocsLayout() {
         'md:block md:h-auto md:min-h-dvh md:overflow-visible',
       )}
     >
-      <DocsHeader query={query} onQueryChange={setQuery} />
+      <DocsHeader query={query} onQueryChange={setQuery} activeDoc={activeDoc} />
 
       {isHome ? (
         // Home: full-width, no sidebar/TOC
@@ -71,7 +71,7 @@ export function DocsLayout() {
             'min-h-0 flex-1 overflow-y-auto',
             'px-8 pt-32 pb-16',
             'md:flex-none md:overflow-visible md:px-4',
-            'sm:px-5 sm:pt-56',
+            'sm:px-5 sm:pt-36',
           )}
         >
           <Outlet />
@@ -96,7 +96,7 @@ export function DocsLayout() {
               'h-full min-h-0 overflow-y-auto',
               'pt-32 pr-12 pb-32 pl-12',
               'md:h-auto md:overflow-visible md:px-6 md:pb-24',
-              'sm:px-5 sm:pt-56',
+              'sm:px-5 sm:pt-36',
             )}
           >
             <div className="mx-auto max-w-[760px] md:max-w-none">

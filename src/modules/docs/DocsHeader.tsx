@@ -1,9 +1,11 @@
-import { useEffect, useId, useMemo, useRef } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Link } from '@tanstack/react-router'
-import { Search, X as ClearIcon } from 'lucide-react'
+import { Search, X as ClearIcon, Menu } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { ThemeToggle } from '@/ui/ThemeToggle'
 import { searchDocs } from './search'
+import { DocsMobileMenu } from './DocsMobileMenu'
+import type { DocId } from './types'
 
 const FOCUS_RING = cn(
   'focus-visible:ring-ink-strong focus-visible:ring-offset-surface',
@@ -181,10 +183,38 @@ function DocsSearch({ query, onChange }: { query: string; onChange: (v: string) 
 export function DocsHeader({
   query,
   onQueryChange,
+  activeDoc,
 }: {
   query: string
   onQueryChange: (v: string) => void
+  activeDoc?: DocId
 }) {
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
+
+  const headerActions = (
+    <>
+      <a
+        href="https://github.com/levx-protocol"
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="LevX GitHub"
+        className={ICON_ACTION}
+      >
+        <GitHubIcon size={16} />
+      </a>
+      <a
+        href="https://x.com/LevXtrade"
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="LevX on X"
+        className={ICON_ACTION}
+      >
+        <XIcon size={15} />
+      </a>
+      <ThemeToggle aria-label="Toggle theme" className={ICON_ACTION} />
+    </>
+  )
+
   return (
     <header
       className={cn(
@@ -203,73 +233,61 @@ export function DocsHeader({
           'sm:grid sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-x-2 sm:gap-y-2 sm:rounded-[28px] sm:px-3 sm:py-2',
         )}
       >
-        <div
+        <Link
+          to="/docs"
           className={cn(
             'relative z-10 flex shrink-0 items-center gap-3',
             'min-h-10',
             'sm:col-start-1 sm:row-start-1 sm:min-w-0 sm:shrink sm:gap-2',
+            'duration-short ease-levx transition-opacity',
+            FOCUS_RING,
           )}
         >
-          <Link
-            to="/"
-            className={cn(
-              'flex shrink-0 items-center rounded-full',
-              'duration-short ease-levx transition-opacity',
-              'hover:opacity-80',
-              FOCUS_RING,
-            )}
-          >
-            <img src="/logo_color.png" alt="LevX" className="-my-1 h-12 w-auto sm:h-10" />
-          </Link>
+          <img src="/logo_color.png" alt="LevX" className="-my-1 h-12 w-auto sm:h-10" />
           <span className="text-ink-strong text-label min-w-0 font-mono tracking-wider uppercase">
             Docs
           </span>
-        </div>
+        </Link>
 
         <div
           className={cn(
-            'pointer-events-none absolute inset-0 z-10 flex items-center justify-center',
-            'px-72',
-            'lg:px-64',
-            'md:static md:flex-1 md:justify-start md:px-0',
+            'pointer-events-none absolute top-1/2 left-1/2 z-10 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center',
+            'w-full max-w-[420px] px-4',
             'sm:hidden',
           )}
         >
-          <div
-            className={cn(
-              'pointer-events-auto flex w-full max-w-[420px] items-center',
-              'sm:max-w-none',
-            )}
-          >
+          <div className="pointer-events-auto flex w-full items-center">
             <DocsSearch query={query} onChange={onQueryChange} />
           </div>
         </div>
 
+        {/* Desktop actions */}
+        <div className={cn('relative z-10 flex shrink-0 items-center gap-2', 'sm:hidden')}>
+          {headerActions}
+        </div>
+
+        {/* Mobile menu */}
         <div
           className={cn(
-            'relative z-10 flex shrink-0 items-center gap-2',
-            'sm:col-start-2 sm:row-start-1 sm:gap-1 sm:justify-self-end',
+            'relative z-20 hidden shrink-0 items-center sm:col-start-2 sm:row-start-1 sm:flex sm:justify-self-end',
           )}
         >
-          <a
-            href="https://github.com/levx-protocol"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="LevX GitHub"
-            className={ICON_ACTION}
+          <button
+            onClick={() => setIsMenuOpen(!isMenuOpen)}
+            className={cn(ICON_ACTION, isMenuOpen && 'bg-surface-1 text-ink-strong')}
+            aria-label="Toggle menu"
+            aria-expanded={isMenuOpen}
           >
-            <GitHubIcon size={16} />
-          </a>
-          <a
-            href="https://x.com/LevXtrade"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="LevX on X"
-            className={ICON_ACTION}
-          >
-            <XIcon size={15} />
-          </a>
-          <ThemeToggle aria-label="Toggle theme" className={ICON_ACTION} />
+            {isMenuOpen ? <ClearIcon size={18} /> : <Menu size={18} />}
+          </button>
+
+          <DocsMobileMenu
+            isOpen={isMenuOpen}
+            onClose={() => setIsMenuOpen(false)}
+            activeDoc={activeDoc}
+            headerActions={headerActions}
+            iconActionClassName={ICON_ACTION}
+          />
         </div>
 
         <div className="relative z-10 hidden min-w-0 sm:col-span-2 sm:row-start-2 sm:block">

@@ -8,13 +8,33 @@ import {
   Layers,
   LinkIcon,
   Map,
+  AppWindow,
+  MessageCircle,
 } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import { ChartFrame } from '@/features/chart/ChartFrame'
 import { cn } from '@/lib/cn'
-import { HyperText } from '@/ui/HyperText'
 import { SIDEBAR_SECTIONS } from './data'
 import type { DocId } from './types'
+
+function GitHubIcon({ size = 16, className }: { size?: number; className?: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden="true"
+      className={className}
+    >
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M12 .5C5.65.5.5 5.77.5 12.28c0 5.21 3.29 9.62 7.86 11.18.57.11.78-.25.78-.57 0-.28-.01-1.02-.02-2-3.2.71-3.87-1.58-3.87-1.58-.52-1.36-1.28-1.72-1.28-1.72-1.05-.73.08-.72.08-.72 1.15.08 1.76 1.22 1.76 1.22 1.03 1.8 2.7 1.28 3.35.98.1-.76.4-1.28.73-1.58-2.55-.3-5.23-1.31-5.23-5.82 0-1.29.45-2.34 1.18-3.16-.12-.3-.51-1.5.11-3.12 0 0 .97-.32 3.17 1.2A10.72 10.72 0 0 1 12 5.7c.98 0 1.97.14 2.89.4 2.2-1.52 3.16-1.2 3.16-1.2.63 1.62.23 2.82.12 3.12.74.82 1.18 1.87 1.18 3.16 0 4.52-2.68 5.52-5.24 5.81.41.37.78 1.09.78 2.19 0 1.58-.01 2.86-.01 3.25 0 .32.2.68.79.57 4.55-1.56 7.83-5.97 7.83-11.18C23.5 5.77 18.35.5 12 .5Z"
+      />
+    </svg>
+  )
+}
 
 const SECTION_ICONS: Record<string, React.ReactNode> = {
   overview: <BookOpen size={16} />,
@@ -67,7 +87,7 @@ export function DocsHome() {
             "[font-variation-settings:'ROND'_100]",
           )}
         >
-          <HyperText>Predict with LevX</HyperText>
+          Predict with LevX
         </h1>
         <p className="text-ink-muted font-editorial text-[20px] leading-snug tracking-tight whitespace-nowrap md:whitespace-normal">
           A path-prediction market protocol on Solana. Predict the route, not just the destination.
@@ -123,14 +143,8 @@ export function DocsHome() {
       {/* Section bento grid */}
       <ChartFrame glow>
         <div className="bg-line grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-px md:grid-cols-1">
-          {SIDEBAR_SECTIONS.map((section) => (
-            <div
-              key={section.id}
-              className={cn(
-                'bg-surface flex min-w-0 flex-col p-6',
-                section.id === 'links' && 'col-span-2 md:col-span-1',
-              )}
-            >
+          {SIDEBAR_SECTIONS.filter((s) => s.id !== 'links').map((section) => (
+            <div key={section.id} className="bg-surface flex min-w-0 flex-col p-6">
               {/* Section header */}
               <div className="mb-5 flex items-center gap-2.5">
                 <span className="text-ink-dim">{SECTION_ICONS[section.id]}</span>
@@ -143,12 +157,7 @@ export function DocsHome() {
               </div>
 
               {/* Items */}
-              <ul
-                className={cn(
-                  'flex flex-col gap-px',
-                  section.id === 'links' && 'grid grid-cols-3 items-center md:grid-cols-1',
-                )}
-              >
+              <ul className="flex flex-col gap-px">
                 {section.items.map((item) => (
                   <li key={item.id}>
                     <Link
@@ -159,8 +168,6 @@ export function DocsHome() {
                         'px-3 py-2.5',
                         'border-line hover:bg-surface-1',
                         'duration-short ease-levx transition-colors',
-                        section.id === 'links' &&
-                          'justify-center text-center md:justify-between md:text-left',
                       )}
                     >
                       <span className="flex min-w-0 items-center gap-2">
@@ -198,6 +205,49 @@ export function DocsHome() {
           ))}
         </div>
       </ChartFrame>
+
+      {/* Text Links */}
+      <div className="mt-12 flex flex-col gap-4">
+        <div className="flex items-center gap-3 font-sans text-[15px]">
+          <AppWindow size={20} className="text-ink-dim" strokeWidth={1.5} />
+          <span className="text-ink-muted">
+            Ready to explore the markets?{' '}
+            <Link
+              to="/docs/$id"
+              params={{ id: 'launch-app' }}
+              className="text-success duration-short ease-levx transition-colors hover:opacity-80"
+            >
+              Launch App
+            </Link>
+          </span>
+        </div>
+        <div className="flex items-center gap-3 font-sans text-[15px]">
+          <GitHubIcon size={20} className="text-ink-dim" />
+          <span className="text-ink-muted">
+            Want to see the code?{' '}
+            <Link
+              to="/docs/$id"
+              params={{ id: 'github' }}
+              className="text-success duration-short ease-levx transition-colors hover:opacity-80"
+            >
+              GitHub
+            </Link>
+          </span>
+        </div>
+        <div className="flex items-center gap-3 font-sans text-[15px]">
+          <MessageCircle size={20} className="text-ink-dim" strokeWidth={1.5} />
+          <span className="text-ink-muted">
+            Have questions or feedback?{' '}
+            <Link
+              to="/docs/$id"
+              params={{ id: 'community' }}
+              className="text-success duration-short ease-levx transition-colors hover:opacity-80"
+            >
+              Community
+            </Link>
+          </span>
+        </div>
+      </div>
 
       {/* Footer strip */}
       <div className="border-line mt-12 flex items-center justify-between border-t pt-8">
