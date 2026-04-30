@@ -121,6 +121,7 @@ export const DOC_META: Record<DocId, DocMeta> = {
       { label: 'STATUS', value: 'Beta' },
     ],
     sections: [
+      { id: 'devnet-setup', num: '00', heading: 'Devnet quick start' },
       { id: 'open-app', num: '01', heading: 'Open the app' },
       { id: 'browse-markets', num: '02', heading: 'Browse markets' },
       { id: 'read-paths', num: '03', heading: 'Read paths' },

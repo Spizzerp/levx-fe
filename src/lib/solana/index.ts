@@ -1,4 +1,3 @@
-export { SolanaProviders } from './providers'
 export { useProgram, getReadOnlyProgram, getReadOnlyProvider } from './program'
 export { PROGRAM_ID } from './pda'
 export {
