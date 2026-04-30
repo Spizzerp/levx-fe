@@ -14,7 +14,6 @@ import {
 import { Link } from '@tanstack/react-router'
 import { ChartFrame } from '@/features/chart/ChartFrame'
 import { cn } from '@/lib/cn'
-import { HyperText } from '@/ui/HyperText'
 import { SIDEBAR_SECTIONS } from './data'
 import type { DocId } from './types'
 
@@ -88,7 +87,7 @@ export function DocsHome() {
             "[font-variation-settings:'ROND'_100]",
           )}
         >
-          <HyperText>Predict with LevX</HyperText>
+          Predict with LevX
         </h1>
         <p className="text-ink-muted font-editorial text-[20px] leading-snug tracking-tight whitespace-nowrap md:whitespace-normal">
           A path-prediction market protocol on Solana. Predict the route, not just the destination.
