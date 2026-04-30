@@ -29,6 +29,7 @@ import { useProgram } from './program'
 import { CU_LIMITS, MAX_CU_PER_TX, SCALE } from '@/lib/constants'
 import { toast } from '@/stores/toastStore'
 import { getSlippageTolerance } from '@/stores/slippageStore'
+import { ERROR_MAP, formatDecoded, lookupError } from './errorMap'
 import { deriveMarketPda, derivePathPda, derivePositionPda, deriveProtocolPda } from './pda'
 import { buildTransaction } from '@/lib/chain/buildTransaction'
 import { getPriorityFee } from '@/lib/chain/priorityFee'
@@ -190,17 +191,26 @@ function exitPositionMinPayoutOut(
 }
 
 /**
- * Map an Anchor-translated error into a user-facing string, with a
- * specific, actionable line for `SlippageExceeded` so the user can
- * decide whether to widen tolerance or refresh.
+ * Map an Anchor-translated error (or a preflight code attached to an
+ * Error via `.code`) into a user-facing string. Routes through the
+ * shared `errorMap` so wager / exit / claim hooks all surface the
+ * same wording for the same condition.
  */
 function describeTxError(err: unknown, fallback: string): string {
-  const e = err as { error?: { errorCode?: { code?: string } }; message?: string }
-  const code = e?.error?.errorCode?.code
-  const msg = e?.message ?? ''
-  if (code === 'SlippageExceeded' || /slippage exceeded/i.test(msg)) {
-    return 'Slippage exceeded — price moved beyond your tolerance. Increase slippage in settings or refresh.'
+  const e = err as {
+    code?: string
+    error?: { errorCode?: { code?: string } }
+    message?: string
   }
+  // Prefer the explicit `.code` (synthetic preflight failures attach
+  // it directly), fall through to Anchor's translateError shape.
+  const code = e?.code ?? e?.error?.errorCode?.code
+  const decoded = lookupError(code)
+  if (decoded) return formatDecoded(decoded)
+  // Fallback regex covers the rare case where translateError didn't
+  // populate `errorCode` but the raw message contains a known pattern.
+  const msg = e?.message ?? ''
+  if (/slippage exceeded/i.test(msg)) return formatDecoded(ERROR_MAP.SlippageExceeded)
   return msg || fallback
 }
 

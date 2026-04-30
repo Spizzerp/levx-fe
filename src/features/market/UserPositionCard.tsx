@@ -7,6 +7,14 @@ import type { MarketState, UserPosition } from '@/types/market'
 interface UserPositionCardProps {
   position: UserPosition
   marketState: MarketState
+  /**
+   * Suppress the in-card action button. Use this when the parent rail
+   * already renders a dedicated action panel (`ClaimButton`,
+   * `VoidMarketPanel`, etc.) so the user doesn't see a duplicate
+   * button — the card's button has no onClick handler and would
+   * otherwise be a dead action.
+   */
+  hideAction?: boolean
 }
 
 const TONE_COLORS: Record<UserPosition['pathTone'], string> = {
@@ -31,8 +39,8 @@ function actionForState(state: MarketState): { label: string; disabled: boolean 
   }
 }
 
-export function UserPositionCard({ position, marketState }: UserPositionCardProps) {
-  const action = actionForState(marketState)
+export function UserPositionCard({ position, marketState, hideAction }: UserPositionCardProps) {
+  const action = hideAction ? null : actionForState(marketState)
   const pnl = position.estimatedPayout - position.collateral
   const pnlPositive = pnl >= 0
   const pnlLabel =
