@@ -655,6 +655,104 @@ export function AdminPage() {
 
       </div>
       </div>
+
+      {/* ── Operator: register a new supported pair ── */}
+      <AddSupportedPairForm />
     </PageLayout>
+  )
+}
+
+/**
+ * Operator-only form for `add_supported_pair`. Registers a new
+ * `(baseMint, quoteMint, pythFeedId)` triple in `protocolState.supportedPairs[]`,
+ * unlocking it for `create_market` calls. Authority must equal the
+ * connected wallet (the program checks `protocolState.authority`).
+ */
+function AddSupportedPairForm() {
+  const program = useProgram()
+  const { publicKey } = useWalletStore()
+  const [baseMint, setBaseMint] = useState('')
+  const [quoteMint, setQuoteMint] = useState('')
+  const [pythFeedId, setPythFeedId] = useState('')
+  const [pending, setPending] = useState(false)
+
+  const handleSubmit = async () => {
+    if (!program || !publicKey) return
+    setPending(true)
+    try {
+      const baseKey = new PublicKey(baseMint.trim())
+      const quoteKey = new PublicKey(quoteMint.trim())
+      const feedBytes = feedIdToBytes(pythFeedId.trim())
+      const [protocolPda] = deriveProtocolPda()
+
+      const ix = await program.methods
+        .addSupportedPair(baseKey, quoteKey, feedBytes)
+        .accountsPartial({ protocolState: protocolPda, authority: publicKey })
+        .instruction()
+
+      const provider = program.provider as AnchorProvider
+      const priorityFeeMicroLamports = await getPriorityFee(provider.connection)
+      const finalIxs = await buildTransaction({
+        instructions: [ix],
+        computeUnitLimit: 100_000,
+        priorityFeeMicroLamports,
+      })
+      const tx = new Transaction().add(...finalIxs)
+      let sig: string
+      try {
+        sig = await provider.sendAndConfirm(tx)
+      } catch (sendErr) {
+        throw translateError(sendErr, parseIdlErrors(program.idl))
+      }
+      toast.success('Supported pair added', { txSig: sig })
+      setBaseMint('')
+      setQuoteMint('')
+      setPythFeedId('')
+    } catch (err) {
+      toast.error('Failed to add supported pair', { message: (err as Error).message })
+    } finally {
+      setPending(false)
+    }
+  }
+
+  return (
+    <section className="border-line mt-16 border-t pt-12">
+      <div className="mb-6 flex items-center gap-3">
+        <h2 className="text-ink-strong font-mono text-caption font-bold tracking-wide uppercase">
+          Add supported pair
+        </h2>
+        <span className="text-ink-dim font-mono text-caption">
+          Operator-only · governs `protocol_state.supported_pairs`
+        </span>
+      </div>
+      <div className="grid grid-cols-1 gap-6 [@media(min-width:1181px)]:grid-cols-3">
+        <Input
+          label="Base mint"
+          value={baseMint}
+          onChange={(e) => setBaseMint(e.target.value)}
+          placeholder="So11…Sol mint"
+        />
+        <Input
+          label="Quote mint"
+          value={quoteMint}
+          onChange={(e) => setQuoteMint(e.target.value)}
+          placeholder="USDC mint"
+        />
+        <Input
+          label="Pyth feed id (hex)"
+          value={pythFeedId}
+          onChange={(e) => setPythFeedId(e.target.value)}
+          placeholder="0xef0d…56d"
+        />
+      </div>
+      <Button
+        variant="secondary"
+        className="mt-6"
+        disabled={pending || !program || !baseMint || !quoteMint || !pythFeedId}
+        onClick={handleSubmit}
+      >
+        {pending ? 'Submitting…' : 'Add pair'}
+      </Button>
+    </section>
   )
 }
