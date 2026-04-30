@@ -58,6 +58,7 @@ function makeMarket(overrides: Partial<Market> & Pick<Market, 'id' | 'pair' | 's
     numPaths: 0,
     amplitudes: [],
     lmsrShareQuantities: [],
+    lmsrAlpha: 100_000,
     lambda: 0,
     decoherenceRate: 500_000,
     minimumProbability: 10_000,
