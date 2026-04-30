@@ -11,12 +11,16 @@ import { useWalletStore } from '@/stores/walletStore'
 const USE_MOCK = import.meta.env.APP_USE_MOCK === 'true'
 
 /**
- * Polling baseline. Markets list and per-market detail revalidate on this
- * cadence as a floor; PR2 will layer event-driven invalidation on top.
+ * Polling baseline. The WS event subscription (`EventStreamProvider`)
+ * does the primary invalidation work — these intervals are just the
+ * floor for transports that miss events (network glitch, RPC blip, or
+ * a market the user navigates to before the WS catches its first
+ * MarketActivated). The per-market detail interval is kept long because
+ * checkpoint-driven changes already arrive via `CheckpointSampled`.
  */
-const MARKETS_REFETCH_MS = 15_000
-const MARKET_REFETCH_MS = 10_000
-const POSITIONS_REFETCH_MS = 15_000
+const MARKETS_REFETCH_MS = 60_000
+const MARKET_REFETCH_MS = 60_000
+const POSITIONS_REFETCH_MS = 60_000
 const STALE_MS = 5_000
 
 async function getApi() {
