@@ -3,6 +3,11 @@
 // Unit tests for the rate-limit helper. The full handler depends on
 // Solana RPC + a real keypair, so we test the rate-limit semantics
 // directly here and rely on manual smoke testing for the on-chain leg.
+//
+// The fake admin emulates Postgres semantics relevant to
+// `try_reserve_faucet_slot`: a serialized row lock so concurrent calls
+// see each other's writes. That's the load-bearing primitive — if it
+// regresses, two parallel requests will both pass the cooldown check.
 
 import { assertEquals, assertNotEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts'
 import { tryReserve, releaseReservation } from './_shared/rateLimit.ts'
@@ -13,15 +18,60 @@ interface Row {
   count: number
 }
 
+const COOLDOWN_SECS = 24 * 60 * 60
+
+/**
+ * Fake admin client. Models the `try_reserve_faucet_slot` Postgres
+ * function and the table-level `from(...)` operations the rollback
+ * path uses.
+ */
 function makeFakeAdmin(seed: Row[] = []) {
   const rows = new Map<string, Row>()
   for (const r of seed) rows.set(r.wallet, r)
 
+  function rpc(name: string, params: { p_wallet: string; p_cooldown_seconds: number }) {
+    if (name !== 'try_reserve_faucet_slot') {
+      return Promise.resolve({ data: null, error: { message: 'unknown rpc' } })
+    }
+    const { p_wallet, p_cooldown_seconds } = params
+    const now = Date.now()
+    const cutoff = now - p_cooldown_seconds * 1000
+
+    const existing = rows.get(p_wallet)
+    if (existing) {
+      const lastMs = Date.parse(existing.last_minted_at)
+      if (lastMs >= cutoff) {
+        const elapsed = Math.floor((now - lastMs) / 1000)
+        return Promise.resolve({
+          data: [
+            {
+              allowed: false,
+              retry_after: Math.max(p_cooldown_seconds - elapsed, 0),
+              prior_last_minted_at: null,
+            },
+          ],
+          error: null,
+        })
+      }
+      const prior = existing.last_minted_at
+      existing.last_minted_at = new Date(now).toISOString()
+      existing.count = existing.count + 1
+      return Promise.resolve({
+        data: [{ allowed: true, retry_after: null, prior_last_minted_at: prior }],
+        error: null,
+      })
+    }
+    rows.set(p_wallet, { wallet: p_wallet, last_minted_at: new Date(now).toISOString(), count: 1 })
+    return Promise.resolve({
+      data: [{ allowed: true, retry_after: null, prior_last_minted_at: null }],
+      error: null,
+    })
+  }
+
   function from(_: string) {
     let filterWallet: string | null = null
-    let filterCutoff: string | null = null
     let updatePayload: Partial<Row> | null = null
-    let intent: 'select' | 'update' | 'insert' | 'delete' = 'select'
+    let intent: 'select' | 'update' | 'delete' = 'select'
 
     const builder = {
       select: () => builder,
@@ -31,27 +81,14 @@ function makeFakeAdmin(seed: Row[] = []) {
           if (filterWallet) rows.delete(filterWallet)
           return Promise.resolve({ error: null })
         }
-        return builder
-      },
-      lt: (_col: string, val: string) => {
-        filterCutoff = val
-        return builder
-      },
-      maybeSingle: async () => {
-        if (intent === 'select') {
-          return { data: rows.get(filterWallet ?? '') ?? null, error: null }
-        }
         if (intent === 'update') {
           const row = rows.get(filterWallet ?? '')
-          if (!row) return { data: null, error: null }
-          if (filterCutoff && row.last_minted_at >= filterCutoff) {
-            return { data: null, error: null }
-          }
-          Object.assign(row, updatePayload ?? {})
-          return { data: { wallet: row.wallet }, error: null }
+          if (row) Object.assign(row, updatePayload ?? {})
+          return Promise.resolve({ error: null })
         }
-        return { data: null, error: null }
+        return builder
       },
+      maybeSingle: async () => ({ data: rows.get(filterWallet ?? '') ?? null, error: null }),
       update: (payload: Partial<Row>) => {
         intent = 'update'
         updatePayload = payload
@@ -61,18 +98,12 @@ function makeFakeAdmin(seed: Row[] = []) {
         intent = 'delete'
         return builder
       },
-      insert: async (payload: Row) => {
-        if (rows.has(payload.wallet)) {
-          return { error: { code: '23505' } }
-        }
-        rows.set(payload.wallet, payload)
-        return { error: null }
-      },
     }
     return builder
   }
 
   return {
+    rpc,
     from,
     _rows: rows,
   }
@@ -84,6 +115,7 @@ Deno.test('tryReserve allows a fresh wallet', async () => {
   const admin = makeFakeAdmin()
   const r = await tryReserve(admin, WALLET)
   assertEquals(r.allowed, true)
+  assertEquals(r.priorLastMintedAt, null)
   assertEquals(admin._rows.size, 1)
 })
 
@@ -93,8 +125,7 @@ Deno.test('tryReserve blocks a wallet that already minted within the cooldown', 
   const r = await tryReserve(admin, WALLET)
   assertEquals(r.allowed, false)
   assertNotEquals(r.retryAfter, undefined)
-  // ~23h remaining — accept anything ≤ 24h * 3600 = 86_400 seconds.
-  assertEquals(r.retryAfter! > 0 && r.retryAfter! <= 24 * 60 * 60, true)
+  assertEquals(r.retryAfter! > 0 && r.retryAfter! <= COOLDOWN_SECS, true)
 })
 
 Deno.test('tryReserve allows a wallet whose last mint is past the cooldown', async () => {
@@ -102,7 +133,7 @@ Deno.test('tryReserve allows a wallet whose last mint is past the cooldown', asy
   const admin = makeFakeAdmin([{ wallet: WALLET, last_minted_at: old, count: 3 }])
   const r = await tryReserve(admin, WALLET)
   assertEquals(r.allowed, true)
-  // The row should be updated, not duplicated.
+  assertEquals(r.priorLastMintedAt, old)
   assertEquals(admin._rows.size, 1)
   assertEquals(admin._rows.get(WALLET)!.count, 4)
 })
@@ -124,15 +155,14 @@ Deno.test('releaseReservation deletes the row when there was no prior reservatio
   await releaseReservation(admin, WALLET, reserved.priorLastMintedAt ?? null)
   assertEquals(admin._rows.size, 0)
   // After rollback, the next request must be allowed (i.e. the wallet
-  // isn't blocked for 24h despite an upstream mint failure).
+  // isn't blocked for the cooldown despite an upstream mint failure).
   const retry = await tryReserve(admin, WALLET)
   assertEquals(retry.allowed, true)
 })
 
 Deno.test('releaseReservation restores the prior last_minted_at on update path', async () => {
-  // Simulate: wallet successfully minted 25h ago (so the next reserve
-  // succeeds via the UPDATE path, not the INSERT path), then mint
-  // fails and we roll back.
+  // Wallet successfully minted 25h ago (so the next reserve succeeds
+  // via the UPDATE path), then mint fails and we roll back.
   const old = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString()
   const admin = makeFakeAdmin([{ wallet: WALLET, last_minted_at: old, count: 3 }])
   const reserved = await tryReserve(admin, WALLET)
@@ -141,4 +171,39 @@ Deno.test('releaseReservation restores the prior last_minted_at on update path',
 
   await releaseReservation(admin, WALLET, reserved.priorLastMintedAt ?? null)
   assertEquals(admin._rows.get(WALLET)!.last_minted_at, old)
+})
+
+Deno.test('tryReserve calls the atomic Postgres RPC (concurrency-hardened)', async () => {
+  // The whole point of this PR's fix: tryReserve must not implement
+  // the cooldown check in JS. If somebody refactors back to the racy
+  // read-then-update pattern, this test breaks.
+  let rpcCalls = 0
+  const admin = {
+    rpc(name: string) {
+      assertEquals(name, 'try_reserve_faucet_slot')
+      rpcCalls++
+      return Promise.resolve({
+        data: [{ allowed: true, retry_after: null, prior_last_minted_at: null }],
+        error: null,
+      })
+    },
+  }
+  await tryReserve(admin as never, WALLET)
+  assertEquals(rpcCalls, 1)
+})
+
+Deno.test('tryReserve surfaces RPC errors instead of silently allowing', async () => {
+  const admin = {
+    rpc() {
+      return Promise.resolve({ data: null, error: { message: 'connection refused' } })
+    },
+  }
+  let threw = false
+  try {
+    await tryReserve(admin as never, WALLET)
+  } catch (e) {
+    threw = true
+    assertEquals(/connection refused/.test((e as Error).message ?? String(e)), true)
+  }
+  assertEquals(threw, true)
 })

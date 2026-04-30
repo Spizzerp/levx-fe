@@ -1,13 +1,13 @@
 // @ts-nocheck — Supabase Edge (Deno).
 //
-// Atomic upsert against `faucet_requests`: `INSERT … ON CONFLICT DO UPDATE …
-// WHERE last_minted_at < cutoff`. If the WHERE clause excludes the row, the
-// UPDATE happens to zero rows and the RETURNING set is empty → blocked.
-//
-// PostgREST's `upsert` with `onConflict + ignoreDuplicates: false` matches
-// this semantic when the table has a primary-key conflict path.
+// Atomic rate-limit reserve. Delegates to the `try_reserve_faucet_slot`
+// Postgres function (see migration 0005), which serializes concurrent
+// same-wallet calls via `SELECT … FOR UPDATE`. The earlier read-then-
+// update implementation was racy at PostgreSQL's default READ COMMITTED:
+// two requests landing in the same millisecond could both observe the
+// cooldown as elapsed and both succeed → 2× mint per cooldown.
 
-const COOLDOWN_MS = 24 * 60 * 60 * 1000 // 24h
+const COOLDOWN_SECS = 24 * 60 * 60 // 24h
 
 export interface RateLimitResult {
   allowed: boolean
@@ -17,7 +17,7 @@ export interface RateLimitResult {
    * The row's `last_minted_at` BEFORE this reservation took effect, or
    * null if there was no prior row. Pass this to `releaseReservation`
    * if the downstream operation fails — without it we'd block the
-   * wallet for 24h despite never minting.
+   * wallet for the full cooldown despite never minting.
    */
   priorLastMintedAt?: string | null
 }
@@ -26,80 +26,48 @@ export interface RateLimitResult {
  * Atomic check-and-record. Returns `{allowed: true}` and persists the
  * request when the wallet is outside the cooldown window. Otherwise
  * `{allowed: false, retryAfter}` and no write occurs.
+ *
+ * All concurrency-correctness lives in the Postgres function — this
+ * helper just shapes the result for the caller.
  */
 export async function tryReserve(admin: any, wallet: string): Promise<RateLimitResult> {
-  const now = new Date()
-  const cutoffIso = new Date(now.getTime() - COOLDOWN_MS).toISOString()
+  const { data, error } = await admin.rpc('try_reserve_faucet_slot', {
+    p_wallet: wallet,
+    p_cooldown_seconds: COOLDOWN_SECS,
+  })
+  if (error) throw error
 
-  // Read first to compute retryAfter on the blocked path. The subsequent
-  // upsert is the actual atomic guard — even if two requests race past
-  // this read, only one will satisfy the `last_minted_at < cutoff`
-  // predicate at write time.
-  const { data: existing } = await admin
-    .from('faucet_requests')
-    .select('last_minted_at, count')
-    .eq('wallet', wallet)
-    .maybeSingle()
-
-  if (existing) {
-    const lastMs = Date.parse(existing.last_minted_at)
-    if (now.getTime() - lastMs < COOLDOWN_MS) {
-      return {
-        allowed: false,
-        retryAfter: Math.ceil((COOLDOWN_MS - (now.getTime() - lastMs)) / 1000),
-      }
-    }
+  // Postgres functions returning TABLE come back as either an array
+  // (postgrest default) or a single row when `.single()` is used. Be
+  // defensive — the function always emits exactly one row.
+  const row = Array.isArray(data) ? data[0] : data
+  if (!row) {
+    throw new Error('try_reserve_faucet_slot returned no row')
   }
 
-  // Atomic gate: update only if the existing row is outside the cooldown,
-  // OR insert if no row exists. Two-step (update→insert-on-fail) so the
-  // WHERE clause runs server-side instead of after a stale read.
-  const { data: updated, error: updErr } = await admin
-    .from('faucet_requests')
-    .update({
-      last_minted_at: now.toISOString(),
-      count: (existing?.count ?? 0) + 1,
-    })
-    .eq('wallet', wallet)
-    .lt('last_minted_at', cutoffIso)
-    .select('wallet')
-    .maybeSingle()
-
-  if (!updErr && updated) return { allowed: true, priorLastMintedAt: existing!.last_minted_at }
-
-  // Insert path (no existing row). On race, `wallet` PK constraint will
-  // block the second concurrent insert with a `23505` error — caller can
-  // surface that as a generic blocked.
-  if (!existing) {
-    const { error: insErr } = await admin
-      .from('faucet_requests')
-      .insert({ wallet, last_minted_at: now.toISOString(), count: 1 })
-    if (insErr) {
-      // PK conflict — another request beat us by milliseconds. Treat as
-      // rate-limited rather than 500.
-      if ((insErr as { code?: string }).code === '23505') {
-        return { allowed: false, retryAfter: Math.ceil(COOLDOWN_MS / 1000) }
-      }
-      throw insErr
+  if (row.allowed) {
+    return {
+      allowed: true,
+      priorLastMintedAt: row.prior_last_minted_at ?? null,
     }
-    return { allowed: true, priorLastMintedAt: null }
   }
-
-  // Existing row, still inside cooldown — treat as blocked.
   return {
     allowed: false,
-    retryAfter: Math.ceil(COOLDOWN_MS / 1000),
+    retryAfter:
+      typeof row.retry_after === 'number' && row.retry_after > 0
+        ? row.retry_after
+        : COOLDOWN_SECS,
   }
 }
 
 /**
  * Best-effort rollback of a previously-successful `tryReserve`. Used
  * when the on-chain mint fails after we've already recorded the
- * reservation — without this the user would be blocked for 24h
- * despite never receiving USDC. Restores the prior `last_minted_at`
- * (or deletes the row if there was no prior row) so the next request
- * is gated by the original cooldown, not the failed attempt's
- * timestamp.
+ * reservation — without this the user would be blocked for the full
+ * cooldown despite never receiving USDC. Restores the prior
+ * `last_minted_at` (or deletes the row if there was no prior row) so
+ * the next request is gated by the original cooldown, not the failed
+ * attempt's timestamp.
  */
 export async function releaseReservation(
   admin: any,
