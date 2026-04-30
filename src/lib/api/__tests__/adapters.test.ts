@@ -29,6 +29,7 @@ describe('anchorPositionToFE', () => {
       pathLabel: 'Path D',
       pathTone: 'bull',
       pathDissolved: false,
+      estimatedPayout: 0,
     })
     expect(pos.id).toBe('7-3')
     expect(pos.marketIdNum).toBe(7)
@@ -45,6 +46,7 @@ describe('anchorPositionToFE', () => {
       pathLabel: 'Path C',
       pathTone: 'neutral',
       pathDissolved: false,
+      estimatedPayout: 0,
     })
     expect(pos.marketState).toBe('settled')
     expect(pos.pair).toBe('ETH/USDC')
@@ -63,6 +65,7 @@ describe('anchorPositionToFE', () => {
       pathLabel: 'Path A',
       pathTone: 'bull',
       pathDissolved: false,
+      estimatedPayout: 0,
     })
     expect(live.entryMultiplier).toBeCloseTo(1.8, 3)
 
@@ -77,8 +80,26 @@ describe('anchorPositionToFE', () => {
         pathLabel: 'Path A',
         pathTone: 'bull',
         pathDissolved: false,
+        estimatedPayout: 0,
       },
     )
     expect(empty.entryMultiplier).toBe(0)
+  })
+
+  it('uses ctx.estimatedPayout verbatim — does NOT read raw.finalPayout', () => {
+    // raw.finalPayout=0 (the realistic state for a fresh wager). The caller
+    // is responsible for computing a sensible estimate per market state.
+    const pos = anchorPositionToFE(rawPosition({ finalPayout: new BN(0) }), {
+      marketIdNum: 1,
+      marketState: 'active',
+      pair: 'BTC/USDC',
+      base: 'BTC',
+      quote: 'USDC',
+      pathLabel: 'Path B',
+      pathTone: 'bull',
+      pathDissolved: false,
+      estimatedPayout: 42.5,
+    })
+    expect(pos.estimatedPayout).toBe(42.5)
   })
 })

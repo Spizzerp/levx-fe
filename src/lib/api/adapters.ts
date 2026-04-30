@@ -132,6 +132,19 @@ export interface PositionContext {
   pathLabel: string
   pathTone: PredictionPath['tone']
   pathDissolved: boolean
+  /**
+   * Display value for the "EST PAYOUT" / "PAYOUT" column. Caller computes
+   * per state (see callers in onchain.ts):
+   *   - claimed → realized `final_payout` from chain
+   *   - dissolved → 0
+   *   - void & unclaimed → `collateral` (refund)
+   *   - otherwise → LMSR-based mark-to-market via `estimateLmsrExitPayout`
+   *
+   * `final_payout` is initialized to 0 by `place_wager` and only written
+   * by `exit_position` / `claim`, so reading it directly would show $0
+   * P&L on every active and settled-but-unclaimed row.
+   */
+  estimatedPayout: number
 }
 
 export function anchorPositionToFE(raw: any, ctx: PositionContext): UserPosition {
@@ -156,7 +169,7 @@ export function anchorPositionToFE(raw: any, ctx: PositionContext): UserPosition
       ? bn(raw.lmsrShares, true) / bn(raw.costBasis, true)
       : 0,
     entryTime: 0, // not directly stored on-chain; could derive from entered_at_checkpoint
-    estimatedPayout: bn(raw.finalPayout, true),
+    estimatedPayout: ctx.estimatedPayout,
     dissolved: ctx.pathDissolved,
     claimed: raw.claimed,
   }

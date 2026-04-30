@@ -191,10 +191,14 @@ const MARKETS: Market[] = [
  * buildAiPathFixture (ai-ultra-bull, ai-bull, ai-neutral, ai-bear, ai-ultra-bear).
  * ───────────────────────────────────────────────────────────── */
 
+// Position fixtures must reference real entries in MARKETS above. Use the
+// route-slug for `marketId` (consumed by `getUserPosition(marketId)` to
+// match against the URL param) and the on-chain numeric id for
+// `marketIdNum` (consumed by transaction hooks to derive PDAs).
 const USER_POSITIONS: UserPosition[] = [
   {
     id: '1-1',
-    marketId: '1', // eth (sampling)
+    marketId: 'eth', // matches MARKETS[1] (id: 'eth', marketId: 1, state: sampling)
     marketIdNum: 1,
     marketState: 'sampling',
     pair: 'ETH/USDC',
@@ -215,7 +219,7 @@ const USER_POSITIONS: UserPosition[] = [
   },
   {
     id: '4-2',
-    marketId: '4', // eth-maturing
+    marketId: 'eth-maturing', // matches MARKETS[4] (state: maturing)
     marketIdNum: 4,
     marketState: 'maturing',
     pair: 'ETH/USDC',
@@ -235,9 +239,9 @@ const USER_POSITIONS: UserPosition[] = [
     claimed: false,
   },
   {
-    id: '6-0',
-    marketId: '6', // sol-settled
-    marketIdNum: 6,
+    id: '5-0',
+    marketId: 'sol-settled', // matches MARKETS[5] (id: 'sol-settled', marketId: 5, state: settled)
+    marketIdNum: 5,
     marketState: 'settled',
     pair: 'SOL/USDC',
     base: 'SOL',

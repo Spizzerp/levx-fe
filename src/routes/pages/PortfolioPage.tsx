@@ -29,6 +29,27 @@ const ACTIVE_STATES: ReadonlySet<MarketState> = new Set([
 ])
 const TERMINAL_STATES: ReadonlySet<MarketState> = new Set(['settled', 'void'])
 
+/**
+ * Mirrors `exit_position.rs:91-93` — the program rejects exits in any
+ * other state. Surface a status label instead of a Close button on
+ * Settling/Maturing/Pending rows so users don't fire txs that will
+ * deterministically revert.
+ */
+const EXITABLE_STATES: ReadonlySet<MarketState> = new Set(['active', 'sampling'])
+
+function awaitingLabel(state: MarketState): string {
+  switch (state) {
+    case 'pending':
+      return 'Awaiting paths'
+    case 'settling':
+      return 'Awaiting scoring'
+    case 'maturing':
+      return 'Awaiting finalize'
+    default:
+      return 'Awaiting'
+  }
+}
+
 interface ActionStatus {
   /** Stable id of the row currently in flight (or null). */
   id: string | null
@@ -169,6 +190,13 @@ export function PortfolioPage() {
       key: 'action',
       header: '',
       render: (pos) => {
+        if (!EXITABLE_STATES.has(pos.marketState)) {
+          return (
+            <span className="text-ink-dim font-mono text-caption uppercase">
+              {awaitingLabel(pos.marketState)}
+            </span>
+          )
+        }
         const closing = action.id === pos.id && action.kind === 'closing'
         const otherInFlight = action.id !== null && action.id !== pos.id
         return (

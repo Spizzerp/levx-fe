@@ -13,6 +13,8 @@ import { anchorMarketToFE, anchorPathToFE, anchorPositionToFE, parseMarketState 
 import { resolveBaseMintLabel } from './pairLabels'
 import { getReadOnlyProgram } from '../solana/program'
 import { deriveMarketPda, derivePathPda, derivePositionPda } from '../solana/pda'
+import { estimateLmsrExitPayout } from '../solana/lmsr'
+import { SCALE } from '@/lib/constants'
 
 /**
  * Derive a PathTone from a path's predicted price trajectory.
@@ -112,6 +114,57 @@ export async function getUserPosition(
 }
 
 /**
+ * Compute a user-facing "estimated payout" for a position. The on-chain
+ * `position.final_payout` is initialized to 0 and only written by
+ * `exit_position` / `claim`, so reading it directly would render $0
+ * payout (and a -100% P&L) on every active and settled-but-unclaimed
+ * row. Instead we derive a sensible per-state estimate:
+ *
+ *   - `claimed`   → realized `final_payout` from chain
+ *   - `dissolved` → 0
+ *   - `void`      → `collateral` (refund — `claim` returns the original wager)
+ *   - else        → LMSR mark-to-market via `estimateLmsrExitPayout`,
+ *                   which is the same closed-form `exit_position` uses on-chain
+ *                   for the λ=0 tier
+ *
+ * The LMSR estimate is gross of the settlement rake (typically 1–2% via
+ * `default_fee_settle_bps`) — close enough for at-a-glance UI. Slippage
+ * tolerance on the actual exit/claim still goes through the real on-chain
+ * computation.
+ */
+function computeEstimatedPayout(args: {
+  positionRaw: { collateral: { toNumber(): number }; lmsrShares: { toNumber(): number }; finalPayout: { toNumber(): number }; claimed: boolean }
+  pathDissolved: boolean
+  pathIndex: number
+  marketState: MarketState
+  marketShareQuantitiesScaled: number[]
+  marketLmsrAlphaScaled: number
+  marketAmplitudesScaled: number[]
+  marketNumPaths: number
+}): number {
+  if (args.positionRaw.claimed) {
+    return args.positionRaw.finalPayout.toNumber() / SCALE
+  }
+  if (args.pathDissolved) return 0
+  if (args.marketState === 'void') {
+    return args.positionRaw.collateral.toNumber() / SCALE
+  }
+  const sharesScaled = args.positionRaw.lmsrShares.toNumber() / SCALE
+  if (sharesScaled <= 0) return 0
+  const activeMask = args.marketAmplitudesScaled
+    .slice(0, args.marketNumPaths)
+    .map((a) => a > 0)
+  return estimateLmsrExitPayout({
+    shareQuantities: args.marketShareQuantitiesScaled,
+    numPaths: args.marketNumPaths,
+    lmsrAlpha: args.marketLmsrAlphaScaled,
+    pathIndex: args.pathIndex,
+    sharesScaled,
+    activeMask,
+  })
+}
+
+/**
  * Fetch a specific position for a connected wallet on a given market + path.
  */
 export async function getPosition(
@@ -133,6 +186,24 @@ export async function getPosition(
     path.tone = deriveTone(path.predictedPrices)
     const pairInfo = resolveBaseMintLabel(marketRaw.baseMint)
     const marketState = parseMarketState(marketRaw.state) as MarketState
+    const numPaths = marketRaw.numPaths as number
+    const shareQuantitiesScaled = (marketRaw.lmsrShareQuantities as { toNumber(): number }[])
+      .slice(0, numPaths)
+      .map((q) => q.toNumber() / SCALE)
+    const amplitudesScaled = (marketRaw.amplitudes as { toNumber(): number }[])
+      .slice(0, numPaths)
+      .map((a) => a.toNumber() / SCALE)
+    const lmsrAlphaScaled = marketRaw.lmsrAlpha.toNumber() / SCALE
+    const estimatedPayout = computeEstimatedPayout({
+      positionRaw,
+      pathDissolved: path.dissolved,
+      pathIndex,
+      marketState,
+      marketShareQuantitiesScaled: shareQuantitiesScaled,
+      marketLmsrAlphaScaled: lmsrAlphaScaled,
+      marketAmplitudesScaled: amplitudesScaled,
+      marketNumPaths: numPaths,
+    })
     return anchorPositionToFE(positionRaw, {
       marketIdNum: marketId,
       marketState,
@@ -142,6 +213,7 @@ export async function getPosition(
       pathLabel: path.label,
       pathTone: path.tone,
       pathDissolved: path.dissolved,
+      estimatedPayout,
     })
   } catch {
     // Account doesn't exist — user has no position on this path
@@ -168,7 +240,20 @@ export async function getUserPositions(wallet: PublicKey | null): Promise<UserPo
   ])
 
   const positions: UserPosition[] = []
-  const marketCache = new Map<string, { marketIdNum: number; marketState: MarketState; pair: string; base: string; quote: string; startTimeMs: number; checkpointInterval: number; baseMint: PublicKey } | null>()
+  interface MarketCacheEntry {
+    marketIdNum: number
+    marketState: MarketState
+    pair: string
+    base: string
+    quote: string
+    startTimeMs: number
+    checkpointInterval: number
+    numPaths: number
+    shareQuantitiesScaled: number[]
+    amplitudesScaled: number[]
+    lmsrAlphaScaled: number
+  }
+  const marketCache = new Map<string, MarketCacheEntry | null>()
   const pathCache = new Map<string, { label: string; tone: ReturnType<typeof deriveTone>; dissolved: boolean }>()
 
   for (const acc of accounts) {
@@ -182,6 +267,7 @@ export async function getUserPositions(wallet: PublicKey | null): Promise<UserPo
       try {
         const marketRaw: any = await program.account.market.fetch(marketPubkey)
         const pairInfo = resolveBaseMintLabel(marketRaw.baseMint)
+        const numPaths = marketRaw.numPaths as number
         mkt = {
           marketIdNum: marketRaw.marketId.toNumber(),
           marketState: parseMarketState(marketRaw.state) as MarketState,
@@ -190,7 +276,14 @@ export async function getUserPositions(wallet: PublicKey | null): Promise<UserPo
           quote: pairInfo.quote,
           startTimeMs: marketRaw.startTime.toNumber() * 1000,
           checkpointInterval: marketRaw.checkpointInterval as number,
-          baseMint: marketRaw.baseMint,
+          numPaths,
+          shareQuantitiesScaled: (marketRaw.lmsrShareQuantities as { toNumber(): number }[])
+            .slice(0, numPaths)
+            .map((q) => q.toNumber() / SCALE),
+          amplitudesScaled: (marketRaw.amplitudes as { toNumber(): number }[])
+            .slice(0, numPaths)
+            .map((a) => a.toNumber() / SCALE),
+          lmsrAlphaScaled: marketRaw.lmsrAlpha.toNumber() / SCALE,
         }
         marketCache.set(marketKey, mkt)
       } catch {
@@ -215,6 +308,17 @@ export async function getUserPositions(wallet: PublicKey | null): Promise<UserPo
       }
     }
 
+    const estimatedPayout = computeEstimatedPayout({
+      positionRaw: raw,
+      pathDissolved: pathInfo.dissolved,
+      pathIndex,
+      marketState: mkt.marketState,
+      marketShareQuantitiesScaled: mkt.shareQuantitiesScaled,
+      marketLmsrAlphaScaled: mkt.lmsrAlphaScaled,
+      marketAmplitudesScaled: mkt.amplitudesScaled,
+      marketNumPaths: mkt.numPaths,
+    })
+
     positions.push(
       anchorPositionToFE(raw, {
         marketIdNum: mkt.marketIdNum,
@@ -225,6 +329,7 @@ export async function getUserPositions(wallet: PublicKey | null): Promise<UserPo
         pathLabel: pathInfo.label,
         pathTone: pathInfo.tone,
         pathDissolved: pathInfo.dissolved,
+        estimatedPayout,
       }),
     )
   }
