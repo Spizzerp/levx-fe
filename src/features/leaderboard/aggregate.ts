@@ -24,8 +24,17 @@ export interface RawPosition {
 
 interface Aggregate {
   user: string
+  /** Sum of collateral across all positions, claimed or not. UI only — not used for the score. */
   totalWagered: number
+  /** Sum of `final_payout` for claimed positions only. */
   realizedPayout: number
+  /**
+   * Sum of `collateral` for the subset of positions that have realized
+   * (`claimed=true`). Used as the negative side of `score = realizedPayout
+   * - realizedWagered` so unclaimed positions don't drag a wallet's
+   * leaderboard rank into the negative until they claim.
+   */
+  realizedWagered: number
   marketsTouched: Set<string>
   settledCount: number
   settledWins: number
@@ -61,6 +70,7 @@ export function aggregatePositions(
         user: pos.user,
         totalWagered: 0,
         realizedPayout: 0,
+        realizedWagered: 0,
         marketsTouched: new Set(),
         settledCount: 0,
         settledWins: 0,
@@ -71,6 +81,7 @@ export function aggregatePositions(
     agg.marketsTouched.add(pos.marketId)
     if (pos.claimed) {
       agg.realizedPayout += pos.finalPayout
+      agg.realizedWagered += pos.collateral
       agg.settledCount += 1
       if (pos.finalPayout > pos.collateral) agg.settledWins += 1
     }
@@ -78,7 +89,10 @@ export function aggregatePositions(
 
   const entries: LeaderboardEntry[] = []
   for (const a of byUser.values()) {
-    const score = a.realizedPayout - a.totalWagered
+    // Score = realized P&L only. Open positions don't count until they
+    // claim — otherwise an active wallet shows as a full loss equal to
+    // its collateral until settlement, which is wrong.
+    const score = a.realizedPayout - a.realizedWagered
     const accuracy = a.settledCount === 0 ? 0 : (a.settledWins / a.settledCount) * 100
     entries.push({
       rank: 0, // assigned after sort

@@ -66,6 +66,32 @@ describe('aggregatePositions', () => {
     expect(out[1].score).toBe(-50)
   })
 
+  it('does NOT count unclaimed positions as full losses (open collateral excluded from score)', () => {
+    // Wallet has $100 in active positions, no settlements. Score must
+    // be 0 (no realized P&L), not -100. The earlier
+    // `realizedPayout - totalWagered` shape made every active wallet
+    // start at score=-collateral until they claimed.
+    const out = aggregatePositions([
+      pos({ user: W1, marketId: 'm1', collateral: 50 }),
+      pos({ user: W1, marketId: 'm2', collateral: 50 }),
+    ])
+    expect(out).toHaveLength(1)
+    expect(out[0].score).toBe(0)
+  })
+
+  it('mixes claimed and unclaimed correctly: only the claimed slice contributes to score', () => {
+    const out = aggregatePositions([
+      // Claimed: +20 P&L
+      pos({ user: W1, marketId: 'm1', collateral: 10, finalPayout: 30, claimed: true }),
+      // Unclaimed: ignored for score
+      pos({ user: W1, marketId: 'm2', collateral: 100 }),
+      pos({ user: W1, marketId: 'm3', collateral: 50 }),
+    ])
+    expect(out[0].score).toBe(20)
+    // Activity tally still counts every position toward markets-touched.
+    expect(out[0].markets).toBe(3)
+  })
+
   it('truncates pubkeys to a stable display form', () => {
     const out = aggregatePositions([pos({ user: W1, marketId: 'm1', collateral: 1 })])
     expect(out[0].user).toMatch(/^[A-Za-z0-9]{4}…[A-Za-z0-9]{4}$/)
