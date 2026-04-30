@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { PublicKey } from '@solana/web3.js'
+import React from 'react'
+
+import type { UserPosition } from '@/types/market'
 
 vi.mock('@/env/env.config', () => ({
   env: {
@@ -13,11 +17,8 @@ vi.mock('@/env/env.config', () => ({
 }))
 
 vi.mock('@/lib/solana/transactions', () => ({
-  useExitPosition: () => ({
-    mutate: vi.fn(),
-    isPending: false,
-    isError: false,
-  }),
+  useExitPosition: () => ({ mutate: vi.fn(), isPending: false, isError: false }),
+  useClaim: () => ({ mutate: vi.fn(), isPending: false, isError: false }),
 }))
 
 vi.mock('@solana/wallet-adapter-react', () => ({
@@ -32,6 +33,15 @@ vi.mock('@/ui/TokenPairIcon', () => ({
   TokenPairIcon: () => null,
 }))
 
+const positionsRef: { current: UserPosition[] } = { current: [] }
+vi.mock('@/lib/chain', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/chain')>('@/lib/chain')
+  return {
+    ...actual,
+    useUserPositions: () => ({ data: positionsRef.current, isLoading: false }),
+  }
+})
+
 import { PortfolioPage } from '@/routes/pages/PortfolioPage'
 import { useWalletStore } from '@/stores/walletStore'
 
@@ -45,25 +55,87 @@ function setConnected(connected: boolean) {
   })
 }
 
+function withQueryClient(node: React.ReactNode): React.ReactElement {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } })
+  return React.createElement(QueryClientProvider, { client }, node) as React.ReactElement
+}
+
+const FIXTURE: UserPosition[] = [
+  {
+    id: '1-1',
+    marketId: '1',
+    marketIdNum: 1,
+    marketState: 'active',
+    pair: 'SOL/USDC',
+    base: 'SOL',
+    quote: 'USDC',
+    pathId: 'path-1',
+    pathIndex: 1,
+    pathLabel: 'Path B',
+    pathTone: 'bull',
+    collateral: 250,
+    leverage: 1,
+    exposure: 250,
+    entryMultiplier: 1.85,
+    entryTime: 0,
+    estimatedPayout: 462.5,
+    dissolved: false,
+    claimed: false,
+  },
+  {
+    id: '6-0',
+    marketId: '6',
+    marketIdNum: 6,
+    marketState: 'settled',
+    pair: 'BTC/USDC',
+    base: 'BTC',
+    quote: 'USDC',
+    pathId: 'path-0',
+    pathIndex: 0,
+    pathLabel: 'Path A',
+    pathTone: 'ultra-bull',
+    collateral: 50,
+    leverage: 1,
+    exposure: 50,
+    entryMultiplier: 2.15,
+    entryTime: 0,
+    estimatedPayout: 107.5,
+    dissolved: false,
+    claimed: false,
+  },
+]
+
 describe('PortfolioPage', () => {
   beforeEach(() => {
     setConnected(false)
+    positionsRef.current = []
   })
 
   it('shows the connect-wallet empty state when disconnected', () => {
-    render(<PortfolioPage />)
+    render(withQueryClient(<PortfolioPage />))
     expect(screen.getByText(/please connect your wallet/i)).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: /active positions/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: /settled positions/i })).not.toBeInTheDocument()
   })
 
-  it('renders active and settled sections with provider labels when connected', () => {
+  it('renders active and settled sections when connected with empty positions', () => {
     setConnected(true)
-    render(<PortfolioPage />)
+    render(withQueryClient(<PortfolioPage />))
     expect(screen.getByRole('heading', { name: /active positions/i })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: /settled positions/i })).toBeInTheDocument()
-    // At least one canonical provider label from AdminPage.AI_PROVIDERS
-    // (Chronos-2 appears in both an active and a settled row, so don't assume uniqueness.)
-    expect(screen.getAllByText(/chronos-2/i).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/no open positions/i).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/no settled positions/i).length).toBeGreaterThan(0)
+  })
+
+  it('splits real positions into active vs settled by marketState', () => {
+    setConnected(true)
+    positionsRef.current = FIXTURE
+    render(withQueryClient(<PortfolioPage />))
+    // Path B is on the active SOL row, Path A on the settled BTC row.
+    expect(screen.getByText('Path B')).toBeInTheDocument()
+    expect(screen.getByText('Path A')).toBeInTheDocument()
+    // Open Positions tile counts only active.
+    const openCounter = screen.getByText('Open Positions').nextElementSibling
+    expect(openCounter?.textContent).toContain('1')
   })
 })
