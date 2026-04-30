@@ -1,4 +1,5 @@
 import { useEffect, useRef, useMemo, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { AnchorProvider, BN, parseIdlErrors, translateError } from '@coral-xyz/anchor'
 import { PublicKey, Keypair, SystemProgram, Transaction } from '@solana/web3.js'
 import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress } from '@solana/spl-token'
@@ -17,8 +18,9 @@ import { PageLayout } from '@/layouts/PageLayout'
 import { cn } from '@/lib/cn'
 import type { PathTone, PredictionPath, PricePoint } from '@/types/market'
 import { useIsAdmin } from '@/lib/hooks/useIsAdmin'
-import { useProgram } from '@/lib/solana/program'
+import { useProgram, getReadOnlyProgram } from '@/lib/solana/program'
 import { deriveMarketPda, deriveProtocolPda } from '@/lib/solana/pda'
+import { resolveBaseMintLabel } from '@/lib/api/pairLabels'
 import { toast } from '@/stores/toastStore'
 import { useWalletStore } from '@/stores/walletStore'
 import type { SupportedPair } from '@/lib/pyth/feedIds'
@@ -28,7 +30,21 @@ import { feedIdForPair } from '@/lib/pyth/feedIds'
 
 /* ── Pair config ─────────────────────────────────────────── */
 
-const PAIRS: { label: SupportedPair; baseMint: string; quoteMint: string }[] = [
+interface PairOption {
+  label: string
+  baseMint: string
+  quoteMint: string
+  /** 64-char hex feed id (no 0x). Always present — gating submit on this. */
+  feedIdHex: string
+}
+
+/**
+ * Hardcoded baseline pairs the UI knows by name. Each entry is paired
+ * with its Pyth feed id from `feedIds.ts`. Supplemented at runtime by
+ * `protocol_state.supportedPairs` so a freshly-registered pair is
+ * usable in the Create form without a code change.
+ */
+const HARDCODED_PAIRS: { label: SupportedPair; baseMint: string; quoteMint: string }[] = [
   {
     label: 'SOL/USDC',
     baseMint: 'So11111111111111111111111111111111111111112',
@@ -145,13 +161,34 @@ function buildPreviewPaths(
 
 /* ── Helpers ─────────────────────────────────────────────── */
 
+/**
+ * Decode a Pyth feed id (0x-prefixed or bare 64-char hex) into the
+ * 32-byte array the IDL expects. Throws on malformed input — callers
+ * should validate up front and surface a friendly toast rather than
+ * relying on the throw.
+ */
 function feedIdToBytes(hexFeedId: string): number[] {
   const hex = hexFeedId.startsWith('0x') ? hexFeedId.slice(2) : hexFeedId
+  if (!/^[0-9a-fA-F]{64}$/.test(hex)) {
+    throw new Error(`Pyth feed id must be 64 hex chars (got ${hex.length})`)
+  }
   const bytes: number[] = []
   for (let i = 0; i < 64; i += 2) {
     bytes.push(parseInt(hex.slice(i, i + 2), 16))
   }
   return bytes
+}
+
+/** Inverse of `feedIdToBytes`: 32-byte array → 64-char lowercase hex. */
+function bytesToFeedIdHex(bytes: number[] | Uint8Array): string {
+  const arr = Array.from(bytes)
+  return arr.map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+/** True iff the input is a 64-char hex string (with optional `0x`). */
+function isValidFeedIdHex(input: string): boolean {
+  const hex = input.trim().startsWith('0x') ? input.trim().slice(2) : input.trim()
+  return /^[0-9a-fA-F]{64}$/.test(hex)
 }
 
 /* ── Provider select dropdown ────────────────────────────── */
@@ -256,6 +293,48 @@ function InfoTip({ text }: { text: string }) {
 }
 
 /** Format a unix-ms timestamp as a local yyyy-MM-ddTHH:mm string for datetime-local inputs. */
+/**
+ * Read `protocol_state.supported_pairs[..numSupportedPairs]` and shape
+ * each as a PairOption usable by the Create form. Pair labels for
+ * unknown mints fall back to a truncated render via `pairLabels`.
+ *
+ * 60s stale cache is sufficient — the operator only changes this when
+ * they explicitly run `add_supported_pair` and a refresh after that
+ * call is acceptable latency. PR2's event invalidation isn't wired
+ * here because `add_supported_pair` doesn't emit a tracked event;
+ * this hook is the source of truth.
+ */
+function useOnChainSupportedPairs() {
+  return useQuery<PairOption[]>({
+    queryKey: ['protocolSupportedPairs'],
+    queryFn: async () => {
+      const program = getReadOnlyProgram()
+      const [protocolPda] = deriveProtocolPda()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const ps: any = await program.account.protocolState.fetch(protocolPda)
+      const num: number = ps.numSupportedPairs as number
+      const out: PairOption[] = []
+      for (let i = 0; i < num; i++) {
+        const tp = ps.supportedPairs[i]
+        if (!tp || !tp.active) continue
+        const baseMint: PublicKey = tp.baseMint
+        const quoteMint: PublicKey = tp.quoteMint
+        const feedHex = bytesToFeedIdHex(tp.pythFeedId as number[])
+        const label = resolveBaseMintLabel(baseMint)
+        out.push({
+          label: label.pair,
+          baseMint: baseMint.toBase58(),
+          quoteMint: quoteMint.toBase58(),
+          feedIdHex: feedHex,
+        })
+      }
+      return out
+    },
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+  })
+}
+
 function toLocalDatetime(ms: number): string {
   const d = new Date(ms)
   const pad = (n: number) => String(n).padStart(2, '0')
@@ -293,9 +372,35 @@ export function AdminPage() {
   // Tx state
   const [isPending, setIsPending] = useState(false)
 
-  const pair = PAIRS[selectedPair]
-  const pairLabel = pair.label
-  const feedId = feedIdForPair(pairLabel)
+  // Merge hardcoded pair labels (nice "SOL/USDC" names) with on-chain
+  // protocol_state.supportedPairs so a pair the operator registered via
+  // the AddSupportedPair form is immediately usable here without a
+  // code change. Hardcoded entries take precedence on (baseMint,
+  // quoteMint) collisions because they carry friendly labels.
+  const { data: onChainPairs = [] } = useOnChainSupportedPairs()
+  const availablePairs = useMemo<PairOption[]>(() => {
+    const merged: PairOption[] = []
+    const seen = new Set<string>()
+    for (const p of HARDCODED_PAIRS) {
+      const feedHex = (feedIdForPair(p.label) ?? '').replace(/^0x/i, '')
+      if (!feedHex) continue
+      const key = `${p.baseMint}-${p.quoteMint}`
+      seen.add(key)
+      merged.push({ label: p.label, baseMint: p.baseMint, quoteMint: p.quoteMint, feedIdHex: feedHex })
+    }
+    for (const p of onChainPairs) {
+      const key = `${p.baseMint}-${p.quoteMint}`
+      if (seen.has(key)) continue
+      merged.push(p)
+    }
+    return merged
+  }, [onChainPairs])
+
+  const pair = availablePairs[selectedPair] ?? availablePairs[0] ?? HARDCODED_PAIRS[0]
+  const pairLabel = pair?.label ?? ''
+  // Hex prefix matches feedIdForPair() outputs ("0x…") so usePythFeed
+  // and useBenchmarksHistory keep accepting the same shape.
+  const feedId = pair?.feedIdHex ? `0x${pair.feedIdHex}` : null
 
   // Live price feed
   usePythFeed(feedId)
@@ -351,9 +456,9 @@ export function AdminPage() {
   }
 
   async function handleCreateMarket() {
-    if (!program || !publicKey) return
-    if (!feedId) {
-      toast.error('No Pyth feed configured for this pair')
+    if (!program || !publicKey || !pair) return
+    if (!pair.feedIdHex || !isValidFeedIdHex(pair.feedIdHex)) {
+      toast.error('No valid Pyth feed configured for this pair')
       return
     }
     setIsPending(true)
@@ -376,7 +481,7 @@ export function AdminPage() {
       const params = {
         baseMint: new PublicKey(pair.baseMint),
         quoteMint,
-        pythFeedId: feedIdToBytes(feedId),
+        pythFeedId: feedIdToBytes(pair.feedIdHex),
         startTime: new BN(startTime),
         endTime: new BN(endTime),
         checkpointInterval,
@@ -436,10 +541,10 @@ export function AdminPage() {
     <PageLayout title="Create" subtitle="Set market details and create" className="max-w-none">
 
       {/* ── Pair selection (above chart) ───────────────────── */}
-      <div className="mb-4 flex gap-2">
-        {PAIRS.map((p, i) => (
+      <div className="mb-4 flex flex-wrap gap-2">
+        {availablePairs.map((p, i) => (
           <button
-            key={p.label}
+            key={`${p.baseMint}-${p.quoteMint}`}
             type="button"
             className={cn(CHIP, i === selectedPair ? CHIP_ACTIVE : CHIP_INACTIVE)}
             onClick={() => setSelectedPair(i)}
@@ -655,6 +760,122 @@ export function AdminPage() {
 
       </div>
       </div>
+
+      {/* ── Operator: register a new supported pair ── */}
+      <AddSupportedPairForm />
     </PageLayout>
+  )
+}
+
+/**
+ * Operator-only form for `add_supported_pair`. Registers a new
+ * `(baseMint, quoteMint, pythFeedId)` triple in `protocolState.supportedPairs[]`,
+ * unlocking it for `create_market` calls. Authority must equal the
+ * connected wallet (the program checks `protocolState.authority`).
+ */
+function AddSupportedPairForm() {
+  const program = useProgram()
+  const { publicKey } = useWalletStore()
+  const [baseMint, setBaseMint] = useState('')
+  const [quoteMint, setQuoteMint] = useState('')
+  const [pythFeedId, setPythFeedId] = useState('')
+  const [pending, setPending] = useState(false)
+
+  const handleSubmit = async () => {
+    if (!program || !publicKey) return
+    if (!isValidFeedIdHex(pythFeedId)) {
+      toast.error('Invalid Pyth feed id', {
+        message: 'Must be exactly 64 hex characters (with optional 0x prefix). A typo would silently encode missing bytes as zero and register a broken oracle feed.',
+      })
+      return
+    }
+    setPending(true)
+    try {
+      const baseKey = new PublicKey(baseMint.trim())
+      const quoteKey = new PublicKey(quoteMint.trim())
+      const feedBytes = feedIdToBytes(pythFeedId.trim())
+      const [protocolPda] = deriveProtocolPda()
+
+      const ix = await program.methods
+        .addSupportedPair(baseKey, quoteKey, feedBytes)
+        .accountsPartial({ protocolState: protocolPda, authority: publicKey })
+        .instruction()
+
+      const provider = program.provider as AnchorProvider
+      const priorityFeeMicroLamports = await getPriorityFee(provider.connection)
+      const finalIxs = await buildTransaction({
+        instructions: [ix],
+        computeUnitLimit: 100_000,
+        priorityFeeMicroLamports,
+      })
+      const tx = new Transaction().add(...finalIxs)
+      let sig: string
+      try {
+        sig = await provider.sendAndConfirm(tx)
+      } catch (sendErr) {
+        throw translateError(sendErr, parseIdlErrors(program.idl))
+      }
+      toast.success('Supported pair added', { txSig: sig })
+      setBaseMint('')
+      setQuoteMint('')
+      setPythFeedId('')
+    } catch (err) {
+      toast.error('Failed to add supported pair', { message: (err as Error).message })
+    } finally {
+      setPending(false)
+    }
+  }
+
+  return (
+    <section className="border-line mt-16 border-t pt-12">
+      <div className="mb-6 flex items-center gap-3">
+        <h2 className="text-ink-strong font-mono text-caption font-bold tracking-wide uppercase">
+          Add supported pair
+        </h2>
+        <span className="text-ink-dim font-mono text-caption">
+          Operator-only · governs `protocol_state.supported_pairs`
+        </span>
+      </div>
+      <div className="grid grid-cols-1 gap-6 [@media(min-width:1181px)]:grid-cols-3">
+        <Input
+          label="Base mint"
+          value={baseMint}
+          onChange={(e) => setBaseMint(e.target.value)}
+          placeholder="So11…Sol mint"
+        />
+        <Input
+          label="Quote mint"
+          value={quoteMint}
+          onChange={(e) => setQuoteMint(e.target.value)}
+          placeholder="USDC mint"
+        />
+        <Input
+          label="Pyth feed id (hex)"
+          value={pythFeedId}
+          onChange={(e) => setPythFeedId(e.target.value)}
+          placeholder="0xef0d…56d"
+        />
+      </div>
+      <div className="mt-6 flex items-center gap-3">
+        <Button
+          variant="secondary"
+          disabled={
+            pending ||
+            !program ||
+            !baseMint ||
+            !quoteMint ||
+            !isValidFeedIdHex(pythFeedId)
+          }
+          onClick={handleSubmit}
+        >
+          {pending ? 'Submitting…' : 'Add pair'}
+        </Button>
+        {pythFeedId && !isValidFeedIdHex(pythFeedId) && (
+          <span className="text-accent font-mono text-caption">
+            Feed id must be 64 hex chars (optionally 0x-prefixed)
+          </span>
+        )}
+      </div>
+    </section>
   )
 }
