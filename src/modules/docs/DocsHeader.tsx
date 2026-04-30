@@ -251,19 +251,12 @@ export function DocsHeader({
 
         <div
           className={cn(
-            'pointer-events-none absolute inset-0 z-10 flex items-center justify-center',
-            'px-72',
-            'lg:px-64',
-            'md:static md:flex-1 md:justify-start md:px-0',
+            'pointer-events-none absolute top-1/2 left-1/2 z-10 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center',
+            'w-full max-w-[420px] px-4',
             'sm:hidden',
           )}
         >
-          <div
-            className={cn(
-              'pointer-events-auto flex w-full max-w-[420px] items-center',
-              'sm:max-w-none',
-            )}
-          >
+          <div className="pointer-events-auto flex w-full items-center">
             <DocsSearch query={query} onChange={onQueryChange} />
           </div>
         </div>
