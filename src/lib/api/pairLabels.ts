@@ -17,10 +17,33 @@
 
 import { PublicKey } from '@solana/web3.js'
 
+import { PYTH_FEED_IDS } from '@/lib/pyth/feedIds'
+
 export interface PairLabel {
   pair: string
   base: string
   quote: string
+}
+
+/**
+ * Reverse-lookup a Pyth feed id (no `0x` prefix, lowercase or not) to
+ * the matching `PYTH_FEED_IDS` entry's pair label. Used as a label
+ * source when the on-chain base mint isn't in `KNOWN_DEVNET_MINTS` but
+ * the registered feed *is* a known major (e.g. devnet test markets that
+ * use random base mints alongside the canonical SOL/USD feed).
+ *
+ * Returning the same `{pair, base, quote}` shape as `resolveBaseMintLabel`
+ * means callers can compose the two without branching.
+ */
+function resolveByFeedId(feedHex: string): PairLabel | null {
+  const want = feedHex.replace(/^0x/i, '').toLowerCase()
+  for (const [pair, hex] of Object.entries(PYTH_FEED_IDS)) {
+    if (hex.replace(/^0x/i, '').toLowerCase() === want) {
+      const [base, quote] = pair.split('/')
+      return { pair, base, quote }
+    }
+  }
+  return null
 }
 
 /**
@@ -38,15 +61,28 @@ export const KNOWN_DEVNET_MINTS: Readonly<Record<string, PairLabel>> = {
 }
 
 /**
- * Resolve a base-mint pubkey to a friendly pair label. Falls back to a
- * truncated render so the UI degrades gracefully when an unrecognized
- * mint shows up (e.g. a freshly added pair where this table hasn't been
- * updated yet).
+ * Resolve a base-mint pubkey (and optional Pyth feed id) to a friendly
+ * pair label. Resolution order:
+ *
+ *   1. `KNOWN_DEVNET_MINTS[baseMint]` — the canonical devnet table.
+ *   2. `PYTH_FEED_IDS` reverse-lookup on `feedIdHex` — useful when the
+ *      market was registered with a random/test base mint but a real
+ *      Pyth feed (e.g. SOL/USD `ef0d…`). The chart's benchmarks history
+ *      is keyed off this label, so a recognized label keeps the chart
+ *      live even when the mint is unknown.
+ *   3. Truncated `<short>…/USDC` fallback so the UI degrades gracefully.
  */
-export function resolveBaseMintLabel(baseMint: PublicKey | string): PairLabel {
+export function resolveBaseMintLabel(
+  baseMint: PublicKey | string,
+  feedIdHex?: string | null,
+): PairLabel {
   const key = typeof baseMint === 'string' ? baseMint : baseMint.toBase58()
   const known = KNOWN_DEVNET_MINTS[key]
   if (known) return known
+  if (feedIdHex) {
+    const byFeed = resolveByFeedId(feedIdHex)
+    if (byFeed) return byFeed
+  }
   const short = key.slice(0, 4)
   return { pair: `${short}…/USDC`, base: short, quote: 'USDC' }
 }

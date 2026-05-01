@@ -14,6 +14,7 @@ import { resolveBaseMintLabel } from './pairLabels'
 import { getReadOnlyProgram } from '../solana/program'
 import { deriveMarketPda, derivePathPda, derivePositionPda } from '../solana/pda'
 import { estimateLmsrExitPayout } from '../solana/lmsr'
+import { bytesToFeedIdHex } from '@/lib/pyth/feedIds'
 import { SCALE } from '@/lib/constants'
 
 /**
@@ -52,7 +53,8 @@ export async function getMarkets(): Promise<Market[]> {
       const raw = acc.account
       const marketId = raw.marketId.toNumber()
       const market = anchorMarketToFE(raw, String(marketId))
-      const pairInfo = resolveBaseMintLabel(raw.baseMint)
+      const feedHex = raw.pythFeedId ? bytesToFeedIdHex(raw.pythFeedId as number[]) : null
+      const pairInfo = resolveBaseMintLabel(raw.baseMint, feedHex)
       market.pair = pairInfo.pair
       market.base = pairInfo.base
       market.quote = pairInfo.quote
@@ -72,7 +74,8 @@ export async function getMarket(id: string): Promise<Market> {
   const raw: any = await program.account.market.fetch(marketPda)
   const market = anchorMarketToFE(raw, id)
 
-  const pairInfo = resolveBaseMintLabel(raw.baseMint)
+  const feedHex = raw.pythFeedId ? bytesToFeedIdHex(raw.pythFeedId as number[]) : null
+  const pairInfo = resolveBaseMintLabel(raw.baseMint, feedHex)
   market.pair = pairInfo.pair
   market.base = pairInfo.base
   market.quote = pairInfo.quote
@@ -184,7 +187,8 @@ export async function getPosition(
     const checkpointInterval = marketRaw.checkpointInterval as number
     const path = anchorPathToFE(pathRaw, startTimeMs, checkpointInterval)
     path.tone = deriveTone(path.predictedPrices)
-    const pairInfo = resolveBaseMintLabel(marketRaw.baseMint)
+    const feedHexA = marketRaw.pythFeedId ? bytesToFeedIdHex(marketRaw.pythFeedId as number[]) : null
+    const pairInfo = resolveBaseMintLabel(marketRaw.baseMint, feedHexA)
     const marketState = parseMarketState(marketRaw.state) as MarketState
     const numPaths = marketRaw.numPaths as number
     const shareQuantitiesScaled = (marketRaw.lmsrShareQuantities as { toNumber(): number }[])
@@ -266,7 +270,8 @@ export async function getUserPositions(wallet: PublicKey | null): Promise<UserPo
     if (mkt === undefined) {
       try {
         const marketRaw: any = await program.account.market.fetch(marketPubkey)
-        const pairInfo = resolveBaseMintLabel(marketRaw.baseMint)
+        const feedHexB = marketRaw.pythFeedId ? bytesToFeedIdHex(marketRaw.pythFeedId as number[]) : null
+        const pairInfo = resolveBaseMintLabel(marketRaw.baseMint, feedHexB)
         const numPaths = marketRaw.numPaths as number
         mkt = {
           marketIdNum: marketRaw.marketId.toNumber(),

@@ -28,3 +28,13 @@ export function feedIdForPair(pair: string): string | null {
 export function benchmarkSymbolForPair(pair: string): string | null {
   return PYTH_BENCHMARK_SYMBOLS[pair as SupportedPair] ?? null
 }
+
+/**
+ * Decode an on-chain `pyth_feed_id` (32-byte array) to its hex string
+ * form (no `0x` prefix, lowercase). Used when reading
+ * `Market.pyth_feed_id` or `TokenPair.pyth_feed_id` and feeding it to
+ * `feedIdForPair` reverse lookups or directly to Hermes.
+ */
+export function bytesToFeedIdHex(bytes: number[] | Uint8Array): string {
+  return Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('')
+}

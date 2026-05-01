@@ -29,7 +29,7 @@ import { toast } from '@/stores/toastStore'
 import { useWalletStore } from '@/stores/walletStore'
 import { usePythFeed, useLatestPrice } from '@/lib/pyth/hooks'
 import { useBenchmarksHistory, useLazyHistoryTrigger } from '@/lib/pyth/useBenchmarksHistory'
-import { PYTH_FEED_IDS } from '@/lib/pyth/feedIds'
+import { bytesToFeedIdHex as bytesToFeedIdHexShared } from '@/lib/pyth/feedIds'
 
 /* ── Pair config ─────────────────────────────────────────── */
 
@@ -159,10 +159,7 @@ function feedIdToBytes(hexFeedId: string): number[] {
 }
 
 /** Inverse of `feedIdToBytes`: 32-byte array → 64-char lowercase hex. */
-function bytesToFeedIdHex(bytes: number[] | Uint8Array): string {
-  const arr = Array.from(bytes)
-  return arr.map((b) => b.toString(16).padStart(2, '0')).join('')
-}
+const bytesToFeedIdHex = bytesToFeedIdHexShared
 
 /** True iff the input is a 64-char hex string (with optional `0x`). */
 function isValidFeedIdHex(input: string): boolean {
@@ -283,21 +280,6 @@ function InfoTip({ text }: { text: string }) {
  * here because `add_supported_pair` doesn't emit a tracked event;
  * this hook is the source of truth.
  */
-/**
- * Inverse of `feedIdForPair` — given an on-chain feed id (no `0x` prefix),
- * find the friendly pair label that maps to it. Returns null if the feed
- * isn't one of the known majors; callers should fall back to a base-mint
- * label. Critical for chart history: `useBenchmarksHistory` is keyed off
- * the pair label, so an unrecognized label stalls historical candle load.
- */
-function pairLabelForFeedId(feedHex: string): string | null {
-  const want = feedHex.toLowerCase()
-  for (const [pair, hex] of Object.entries(PYTH_FEED_IDS)) {
-    if (hex.replace(/^0x/i, '').toLowerCase() === want) return pair
-  }
-  return null
-}
-
 function useOnChainSupportedPairs() {
   return useQuery<PairOption[]>({
     queryKey: ['protocolSupportedPairs'],
@@ -314,10 +296,10 @@ function useOnChainSupportedPairs() {
         const baseMint: PublicKey = tp.baseMint
         const quoteMint: PublicKey = tp.quoteMint
         const feedHex = bytesToFeedIdHex(tp.pythFeedId as number[])
-        // Prefer the friendly label derived from the registered Pyth feed id
-        // (so the chart's benchmarks lookup resolves) over the truncated
-        // base-mint label.
-        const label = pairLabelForFeedId(feedHex) ?? resolveBaseMintLabel(baseMint).pair
+        // resolveBaseMintLabel reverse-looks-up the feed id when the base
+        // mint isn't known — gives "SOL/USDC" for an on-chain pair whose
+        // base mint is a random test mint but the feed id is canonical.
+        const label = resolveBaseMintLabel(baseMint, feedHex).pair
         out.push({
           label,
           baseMint: baseMint.toBase58(),
