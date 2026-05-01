@@ -1,6 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
 import type { ReactNode } from 'react'
-import { Link } from '@tanstack/react-router'
 import { Code, CodeBlock, Li, Note, P, Section, Ul } from './primitives'
 import type { DocId } from './types'
 
@@ -1204,23 +1203,23 @@ function LaunchAppContent() {
   return (
     <>
       <Section id="app" num="01" heading="App">
-        <P>Open the LevX web app from the main application route.</P>
+        <P>Public application access is not linked from the docs yet.</P>
         <Ul>
           <Li>
-            <Link to="/" className="text-ink-strong underline underline-offset-4">
-              Launch app
-            </Link>
+            <span className="text-ink-dim font-mono text-caption tracking-wider uppercase">
+              COMING SOON
+            </span>
           </Li>
         </Ul>
       </Section>
 
       <Section id="markets" num="02" heading="Markets">
-        <P>To go directly to market discovery, open the markets page.</P>
+        <P>Direct market discovery links will return when the application layer is ready.</P>
         <Ul>
           <Li>
-            <Link to="/markets" className="text-ink-strong underline underline-offset-4">
-              Browse markets
-            </Link>
+            <span className="text-ink-dim font-mono text-caption tracking-wider uppercase">
+              COMING SOON
+            </span>
           </Li>
         </Ul>
       </Section>

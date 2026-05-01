@@ -320,10 +320,10 @@ export const DOC_META: Record<DocId, DocMeta> = {
   'launch-app': {
     category: '04 - Links',
     title: 'Launch App',
-    tagline: 'Open the LevX web application and explore active devnet markets.',
+    tagline: 'Application and market discovery links are coming soon.',
     meta: [
-      { label: 'DESTINATION', value: 'Web app' },
-      { label: 'STATUS', value: 'Stable' },
+      { label: 'DESTINATION', value: 'Application layer' },
+      { label: 'STATUS', value: 'Coming soon' },
     ],
     sections: [
       { id: 'app', num: '01', heading: 'App' },

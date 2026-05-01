@@ -212,13 +212,9 @@ export function DocsHome() {
           <AppWindow size={20} className="text-ink-dim" strokeWidth={1.5} />
           <span className="text-ink-muted">
             Ready to explore the markets?{' '}
-            <Link
-              to="/docs/$id"
-              params={{ id: 'launch-app' }}
-              className="text-success duration-short ease-levx transition-colors hover:opacity-80"
-            >
-              Launch App
-            </Link>
+            <span className="text-ink-dim font-mono text-caption tracking-wider uppercase">
+              COMING SOON
+            </span>
           </span>
         </div>
         <div className="flex items-center gap-3 font-sans text-[15px]">
