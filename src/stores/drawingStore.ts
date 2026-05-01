@@ -1,27 +1,48 @@
 import { create } from 'zustand'
-import type { CheckpointCrossing, DrawingPhase, DrawingStore } from '@/lib/drawing/types'
+import type { CheckpointCrossing, DrawingPhase, DrawingStore, ToolId } from '@/lib/drawing/types'
 
 const idleState: DrawingPhase = { phase: 'idle' }
+
+const UNDO_STACK_LIMIT = 50
 
 export const useDrawingStore = create<DrawingStore>((set, get) => ({
   state: idleState,
   totalCheckpoints: 0,
+  activeTool: 'freehand' as ToolId,
+  undoStack: [],
+  redoStack: [],
 
   enterDrawMode: (totalCheckpoints) => {
     set({
       state: { phase: 'drawMode', values: new Array(totalCheckpoints).fill(null) as null[] },
       totalCheckpoints,
+      undoStack: [],
+      redoStack: [],
     })
   },
 
   beginStroke: () => {
-    const { state } = get()
+    const { state, undoStack } = get()
     if (state.phase === 'drawMode') {
-      set({ state: { phase: 'sweeping', values: state.values, pointerDown: true } })
+      const snapshot = [...state.values]
+      const trimmed = undoStack.length >= UNDO_STACK_LIMIT ? undoStack.slice(1) : undoStack
+      set({
+        state: { phase: 'sweeping', values: state.values, pointerDown: true },
+        undoStack: [...trimmed, snapshot],
+        // Branching from a (possibly partial) undo: the redo future is no
+        // longer reachable.
+        redoStack: [],
+      })
     } else if (state.phase === 'ready') {
       // Multi-stroke re-entry: ready guarantees number[], widen to (number | null)[]
       const values: (number | null)[] = [...state.values]
-      set({ state: { phase: 'sweeping', values, pointerDown: true } })
+      const snapshot = [...state.values] as (number | null)[]
+      const trimmed = undoStack.length >= UNDO_STACK_LIMIT ? undoStack.slice(1) : undoStack
+      set({
+        state: { phase: 'sweeping', values, pointerDown: true },
+        undoStack: [...trimmed, snapshot],
+        redoStack: [],
+      })
     }
     // idle / sweeping / confirming / submitted / error → noop
   },
@@ -54,11 +75,13 @@ export const useDrawingStore = create<DrawingStore>((set, get) => ({
     if (totalCheckpoints === 0) return
     set({
       state: { phase: 'drawMode', values: new Array(totalCheckpoints).fill(null) as null[] },
+      undoStack: [],
+      redoStack: [],
     })
   },
 
   exitDrawMode: () => {
-    set({ state: idleState, totalCheckpoints: 0 })
+    set({ state: idleState, totalCheckpoints: 0, undoStack: [], redoStack: [] })
   },
 
   confirm: () => {
@@ -82,5 +105,65 @@ export const useDrawingStore = create<DrawingStore>((set, get) => ({
       values = []
     }
     set({ state: { phase: 'error', message, values } })
+  },
+
+  setActiveTool: (tool) => {
+    set({ activeTool: tool })
+  },
+
+  undo: () => {
+    const { state, undoStack, redoStack } = get()
+    // Only safe to undo from quiescent phases — sweeping has live pointer
+    // capture, post-submit phases shouldn't be rewound.
+    if (state.phase !== 'drawMode' && state.phase !== 'ready') return
+    if (undoStack.length === 0) return
+
+    const prev = undoStack[undoStack.length - 1]
+    const newUndo = undoStack.slice(0, -1)
+    const current: (number | null)[] = [...state.values]
+    const trimmedRedo = redoStack.length >= UNDO_STACK_LIMIT ? redoStack.slice(1) : redoStack
+    const newRedo = [...trimmedRedo, current]
+    const allFilled = prev.every((v): v is number => v !== null)
+
+    if (allFilled) {
+      set({
+        state: { phase: 'ready', values: prev as number[] },
+        undoStack: newUndo,
+        redoStack: newRedo,
+      })
+    } else {
+      set({
+        state: { phase: 'drawMode', values: prev },
+        undoStack: newUndo,
+        redoStack: newRedo,
+      })
+    }
+  },
+
+  redo: () => {
+    const { state, undoStack, redoStack } = get()
+    if (state.phase !== 'drawMode' && state.phase !== 'ready') return
+    if (redoStack.length === 0) return
+
+    const next = redoStack[redoStack.length - 1]
+    const newRedo = redoStack.slice(0, -1)
+    const current: (number | null)[] = [...state.values]
+    const trimmedUndo = undoStack.length >= UNDO_STACK_LIMIT ? undoStack.slice(1) : undoStack
+    const newUndo = [...trimmedUndo, current]
+    const allFilled = next.every((v): v is number => v !== null)
+
+    if (allFilled) {
+      set({
+        state: { phase: 'ready', values: next as number[] },
+        undoStack: newUndo,
+        redoStack: newRedo,
+      })
+    } else {
+      set({
+        state: { phase: 'drawMode', values: next },
+        undoStack: newUndo,
+        redoStack: newRedo,
+      })
+    }
   },
 }))

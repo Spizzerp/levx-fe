@@ -16,6 +16,13 @@ export interface CheckpointCrossing {
   y: number
 }
 
+/**
+ * Authoring tool selected in the floating drawing toolbar.
+ * Each tool produces checkpoint y-values via the same store actions, but
+ * differs in how the user inputs them (sweep, click anchors, drag handles…).
+ */
+export type ToolId = 'freehand' | 'line'
+
 /** Discriminated union of every drawing editor state. */
 export type DrawingPhase =
   | { phase: 'idle' }
@@ -30,6 +37,18 @@ export type DrawingPhase =
 export interface DrawingStore {
   state: DrawingPhase
   totalCheckpoints: number
+  activeTool: ToolId
+  /**
+   * Stack of `values` snapshots captured at each `beginStroke`. Most recent
+   * snapshot is at the end. `undo()` pops and restores. Bounded depth.
+   */
+  undoStack: (number | null)[][]
+  /**
+   * Counterpart to undoStack — populated by `undo()` (it pushes the current
+   * values before restoring) and consumed by `redo()`. Cleared whenever a
+   * fresh stroke begins (the future has been overwritten).
+   */
+  redoStack: (number | null)[][]
   enterDrawMode: (totalCheckpoints: number) => void
   beginStroke: () => void
   setCheckpointValues: (crossings: CheckpointCrossing[]) => void
@@ -39,4 +58,15 @@ export interface DrawingStore {
   confirm: () => void
   onTxSuccess: (sig: string) => void
   onTxError: (msg: string) => void
+  setActiveTool: (tool: ToolId) => void
+  /**
+   * Revert the most recent stroke. Noop when the stack is empty or when the
+   * phase is anything other than `drawMode` or `ready` (e.g. mid-sweep,
+   * post-submit).
+   */
+  undo: () => void
+  /**
+   * Reapply the most recently undone stroke. Same phase guards as `undo`.
+   */
+  redo: () => void
 }

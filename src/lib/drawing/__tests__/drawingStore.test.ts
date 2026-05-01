@@ -3,7 +3,13 @@ import { useDrawingStore } from '@/stores/drawingStore'
 
 // Reset store to idle before each test
 beforeEach(() => {
-  useDrawingStore.setState({ state: { phase: 'idle' }, totalCheckpoints: 0 })
+  useDrawingStore.setState({
+    state: { phase: 'idle' },
+    totalCheckpoints: 0,
+    undoStack: [],
+    redoStack: [],
+    activeTool: 'freehand',
+  })
 })
 
 describe('drawingStore', () => {
@@ -192,5 +198,246 @@ describe('drawingStore', () => {
     // state is idle — beginStroke should not change phase
     useDrawingStore.getState().beginStroke()
     expect(useDrawingStore.getState().state.phase).toBe('idle')
+  })
+
+  it("activeTool defaults to 'freehand'", () => {
+    expect(useDrawingStore.getState().activeTool).toBe('freehand')
+  })
+
+  it('setActiveTool updates the active tool', () => {
+    useDrawingStore.getState().setActiveTool('line')
+    expect(useDrawingStore.getState().activeTool).toBe('line')
+  })
+
+  describe('undo', () => {
+    it('undoStack is empty after enterDrawMode', () => {
+      useDrawingStore.getState().enterDrawMode(3)
+      expect(useDrawingStore.getState().undoStack).toEqual([])
+    })
+
+    it('beginStroke pushes a snapshot of values onto undoStack', () => {
+      useDrawingStore.getState().enterDrawMode(3)
+      useDrawingStore.getState().beginStroke()
+      const stack = useDrawingStore.getState().undoStack
+      expect(stack).toHaveLength(1)
+      expect(stack[0]).toEqual([null, null, null])
+    })
+
+    it('two strokes push two snapshots in order', () => {
+      useDrawingStore.getState().enterDrawMode(3)
+      useDrawingStore.getState().beginStroke()
+      useDrawingStore.getState().setCheckpointValues([
+        { index: 0, y: 100 },
+        { index: 1, y: 110 },
+        { index: 2, y: 120 },
+      ])
+      useDrawingStore.getState().endStroke() // → ready
+      useDrawingStore.getState().beginStroke() // re-enter sweeping
+      const stack = useDrawingStore.getState().undoStack
+      expect(stack).toHaveLength(2)
+      expect(stack[0]).toEqual([null, null, null])
+      expect(stack[1]).toEqual([100, 110, 120])
+    })
+
+    it('undo restores values to the most recent snapshot and pops the stack', () => {
+      useDrawingStore.getState().enterDrawMode(3)
+      useDrawingStore.getState().beginStroke()
+      useDrawingStore.getState().setCheckpointValues([
+        { index: 0, y: 100 },
+        { index: 1, y: 110 },
+        { index: 2, y: 120 },
+      ])
+      useDrawingStore.getState().endStroke() // → ready
+      useDrawingStore.getState().undo()
+      const state = useDrawingStore.getState().state
+      expect(state.phase).toBe('drawMode')
+      if (state.phase !== 'drawMode') throw new Error('expected drawMode')
+      expect(state.values).toEqual([null, null, null])
+      expect(useDrawingStore.getState().undoStack).toEqual([])
+    })
+
+    it('undo restores phase to ready when restored snapshot has no nulls', () => {
+      useDrawingStore.getState().enterDrawMode(3)
+      // Stroke 1 — fill all values
+      useDrawingStore.getState().beginStroke()
+      useDrawingStore.getState().setCheckpointValues([
+        { index: 0, y: 100 },
+        { index: 1, y: 110 },
+        { index: 2, y: 120 },
+      ])
+      useDrawingStore.getState().endStroke() // → ready
+      // Stroke 2 — overwrite one
+      useDrawingStore.getState().beginStroke()
+      useDrawingStore.getState().setCheckpointValues([{ index: 1, y: 999 }])
+      useDrawingStore.getState().endStroke() // → ready (still all filled)
+      // Undo back to stroke-1 result
+      useDrawingStore.getState().undo()
+      const state = useDrawingStore.getState().state
+      expect(state.phase).toBe('ready')
+      if (state.phase !== 'ready') throw new Error('expected ready')
+      expect(state.values).toEqual([100, 110, 120])
+    })
+
+    it('undo is a noop while sweeping (would orphan pointer capture)', () => {
+      useDrawingStore.getState().enterDrawMode(3)
+      useDrawingStore.getState().beginStroke()
+      useDrawingStore.getState().setCheckpointValues([{ index: 0, y: 100 }])
+      const stackBefore = useDrawingStore.getState().undoStack
+      useDrawingStore.getState().undo()
+      // Phase still sweeping, stack unchanged.
+      expect(useDrawingStore.getState().state.phase).toBe('sweeping')
+      expect(useDrawingStore.getState().undoStack).toEqual(stackBefore)
+    })
+
+    it('undo is a noop when stack is empty', () => {
+      useDrawingStore.getState().enterDrawMode(3)
+      useDrawingStore.getState().undo()
+      expect(useDrawingStore.getState().state.phase).toBe('drawMode')
+      expect(useDrawingStore.getState().undoStack).toEqual([])
+    })
+
+    it('reset clears undoStack', () => {
+      useDrawingStore.getState().enterDrawMode(3)
+      useDrawingStore.getState().beginStroke()
+      useDrawingStore.getState().setCheckpointValues([{ index: 0, y: 100 }])
+      useDrawingStore.getState().endStroke()
+      expect(useDrawingStore.getState().undoStack.length).toBeGreaterThan(0)
+      useDrawingStore.getState().reset()
+      expect(useDrawingStore.getState().undoStack).toEqual([])
+    })
+
+    it('exitDrawMode clears undoStack', () => {
+      useDrawingStore.getState().enterDrawMode(3)
+      useDrawingStore.getState().beginStroke()
+      useDrawingStore.getState().endStroke()
+      useDrawingStore.getState().exitDrawMode()
+      expect(useDrawingStore.getState().undoStack).toEqual([])
+    })
+
+    it('undoStack depth is capped at 50', () => {
+      useDrawingStore.getState().enterDrawMode(2)
+      // 60 strokes, each just begin+end without committing values stays in drawMode
+      for (let i = 0; i < 60; i++) {
+        useDrawingStore.getState().beginStroke()
+        useDrawingStore.getState().endStroke()
+      }
+      expect(useDrawingStore.getState().undoStack.length).toBe(50)
+    })
+  })
+
+  describe('redo', () => {
+    it('undo pushes the current values onto redoStack', () => {
+      useDrawingStore.getState().enterDrawMode(3)
+      useDrawingStore.getState().beginStroke()
+      useDrawingStore.getState().setCheckpointValues([
+        { index: 0, y: 100 },
+        { index: 1, y: 110 },
+        { index: 2, y: 120 },
+      ])
+      useDrawingStore.getState().endStroke() // → ready
+      useDrawingStore.getState().undo()
+      expect(useDrawingStore.getState().redoStack).toEqual([[100, 110, 120]])
+    })
+
+    it('redo restores the most recently undone state', () => {
+      useDrawingStore.getState().enterDrawMode(3)
+      useDrawingStore.getState().beginStroke()
+      useDrawingStore.getState().setCheckpointValues([
+        { index: 0, y: 100 },
+        { index: 1, y: 110 },
+        { index: 2, y: 120 },
+      ])
+      useDrawingStore.getState().endStroke() // → ready, values=[100,110,120]
+      useDrawingStore.getState().undo()       // → drawMode, values=[null,null,null]
+      useDrawingStore.getState().redo()       // → ready, values=[100,110,120]
+      const state = useDrawingStore.getState().state
+      expect(state.phase).toBe('ready')
+      if (state.phase !== 'ready') throw new Error('expected ready')
+      expect(state.values).toEqual([100, 110, 120])
+    })
+
+    it('redo is a noop when redoStack is empty', () => {
+      useDrawingStore.getState().enterDrawMode(3)
+      useDrawingStore.getState().redo()
+      expect(useDrawingStore.getState().state.phase).toBe('drawMode')
+    })
+
+    it('redo is a noop while sweeping', () => {
+      useDrawingStore.getState().enterDrawMode(3)
+      useDrawingStore.getState().beginStroke()
+      useDrawingStore.getState().endStroke() // → drawMode (still partial)
+      useDrawingStore.getState().undo()       // populates redoStack
+      useDrawingStore.getState().beginStroke() // → sweeping
+      const stackBefore = useDrawingStore.getState().redoStack
+      useDrawingStore.getState().redo()
+      expect(useDrawingStore.getState().state.phase).toBe('sweeping')
+      expect(useDrawingStore.getState().redoStack).toEqual(stackBefore)
+    })
+
+    it('beginning a new stroke clears the redoStack (branching)', () => {
+      useDrawingStore.getState().enterDrawMode(3)
+      useDrawingStore.getState().beginStroke()
+      useDrawingStore.getState().setCheckpointValues([
+        { index: 0, y: 100 },
+      ])
+      useDrawingStore.getState().endStroke()
+      useDrawingStore.getState().undo()
+      expect(useDrawingStore.getState().redoStack.length).toBeGreaterThan(0)
+      // New stroke from the undone state — redo is no longer reachable.
+      useDrawingStore.getState().beginStroke()
+      expect(useDrawingStore.getState().redoStack).toEqual([])
+    })
+
+    it('undo / redo round-trip preserves the value sequence across many steps', () => {
+      useDrawingStore.getState().enterDrawMode(3)
+
+      // stroke 1: [100,110,120]
+      useDrawingStore.getState().beginStroke()
+      useDrawingStore.getState().setCheckpointValues([
+        { index: 0, y: 100 },
+        { index: 1, y: 110 },
+        { index: 2, y: 120 },
+      ])
+      useDrawingStore.getState().endStroke()
+
+      // stroke 2: overwrite to [200,210,220]
+      useDrawingStore.getState().beginStroke()
+      useDrawingStore.getState().setCheckpointValues([
+        { index: 0, y: 200 },
+        { index: 1, y: 210 },
+        { index: 2, y: 220 },
+      ])
+      useDrawingStore.getState().endStroke()
+
+      // Undo twice
+      useDrawingStore.getState().undo() // → [100,110,120]
+      useDrawingStore.getState().undo() // → [null,null,null]
+      // Redo twice
+      useDrawingStore.getState().redo() // → [100,110,120]
+      useDrawingStore.getState().redo() // → [200,210,220]
+
+      const state = useDrawingStore.getState().state
+      if (state.phase !== 'ready') throw new Error('expected ready')
+      expect(state.values).toEqual([200, 210, 220])
+    })
+
+    it('reset clears redoStack', () => {
+      useDrawingStore.getState().enterDrawMode(3)
+      useDrawingStore.getState().beginStroke()
+      useDrawingStore.getState().endStroke()
+      useDrawingStore.getState().undo()
+      expect(useDrawingStore.getState().redoStack.length).toBeGreaterThan(0)
+      useDrawingStore.getState().reset()
+      expect(useDrawingStore.getState().redoStack).toEqual([])
+    })
+
+    it('exitDrawMode clears redoStack', () => {
+      useDrawingStore.getState().enterDrawMode(3)
+      useDrawingStore.getState().beginStroke()
+      useDrawingStore.getState().endStroke()
+      useDrawingStore.getState().undo()
+      useDrawingStore.getState().exitDrawMode()
+      expect(useDrawingStore.getState().redoStack).toEqual([])
+    })
   })
 })

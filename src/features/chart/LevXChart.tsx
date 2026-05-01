@@ -20,6 +20,7 @@ import { useChartViewport } from '@/lib/chart/useChartViewport'
 import { useYAxisViewport } from '@/lib/chart/useYAxisViewport'
 import { computeVisiblePriceDomain } from '@/lib/chart/computeVisiblePriceDomain'
 import { DrawingGrid } from '@/features/chart/DrawingGrid'
+import { DrawingToolbar } from '@/features/chart/DrawingToolbar'
 import { ChartMorphLine } from '@/features/chart/ChartMorphLine'
 import { Stub } from '@/ui/Stub'
 
@@ -748,6 +749,7 @@ function LevXChartOuter(props: LevXChartProps) {
           <ChartInner {...props} width={width} height={parentHeight} />
         )}
       </ParentSize>
+      <DrawingToolbar top={MARGIN.top + 8} right={MARGIN.right + 8} />
     </div>
   )
 }
