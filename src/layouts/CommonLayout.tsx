@@ -5,6 +5,25 @@ import { Link, useLocation } from '@tanstack/react-router'
 import { Nav } from '@/layouts/Nav'
 import { ToastContainer } from '@/ui/ToastContainer'
 import { WrongNetworkBanner } from '@/features/wallet/WrongNetworkBanner'
+import { KeeperHealthDot } from '@/features/wallet/KeeperHealthDot'
+
+const KEEPER_HEALTH_ROUTES = [
+  '/markets',
+  '/market/',
+  '/portfolio',
+  '/positions',
+  '/leaderboard',
+  '/vault',
+  '/admin',
+] as const
+
+function shouldShowKeeperHealth(pathname: string): boolean {
+  return KEEPER_HEALTH_ROUTES.some((route) =>
+    route.endsWith('/')
+      ? pathname.startsWith(route)
+      : pathname === route || pathname.startsWith(`${route}/`),
+  )
+}
 
 function XIcon({ size = 16 }: { size?: number }) {
   return (
@@ -17,6 +36,7 @@ function XIcon({ size = 16 }: { size?: number }) {
 export function CommonLayout({ children }: PropsWithChildren) {
   const { pathname } = useLocation()
   const showChrome = pathname !== '/' && !pathname.startsWith('/docs')
+  const showKeeperHealth = shouldShowKeeperHealth(pathname)
 
   return (
     <>
@@ -43,6 +63,11 @@ export function CommonLayout({ children }: PropsWithChildren) {
           >
             <FileText size={16} strokeWidth={1.5} aria-hidden="true" />
           </Link>
+        </div>
+      )}
+      {showKeeperHealth && (
+        <div className="pointer-events-none fixed right-4 bottom-4 z-50">
+          <KeeperHealthDot className="pointer-events-auto" />
         </div>
       )}
       <ToastContainer />

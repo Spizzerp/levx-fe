@@ -24,6 +24,10 @@ vi.mock('@/features/wallet/WrongNetworkBanner', () => ({
   WrongNetworkBanner: () => null,
 }))
 
+vi.mock('@/features/wallet/KeeperHealthDot', () => ({
+  KeeperHealthDot: () => <div data-testid="keeper-health">Keeper online</div>,
+}))
+
 vi.mock('@/ui/ToastContainer', () => ({
   ToastContainer: () => null,
 }))
@@ -39,10 +43,11 @@ describe('CommonLayout', () => {
       </CommonLayout>,
     )
     expect(screen.queryByTestId('nav-marker')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('keeper-health')).not.toBeInTheDocument()
     expect(screen.getByTestId('child')).toBeInTheDocument()
   })
 
-  it('renders Nav on non-landing routes', () => {
+  it('renders Nav and keeper health on protocol app routes', () => {
     mockPathname = '/markets'
     render(
       <CommonLayout>
@@ -50,5 +55,24 @@ describe('CommonLayout', () => {
       </CommonLayout>,
     )
     expect(screen.getByTestId('nav-marker')).toBeInTheDocument()
+    expect(screen.getByTestId('keeper-health')).toBeInTheDocument()
+  })
+
+  it('hides keeper health on docs and non-protocol app routes', () => {
+    mockPathname = '/docs'
+    const { rerender } = render(
+      <CommonLayout>
+        <div data-testid="child">child</div>
+      </CommonLayout>,
+    )
+    expect(screen.queryByTestId('keeper-health')).not.toBeInTheDocument()
+
+    mockPathname = '/profile'
+    rerender(
+      <CommonLayout>
+        <div data-testid="child">child</div>
+      </CommonLayout>,
+    )
+    expect(screen.queryByTestId('keeper-health')).not.toBeInTheDocument()
   })
 })

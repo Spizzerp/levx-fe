@@ -7,7 +7,6 @@ import { env, toSolanaCluster } from '@/env'
 import { AnchorProgramProvider } from '@/lib/chain'
 import { EventStreamProvider } from '@/lib/solana/EventStreamProvider'
 import { SupabaseAuthProvider } from '@/lib/supabase/provider'
-import { KeeperHealthDot } from '@/features/wallet/KeeperHealthDot'
 import { WalletSync } from '@/stores/walletStore'
 import '@/style/wallet.css'
 
@@ -56,14 +55,7 @@ export function UIRoot({ children }: PropsWithChildren) {
           <AnchorProgramProvider>
             <WalletSync />
             <SupabaseAuthProvider>
-              <EventStreamProvider>
-                {children}
-                {/* Global liveness indicator — fixed bottom-right so every
-                    page sees the same dot without each layout opting in. */}
-                <div className="pointer-events-none fixed right-4 bottom-4 z-50">
-                  <KeeperHealthDot className="pointer-events-auto" />
-                </div>
-              </EventStreamProvider>
+              <EventStreamProvider>{children}</EventStreamProvider>
             </SupabaseAuthProvider>
           </AnchorProgramProvider>
         </WalletModalProvider>
