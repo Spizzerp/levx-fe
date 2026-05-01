@@ -2,7 +2,11 @@ import { useEffect, useRef, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { AnchorProvider, BN, parseIdlErrors, translateError } from '@coral-xyz/anchor'
 import { PublicKey, Keypair, SystemProgram, Transaction } from '@solana/web3.js'
-import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress } from '@solana/spl-token'
+import {
+  TOKEN_PROGRAM_ID,
+  getAssociatedTokenAddress,
+  createAssociatedTokenAccountIdempotentInstruction,
+} from '@solana/spl-token'
 
 import { buildTransaction } from '@/lib/chain/buildTransaction'
 import { getPriorityFee } from '@/lib/chain/priorityFee'
@@ -517,8 +521,18 @@ export function AdminPage() {
 
       const provider = program.provider as AnchorProvider
       const priorityFeeMicroLamports = await getPriorityFee(provider.connection)
+
+      // Idempotent ATA creation for the creator. If the admin wallet has never
+      // held USDC, the ATA doesn't exist and create_market hits AccountNotInitialized.
+      const createAtaIx = createAssociatedTokenAccountIdempotentInstruction(
+        publicKey,
+        creatorTokenAccount,
+        publicKey,
+        quoteMint,
+      )
+
       const finalIxs = await buildTransaction({
-        instructions: [ix],
+        instructions: [createAtaIx, ix],
         computeUnitLimit: CU_LIMITS.createMarket,
         priorityFeeMicroLamports,
       })

@@ -1,12 +1,29 @@
 // @ts-nocheck — Supabase Edge (Deno).
-const ORIGIN = Deno.env.get('APP_ORIGIN') ?? '*'
 
-// `apikey` and `x-client-info` are sent by both raw `fetch` callers (the
-// FE wraps requests with `apikey: env.APP_SUPABASE_ANON_KEY`) and the
-// `supabase-js` client; without them the preflight rejects the request
-// before our handler ever runs.
-export const corsHeaders = {
-  'Access-Control-Allow-Origin':  ORIGIN,
-  'Access-Control-Allow-Headers': 'apikey, Content-Type, Authorization, x-client-info',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+const RAW = Deno.env.get('APP_ORIGIN') ?? '*'
+const ALLOWED = RAW.split(',').map((s) => s.trim()).filter(Boolean)
+
+/**
+ * Build CORS headers for a single request. Matches the incoming `Origin`
+ * against the comma-separated `APP_ORIGIN` env var (e.g.
+ * `https://levx.trade,https://www.levx.trade`).
+ *
+ * `apikey` and `x-client-info` are sent by both raw `fetch` callers (the
+ * FE wraps requests with `apikey: env.APP_SUPABASE_ANON_KEY`) and the
+ * `supabase-js` client; without them the preflight rejects the request
+ * before our handler ever runs.
+ */
+export function corsHeadersFor(req: Request) {
+  const origin = req.headers.get('Origin') ?? ''
+  const allow =
+    ALLOWED.includes('*') ? '*'
+    : ALLOWED.includes(origin) ? origin
+    : ALLOWED[0] ?? '*'
+
+  return {
+    'Access-Control-Allow-Origin':  allow,
+    'Access-Control-Allow-Headers': 'apikey, Content-Type, Authorization, x-client-info',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Vary': 'Origin',
+  }
 }
