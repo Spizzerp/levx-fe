@@ -1,5 +1,5 @@
 import { useEffect, useRef, useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnchorProvider, BN, parseIdlErrors, translateError } from '@coral-xyz/anchor'
 import { PublicKey, Keypair, SystemProgram, Transaction } from '@solana/web3.js'
 import {
@@ -773,6 +773,9 @@ export function AdminPage() {
 
       {/* ── Operator: register a new supported pair ── */}
       <AddSupportedPairForm />
+
+      {/* ── Operator: manage existing supported pairs ── */}
+      <ManageSupportedPairsTable />
     </PageLayout>
   )
 }
@@ -886,6 +889,146 @@ function AddSupportedPairForm() {
           </span>
         )}
       </div>
+    </section>
+  )
+}
+
+/**
+ * Operator-only table that lists every entry in
+ * `protocol_state.supported_pairs[..numSupportedPairs]` with a delete
+ * action per row. Calls the on-chain `remove_supported_pair(index)`,
+ * which swap-removes the slot — the last entry moves into the deleted
+ * slot, the tail is zeroed, and the count decrements.
+ *
+ * Slot indices are NOT stable across removals (per the program's
+ * caller-contract documentation), so this table always re-fetches
+ * after a successful removal rather than mutating its cached list.
+ *
+ * Each row's "remove" requires a confirm-click: a 2-step state
+ * machine (`confirmingIndex`) gates the actual mutation, so a stray
+ * click can't silently nuke a slot.
+ */
+function ManageSupportedPairsTable() {
+  const program = useProgram()
+  const { publicKey } = useWalletStore()
+  const { data: pairs = [], isLoading } = useOnChainSupportedPairs()
+  const queryClient = useQueryClient()
+  const [confirmingIndex, setConfirmingIndex] = useState<number | null>(null)
+  const [pendingIndex, setPendingIndex] = useState<number | null>(null)
+
+  const handleRemove = async (index: number) => {
+    if (!program || !publicKey) return
+    if (confirmingIndex !== index) {
+      setConfirmingIndex(index)
+      return
+    }
+    setPendingIndex(index)
+    try {
+      const [protocolPda] = deriveProtocolPda()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const ix = await (program.methods as any)
+        .removeSupportedPair(index)
+        .accountsPartial({ protocolState: protocolPda, authority: publicKey })
+        .instruction()
+
+      const provider = program.provider as AnchorProvider
+      const priorityFeeMicroLamports = await getPriorityFee(provider.connection)
+      const finalIxs = await buildTransaction({
+        instructions: [ix],
+        computeUnitLimit: 50_000,
+        priorityFeeMicroLamports,
+      })
+      const tx = new Transaction().add(...finalIxs)
+      let sig: string
+      try {
+        sig = await provider.sendAndConfirm(tx)
+      } catch (sendErr) {
+        throw translateError(sendErr, parseIdlErrors(program.idl))
+      }
+      toast.success('Supported pair removed', { txSig: sig })
+      // Indices shift after a swap-remove — invalidate so the table
+      // re-fetches fresh state rather than rendering stale slot data.
+      queryClient.invalidateQueries({ queryKey: ['protocolSupportedPairs'] })
+      setConfirmingIndex(null)
+    } catch (err) {
+      toast.error('Failed to remove supported pair', {
+        message: (err as Error).message,
+      })
+    } finally {
+      setPendingIndex(null)
+    }
+  }
+
+  return (
+    <section className="border-line mt-16 border-t pt-12">
+      <div className="mb-6 flex items-center gap-3">
+        <h2 className="text-ink-strong font-mono text-caption font-bold tracking-wide uppercase">
+          Manage supported pairs
+        </h2>
+        <span className="text-ink-dim font-mono text-caption">
+          {pairs.length} on-chain · slot indices shift on removal
+        </span>
+      </div>
+      {isLoading && (
+        <p className="text-ink-dim font-mono text-caption">Loading on-chain pairs…</p>
+      )}
+      {!isLoading && pairs.length === 0 && (
+        <p className="text-ink-dim font-mono text-caption">
+          No supported pairs registered. Use the form above to add one.
+        </p>
+      )}
+      {pairs.length > 0 && (
+        <div className="border-line overflow-hidden rounded-lg border">
+          <table className="w-full font-mono text-caption">
+            <thead className="border-line text-ink-dim border-b">
+              <tr>
+                <th className="px-4 py-3 text-left">Slot</th>
+                <th className="px-4 py-3 text-left">Pair</th>
+                <th className="px-4 py-3 text-left">Base mint</th>
+                <th className="px-4 py-3 text-left">Quote mint</th>
+                <th className="px-4 py-3 text-left">Pyth feed (head)</th>
+                <th className="px-4 py-3 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pairs.map((p, i) => {
+                const isConfirming = confirmingIndex === i
+                const isThisPending = pendingIndex === i
+                return (
+                  <tr key={`${p.baseMint}-${p.quoteMint}-${i}`} className="border-line border-b last:border-b-0">
+                    <td className="text-ink-dim px-4 py-3">{i}</td>
+                    <td className="text-ink-strong px-4 py-3">{p.label}</td>
+                    <td className="text-ink-dim px-4 py-3">{p.baseMint.slice(0, 6)}…{p.baseMint.slice(-4)}</td>
+                    <td className="text-ink-dim px-4 py-3">{p.quoteMint.slice(0, 6)}…{p.quoteMint.slice(-4)}</td>
+                    <td className="text-ink-dim px-4 py-3">{p.feedIdHex.slice(0, 8)}…</td>
+                    <td className="px-4 py-3 text-right">
+                      <Button
+                        variant={isConfirming ? 'destructive' : 'ghost'}
+                        disabled={!program || isThisPending || (pendingIndex !== null && pendingIndex !== i)}
+                        onClick={() => handleRemove(i)}
+                      >
+                        {isThisPending
+                          ? 'Removing…'
+                          : isConfirming
+                            ? 'Confirm remove'
+                            : 'Remove'}
+                      </Button>
+                      {isConfirming && !isThisPending && (
+                        <Button
+                          variant="ghost"
+                          onClick={() => setConfirmingIndex(null)}
+                        >
+                          Cancel
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </section>
   )
 }

@@ -1735,6 +1735,52 @@
       ]
     },
     {
+      "name": "remove_supported_pair",
+      "discriminator": [
+        157,
+        223,
+        173,
+        105,
+        104,
+        9,
+        152,
+        150
+      ],
+      "accounts": [
+        {
+          "name": "protocol_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "index",
+          "type": "u8"
+        }
+      ]
+    },
+    {
       "name": "resolve_dispute",
       "discriminator": [
         231,
@@ -2920,6 +2966,19 @@
         156,
         85,
         248
+      ]
+    },
+    {
+      "name": "SupportedPairRemoved",
+      "discriminator": [
+        132,
+        157,
+        47,
+        93,
+        176,
+        229,
+        92,
+        94
       ]
     },
     {
@@ -5111,6 +5170,74 @@
           },
           {
             "name": "pyth_feed_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "SupportedPairRemoved",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "index",
+            "docs": [
+              "Original index of the pair that was removed."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "new_num_supported_pairs",
+            "docs": [
+              "`num_supported_pairs` after the removal — equivalent to the",
+              "pre-removal index of the entry that was swapped into `index`."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "base_mint",
+            "docs": [
+              "The pair that was removed (sourced from the original slot at",
+              "`index` before the swap-remove ran)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "quote_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "pyth_feed_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "replacement_base_mint",
+            "docs": [
+              "The pair that moved into `index` as part of swap-remove. When",
+              "`index == new_num_supported_pairs` the swap was a no-op (the",
+              "removed entry was already the last one); in that case this",
+              "field is `TokenPair::default()` so consumers can short-circuit",
+              "without re-reading state."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "replacement_quote_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "replacement_pyth_feed_id",
             "type": {
               "array": [
                 "u8",
