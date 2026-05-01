@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Pencil, Slash } from 'lucide-react'
+import { PenTool, Pencil, Slash } from 'lucide-react'
 
 import { cn } from '@/lib/cn'
 import { useDrawingStore } from '@/stores/drawingStore'
@@ -15,6 +15,7 @@ interface ToolDef {
 const TOOLS: ToolDef[] = [
   { id: 'freehand', label: 'Freehand', shortcut: 'F', Icon: Pencil },
   { id: 'line', label: 'Line', shortcut: 'L', Icon: Slash },
+  { id: 'bezier', label: 'Bezier', shortcut: 'B', Icon: PenTool },
 ]
 
 export interface DrawingToolbarProps {
@@ -80,6 +81,8 @@ export function DrawingToolbar({ top, right }: DrawingToolbarProps) {
         useDrawingStore.getState().setActiveTool('freehand')
       } else if (e.key === 'l' || e.key === 'L') {
         useDrawingStore.getState().setActiveTool('line')
+      } else if (e.key === 'b' || e.key === 'B') {
+        useDrawingStore.getState().setActiveTool('bezier')
       }
     }
     window.addEventListener('keydown', onKeyDown)

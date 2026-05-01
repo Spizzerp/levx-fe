@@ -4,6 +4,7 @@ import { curveCatmullRom } from '@visx/curve'
 import { useDrawingStore } from '@/stores/drawingStore'
 import { useDrawBroadcast, usePublishDrawFrame } from '@/lib/supabase/hooks'
 import { useWalletStore } from '@/stores/walletStore'
+import { BezierTool } from '@/features/chart/drawingTools/BezierTool'
 import { FreehandTool } from '@/features/chart/drawingTools/FreehandTool'
 import { LineTool } from '@/features/chart/drawingTools/LineTool'
 
@@ -144,6 +145,19 @@ export function DrawingLayer({
       )}
       {activeTool === 'line' && (
         <LineTool
+          xScale={xScale}
+          yScale={yScale}
+          innerWidth={innerWidth}
+          innerHeight={innerHeight}
+          margin={margin}
+          checkpointXs={checkpointXs}
+          marketStart={marketStart}
+          onStrokeStart={onStrokeStart}
+          onStrokeEnd={onStrokeEnd}
+        />
+      )}
+      {activeTool === 'bezier' && (
+        <BezierTool
           xScale={xScale}
           yScale={yScale}
           innerWidth={innerWidth}

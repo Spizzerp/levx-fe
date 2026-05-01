@@ -21,7 +21,7 @@ export interface CheckpointCrossing {
  * Each tool produces checkpoint y-values via the same store actions, but
  * differs in how the user inputs them (sweep, click anchors, drag handles…).
  */
-export type ToolId = 'freehand' | 'line'
+export type ToolId = 'freehand' | 'line' | 'bezier'
 
 /** Discriminated union of every drawing editor state. */
 export type DrawingPhase =

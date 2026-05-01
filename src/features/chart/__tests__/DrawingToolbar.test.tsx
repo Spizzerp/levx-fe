@@ -67,7 +67,7 @@ describe('DrawingToolbar', () => {
     expect(toolbar.style.right).toBe('88px')
   })
 
-  it('renders both freehand and line buttons', () => {
+  it('renders freehand, line, and bezier buttons', () => {
     useDrawingStore.setState({
       state: { phase: 'drawMode', values: [null] },
       totalCheckpoints: 1,
@@ -76,6 +76,7 @@ describe('DrawingToolbar', () => {
     const { container } = render(<DrawingToolbar top={40} right={88} />)
     expect(container.querySelector('[data-testid="drawing-tool-freehand"]')).toBeInTheDocument()
     expect(container.querySelector('[data-testid="drawing-tool-line"]')).toBeInTheDocument()
+    expect(container.querySelector('[data-testid="drawing-tool-bezier"]')).toBeInTheDocument()
   })
 
   it('switching tools updates active state', () => {
@@ -188,6 +189,19 @@ describe('DrawingToolbar', () => {
     render(<DrawingToolbar top={40} right={88} />)
     fireEvent.keyDown(window, { key: 'l' })
     expect(useDrawingStore.getState().activeTool).toBe('line')
+  })
+
+  it('B switches to bezier tool', () => {
+    useDrawingStore.setState({
+      state: { phase: 'drawMode', values: [null] },
+      totalCheckpoints: 1,
+      activeTool: 'freehand',
+      undoStack: [],
+      redoStack: [],
+    })
+    render(<DrawingToolbar top={40} right={88} />)
+    fireEvent.keyDown(window, { key: 'b' })
+    expect(useDrawingStore.getState().activeTool).toBe('bezier')
   })
 
   it('tool shortcuts are ignored when Ctrl/Cmd is held', () => {
