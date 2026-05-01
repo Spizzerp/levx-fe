@@ -27,10 +27,8 @@ import { deriveMarketPda, deriveProtocolPda } from '@/lib/solana/pda'
 import { resolveBaseMintLabel } from '@/lib/api/pairLabels'
 import { toast } from '@/stores/toastStore'
 import { useWalletStore } from '@/stores/walletStore'
-import type { SupportedPair } from '@/lib/pyth/feedIds'
 import { usePythFeed, useLatestPrice } from '@/lib/pyth/hooks'
 import { useBenchmarksHistory, useLazyHistoryTrigger } from '@/lib/pyth/useBenchmarksHistory'
-import { feedIdForPair } from '@/lib/pyth/feedIds'
 
 /* ── Pair config ─────────────────────────────────────────── */
 
@@ -41,30 +39,6 @@ interface PairOption {
   /** 64-char hex feed id (no 0x). Always present — gating submit on this. */
   feedIdHex: string
 }
-
-/**
- * Hardcoded baseline pairs the UI knows by name. Each entry is paired
- * with its Pyth feed id from `feedIds.ts`. Supplemented at runtime by
- * `protocol_state.supportedPairs` so a freshly-registered pair is
- * usable in the Create form without a code change.
- */
-const HARDCODED_PAIRS: { label: SupportedPair; baseMint: string; quoteMint: string }[] = [
-  {
-    label: 'SOL/USDC',
-    baseMint: 'So11111111111111111111111111111111111111112',
-    quoteMint: 'Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr', // devnet USDC
-  },
-  {
-    label: 'BTC/USDC',
-    baseMint: '3BZPwbcqB5kKScF3TEXxwNfx5ipV13kbRVDvfVp5c6fv', // devnet wrapped BTC
-    quoteMint: 'Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr',
-  },
-  {
-    label: 'ETH/USDC',
-    baseMint: '7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs', // devnet wrapped ETH
-    quoteMint: 'Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr',
-  },
-]
 
 /* ── Duration units ──────────────────────────────────────── */
 
@@ -376,31 +350,17 @@ export function AdminPage() {
   // Tx state
   const [isPending, setIsPending] = useState(false)
 
-  // Merge hardcoded pair labels (nice "SOL/USDC" names) with on-chain
-  // protocol_state.supportedPairs so a pair the operator registered via
-  // the AddSupportedPair form is immediately usable here without a
-  // code change. Hardcoded entries take precedence on (baseMint,
-  // quoteMint) collisions because they carry friendly labels.
+  // Drive the pair dropdown solely from on-chain protocol_state.supportedPairs.
+  // Hardcoded pairs were a bootstrap convenience but their (baseMint, quoteMint)
+  // mints don't necessarily match what's registered on-chain — and create_market
+  // enforces both sides match a registered pair, so anything else just errors.
   const { data: onChainPairs = [] } = useOnChainSupportedPairs()
   const availablePairs = useMemo<PairOption[]>(() => {
-    const merged: PairOption[] = []
-    const seen = new Set<string>()
-    for (const p of HARDCODED_PAIRS) {
-      const feedHex = (feedIdForPair(p.label) ?? '').replace(/^0x/i, '')
-      if (!feedHex) continue
-      const key = `${p.baseMint}-${p.quoteMint}`
-      seen.add(key)
-      merged.push({ label: p.label, baseMint: p.baseMint, quoteMint: p.quoteMint, feedIdHex: feedHex })
-    }
-    for (const p of onChainPairs) {
-      const key = `${p.baseMint}-${p.quoteMint}`
-      if (seen.has(key)) continue
-      merged.push(p)
-    }
+    const merged: PairOption[] = [...onChainPairs]
     return merged
   }, [onChainPairs])
 
-  const pair = availablePairs[selectedPair] ?? availablePairs[0] ?? HARDCODED_PAIRS[0]
+  const pair = availablePairs[selectedPair] ?? availablePairs[0]
   const pairLabel = pair?.label ?? ''
   // Hex prefix matches feedIdForPair() outputs ("0x…") so usePythFeed
   // and useBenchmarksHistory keep accepting the same shape.
@@ -470,10 +430,26 @@ export function AdminPage() {
     try {
       const [protocolPda] = deriveProtocolPda()
 
-      // Read protocol state to get next market_id
+      // Read protocol state to get next market_id and the canonical collateral mint
       const protocolAcc = await program.account.protocolState.fetch(protocolPda)
       const nextMarketId = protocolAcc.totalMarketsCreated.toNumber()
       const [marketPda] = deriveMarketPda(nextMarketId)
+
+      // Pre-flight: the program enforces `has_one = collateral_mint` on
+      // protocol_state, so the pair's quote mint must equal the protocol's
+      // configured collateral mint. Catch the mismatch here with a clear
+      // toast instead of letting it bubble up as InvalidCollateralMint (6029).
+      const protocolCollateralMint = (protocolAcc.collateralMint as PublicKey).toBase58()
+      if (pair.quoteMint !== protocolCollateralMint) {
+        toast.error(
+          `Pair quote mint (${pair.quoteMint.slice(0, 6)}…) ` +
+          `doesn't match protocol collateral mint (${protocolCollateralMint.slice(0, 6)}…). ` +
+          `Either pick a pair whose quote mint is the protocol collateral, ` +
+          `or call update_collateral_mint.`,
+        )
+        setIsPending(false)
+        return
+      }
 
       const startTime = Math.floor(new Date(startTimeInput).getTime() / 1000)
       const endTime = startTime + durationHours * 3600
