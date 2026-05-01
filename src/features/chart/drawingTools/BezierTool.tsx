@@ -33,8 +33,20 @@ interface DragState {
   handleDomainY: number
 }
 
+/** Identifies which handle of which committed anchor is being edited. */
+interface HandleEdit {
+  anchorIdx: number
+  /**
+   * 'out' = the stored outgoing handle. 'in' = the mirrored incoming handle —
+   * we still write to anchor.outHandle, mirroring the cursor across the anchor.
+   */
+  side: 'out' | 'in'
+}
+
 /** Pixel distance below which a click-drag is treated as a plain click (no handle). */
 const HANDLE_THRESHOLD_PX = 4
+/** Hit area radius for handle dots — visual is r=3, hit area generously larger. */
+const HANDLE_HIT_RADIUS = 8
 
 /**
  * BezierTool — Illustrator-style pen tool.
@@ -62,12 +74,17 @@ export function BezierTool({
 }: BezierToolProps) {
   const [anchors, setAnchors] = useState<BezierAnchor[]>([])
   const [drag, setDrag] = useState<DragState | null>(null)
+  const [handleEdit, setHandleEdit] = useState<HandleEdit | null>(null)
 
   // Refs for keyboard handler to read fresh values without re-binding on every state change.
   const anchorsRef = useRef(anchors)
   useEffect(() => {
     anchorsRef.current = anchors
   }, [anchors])
+
+  // editRef shadows handleEdit so pointermove handlers can read fresh state
+  // without waiting for a re-render — pointermove can fire before React commits.
+  const editRef = useRef<HandleEdit | null>(null)
 
   const scalesRef = useRef({ xScale, yScale })
   useEffect(() => {
@@ -240,6 +257,80 @@ export function BezierTool({
   }, [])
 
   // ----------------------------------------------------------------
+  // Handle-edit pointer handlers (drag a placed anchor's handle to reshape)
+  // ----------------------------------------------------------------
+
+  const onHandlePointerDown = useCallback(
+    (
+      e: React.PointerEvent<SVGCircleElement>,
+      anchorIdx: number,
+      side: 'out' | 'in',
+    ) => {
+      // Don't let the overlay rect's pointerdown fire and place a new anchor.
+      e.stopPropagation()
+      e.currentTarget.setPointerCapture(e.pointerId)
+      const next: HandleEdit = { anchorIdx, side }
+      editRef.current = next
+      setHandleEdit(next)
+    },
+    [],
+  )
+
+  const onHandlePointerMove = useCallback(
+    (e: React.PointerEvent<SVGCircleElement>) => {
+      const cur = editRef.current
+      if (!cur) return
+      // Pointer was released without firing pointerUp.
+      if (e.buttons === 0) {
+        editRef.current = null
+        setHandleEdit(null)
+        return
+      }
+
+      const svg = (e.currentTarget as SVGElement).ownerSVGElement
+      if (!svg) return
+      const svgRect = svg.getBoundingClientRect()
+      const chartX = e.clientX - svgRect.left - margin.left
+      const chartY = e.clientY - svgRect.top - margin.top
+
+      const { xScale: xs, yScale: ys } = scalesRef.current
+      const domainX = Number(xs.invert(chartX))
+      const domainY = Number(ys.invert(chartY))
+
+      setAnchors((prev) => {
+        const a = prev[cur.anchorIdx]
+        if (!a) return prev
+        // For 'in' side, mirror the cursor across the anchor — outHandle stays
+        // the source of truth, with the in-handle implicit (symmetric in v1).
+        const newOut =
+          cur.side === 'out'
+            ? { domainX, domainY }
+            : {
+                domainX: 2 * a.domainX - domainX,
+                domainY: 2 * a.domainY - domainY,
+              }
+        const next = [...prev]
+        next[cur.anchorIdx] = { ...a, outHandle: newOut }
+        return next
+      })
+    },
+    [margin.left, margin.top],
+  )
+
+  const onHandlePointerUp = useCallback(
+    (e: React.PointerEvent<SVGCircleElement>) => {
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId)
+      } catch {
+        // already released
+      }
+      editRef.current = null
+      setHandleEdit(null)
+    },
+    [],
+  )
+
+  // ----------------------------------------------------------------
   // Render — derive chart-coords from domain anchors via current scales.
   // ----------------------------------------------------------------
 
@@ -334,58 +425,101 @@ export function BezierTool({
           strokeWidth={2}
           fill="none"
           opacity={0.85}
+          pointerEvents="none"
           data-testid="bezier-path"
         />
       )}
 
-      {/* Anchor dots + handle indicators for committed anchors. */}
-      {anchorPx.map((p, i) => (
-        <g key={i} data-testid="bezier-anchor">
-          {p.out && (
-            <>
-              <line
-                x1={p.x}
-                y1={p.y}
-                x2={p.out.x}
-                y2={p.out.y}
-                stroke="#5B9BF6"
-                strokeWidth={1}
-                opacity={0.4}
-              />
-              <line
-                x1={p.x}
-                y1={p.y}
-                x2={2 * p.x - p.out.x}
-                y2={2 * p.y - p.out.y}
-                stroke="#5B9BF6"
-                strokeWidth={1}
-                opacity={0.4}
-              />
-              <circle
-                cx={p.out.x}
-                cy={p.out.y}
-                r={3}
-                fill="transparent"
-                stroke="#5B9BF6"
-                strokeWidth={1}
-              />
-              <circle
-                cx={2 * p.x - p.out.x}
-                cy={2 * p.y - p.out.y}
-                r={3}
-                fill="transparent"
-                stroke="#5B9BF6"
-                strokeWidth={1}
-              />
-            </>
-          )}
-          <circle cx={p.x} cy={p.y} r={4} fill="#5B9BF6" />
-        </g>
-      ))}
+      {/* Anchor dots + handle indicators + handle hit areas. */}
+      {anchorPx.map((p, i) => {
+        const inX = p.out ? 2 * p.x - p.out.x : null
+        const inY = p.out ? 2 * p.y - p.out.y : null
+        const isEditingOut = handleEdit?.anchorIdx === i && handleEdit?.side === 'out'
+        const isEditingIn = handleEdit?.anchorIdx === i && handleEdit?.side === 'in'
+        return (
+          <g key={i} data-testid="bezier-anchor">
+            {p.out && (
+              <>
+                {/* Visual handle lines (non-interactive). */}
+                <line
+                  x1={p.x}
+                  y1={p.y}
+                  x2={p.out.x}
+                  y2={p.out.y}
+                  stroke="#5B9BF6"
+                  strokeWidth={1}
+                  opacity={0.4}
+                  pointerEvents="none"
+                />
+                <line
+                  x1={p.x}
+                  y1={p.y}
+                  x2={inX as number}
+                  y2={inY as number}
+                  stroke="#5B9BF6"
+                  strokeWidth={1}
+                  opacity={0.4}
+                  pointerEvents="none"
+                />
+                {/* Visual handle dots (non-interactive). */}
+                <circle
+                  cx={p.out.x}
+                  cy={p.out.y}
+                  r={3}
+                  fill="transparent"
+                  stroke="#5B9BF6"
+                  strokeWidth={1}
+                  pointerEvents="none"
+                />
+                <circle
+                  cx={inX as number}
+                  cy={inY as number}
+                  r={3}
+                  fill="transparent"
+                  stroke="#5B9BF6"
+                  strokeWidth={1}
+                  pointerEvents="none"
+                />
+                {/* Hit areas — interactive, larger than the visual dot for easy targeting. */}
+                <circle
+                  cx={p.out.x}
+                  cy={p.out.y}
+                  r={HANDLE_HIT_RADIUS}
+                  fill="transparent"
+                  style={{ cursor: isEditingOut ? 'grabbing' : 'grab' }}
+                  onPointerDown={(e) => onHandlePointerDown(e, i, 'out')}
+                  onPointerMove={onHandlePointerMove}
+                  onPointerUp={onHandlePointerUp}
+                  onPointerCancel={onHandlePointerUp}
+                  data-testid="bezier-handle-hit"
+                  data-anchor-idx={i}
+                  data-side="out"
+                />
+                <circle
+                  cx={inX as number}
+                  cy={inY as number}
+                  r={HANDLE_HIT_RADIUS}
+                  fill="transparent"
+                  style={{ cursor: isEditingIn ? 'grabbing' : 'grab' }}
+                  onPointerDown={(e) => onHandlePointerDown(e, i, 'in')}
+                  onPointerMove={onHandlePointerMove}
+                  onPointerUp={onHandlePointerUp}
+                  onPointerCancel={onHandlePointerUp}
+                  data-testid="bezier-handle-hit"
+                  data-anchor-idx={i}
+                  data-side="in"
+                />
+              </>
+            )}
+            {/* Anchor dot (non-interactive). */}
+            <circle cx={p.x} cy={p.y} r={4} fill="#5B9BF6" pointerEvents="none" />
+          </g>
+        )
+      })}
 
       {/* In-flight drag preview: provisional anchor + its handles. */}
       {drag !== null && (
-        <g data-testid="bezier-drag-preview">
+        <g data-testid="bezier-drag-preview" pointerEvents="none">
           <line
             x1={drag.startChartX}
             y1={drag.startChartY}
