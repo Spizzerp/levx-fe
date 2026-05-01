@@ -497,6 +497,7 @@ export function AdminPage() {
         weightDd: new BN(Math.round(0.25 * SCALE)),
         weightEndpoint: new BN(Math.round(0.25 * SCALE)),
         weightDisplacement: new BN(Math.round(0.25 * SCALE)),
+        lmsrAlpha: null,
       }
 
       const ix = await program.methods
