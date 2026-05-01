@@ -21,7 +21,7 @@ export function corsHeadersFor(req: Request) {
 
   return {
     'Access-Control-Allow-Origin':  allow,
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Headers': 'apikey, Content-Type, Authorization, x-client-info',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Vary': 'Origin',
   }
