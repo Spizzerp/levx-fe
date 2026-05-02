@@ -70,3 +70,18 @@
     transform: translateX(0);
   }
 }
+
+/* Disable all hover effects on touch/coarse-pointer devices */
+@media (hover: none) and (pointer: coarse) {
+  *:hover {
+    color: inherit;
+    background: inherit;
+    background-color: inherit;
+    border-color: inherit;
+    opacity: inherit;
+    transform: inherit;
+    box-shadow: inherit;
+    text-decoration: inherit;
+    filter: inherit;
+  }
+}
