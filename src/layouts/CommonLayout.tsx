@@ -45,31 +45,32 @@ export function CommonLayout({ children }: PropsWithChildren) {
       <div style={{ isolation: 'isolate' }} className="flex-1">
         {children}
       </div>
-      {showChrome && (
-        <div className="mt-auto flex items-center justify-center gap-4 py-8">
-          <a
-            href="https://x.com/LevXtrade"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="LevX on X"
-            className="text-ink-dim hover:text-ink-strong duration-short ease-levx transition-colors"
-          >
-            <XIcon size={16} />
-          </a>
-          <Link
-            to="/docs"
-            aria-label="LevX docs"
-            className="text-ink-dim duration-short ease-levx hover:text-ink-strong transition-colors"
-          >
-            <FileText size={16} strokeWidth={1.5} aria-hidden="true" />
-          </Link>
+      <footer className="mt-auto border-t border-ink-dim/25">
+        <div className="mx-auto flex max-w-[1680px] items-center justify-between px-10 py-4">
+          <span className="text-ink-dim font-mono text-xs">
+            © Not Your Business LLC
+          </span>
+          <div className="flex items-center gap-4">
+            {showKeeperHealth && <KeeperHealthDot />}
+            <a
+              href="https://x.com/LevXtrade"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="LevX on X"
+              className="text-ink-dim hover:text-ink-strong duration-short ease-levx transition-colors"
+            >
+              <XIcon size={15} />
+            </a>
+            <Link
+              to="/docs"
+              aria-label="LevX docs"
+              className="text-ink-dim duration-short ease-levx hover:text-ink-strong transition-colors"
+            >
+              <FileText size={15} strokeWidth={1.5} aria-hidden="true" />
+            </Link>
+          </div>
         </div>
-      )}
-      {showKeeperHealth && (
-        <div className="pointer-events-none fixed right-4 bottom-4 z-50">
-          <KeeperHealthDot className="pointer-events-auto" />
-        </div>
-      )}
+      </footer>
       <ToastContainer />
     </>
   )
