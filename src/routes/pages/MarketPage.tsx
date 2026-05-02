@@ -1,6 +1,6 @@
-import { useParams } from '@tanstack/react-router'
+import { Link, useParams } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
-import { Plus } from 'lucide-react'
+import { ArrowLeft, Plus } from 'lucide-react'
 
 import { Button } from '@/ui/Button'
 import { ChartFrame } from '@/features/chart/ChartFrame'
@@ -355,6 +355,18 @@ export function MarketPage() {
     >
       {/* ── Chart column ─────────────────────────────── */}
       <section>
+        <Link
+          to="/markets"
+          className="group mb-5 flex items-center gap-1 text-ink-dim hover:text-ink-strong transition-colors"
+        >
+          <ArrowLeft
+            size={14}
+            strokeWidth={2}
+            className="duration-short ease-levx transition-transform group-hover:-translate-x-0.5"
+          />
+          <span className="text-micro font-mono tracking-wider uppercase">Markets</span>
+        </Link>
+
         <div className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1">
           <span className="text-ink-muted font-mono text-xs tracking-widest uppercase">
             {market.pair.replace('/', ' / ')}
