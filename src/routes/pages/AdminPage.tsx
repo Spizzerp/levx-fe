@@ -29,7 +29,6 @@ import { toast } from '@/stores/toastStore'
 import { useWalletStore } from '@/stores/walletStore'
 import { usePythFeed, useLatestPrice } from '@/lib/pyth/hooks'
 import { useBenchmarksHistory, useLazyHistoryTrigger } from '@/lib/pyth/useBenchmarksHistory'
-import { PYTH_FEED_IDS } from '@/lib/pyth/feedIds'
 
 /* ── Pair config ─────────────────────────────────────────── */
 
@@ -283,21 +282,6 @@ function InfoTip({ text }: { text: string }) {
  * here because `add_supported_pair` doesn't emit a tracked event;
  * this hook is the source of truth.
  */
-/**
- * Inverse of `feedIdForPair` — given an on-chain feed id (no `0x` prefix),
- * find the friendly pair label that maps to it. Returns null if the feed
- * isn't one of the known majors; callers should fall back to a base-mint
- * label. Critical for chart history: `useBenchmarksHistory` is keyed off
- * the pair label, so an unrecognized label stalls historical candle load.
- */
-function pairLabelForFeedId(feedHex: string): string | null {
-  const want = feedHex.toLowerCase()
-  for (const [pair, hex] of Object.entries(PYTH_FEED_IDS)) {
-    if (hex.replace(/^0x/i, '').toLowerCase() === want) return pair
-  }
-  return null
-}
-
 function useOnChainSupportedPairs() {
   return useQuery<PairOption[]>({
     queryKey: ['protocolSupportedPairs'],
@@ -314,10 +298,7 @@ function useOnChainSupportedPairs() {
         const baseMint: PublicKey = tp.baseMint
         const quoteMint: PublicKey = tp.quoteMint
         const feedHex = bytesToFeedIdHex(tp.pythFeedId as number[])
-        // Prefer the friendly label derived from the registered Pyth feed id
-        // (so the chart's benchmarks lookup resolves) over the truncated
-        // base-mint label.
-        const label = pairLabelForFeedId(feedHex) ?? resolveBaseMintLabel(baseMint).pair
+        const label = resolveBaseMintLabel(baseMint).pair
         out.push({
           label,
           baseMint: baseMint.toBase58(),
