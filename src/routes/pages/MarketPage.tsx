@@ -130,13 +130,17 @@ export function MarketPage() {
   const [hoveredPathId, setHoveredPathId] = useState<string | null>(null)
   const [leverage, setLeverage] = useState(22)
   const [collateral, setCollateral] = useState('25.00')
-  const [mountTime] = useState(() => Date.now())
+  const [now, setNow] = useState(() => Date.now())
   const [showOtherPositions] = useState(false)
+
+  // Update `now` every second so countdowns tick in real time.
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [])
 
   // Exit draw mode on unmount so a user navigating away doesn't leave the store in sweeping state.
   useEffect(() => () => exitDrawMode(), [exitDrawMode])
-
-  const now = mountTime
 
   // Chart schedule from on-chain market params
   const chartMarketStart = market?.startTime ?? now
@@ -332,8 +336,7 @@ export function MarketPage() {
   const showClaimCard = market.state === 'settled'
   const showVoidPanel = market.state === 'void'
   const showPendingPaths = market.state === 'pending' && market.numPaths < 3
-  const showPositionRail =
-    !showWagerRail && !showVoidPanel && !showPendingPaths && !!userPosition
+  const showPositionRail = !showWagerRail && !showVoidPanel && !showPendingPaths && !!userPosition
   const showRail =
     showWagerRail ||
     showMaturityCard ||
