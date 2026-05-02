@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { sampleBezierAtCheckpoints, type BezierAnchor } from '@/lib/drawing/bezierSampling'
+import { useBezierStore } from '@/stores/bezierStore'
 import { useDrawingStore } from '@/stores/drawingStore'
 
 interface MinimalScale {
@@ -93,31 +94,40 @@ export function BezierTool({
   onStrokeStart,
   onStrokeEnd,
 }: BezierToolProps) {
-  const [anchors, setAnchors] = useState<BezierAnchor[]>([])
+  // anchors live in bezierStore so undo/redo (Cmd/Ctrl+Z) can coordinate with
+  // the drawingStore's commit-level undo. Transient drag/edit state stays
+  // local — it isn't undoable.
+  const anchors = useBezierStore((s) => s.anchors)
   const [drag, setDrag] = useState<DragState | null>(null)
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null)
-
-  // Refs for keyboard handler to read fresh values without re-binding on every state change.
-  const anchorsRef = useRef(anchors)
-  useEffect(() => {
-    anchorsRef.current = anchors
-  }, [anchors])
 
   // editRef shadows editTarget so pointermove handlers can read fresh state
   // without waiting for a re-render — pointermove can fire before React commits.
   const editRef = useRef<EditTarget | null>(null)
+
+  // preEditRef captures the anchors snapshot at the start of a gesture so we
+  // can push (before, after) onto bezier history once the gesture completes.
+  const preEditRef = useRef<BezierAnchor[] | null>(null)
 
   const scalesRef = useRef({ xScale, yScale })
   useEffect(() => {
     scalesRef.current = { xScale, yScale }
   })
 
+  // Reset bezier authoring state when the tool unmounts (tool switch / exit
+  // draw mode). Keeps the v1 "switch cancels in-progress" rule.
+  useEffect(() => {
+    return () => {
+      useBezierStore.getState().reset()
+    }
+  }, [])
+
   // ----------------------------------------------------------------
   // Commit / cancel
   // ----------------------------------------------------------------
 
   const commit = useCallback(() => {
-    const a = anchorsRef.current
+    const a = useBezierStore.getState().anchors
     if (a.length < 2) return
 
     const { yScale: ys } = scalesRef.current
@@ -133,12 +143,21 @@ export function BezierTool({
     useDrawingStore.getState().endStroke()
     onStrokeEnd?.()
 
-    setAnchors([])
+    // pushCommit clears anchors and records a 'commit' history entry. The
+    // toolbar's Cmd+Z handler walks back over this entry by also calling
+    // drawingStore.undo() to revert the values write.
+    useBezierStore.getState().pushCommit(a)
     setDrag(null)
   }, [checkpointXs, onStrokeStart, onStrokeEnd])
 
   const cancel = useCallback(() => {
-    setAnchors([])
+    const before = useBezierStore.getState().anchors
+    if (before.length === 0) {
+      // Nothing to undo. Just clear transient drag state.
+      setDrag(null)
+      return
+    }
+    useBezierStore.getState().pushEdit(before, [])
     setDrag(null)
   }, [])
 
@@ -158,18 +177,19 @@ export function BezierTool({
         return
       }
 
+      const current = useBezierStore.getState().anchors
       if (e.key === 'Escape') {
-        if (anchorsRef.current.length === 0) return
+        if (current.length === 0) return
         e.preventDefault()
         cancel()
       } else if (e.key === 'Enter') {
-        if (anchorsRef.current.length < 2) return
+        if (current.length < 2) return
         e.preventDefault()
         commit()
       } else if (e.key === 'Backspace') {
-        if (anchorsRef.current.length === 0) return
+        if (current.length === 0) return
         e.preventDefault()
-        setAnchors((prev) => prev.slice(0, -1))
+        useBezierStore.getState().pushEdit(current, current.slice(0, -1))
       }
     }
     window.addEventListener('keydown', onKey)
@@ -262,7 +282,9 @@ export function BezierTool({
           : { domainX: d.handleDomainX, domainY: d.handleDomainY },
       }
 
-      setAnchors((prev) => [...prev, newAnchor])
+      // One placement → one history entry.
+      const before = useBezierStore.getState().anchors
+      useBezierStore.getState().pushEdit(before, [...before, newAnchor])
       setDrag(null)
     },
     [drag],
@@ -288,6 +310,8 @@ export function BezierTool({
       e.currentTarget.setPointerCapture(e.pointerId)
       editRef.current = target
       setEditTarget(target)
+      // Snapshot pre-state so we can push a single history entry at gesture end.
+      preEditRef.current = useBezierStore.getState().anchors
     },
     [],
   )
@@ -300,6 +324,7 @@ export function BezierTool({
       if (e.buttons === 0) {
         editRef.current = null
         setEditTarget(null)
+        preEditRef.current = null
         return
       }
 
@@ -313,32 +338,27 @@ export function BezierTool({
       const rawDomainX = Number(xs.invert(chartX))
       const rawDomainY = Number(ys.invert(chartY))
 
-      setAnchors((prev) => {
-        const a = prev[cur.anchorIdx]
-        if (!a) return prev
+      // Transient update — no history push during drag.
+      const prev = useBezierStore.getState().anchors
+      const a = prev[cur.anchorIdx]
+      if (!a) return
 
-        if (cur.kind === 'anchor') {
-          // Snap X to nearest checkpoint; Y stays continuous. Handles travel
-          // with the anchor (relative offset preserved) so symmetric handles
-          // stay symmetric.
-          const snappedX = snapToNearestCheckpoint(rawDomainX, checkpointXs)
-          const dx = snappedX - a.domainX
-          const dy = rawDomainY - a.domainY
-          const newOut = a.outHandle
-            ? {
-                domainX: a.outHandle.domainX + dx,
-                domainY: a.outHandle.domainY + dy,
-              }
-            : null
-          const next = [...prev]
-          next[cur.anchorIdx] = {
-            domainX: snappedX,
-            domainY: rawDomainY,
-            outHandle: newOut,
-          }
-          return next
-        }
-
+      let updated: BezierAnchor
+      if (cur.kind === 'anchor') {
+        // Snap X to nearest checkpoint; Y stays continuous. Handles travel
+        // with the anchor (relative offset preserved) so symmetric handles
+        // stay symmetric.
+        const snappedX = snapToNearestCheckpoint(rawDomainX, checkpointXs)
+        const dx = snappedX - a.domainX
+        const dy = rawDomainY - a.domainY
+        const newOut = a.outHandle
+          ? {
+              domainX: a.outHandle.domainX + dx,
+              domainY: a.outHandle.domainY + dy,
+            }
+          : null
+        updated = { domainX: snappedX, domainY: rawDomainY, outHandle: newOut }
+      } else {
         // Handle drag: 'out' writes the cursor directly; 'in' mirrors across
         // the anchor — outHandle is always the source of truth.
         const newOut =
@@ -348,10 +368,12 @@ export function BezierTool({
                 domainX: 2 * a.domainX - rawDomainX,
                 domainY: 2 * a.domainY - rawDomainY,
               }
-        const next = [...prev]
-        next[cur.anchorIdx] = { ...a, outHandle: newOut }
-        return next
-      })
+        updated = { ...a, outHandle: newOut }
+      }
+
+      const next = [...prev]
+      next[cur.anchorIdx] = updated
+      useBezierStore.getState().setAnchors(next)
     },
     [checkpointXs, margin.left, margin.top],
   )
@@ -363,6 +385,14 @@ export function BezierTool({
       } catch {
         // already released
       }
+      // Push one history entry for the whole gesture, but only if anchors
+      // actually changed (e.g. a click without drag is a no-op).
+      const before = preEditRef.current
+      const after = useBezierStore.getState().anchors
+      if (before !== null && before !== after) {
+        useBezierStore.getState().pushEdit(before, after)
+      }
+      preEditRef.current = null
       editRef.current = null
       setEditTarget(null)
     },

@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { PenTool, Pencil, Slash } from 'lucide-react'
 
 import { cn } from '@/lib/cn'
+import { useBezierStore } from '@/stores/bezierStore'
 import { useDrawingStore } from '@/stores/drawingStore'
 import type { ToolId } from '@/lib/drawing/types'
 
@@ -17,6 +18,39 @@ const TOOLS: ToolDef[] = [
   { id: 'line', label: 'Line', shortcut: 'L', Icon: Slash },
   { id: 'bezier', label: 'Bezier', shortcut: 'B', Icon: PenTool },
 ]
+
+/**
+ * Cmd/Ctrl+Z dispatcher.
+ *
+ * Bezier authoring has its own history (anchor placement, drag, handle
+ * adjustments, commit). When that history is non-empty AND bezier is the
+ * active tool, undo walks back through it. Walking back over a commit-kind
+ * action additionally calls drawingStore.undo() to revert the values write,
+ * so the user lands back in the path-editor view exactly as it was pre-✓.
+ *
+ * In every other case we delegate to the drawingStore's stroke-level undo.
+ */
+function dispatchUndo() {
+  const drawing = useDrawingStore.getState()
+  const bezier = useBezierStore.getState()
+  if (drawing.activeTool === 'bezier' && bezier.past.length > 0) {
+    const action = bezier.undo()
+    if (action?.kind === 'commit') drawing.undo()
+    return
+  }
+  drawing.undo()
+}
+
+function dispatchRedo() {
+  const drawing = useDrawingStore.getState()
+  const bezier = useBezierStore.getState()
+  if (drawing.activeTool === 'bezier' && bezier.future.length > 0) {
+    const action = bezier.redo()
+    if (action?.kind === 'commit') drawing.redo()
+    return
+  }
+  drawing.redo()
+}
 
 export interface DrawingToolbarProps {
   /** Pixel offset from the chart wrap's top edge — typically chart MARGIN.top + padding. */
@@ -63,15 +97,15 @@ export function DrawingToolbar({ top, right }: DrawingToolbarProps) {
       if (mod && isZ) {
         e.preventDefault()
         if (e.shiftKey) {
-          useDrawingStore.getState().redo()
+          dispatchRedo()
         } else {
-          useDrawingStore.getState().undo()
+          dispatchUndo()
         }
         return
       }
       if (mod && isY && !e.shiftKey) {
         e.preventDefault()
-        useDrawingStore.getState().redo()
+        dispatchRedo()
         return
       }
 

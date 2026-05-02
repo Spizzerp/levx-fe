@@ -3,6 +3,7 @@ import { render, fireEvent, act } from '@testing-library/react'
 import { scaleLinear, scaleTime } from '@visx/scale'
 
 import { BezierTool } from '@/features/chart/drawingTools/BezierTool'
+import { useBezierStore } from '@/stores/bezierStore'
 import { useDrawingStore } from '@/stores/drawingStore'
 
 const startTime = 1_700_000_000_000
@@ -63,6 +64,7 @@ beforeEach(() => {
     redoStack: [],
     activeTool: 'bezier',
   })
+  useBezierStore.setState({ anchors: [], past: [], future: [] })
 })
 
 afterEach(() => {
@@ -391,6 +393,96 @@ describe('BezierTool', () => {
 
     // Still only one anchor — handle drag did not create a new one.
     expect(container.querySelectorAll('[data-testid="bezier-anchor"]').length).toBe(1)
+  })
+
+  it('placing an anchor pushes one entry onto bezierStore.past', () => {
+    const { container } = renderTool()
+    const overlay = container.querySelector('[data-testid="drawing-overlay"]') as SVGRectElement
+    stubOverlayMethods(overlay)
+
+    fireEvent.pointerDown(overlay, { pointerId: 1, clientX: 100, clientY: 200 })
+    fireEvent.pointerUp(overlay, { pointerId: 1, clientX: 100, clientY: 200 })
+
+    expect(useBezierStore.getState().past).toHaveLength(1)
+    expect(useBezierStore.getState().past[0].kind).toBe('edit')
+  })
+
+  it('handle drag pushes exactly one entry per gesture', () => {
+    const { container } = renderTool()
+    const overlay = container.querySelector('[data-testid="drawing-overlay"]') as SVGRectElement
+    stubOverlayMethods(overlay)
+
+    // Place a smooth anchor (one entry).
+    fireEvent.pointerDown(overlay, { pointerId: 1, clientX: 100, clientY: 200 })
+    fireEvent.pointerMove(overlay, { pointerId: 1, buttons: 1, clientX: 150, clientY: 180 })
+    fireEvent.pointerUp(overlay, { pointerId: 1, clientX: 150, clientY: 180 })
+    expect(useBezierStore.getState().past).toHaveLength(1)
+
+    // Drag the handle through several pointermoves; expect ONE additional entry.
+    const outHit = container.querySelector(
+      '[data-testid="bezier-handle-hit"][data-side="out"]',
+    ) as SVGCircleElement
+    stubOverlayMethods(outHit)
+    fireEvent.pointerDown(outHit, { pointerId: 2, clientX: 150, clientY: 180 })
+    fireEvent.pointerMove(outHit, { pointerId: 2, buttons: 1, clientX: 160, clientY: 170 })
+    fireEvent.pointerMove(outHit, { pointerId: 2, buttons: 1, clientX: 180, clientY: 160 })
+    fireEvent.pointerMove(outHit, { pointerId: 2, buttons: 1, clientX: 200, clientY: 100 })
+    fireEvent.pointerUp(outHit, { pointerId: 2, clientX: 200, clientY: 100 })
+
+    expect(useBezierStore.getState().past).toHaveLength(2)
+  })
+
+  it('committing pushes a commit-kind entry onto bezier history', () => {
+    const { container } = renderTool()
+    const overlay = container.querySelector('[data-testid="drawing-overlay"]') as SVGRectElement
+    stubOverlayMethods(overlay)
+
+    fireEvent.pointerDown(overlay, { pointerId: 1, clientX: 0, clientY: 200 })
+    fireEvent.pointerUp(overlay, { pointerId: 1, clientX: 0, clientY: 200 })
+    fireEvent.pointerDown(overlay, { pointerId: 2, clientX: 800, clientY: 200 })
+    fireEvent.pointerUp(overlay, { pointerId: 2, clientX: 800, clientY: 200 })
+
+    const commit = container.querySelector('[data-testid="bezier-commit"]') as SVGGElement
+    fireEvent.click(commit)
+
+    const past = useBezierStore.getState().past
+    expect(past[past.length - 1].kind).toBe('commit')
+    expect(useBezierStore.getState().anchors).toEqual([])
+  })
+
+  it('after commit + Cmd+Z on bezierStore.undo, anchors are restored', () => {
+    const { container } = renderTool()
+    const overlay = container.querySelector('[data-testid="drawing-overlay"]') as SVGRectElement
+    stubOverlayMethods(overlay)
+
+    // Place 2 anchors and commit.
+    fireEvent.pointerDown(overlay, { pointerId: 1, clientX: 0, clientY: 200 })
+    fireEvent.pointerUp(overlay, { pointerId: 1, clientX: 0, clientY: 200 })
+    fireEvent.pointerDown(overlay, { pointerId: 2, clientX: 800, clientY: 200 })
+    fireEvent.pointerUp(overlay, { pointerId: 2, clientX: 800, clientY: 200 })
+    const commit = container.querySelector('[data-testid="bezier-commit"]') as SVGGElement
+    fireEvent.click(commit)
+    expect(useBezierStore.getState().anchors).toEqual([])
+
+    // Pop the commit-kind action via the store's undo (toolbar would also call
+    // drawingStore.undo() in real usage; this test isolates the bezier side).
+    const action = useBezierStore.getState().undo()
+    expect(action?.kind).toBe('commit')
+    expect(useBezierStore.getState().anchors).toHaveLength(2)
+  })
+
+  it('unmount resets bezierStore (tool switch discards in-progress)', () => {
+    const { container, unmount } = renderTool()
+    const overlay = container.querySelector('[data-testid="drawing-overlay"]') as SVGRectElement
+    stubOverlayMethods(overlay)
+
+    fireEvent.pointerDown(overlay, { pointerId: 1, clientX: 100, clientY: 200 })
+    fireEvent.pointerUp(overlay, { pointerId: 1, clientX: 100, clientY: 200 })
+    expect(useBezierStore.getState().past.length).toBeGreaterThan(0)
+
+    unmount()
+    expect(useBezierStore.getState().past).toEqual([])
+    expect(useBezierStore.getState().anchors).toEqual([])
   })
 
   it('rejects pointerdown in history region', () => {
