@@ -28,11 +28,11 @@ export function StreamingBanner() {
     <div className="flex shrink-0 items-center gap-8" aria-hidden="true">
       {ITEMS.map((item, i) =>
         item.type === 'logo' ? (
-          <img key={`logo-${i}`} src="/logo_color.png" alt="" className="h-6 w-auto brightness-0" />
+          <img key={`logo-${i}`} src="/logo_color.png" alt="" className="h-5 w-auto brightness-0" />
         ) : (
           <span
             key={`text-${i}`}
-            className="text-caption font-mono whitespace-nowrap text-black uppercase"
+            className="text-caption font-mono font-medium whitespace-nowrap text-black uppercase"
           >
             {item.content}
           </span>
