@@ -21,7 +21,7 @@ export interface CheckpointCrossing {
  * Each tool produces checkpoint y-values via the same store actions, but
  * differs in how the user inputs them (sweep, click anchors, drag handles…).
  */
-export type ToolId = 'freehand' | 'line' | 'bezier'
+export type ToolId = 'freehand' | 'line' | 'bezier' | 'select'
 
 /** Discriminated union of every drawing editor state. */
 export type DrawingPhase =
@@ -38,6 +38,14 @@ export interface DrawingStore {
   state: DrawingPhase
   totalCheckpoints: number
   activeTool: ToolId
+  /**
+   * Indices of checkpoints currently selected via the SelectTool. Persists
+   * across tool switches but is cleared on enterDrawMode / reset / exit /
+   * onTxSuccess. Stale indices (pointing to null values after undo) are
+   * silently filtered at render — the store does not try to keep this in
+   * sync with values changes.
+   */
+  selectedIndices: ReadonlySet<number>
   /**
    * Stack of `values` snapshots captured at each `beginStroke`. Most recent
    * snapshot is at the end. `undo()` pops and restores. Bounded depth.
@@ -59,6 +67,8 @@ export interface DrawingStore {
   onTxSuccess: (sig: string) => void
   onTxError: (msg: string) => void
   setActiveTool: (tool: ToolId) => void
+  setSelectedIndices: (indices: ReadonlySet<number>) => void
+  clearSelectedIndices: () => void
   /**
    * Revert the most recent stroke. Noop when the stack is empty or when the
    * phase is anything other than `drawMode` or `ready` (e.g. mid-sweep,

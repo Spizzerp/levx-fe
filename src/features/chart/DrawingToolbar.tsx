@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { PenTool, Pencil, Slash } from 'lucide-react'
+import { MousePointer2, PenTool, Pencil, Slash } from 'lucide-react'
 
 import { cn } from '@/lib/cn'
 import { useBezierStore } from '@/stores/bezierStore'
@@ -17,6 +17,7 @@ const TOOLS: ToolDef[] = [
   { id: 'freehand', label: 'Freehand', shortcut: 'F', Icon: Pencil },
   { id: 'line', label: 'Line', shortcut: 'L', Icon: Slash },
   { id: 'bezier', label: 'Bezier', shortcut: 'B', Icon: PenTool },
+  { id: 'select', label: 'Select & Move', shortcut: 'S', Icon: MousePointer2 },
 ]
 
 /**
@@ -117,6 +118,8 @@ export function DrawingToolbar({ top, right }: DrawingToolbarProps) {
         useDrawingStore.getState().setActiveTool('line')
       } else if (e.key === 'b' || e.key === 'B') {
         useDrawingStore.getState().setActiveTool('bezier')
+      } else if (e.key === 's' || e.key === 'S') {
+        useDrawingStore.getState().setActiveTool('select')
       }
     }
     window.addEventListener('keydown', onKeyDown)

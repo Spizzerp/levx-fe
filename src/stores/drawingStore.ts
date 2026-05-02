@@ -5,10 +5,13 @@ const idleState: DrawingPhase = { phase: 'idle' }
 
 const UNDO_STACK_LIMIT = 50
 
+const EMPTY_SELECTION: ReadonlySet<number> = new Set<number>()
+
 export const useDrawingStore = create<DrawingStore>((set, get) => ({
   state: idleState,
   totalCheckpoints: 0,
   activeTool: 'freehand' as ToolId,
+  selectedIndices: EMPTY_SELECTION,
   undoStack: [],
   redoStack: [],
 
@@ -16,6 +19,7 @@ export const useDrawingStore = create<DrawingStore>((set, get) => ({
     set({
       state: { phase: 'drawMode', values: new Array(totalCheckpoints).fill(null) as null[] },
       totalCheckpoints,
+      selectedIndices: EMPTY_SELECTION,
       undoStack: [],
       redoStack: [],
     })
@@ -75,13 +79,20 @@ export const useDrawingStore = create<DrawingStore>((set, get) => ({
     if (totalCheckpoints === 0) return
     set({
       state: { phase: 'drawMode', values: new Array(totalCheckpoints).fill(null) as null[] },
+      selectedIndices: EMPTY_SELECTION,
       undoStack: [],
       redoStack: [],
     })
   },
 
   exitDrawMode: () => {
-    set({ state: idleState, totalCheckpoints: 0, undoStack: [], redoStack: [] })
+    set({
+      state: idleState,
+      totalCheckpoints: 0,
+      selectedIndices: EMPTY_SELECTION,
+      undoStack: [],
+      redoStack: [],
+    })
   },
 
   confirm: () => {
@@ -91,7 +102,7 @@ export const useDrawingStore = create<DrawingStore>((set, get) => ({
   },
 
   onTxSuccess: (txSig) => {
-    set({ state: { phase: 'submitted', txSig } })
+    set({ state: { phase: 'submitted', txSig }, selectedIndices: EMPTY_SELECTION })
   },
 
   onTxError: (message) => {
@@ -109,6 +120,14 @@ export const useDrawingStore = create<DrawingStore>((set, get) => ({
 
   setActiveTool: (tool) => {
     set({ activeTool: tool })
+  },
+
+  setSelectedIndices: (indices) => {
+    set({ selectedIndices: indices })
+  },
+
+  clearSelectedIndices: () => {
+    set({ selectedIndices: EMPTY_SELECTION })
   },
 
   undo: () => {

@@ -7,6 +7,7 @@ import { useWalletStore } from '@/stores/walletStore'
 import { BezierTool } from '@/features/chart/drawingTools/BezierTool'
 import { FreehandTool } from '@/features/chart/drawingTools/FreehandTool'
 import { LineTool } from '@/features/chart/drawingTools/LineTool'
+import { SelectTool } from '@/features/chart/drawingTools/SelectTool'
 
 /** Centripetal Catmull-Rom with α=0.5 — pre-created once, not per-render. */
 const CATMULL_ROM_ALPHA_05 = curveCatmullRom.alpha(0.5)
@@ -85,6 +86,7 @@ export function DrawingLayer({
   // Subscribe to phase, values, and active tool separately to minimise re-renders.
   const phase = useDrawingStore((s) => s.state.phase)
   const activeTool = useDrawingStore((s) => s.activeTool)
+  const selectedIndices = useDrawingStore((s) => s.selectedIndices)
   const values = useDrawingStore((s) => {
     const st = s.state
     if (
@@ -169,8 +171,24 @@ export function DrawingLayer({
           onStrokeEnd={onStrokeEnd}
         />
       )}
+      {activeTool === 'select' && (
+        <SelectTool
+          xScale={xScale}
+          yScale={yScale}
+          innerWidth={innerWidth}
+          innerHeight={innerHeight}
+          margin={margin}
+          checkpointXs={checkpointXs}
+          marketStart={marketStart}
+          onStrokeStart={onStrokeStart}
+          onStrokeEnd={onStrokeEnd}
+        />
+      )}
 
-      {/* Smoothed Catmull-Rom curve through captured checkpoint values. */}
+      {/* Smoothed Catmull-Rom curve through captured checkpoint values.
+          pointerEvents="none" so the curve never intercepts clicks intended
+          for the active tool overlay underneath (notably the SelectTool
+          marquee / dot-drag hit testing). */}
       {capturedPoints.length >= 2 && (
         <LinePath<CapturedPoint>
           data={capturedPoints}
@@ -180,6 +198,7 @@ export function DrawingLayer({
           stroke="#5B9BF6"
           strokeWidth={2}
           fill="none"
+          pointerEvents="none"
           data-testid="smoothed-curve"
         />
       )}
@@ -223,10 +242,23 @@ export function DrawingLayer({
           const cx = Number(xScale(checkpointXs[i]))
           const cy = Number(yScale(v))
           const showLabel = i === maxIdx || (i === minIdx && minIdx !== maxIdx)
+          const isSelected = selectedIndices.has(i)
 
           return (
-            <g key={i} data-testid="checkpoint-dot">
-              <circle cx={cx} cy={cy} r={4} fill="#5B9BF6" />
+            <g
+              key={i}
+              data-testid="checkpoint-dot"
+              data-selected={isSelected ? 'true' : 'false'}
+              pointerEvents="none"
+            >
+              <circle
+                cx={cx}
+                cy={cy}
+                r={4}
+                fill={isSelected ? '#5B9BF6' : 'transparent'}
+                stroke="#5B9BF6"
+                strokeWidth={1.5}
+              />
               {showLabel && (
                 <text
                   x={cx + 6}
