@@ -1,8 +1,12 @@
 import { useEffect, useRef, useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnchorProvider, BN, parseIdlErrors, translateError } from '@coral-xyz/anchor'
 import { PublicKey, Keypair, SystemProgram, Transaction } from '@solana/web3.js'
-import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress } from '@solana/spl-token'
+import {
+  TOKEN_PROGRAM_ID,
+  getAssociatedTokenAddress,
+  createAssociatedTokenAccountIdempotentInstruction,
+} from '@solana/spl-token'
 
 import { buildTransaction } from '@/lib/chain/buildTransaction'
 import { getPriorityFee } from '@/lib/chain/priorityFee'
@@ -23,10 +27,8 @@ import { deriveMarketPda, deriveProtocolPda } from '@/lib/solana/pda'
 import { resolveBaseMintLabel } from '@/lib/api/pairLabels'
 import { toast } from '@/stores/toastStore'
 import { useWalletStore } from '@/stores/walletStore'
-import type { SupportedPair } from '@/lib/pyth/feedIds'
 import { usePythFeed, useLatestPrice } from '@/lib/pyth/hooks'
 import { useBenchmarksHistory, useLazyHistoryTrigger } from '@/lib/pyth/useBenchmarksHistory'
-import { feedIdForPair } from '@/lib/pyth/feedIds'
 
 /* ── Pair config ─────────────────────────────────────────── */
 
@@ -37,30 +39,6 @@ interface PairOption {
   /** 64-char hex feed id (no 0x). Always present — gating submit on this. */
   feedIdHex: string
 }
-
-/**
- * Hardcoded baseline pairs the UI knows by name. Each entry is paired
- * with its Pyth feed id from `feedIds.ts`. Supplemented at runtime by
- * `protocol_state.supportedPairs` so a freshly-registered pair is
- * usable in the Create form without a code change.
- */
-const HARDCODED_PAIRS: { label: SupportedPair; baseMint: string; quoteMint: string }[] = [
-  {
-    label: 'SOL/USDC',
-    baseMint: 'So11111111111111111111111111111111111111112',
-    quoteMint: 'Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr', // devnet USDC
-  },
-  {
-    label: 'BTC/USDC',
-    baseMint: '3BZPwbcqB5kKScF3TEXxwNfx5ipV13kbRVDvfVp5c6fv', // devnet wrapped BTC
-    quoteMint: 'Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr',
-  },
-  {
-    label: 'ETH/USDC',
-    baseMint: '7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs', // devnet wrapped ETH
-    quoteMint: 'Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr',
-  },
-]
 
 /* ── Duration units ──────────────────────────────────────── */
 
@@ -320,9 +298,9 @@ function useOnChainSupportedPairs() {
         const baseMint: PublicKey = tp.baseMint
         const quoteMint: PublicKey = tp.quoteMint
         const feedHex = bytesToFeedIdHex(tp.pythFeedId as number[])
-        const label = resolveBaseMintLabel(baseMint)
+        const label = resolveBaseMintLabel(baseMint).pair
         out.push({
-          label: label.pair,
+          label,
           baseMint: baseMint.toBase58(),
           quoteMint: quoteMint.toBase58(),
           feedIdHex: feedHex,
@@ -372,31 +350,17 @@ export function AdminPage() {
   // Tx state
   const [isPending, setIsPending] = useState(false)
 
-  // Merge hardcoded pair labels (nice "SOL/USDC" names) with on-chain
-  // protocol_state.supportedPairs so a pair the operator registered via
-  // the AddSupportedPair form is immediately usable here without a
-  // code change. Hardcoded entries take precedence on (baseMint,
-  // quoteMint) collisions because they carry friendly labels.
+  // Drive the pair dropdown solely from on-chain protocol_state.supportedPairs.
+  // Hardcoded pairs were a bootstrap convenience but their (baseMint, quoteMint)
+  // mints don't necessarily match what's registered on-chain — and create_market
+  // enforces both sides match a registered pair, so anything else just errors.
   const { data: onChainPairs = [] } = useOnChainSupportedPairs()
   const availablePairs = useMemo<PairOption[]>(() => {
-    const merged: PairOption[] = []
-    const seen = new Set<string>()
-    for (const p of HARDCODED_PAIRS) {
-      const feedHex = (feedIdForPair(p.label) ?? '').replace(/^0x/i, '')
-      if (!feedHex) continue
-      const key = `${p.baseMint}-${p.quoteMint}`
-      seen.add(key)
-      merged.push({ label: p.label, baseMint: p.baseMint, quoteMint: p.quoteMint, feedIdHex: feedHex })
-    }
-    for (const p of onChainPairs) {
-      const key = `${p.baseMint}-${p.quoteMint}`
-      if (seen.has(key)) continue
-      merged.push(p)
-    }
+    const merged: PairOption[] = [...onChainPairs]
     return merged
   }, [onChainPairs])
 
-  const pair = availablePairs[selectedPair] ?? availablePairs[0] ?? HARDCODED_PAIRS[0]
+  const pair = availablePairs[selectedPair] ?? availablePairs[0]
   const pairLabel = pair?.label ?? ''
   // Hex prefix matches feedIdForPair() outputs ("0x…") so usePythFeed
   // and useBenchmarksHistory keep accepting the same shape.
@@ -466,10 +430,26 @@ export function AdminPage() {
     try {
       const [protocolPda] = deriveProtocolPda()
 
-      // Read protocol state to get next market_id
+      // Read protocol state to get next market_id and the canonical collateral mint
       const protocolAcc = await program.account.protocolState.fetch(protocolPda)
       const nextMarketId = protocolAcc.totalMarketsCreated.toNumber()
       const [marketPda] = deriveMarketPda(nextMarketId)
+
+      // Pre-flight: the program enforces `has_one = collateral_mint` on
+      // protocol_state, so the pair's quote mint must equal the protocol's
+      // configured collateral mint. Catch the mismatch here with a clear
+      // toast instead of letting it bubble up as InvalidCollateralMint (6029).
+      const protocolCollateralMint = (protocolAcc.collateralMint as PublicKey).toBase58()
+      if (pair.quoteMint !== protocolCollateralMint) {
+        toast.error(
+          `Pair quote mint (${pair.quoteMint.slice(0, 6)}…) ` +
+          `doesn't match protocol collateral mint (${protocolCollateralMint.slice(0, 6)}…). ` +
+          `Either pick a pair whose quote mint is the protocol collateral, ` +
+          `or call update_collateral_mint.`,
+        )
+        setIsPending(false)
+        return
+      }
 
       const startTime = Math.floor(new Date(startTimeInput).getTime() / 1000)
       const endTime = startTime + durationHours * 3600
@@ -497,6 +477,7 @@ export function AdminPage() {
         weightDd: new BN(Math.round(0.25 * SCALE)),
         weightEndpoint: new BN(Math.round(0.25 * SCALE)),
         weightDisplacement: new BN(Math.round(0.25 * SCALE)),
+        lmsrAlpha: null,
       }
 
       const ix = await program.methods
@@ -516,8 +497,18 @@ export function AdminPage() {
 
       const provider = program.provider as AnchorProvider
       const priorityFeeMicroLamports = await getPriorityFee(provider.connection)
+
+      // Idempotent ATA creation for the creator. If the admin wallet has never
+      // held USDC, the ATA doesn't exist and create_market hits AccountNotInitialized.
+      const createAtaIx = createAssociatedTokenAccountIdempotentInstruction(
+        publicKey,
+        creatorTokenAccount,
+        publicKey,
+        quoteMint,
+      )
+
       const finalIxs = await buildTransaction({
-        instructions: [ix],
+        instructions: [createAtaIx, ix],
         computeUnitLimit: CU_LIMITS.createMarket,
         priorityFeeMicroLamports,
       })
@@ -763,6 +754,9 @@ export function AdminPage() {
 
       {/* ── Operator: register a new supported pair ── */}
       <AddSupportedPairForm />
+
+      {/* ── Operator: manage existing supported pairs ── */}
+      <ManageSupportedPairsTable />
     </PageLayout>
   )
 }
@@ -876,6 +870,146 @@ function AddSupportedPairForm() {
           </span>
         )}
       </div>
+    </section>
+  )
+}
+
+/**
+ * Operator-only table that lists every entry in
+ * `protocol_state.supported_pairs[..numSupportedPairs]` with a delete
+ * action per row. Calls the on-chain `remove_supported_pair(index)`,
+ * which swap-removes the slot — the last entry moves into the deleted
+ * slot, the tail is zeroed, and the count decrements.
+ *
+ * Slot indices are NOT stable across removals (per the program's
+ * caller-contract documentation), so this table always re-fetches
+ * after a successful removal rather than mutating its cached list.
+ *
+ * Each row's "remove" requires a confirm-click: a 2-step state
+ * machine (`confirmingIndex`) gates the actual mutation, so a stray
+ * click can't silently nuke a slot.
+ */
+function ManageSupportedPairsTable() {
+  const program = useProgram()
+  const { publicKey } = useWalletStore()
+  const { data: pairs = [], isLoading } = useOnChainSupportedPairs()
+  const queryClient = useQueryClient()
+  const [confirmingIndex, setConfirmingIndex] = useState<number | null>(null)
+  const [pendingIndex, setPendingIndex] = useState<number | null>(null)
+
+  const handleRemove = async (index: number) => {
+    if (!program || !publicKey) return
+    if (confirmingIndex !== index) {
+      setConfirmingIndex(index)
+      return
+    }
+    setPendingIndex(index)
+    try {
+      const [protocolPda] = deriveProtocolPda()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const ix = await (program.methods as any)
+        .removeSupportedPair(index)
+        .accountsPartial({ protocolState: protocolPda, authority: publicKey })
+        .instruction()
+
+      const provider = program.provider as AnchorProvider
+      const priorityFeeMicroLamports = await getPriorityFee(provider.connection)
+      const finalIxs = await buildTransaction({
+        instructions: [ix],
+        computeUnitLimit: 50_000,
+        priorityFeeMicroLamports,
+      })
+      const tx = new Transaction().add(...finalIxs)
+      let sig: string
+      try {
+        sig = await provider.sendAndConfirm(tx)
+      } catch (sendErr) {
+        throw translateError(sendErr, parseIdlErrors(program.idl))
+      }
+      toast.success('Supported pair removed', { txSig: sig })
+      // Indices shift after a swap-remove — invalidate so the table
+      // re-fetches fresh state rather than rendering stale slot data.
+      queryClient.invalidateQueries({ queryKey: ['protocolSupportedPairs'] })
+      setConfirmingIndex(null)
+    } catch (err) {
+      toast.error('Failed to remove supported pair', {
+        message: (err as Error).message,
+      })
+    } finally {
+      setPendingIndex(null)
+    }
+  }
+
+  return (
+    <section className="border-line mt-16 border-t pt-12">
+      <div className="mb-6 flex items-center gap-3">
+        <h2 className="text-ink-strong font-mono text-caption font-bold tracking-wide uppercase">
+          Manage supported pairs
+        </h2>
+        <span className="text-ink-dim font-mono text-caption">
+          {pairs.length} on-chain · slot indices shift on removal
+        </span>
+      </div>
+      {isLoading && (
+        <p className="text-ink-dim font-mono text-caption">Loading on-chain pairs…</p>
+      )}
+      {!isLoading && pairs.length === 0 && (
+        <p className="text-ink-dim font-mono text-caption">
+          No supported pairs registered. Use the form above to add one.
+        </p>
+      )}
+      {pairs.length > 0 && (
+        <div className="border-line overflow-hidden rounded-lg border">
+          <table className="w-full font-mono text-caption">
+            <thead className="border-line text-ink-dim border-b">
+              <tr>
+                <th className="px-4 py-3 text-left">Slot</th>
+                <th className="px-4 py-3 text-left">Pair</th>
+                <th className="px-4 py-3 text-left">Base mint</th>
+                <th className="px-4 py-3 text-left">Quote mint</th>
+                <th className="px-4 py-3 text-left">Pyth feed (head)</th>
+                <th className="px-4 py-3 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pairs.map((p, i) => {
+                const isConfirming = confirmingIndex === i
+                const isThisPending = pendingIndex === i
+                return (
+                  <tr key={`${p.baseMint}-${p.quoteMint}-${i}`} className="border-line border-b last:border-b-0">
+                    <td className="text-ink-dim px-4 py-3">{i}</td>
+                    <td className="text-ink-strong px-4 py-3">{p.label}</td>
+                    <td className="text-ink-dim px-4 py-3">{p.baseMint.slice(0, 6)}…{p.baseMint.slice(-4)}</td>
+                    <td className="text-ink-dim px-4 py-3">{p.quoteMint.slice(0, 6)}…{p.quoteMint.slice(-4)}</td>
+                    <td className="text-ink-dim px-4 py-3">{p.feedIdHex.slice(0, 8)}…</td>
+                    <td className="px-4 py-3 text-right">
+                      <Button
+                        variant={isConfirming ? 'destructive' : 'ghost'}
+                        disabled={!program || isThisPending || (pendingIndex !== null && pendingIndex !== i)}
+                        onClick={() => handleRemove(i)}
+                      >
+                        {isThisPending
+                          ? 'Removing…'
+                          : isConfirming
+                            ? 'Confirm remove'
+                            : 'Remove'}
+                      </Button>
+                      {isConfirming && !isThisPending && (
+                        <Button
+                          variant="ghost"
+                          onClick={() => setConfirmingIndex(null)}
+                        >
+                          Cancel
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </section>
   )
 }

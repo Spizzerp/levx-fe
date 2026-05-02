@@ -3,7 +3,7 @@ import { createClient } from 'supabase-js'
 import nacl from 'tweetnacl'
 import bs58 from 'bs58'
 import { create as signJWT, getNumericDate } from 'djwt'
-import { corsHeaders } from './_shared/cors.ts'
+import { corsHeadersFor } from './_shared/cors.ts'
 import { buildMessage } from './_shared/message.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
@@ -42,42 +42,42 @@ function getJwtKey(): Promise<CryptoKey> {
   return _jwtKey
 }
 
-function json(body: unknown, status = 200): Response {
+function json(req: Request, body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    headers: { ...corsHeadersFor(req), 'Content-Type': 'application/json' },
   })
 }
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders })
+  if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeadersFor(req) })
   const url = new URL(req.url)
 
   try {
-    if (url.pathname.endsWith('/nonce')) return await handleNonce()
+    if (url.pathname.endsWith('/nonce')) return await handleNonce(req)
     if (url.pathname.endsWith('/verify')) return await handleVerify(req)
-    return json({ error: 'not_found' }, 404)
+    return json(req, { error: 'not_found' }, 404)
   } catch (e) {
     console.error(e)
-    return json({ error: 'internal' }, 500)
+    return json(req, { error: 'internal' }, 500)
   }
 })
 
-async function handleNonce(): Promise<Response> {
+async function handleNonce(req: Request): Promise<Response> {
   await admin.from('auth_nonces').delete().lt('expires_at', new Date().toISOString())
   const nonce = bs58.encode(crypto.getRandomValues(new Uint8Array(32)))
   const expiresAt = new Date(Date.now() + NONCE_TTL_SECONDS * 1000).toISOString()
   const { error } = await admin.from('auth_nonces').insert({ nonce, expires_at: expiresAt })
   if (error) throw error
-  return json({ nonce, message: buildMessage(nonce), expiresAt })
+  return json(req, { nonce, message: buildMessage(nonce), expiresAt })
 }
 
 async function handleVerify(req: Request): Promise<Response> {
   const parsed = await req.json().catch(() => null)
-  if (!parsed || typeof parsed !== 'object') return json({ error: 'malformed' }, 400)
+  if (!parsed || typeof parsed !== 'object') return json(req, { error: 'malformed' }, 400)
   const { pubkey, nonce, signature } = parsed as Record<string, unknown>
   if (typeof pubkey !== 'string' || typeof nonce !== 'string' || typeof signature !== 'string') {
-    return json({ error: 'malformed' }, 400)
+    return json(req, { error: 'malformed' }, 400)
   }
 
   // Fail before consuming a nonce so misconfiguration does not burn valid nonces.
@@ -85,7 +85,7 @@ async function handleVerify(req: Request): Promise<Response> {
     console.error(
       '[verify-wallet] Missing EDGE_JWT_SECRET. Set it to the API JWT secret: Dashboard → Project Settings → API, then `supabase secrets set EDGE_JWT_SECRET=…`',
     )
-    return json({ error: 'jwt_secret_missing' }, 503)
+    return json(req, { error: 'jwt_secret_missing' }, 503)
   }
 
   // Atomic consume: single delete returning the row, gated on expires_at.
@@ -96,7 +96,7 @@ async function handleVerify(req: Request): Promise<Response> {
     .gt('expires_at', new Date().toISOString())
     .select('nonce')
     .maybeSingle()
-  if (delErr || !deleted) return json({ error: 'nonce_used_or_expired' }, 400)
+  if (delErr || !deleted) return json(req, { error: 'nonce_used_or_expired' }, 400)
 
   const messageBytes = new TextEncoder().encode(buildMessage(nonce))
   let sigBytes: Uint8Array
@@ -105,14 +105,14 @@ async function handleVerify(req: Request): Promise<Response> {
     sigBytes = bs58.decode(signature)
     pubkeyBytes = bs58.decode(pubkey)
   } catch {
-    return json({ error: 'malformed' }, 400)
+    return json(req, { error: 'malformed' }, 400)
   }
   if (sigBytes.length !== 64 || pubkeyBytes.length !== 32) {
-    return json({ error: 'malformed' }, 400)
+    return json(req, { error: 'malformed' }, 400)
   }
 
   const ok = nacl.sign.detached.verify(messageBytes, sigBytes, pubkeyBytes)
-  if (!ok) return json({ error: 'invalid_signature' }, 401)
+  if (!ok) return json(req, { error: 'invalid_signature' }, 401)
 
   const jwt = await signJWT(
     { alg: 'HS256', typ: 'JWT' },
@@ -128,5 +128,5 @@ async function handleVerify(req: Request): Promise<Response> {
     await getJwtKey(),
   )
   const expiresAt = new Date(Date.now() + JWT_TTL_SECONDS * 1000).toISOString()
-  return json({ jwt, expiresAt })
+  return json(req, { jwt, expiresAt })
 }

@@ -32,7 +32,7 @@ import {
   getAssociatedTokenAddress,
 } from '@solana/spl-token'
 
-import { corsHeaders } from './_shared/cors.ts'
+import { corsHeadersFor } from './_shared/cors.ts'
 import { tryReserve, releaseReservation } from './_shared/rateLimit.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
@@ -75,26 +75,32 @@ function getAuthorityKeypair(): Keypair {
   return _authorityKeypair
 }
 
-function json(body: unknown, status = 200, extraHeaders: Record<string, string> = {}): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json', ...extraHeaders },
-  })
+function makeJson(req: Request) {
+  const cors = corsHeadersFor(req)
+  return function json(body: unknown, status = 200, extraHeaders: Record<string, string> = {}): Response {
+    return new Response(JSON.stringify(body), {
+      status,
+      headers: { ...cors, 'Content-Type': 'application/json', ...extraHeaders },
+    })
+  }
 }
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders })
+  const json = makeJson(req)
+  if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeadersFor(req) })
   if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405)
 
   try {
-    return await handle(req)
+    return await handle(req, json)
   } catch (e) {
     console.error('[request-test-usdc] unhandled', e)
     return json({ error: 'internal' }, 500)
   }
 })
 
-async function handle(req: Request): Promise<Response> {
+type JsonFn = ReturnType<typeof makeJson>
+
+async function handle(req: Request, json: JsonFn): Promise<Response> {
   // ── 1. JWT auth ───────────────────────────────────────────────────
   const auth = req.headers.get('authorization') ?? ''
   const m = auth.match(/^Bearer\s+(.+)$/i)
