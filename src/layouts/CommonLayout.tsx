@@ -3,6 +3,7 @@ import { FileText } from 'lucide-react'
 import { Link, useLocation } from '@tanstack/react-router'
 
 import { Nav } from '@/layouts/Nav'
+import { StreamingBanner } from '@/ui/StreamingBanner'
 import { ToastContainer } from '@/ui/ToastContainer'
 import { WrongNetworkBanner } from '@/features/wallet/WrongNetworkBanner'
 import { KeeperHealthDot } from '@/features/wallet/KeeperHealthDot'
@@ -40,6 +41,7 @@ export function CommonLayout({ children }: PropsWithChildren) {
 
   return (
     <>
+      {showChrome && <StreamingBanner />}
       {showChrome && <Nav />}
       <WrongNetworkBanner />
       <div style={{ isolation: 'isolate' }} className="flex-1">
