@@ -1,4 +1,5 @@
 import { useEffect, useRef, useMemo, useState } from 'react'
+import { useNavigate } from '@tanstack/react-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnchorProvider, BN, parseIdlErrors, translateError } from '@coral-xyz/anchor'
 import { PublicKey, Keypair, SystemProgram, Transaction } from '@solana/web3.js'
@@ -89,20 +90,24 @@ function buildPreviewPaths(
   return Array.from({ length: count }, (_, idx) => {
     // Evenly space slopes from +0.20 (most bullish) to -0.20 (most bearish)
     const t = count === 1 ? 0.5 : idx / (count - 1) // 0..1
-    const slope = 0.20 - t * 0.40 // +0.20 → -0.20
+    const slope = 0.2 - t * 0.4 // +0.20 → -0.20
 
     // Assign tone from slope magnitude
     const tone: PathTone =
-      slope > 0.12 ? 'ultra-bull' :
-      slope > 0.04 ? 'bull' :
-      slope > -0.04 ? 'neutral' :
-      slope > -0.12 ? 'bear' :
-      'ultra-bear'
+      slope > 0.12
+        ? 'ultra-bull'
+        : slope > 0.04
+          ? 'bull'
+          : slope > -0.04
+            ? 'neutral'
+            : slope > -0.12
+              ? 'bear'
+              : 'ultra-bear'
     // Paths start from the market open time, anchored at base price
     const data: PricePoint[] = Array.from({ length: totalCheckpoints + 1 }, (_, i) => {
       const p = i / totalCheckpoints
       const wiggle = i === 0 ? 0 : Math.sin((i + idx * 3 + seed) * 0.4) * basePrice * 0.012
-      const drift = i === 0 ? 0 : Math.cos((i * 0.17) + idx * 1.3) * basePrice * 0.008
+      const drift = i === 0 ? 0 : Math.cos(i * 0.17 + idx * 1.3) * basePrice * 0.008
       return {
         time: startTime + i * intervalMs,
         value: basePrice * (1 + slope * p) + wiggle + drift,
@@ -171,13 +176,7 @@ function isValidFeedIdHex(input: string): boolean {
 
 /* ── Provider select dropdown ────────────────────────────── */
 
-function ProviderSelect({
-  value,
-  onChange,
-}: {
-  value: string
-  onChange: (id: string) => void
-}) {
+function ProviderSelect({ value, onChange }: { value: string; onChange: (id: string) => void }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const selected = AI_PROVIDERS.find((p) => p.id === value) ?? AI_PROVIDERS[0]
@@ -205,7 +204,7 @@ function ProviderSelect({
         onClick={() => setOpen((v) => !v)}
         className={cn(
           'flex w-full items-center justify-between',
-          'font-mono text-label text-ink uppercase tracking-wide',
+          'text-label text-ink font-mono tracking-wide uppercase',
           'cursor-pointer',
         )}
       >
@@ -220,18 +219,20 @@ function ProviderSelect({
         />
       </button>
       {open && (
-        <div className={cn(
-          'absolute left-0 top-[calc(100%+6px)] z-overlay min-w-[360px]',
-          'border-line-strong bg-surface-1 rounded-lg border py-1',
-          'shadow-[0_4px_20px_rgba(0,0,0,0.6)]',
-        )}>
+        <div
+          className={cn(
+            'z-overlay absolute top-[calc(100%+6px)] left-0 min-w-[360px]',
+            'border-line-strong bg-surface-1 rounded-lg border py-1',
+            'shadow-[0_4px_20px_rgba(0,0,0,0.6)]',
+          )}
+        >
           {AI_PROVIDERS.map((p) => (
             <button
               key={p.id}
               type="button"
               className={cn(
                 'flex w-full items-center justify-between px-3 py-2',
-                'font-mono text-label uppercase tracking-wide',
+                'text-label font-mono tracking-wide uppercase',
                 'duration-short ease-levx transition-[background-color,color]',
                 p.id === value ? 'text-ink-strong' : 'text-ink-muted',
                 'hover:bg-surface-2 hover:text-ink-strong',
@@ -257,13 +258,15 @@ function InfoTip({ text }: { text: string }) {
   return (
     <span className="group relative ml-1.5 inline-flex cursor-help">
       <Info size={12} strokeWidth={1.5} className="text-ink-dim" />
-      <span className={cn(
-        'pointer-events-none absolute bottom-full left-1/2 z-toast mb-2 -translate-x-1/2',
-        'w-56 rounded border border-line-strong bg-surface-1 px-3 py-2',
-        'font-mono text-label leading-relaxed text-ink-muted',
-        'opacity-0 transition-opacity duration-short ease-levx',
-        'group-hover:opacity-100',
-      )}>
+      <span
+        className={cn(
+          'z-toast pointer-events-none absolute bottom-full left-1/2 mb-2 -translate-x-1/2',
+          'border-line-strong bg-surface-1 w-56 rounded border px-3 py-2',
+          'text-label text-ink-muted font-mono leading-relaxed',
+          'duration-short ease-levx opacity-0 transition-opacity',
+          'group-hover:opacity-100',
+        )}
+      >
         {text}
       </span>
     </span>
@@ -326,13 +329,16 @@ import { CHIP, CHIP_ACTIVE, CHIP_INACTIVE } from '@/ui/styles'
 /* ── Page ────────────────────────────────────────────────── */
 
 export function AdminPage() {
+  const navigate = useNavigate()
   const program = useProgram()
   const publicKey = useWalletStore((s) => s.publicKey)
   const isAdmin = useIsAdmin()
 
   // Form state
   const [selectedPair, setSelectedPair] = useState(0)
-  const [startTimeInput, setStartTimeInput] = useState(() => toLocalDatetime(Date.now() + 5 * 60 * 1000))
+  const [startTimeInput, setStartTimeInput] = useState(() =>
+    toLocalDatetime(Date.now() + 5 * 60 * 1000),
+  )
   const [durationValue, setDurationValue] = useState(7)
   const [durationUnit, setDurationUnit] = useState<DurationUnit>('days')
   const durationHours = DURATION_UNITS.find((u) => u.id === durationUnit)!.toHours(durationValue)
@@ -406,9 +412,23 @@ export function AdminPage() {
   const previewPaths = useMemo(
     () =>
       basePrice > 0
-        ? buildPreviewPaths(numPaths, basePrice, chartMarketStart, checkpointInterval, chartTotalCheckpoints, selectedPair)
+        ? buildPreviewPaths(
+            numPaths,
+            basePrice,
+            chartMarketStart,
+            checkpointInterval,
+            chartTotalCheckpoints,
+            selectedPair,
+          )
         : [],
-    [numPaths, basePrice, chartMarketStart, checkpointInterval, chartTotalCheckpoints, selectedPair],
+    [
+      numPaths,
+      basePrice,
+      chartMarketStart,
+      checkpointInterval,
+      chartTotalCheckpoints,
+      selectedPair,
+    ],
   )
 
   if (!isAdmin) {
@@ -443,9 +463,9 @@ export function AdminPage() {
       if (pair.quoteMint !== protocolCollateralMint) {
         toast.error(
           `Pair quote mint (${pair.quoteMint.slice(0, 6)}…) ` +
-          `doesn't match protocol collateral mint (${protocolCollateralMint.slice(0, 6)}…). ` +
-          `Either pick a pair whose quote mint is the protocol collateral, ` +
-          `or call update_collateral_mint.`,
+            `doesn't match protocol collateral mint (${protocolCollateralMint.slice(0, 6)}…). ` +
+            `Either pick a pair whose quote mint is the protocol collateral, ` +
+            `or call update_collateral_mint.`,
         )
         setIsPending(false)
         return
@@ -521,6 +541,7 @@ export function AdminPage() {
       }
 
       toast.success('Market created', { txSig: sig })
+      void navigate({ to: '/market/$id', params: { id: String(nextMarketId) } })
     } catch (err) {
       toast.error('Failed to create market', { message: (err as Error).message })
     } finally {
@@ -530,7 +551,6 @@ export function AdminPage() {
 
   return (
     <PageLayout title="Create" subtitle="Set market details and create" className="max-w-none">
-
       {/* ── Pair selection (above chart) ───────────────────── */}
       <div className="mb-4 flex flex-wrap gap-2">
         {availablePairs.map((p, i) => (
@@ -546,210 +566,212 @@ export function AdminPage() {
       </div>
 
       <div className="grid grid-cols-[1fr_420px] items-start gap-10">
-      {/* ── Left column (chart + path providers) ──────────── */}
-      <div className="flex flex-col gap-6">
-        <ChartFrame glow>
-          <LevXChart
-            history={chartHistory}
-            predictions={previewPaths}
-            nowTime={now}
-            marketStart={chartMarketStart}
-            marketEnd={chartMarketEnd}
-            pair={pairLabel}
-            isLoading={isBenchmarksLoading}
-            error={null}
-            onViewportChange={onChartViewportChange}
-            height={520}
-            market={{
-              startTime: chartMarketStart,
-              checkpointInterval,
-              totalCheckpoints: chartTotalCheckpoints,
-            }}
-          />
-        </ChartFrame>
+        {/* ── Left column (chart + path providers) ──────────── */}
+        <div className="flex flex-col gap-6">
+          <ChartFrame glow>
+            <LevXChart
+              history={chartHistory}
+              predictions={previewPaths}
+              nowTime={now}
+              marketStart={chartMarketStart}
+              marketEnd={chartMarketEnd}
+              pair={pairLabel}
+              isLoading={isBenchmarksLoading}
+              error={null}
+              onViewportChange={onChartViewportChange}
+              height={520}
+              market={{
+                startTime: chartMarketStart,
+                checkpointInterval,
+                totalCheckpoints: chartTotalCheckpoints,
+              }}
+            />
+          </ChartFrame>
 
-        {/* ── AI path provider assignment ─────────────────── */}
-        <div>
-          <div className="mb-5 flex items-center justify-between">
-            <Label>AI path providers</Label>
-            <div className="flex gap-1.5">
-              {[3, 4, 5, 6, 7].map((n) => (
-                <button
-                  key={n}
-                  type="button"
+          {/* ── AI path provider assignment ─────────────────── */}
+          <div>
+            <div className="mb-5 flex items-center justify-between">
+              <Label>AI path providers</Label>
+              <div className="flex gap-1.5">
+                {[3, 4, 5, 6, 7].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    className={cn(
+                      'flex h-7 w-7 items-center justify-center rounded-full border',
+                      'text-label font-mono tracking-wide',
+                      'duration-short ease-levx transition-[border-color,color]',
+                      'cursor-pointer',
+                      n === numPaths
+                        ? 'border-ink-strong text-ink-strong'
+                        : 'border-line-strong text-ink-muted hover:border-ink hover:text-ink',
+                    )}
+                    onClick={() => setNumPaths(n)}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2" style={{ position: 'relative' }}>
+              {previewPaths.map((path, idx) => (
+                <div
+                  key={path.id}
                   className={cn(
-                    'flex h-7 w-7 items-center justify-center rounded-full border',
-                    'font-mono text-label tracking-wide',
-                    'duration-short ease-levx transition-[border-color,color]',
-                    'cursor-pointer',
-                    n === numPaths
-                      ? 'border-ink-strong text-ink-strong'
-                      : 'border-line-strong text-ink-muted hover:border-ink hover:text-ink',
+                    'relative flex items-center gap-4 rounded-lg px-4 py-2.5',
+                    'border-line border',
+                    'duration-short ease-levx transition-[border-color]',
+                    'hover:border-line-strong',
                   )}
-                  onClick={() => setNumPaths(n)}
                 >
-                  {n}
+                  <span className="text-ink-dim text-label w-5 shrink-0 font-mono">
+                    {String(idx + 1).padStart(2, '0')}
+                  </span>
+                  <span
+                    className="h-2 w-2 shrink-0 rounded-full"
+                    style={{ background: GRADIENT.css }}
+                  />
+                  <ProviderSelect
+                    value={pathProviders[idx] ?? AI_PROVIDERS[0].id}
+                    onChange={(id) => {
+                      const next = [...pathProviders]
+                      next[idx] = id
+                      setPathProviders(next)
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Market config form (right) ───────────────────── */}
+        <div>
+          {/* Start time */}
+          <Label className="mb-3">Market start</Label>
+          <div className="mb-12 flex items-end gap-3">
+            <input
+              type="datetime-local"
+              value={startTimeInput}
+              onChange={(e) => setStartTimeInput(e.target.value)}
+              min={new Date().toISOString().slice(0, 16)}
+              className={cn(
+                'border-line-strong flex-1 border-b bg-transparent py-2',
+                'text-ink-strong font-mono text-sm',
+                'focus:border-ink-strong focus:outline-none',
+              )}
+            />
+            <button
+              type="button"
+              className={cn(CHIP, CHIP_INACTIVE, 'shrink-0')}
+              onClick={() => setStartTimeInput(toLocalDatetime(Date.now() + 5 * 60 * 1000))}
+            >
+              Now + 5min
+            </button>
+          </div>
+
+          {/* Duration */}
+          <Label className="mb-3">Market duration</Label>
+          <div className="mb-12 flex items-end gap-3">
+            <input
+              type="number"
+              min={1}
+              max={durationUnit === 'years' ? 1 : durationUnit === 'months' ? 12 : 365}
+              value={durationValue}
+              onChange={(e) => setDurationValue(Math.max(1, parseInt(e.target.value) || 1))}
+              className={cn(
+                'border-line-strong w-20 border-b bg-transparent py-2 text-center',
+                'text-ink-strong font-mono text-sm',
+                'focus:border-ink-strong focus:outline-none',
+              )}
+            />
+            <div className="flex gap-2">
+              {DURATION_UNITS.map((u) => (
+                <button
+                  key={u.id}
+                  type="button"
+                  className={cn(CHIP, u.id === durationUnit ? CHIP_ACTIVE : CHIP_INACTIVE)}
+                  onClick={() => {
+                    setDurationUnit(u.id)
+                    if (u.id === 'years') setDurationValue(Math.min(durationValue, 1))
+                    if (u.id === 'months') setDurationValue(Math.min(durationValue, 12))
+                  }}
+                >
+                  {u.label}
                 </button>
               ))}
             </div>
           </div>
 
-          <div className="flex flex-col gap-2" style={{ position: 'relative' }}>
-            {previewPaths.map((path, idx) => (
-              <div
-                key={path.id}
-                className={cn(
-                  'relative flex items-center gap-4 rounded-lg px-4 py-2.5',
-                  'border border-line',
-                  'duration-short ease-levx transition-[border-color]',
-                  'hover:border-line-strong',
-                )}
-              >
-                <span className="text-ink-dim font-mono text-label w-5 shrink-0">
-                  {String(idx + 1).padStart(2, '0')}
-                </span>
-                <span
-                  className="h-2 w-2 shrink-0 rounded-full"
-                  style={{ background: GRADIENT.css }}
-                />
-                <ProviderSelect
-                  value={pathProviders[idx] ?? AI_PROVIDERS[0].id}
-                  onChange={(id) => {
-                    const next = [...pathProviders]
-                    next[idx] = id
-                    setPathProviders(next)
-                  }}
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* ── Market config form (right) ───────────────────── */}
-      <div>
-        {/* Start time */}
-        <Label className="mb-3">Market start</Label>
-        <div className="mb-12 flex items-end gap-3">
-          <input
-            type="datetime-local"
-            value={startTimeInput}
-            onChange={(e) => setStartTimeInput(e.target.value)}
-            min={new Date().toISOString().slice(0, 16)}
-            className={cn(
-              'border-line-strong flex-1 border-b bg-transparent py-2',
-              'font-mono text-sm text-ink-strong',
-              'focus:border-ink-strong focus:outline-none',
-            )}
-          />
-          <button
-            type="button"
-            className={cn(CHIP, CHIP_INACTIVE, 'shrink-0')}
-            onClick={() => setStartTimeInput(toLocalDatetime(Date.now() + 5 * 60 * 1000))}
-          >
-            Now + 5min
-          </button>
-        </div>
-
-        {/* Duration */}
-        <Label className="mb-3">Market duration</Label>
-        <div className="mb-12 flex items-end gap-3">
-          <input
-            type="number"
-            min={1}
-            max={durationUnit === 'years' ? 1 : durationUnit === 'months' ? 12 : 365}
-            value={durationValue}
-            onChange={(e) => setDurationValue(Math.max(1, parseInt(e.target.value) || 1))}
-            className={cn(
-              'border-line-strong w-20 border-b bg-transparent py-2 text-center',
-              'font-mono text-sm text-ink-strong',
-              'focus:border-ink-strong focus:outline-none',
-            )}
-          />
-          <div className="flex gap-2">
-            {DURATION_UNITS.map((u) => (
+          {/* Checkpoint interval */}
+          <Label>Checkpoint interval</Label>
+          <div className="mt-3 mb-12 flex gap-2">
+            {INTERVAL_PRESETS.map((p) => (
               <button
-                key={u.id}
+                key={p.sec}
                 type="button"
-                className={cn(CHIP, u.id === durationUnit ? CHIP_ACTIVE : CHIP_INACTIVE)}
-                onClick={() => {
-                  setDurationUnit(u.id)
-                  if (u.id === 'years') setDurationValue(Math.min(durationValue, 1))
-                  if (u.id === 'months') setDurationValue(Math.min(durationValue, 12))
-                }}
+                className={cn(CHIP, p.sec === checkpointInterval ? CHIP_ACTIVE : CHIP_INACTIVE)}
+                onClick={() => setCheckpointInterval(p.sec)}
               >
-                {u.label}
+                {p.label}
               </button>
             ))}
           </div>
+
+          {/* Protocol params */}
+          <Label className="mb-3 block">Protocol parameters</Label>
+          <div className="mb-12 grid grid-cols-2 gap-x-6 gap-y-8">
+            <div>
+              <span className="text-label text-ink-muted flex items-center font-mono uppercase">
+                Lambda
+                <InfoTip text="0 = pure LMSR pricing. Higher values blend quantum eigendecomposition, making path prices correlated based on trajectory similarity." />
+              </span>
+              <Input value={lambda} onChange={(e) => setLambda(e.target.value)} />
+            </div>
+            <div>
+              <span className="text-label text-ink-muted flex items-center font-mono uppercase">
+                Decoherence rate
+                <InfoTip text="How fast paths decay when predictions deviate from reality. 0.5 = 50% decay per checkpoint. Higher = faster elimination." />
+              </span>
+              <Input value={decoherenceRate} onChange={(e) => setDecoherenceRate(e.target.value)} />
+            </div>
+            <div>
+              <span className="text-label text-ink-muted flex items-center font-mono uppercase">
+                Min probability
+                <InfoTip text="Floor probability (0.01 = 1%). When a path's Born probability drops below this, it dissolves and its pool redistributes to survivors." />
+              </span>
+              <Input
+                value={minimumProbability}
+                onChange={(e) => setMinimumProbability(e.target.value)}
+              />
+            </div>
+            <div>
+              <span className="text-label text-ink-muted flex items-center font-mono uppercase">
+                Path max age
+                <InfoTip text="Seconds. AI paths must be submitted within this window of market start to be accepted. 1800 = 30 min. Prevents stale predictions." />
+              </span>
+              <Input value={pathMaxAge} onChange={(e) => setPathMaxAge(e.target.value)} />
+            </div>
+            <div>
+              <span className="text-label text-ink-muted flex items-center font-mono uppercase">
+                Nudge rate
+                <InfoTip text="LMSR oracle nudge fraction per checkpoint (0.05 = 5%). Zero-sum adjustment that rewards accurate paths and penalises deviating ones." />
+              </span>
+              <Input value={nudgeRate} onChange={(e) => setNudgeRate(e.target.value)} />
+            </div>
+          </div>
+
+          {/* Submit */}
+          <Button
+            variant="primary"
+            fullWidth
+            disabled={isPending || !program}
+            onClick={handleCreateMarket}
+          >
+            {isPending ? 'Creating…' : 'Create Market'}
+          </Button>
         </div>
-
-        {/* Checkpoint interval */}
-        <Label>Checkpoint interval</Label>
-        <div className="mt-3 mb-12 flex gap-2">
-          {INTERVAL_PRESETS.map((p) => (
-            <button
-              key={p.sec}
-              type="button"
-              className={cn(CHIP, p.sec === checkpointInterval ? CHIP_ACTIVE : CHIP_INACTIVE)}
-              onClick={() => setCheckpointInterval(p.sec)}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Protocol params */}
-        <Label className="block mb-3">Protocol parameters</Label>
-        <div className="mb-12 grid grid-cols-2 gap-x-6 gap-y-8">
-          <div>
-            <span className="text-label text-ink-muted font-mono uppercase flex items-center">
-              Lambda
-              <InfoTip text="0 = pure LMSR pricing. Higher values blend quantum eigendecomposition, making path prices correlated based on trajectory similarity." />
-            </span>
-            <Input value={lambda} onChange={(e) => setLambda(e.target.value)} />
-          </div>
-          <div>
-            <span className="text-label text-ink-muted font-mono uppercase flex items-center">
-              Decoherence rate
-              <InfoTip text="How fast paths decay when predictions deviate from reality. 0.5 = 50% decay per checkpoint. Higher = faster elimination." />
-            </span>
-            <Input value={decoherenceRate} onChange={(e) => setDecoherenceRate(e.target.value)} />
-          </div>
-          <div>
-            <span className="text-label text-ink-muted font-mono uppercase flex items-center">
-              Min probability
-              <InfoTip text="Floor probability (0.01 = 1%). When a path's Born probability drops below this, it dissolves and its pool redistributes to survivors." />
-            </span>
-            <Input value={minimumProbability} onChange={(e) => setMinimumProbability(e.target.value)} />
-          </div>
-          <div>
-            <span className="text-label text-ink-muted font-mono uppercase flex items-center">
-              Path max age
-              <InfoTip text="Seconds. AI paths must be submitted within this window of market start to be accepted. 1800 = 30 min. Prevents stale predictions." />
-            </span>
-            <Input value={pathMaxAge} onChange={(e) => setPathMaxAge(e.target.value)} />
-          </div>
-          <div>
-            <span className="text-label text-ink-muted font-mono uppercase flex items-center">
-              Nudge rate
-              <InfoTip text="LMSR oracle nudge fraction per checkpoint (0.05 = 5%). Zero-sum adjustment that rewards accurate paths and penalises deviating ones." />
-            </span>
-            <Input value={nudgeRate} onChange={(e) => setNudgeRate(e.target.value)} />
-          </div>
-        </div>
-
-        {/* Submit */}
-        <Button
-          variant="primary"
-          fullWidth
-          disabled={isPending || !program}
-          onClick={handleCreateMarket}
-        >
-          {isPending ? 'Creating…' : 'Create Market'}
-        </Button>
-
-      </div>
       </div>
 
       {/* ── Operator: register a new supported pair ── */}
@@ -779,7 +801,8 @@ function AddSupportedPairForm() {
     if (!program || !publicKey) return
     if (!isValidFeedIdHex(pythFeedId)) {
       toast.error('Invalid Pyth feed id', {
-        message: 'Must be exactly 64 hex characters (with optional 0x prefix). A typo would silently encode missing bytes as zero and register a broken oracle feed.',
+        message:
+          'Must be exactly 64 hex characters (with optional 0x prefix). A typo would silently encode missing bytes as zero and register a broken oracle feed.',
       })
       return
     }
@@ -823,10 +846,10 @@ function AddSupportedPairForm() {
   return (
     <section className="border-line mt-16 border-t pt-12">
       <div className="mb-6 flex items-center gap-3">
-        <h2 className="text-ink-strong font-mono text-caption font-bold tracking-wide uppercase">
+        <h2 className="text-ink-strong text-caption font-mono font-bold tracking-wide uppercase">
           Add supported pair
         </h2>
-        <span className="text-ink-dim font-mono text-caption">
+        <span className="text-ink-dim text-caption font-mono">
           Operator-only · governs `protocol_state.supported_pairs`
         </span>
       </div>
@@ -853,19 +876,13 @@ function AddSupportedPairForm() {
       <div className="mt-6 flex items-center gap-3">
         <Button
           variant="secondary"
-          disabled={
-            pending ||
-            !program ||
-            !baseMint ||
-            !quoteMint ||
-            !isValidFeedIdHex(pythFeedId)
-          }
+          disabled={pending || !program || !baseMint || !quoteMint || !isValidFeedIdHex(pythFeedId)}
           onClick={handleSubmit}
         >
           {pending ? 'Submitting…' : 'Add pair'}
         </Button>
         {pythFeedId && !isValidFeedIdHex(pythFeedId) && (
-          <span className="text-accent font-mono text-caption">
+          <span className="text-accent text-caption font-mono">
             Feed id must be 64 hex chars (optionally 0x-prefixed)
           </span>
         )}
@@ -943,24 +960,22 @@ function ManageSupportedPairsTable() {
   return (
     <section className="border-line mt-16 border-t pt-12">
       <div className="mb-6 flex items-center gap-3">
-        <h2 className="text-ink-strong font-mono text-caption font-bold tracking-wide uppercase">
+        <h2 className="text-ink-strong text-caption font-mono font-bold tracking-wide uppercase">
           Manage supported pairs
         </h2>
-        <span className="text-ink-dim font-mono text-caption">
+        <span className="text-ink-dim text-caption font-mono">
           {pairs.length} on-chain · slot indices shift on removal
         </span>
       </div>
-      {isLoading && (
-        <p className="text-ink-dim font-mono text-caption">Loading on-chain pairs…</p>
-      )}
+      {isLoading && <p className="text-ink-dim text-caption font-mono">Loading on-chain pairs…</p>}
       {!isLoading && pairs.length === 0 && (
-        <p className="text-ink-dim font-mono text-caption">
+        <p className="text-ink-dim text-caption font-mono">
           No supported pairs registered. Use the form above to add one.
         </p>
       )}
       {pairs.length > 0 && (
         <div className="border-line overflow-hidden rounded-lg border">
-          <table className="w-full font-mono text-caption">
+          <table className="text-caption w-full font-mono">
             <thead className="border-line text-ink-dim border-b">
               <tr>
                 <th className="px-4 py-3 text-left">Slot</th>
@@ -976,29 +991,31 @@ function ManageSupportedPairsTable() {
                 const isConfirming = confirmingIndex === i
                 const isThisPending = pendingIndex === i
                 return (
-                  <tr key={`${p.baseMint}-${p.quoteMint}-${i}`} className="border-line border-b last:border-b-0">
+                  <tr
+                    key={`${p.baseMint}-${p.quoteMint}-${i}`}
+                    className="border-line border-b last:border-b-0"
+                  >
                     <td className="text-ink-dim px-4 py-3">{i}</td>
                     <td className="text-ink-strong px-4 py-3">{p.label}</td>
-                    <td className="text-ink-dim px-4 py-3">{p.baseMint.slice(0, 6)}…{p.baseMint.slice(-4)}</td>
-                    <td className="text-ink-dim px-4 py-3">{p.quoteMint.slice(0, 6)}…{p.quoteMint.slice(-4)}</td>
+                    <td className="text-ink-dim px-4 py-3">
+                      {p.baseMint.slice(0, 6)}…{p.baseMint.slice(-4)}
+                    </td>
+                    <td className="text-ink-dim px-4 py-3">
+                      {p.quoteMint.slice(0, 6)}…{p.quoteMint.slice(-4)}
+                    </td>
                     <td className="text-ink-dim px-4 py-3">{p.feedIdHex.slice(0, 8)}…</td>
                     <td className="px-4 py-3 text-right">
                       <Button
                         variant={isConfirming ? 'destructive' : 'ghost'}
-                        disabled={!program || isThisPending || (pendingIndex !== null && pendingIndex !== i)}
+                        disabled={
+                          !program || isThisPending || (pendingIndex !== null && pendingIndex !== i)
+                        }
                         onClick={() => handleRemove(i)}
                       >
-                        {isThisPending
-                          ? 'Removing…'
-                          : isConfirming
-                            ? 'Confirm remove'
-                            : 'Remove'}
+                        {isThisPending ? 'Removing…' : isConfirming ? 'Confirm remove' : 'Remove'}
                       </Button>
                       {isConfirming && !isThisPending && (
-                        <Button
-                          variant="ghost"
-                          onClick={() => setConfirmingIndex(null)}
-                        >
+                        <Button variant="ghost" onClick={() => setConfirmingIndex(null)}>
                           Cancel
                         </Button>
                       )}
