@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import { DRAW_IN_FLIGHT } from '@/lib/drawing/colors'
 import { clientToChart } from '@/lib/drawing/pointer'
 import { DRAG_THRESHOLD_PX, type CheckpointCrossing, type MinimalScale } from '@/lib/drawing/types'
 import { selectValues, useDrawingStore } from '@/stores/drawingStore'
+import { DrawingOverlayRect } from '@/features/chart/drawingTools/DrawingOverlayRect'
 
 export interface SelectToolProps {
   xScale: MinimalScale
@@ -401,20 +403,16 @@ export function SelectTool({
   // re-renders don't clobber it.
   return (
     <>
-      <rect
+      <DrawingOverlayRect
         ref={overlayRef}
         x={0}
-        y={0}
         width={innerWidth}
         height={innerHeight}
-        fill="transparent"
-        style={{ touchAction: 'none' }}
+        dataTool="select"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerCancel}
-        data-testid="drawing-overlay"
-        data-tool="select"
       />
       {marquee && (() => {
         const x = Math.min(marquee.startChartX, marquee.curChartX)
@@ -427,9 +425,9 @@ export function SelectTool({
             y={y}
             width={w}
             height={h}
-            fill="#5B9BF6"
+            fill={DRAW_IN_FLIGHT}
             fillOpacity={0.08}
-            stroke="#5B9BF6"
+            stroke={DRAW_IN_FLIGHT}
             strokeWidth={1}
             strokeDasharray="3 3"
             pointerEvents="none"

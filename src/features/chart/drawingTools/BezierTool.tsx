@@ -1,10 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { sampleBezierAtCheckpoints, type BezierAnchor } from '@/lib/drawing/bezierSampling'
-import { clientToChart } from '@/lib/drawing/pointer'
+import {
+  DRAW_COMMIT_FILL,
+  DRAW_COMMIT_INK,
+  DRAW_IN_FLIGHT,
+} from '@/lib/drawing/colors'
+import { clientToChart, getFutureRegion } from '@/lib/drawing/pointer'
 import { DRAG_THRESHOLD_PX, type MinimalScale } from '@/lib/drawing/types'
 import { useBezierStore } from '@/stores/bezierStore'
 import { useDrawingStore } from '@/stores/drawingStore'
+import { DrawingOverlayRect } from '@/features/chart/drawingTools/DrawingOverlayRect'
 
 export interface BezierToolProps {
   xScale: MinimalScale
@@ -129,6 +135,16 @@ export function BezierTool({
   const commit = useCallback(() => {
     const a = useBezierStore.getState().anchors
     if (a.length < 2) return
+
+    // Phase guard — beginStroke is a no-op outside drawMode/ready, so without
+    // this check we'd push a bezier commit-history entry that the drawing
+    // store never received the corresponding values for. Cmd+Z walking over
+    // that orphan entry would then call drawingStore.undo() against a stack
+    // entry that doesn't exist, leaving the two histories permanently out of
+    // sync. Belt-and-braces — the toolbar already gates the bezier tool to
+    // non-idle phases.
+    const phase = useDrawingStore.getState().state.phase
+    if (phase !== 'drawMode' && phase !== 'ready') return
 
     const { yScale: ys } = scalesRef.current
     const dom = ys.domain()
@@ -417,8 +433,7 @@ export function BezierTool({
   // Render — derive chart-coords from domain anchors via current scales.
   // ----------------------------------------------------------------
 
-  const futureStartX = Math.max(0, Number(xScale(marketStart)))
-  const futureWidth = Math.max(0, innerWidth - futureStartX)
+  const future = getFutureRegion(xScale, marketStart, innerWidth)
 
   // Build the cubic path d attribute through committed anchors.
   function pathD(allAnchors: BezierAnchor[]): string {
@@ -485,26 +500,23 @@ export function BezierTool({
 
   return (
     <>
-      <rect
-        x={futureStartX}
-        y={0}
-        width={futureWidth}
+      <DrawingOverlayRect
+        x={future.x}
+        width={future.width}
         height={innerHeight}
-        fill="transparent"
-        style={{ touchAction: 'none', cursor: 'crosshair' }}
+        cursor="crosshair"
+        dataTool="bezier"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerCancel}
-        data-testid="drawing-overlay"
-        data-tool="bezier"
       />
 
       {/* Cubic path through committed anchors + (optionally) the in-flight one. */}
       {(anchors.length >= 1 || drag !== null) && (
         <path
           d={previewPathD()}
-          stroke="#5B9BF6"
+          stroke={DRAW_IN_FLIGHT}
           strokeWidth={2}
           fill="none"
           opacity={0.85}
@@ -530,7 +542,7 @@ export function BezierTool({
                   y1={p.y}
                   x2={p.out.x}
                   y2={p.out.y}
-                  stroke="#5B9BF6"
+                  stroke={DRAW_IN_FLIGHT}
                   strokeWidth={1}
                   opacity={0.4}
                   pointerEvents="none"
@@ -540,7 +552,7 @@ export function BezierTool({
                   y1={p.y}
                   x2={inX as number}
                   y2={inY as number}
-                  stroke="#5B9BF6"
+                  stroke={DRAW_IN_FLIGHT}
                   strokeWidth={1}
                   opacity={0.4}
                   pointerEvents="none"
@@ -551,7 +563,7 @@ export function BezierTool({
                   cy={p.out.y}
                   r={3}
                   fill="transparent"
-                  stroke="#5B9BF6"
+                  stroke={DRAW_IN_FLIGHT}
                   strokeWidth={1}
                   pointerEvents="none"
                 />
@@ -560,7 +572,7 @@ export function BezierTool({
                   cy={inY as number}
                   r={3}
                   fill="transparent"
-                  stroke="#5B9BF6"
+                  stroke={DRAW_IN_FLIGHT}
                   strokeWidth={1}
                   pointerEvents="none"
                 />
@@ -610,7 +622,7 @@ export function BezierTool({
               data-anchor-idx={i}
             />
             {/* Anchor dot (non-interactive). */}
-            <circle cx={p.x} cy={p.y} r={4} fill="#5B9BF6" pointerEvents="none" />
+            <circle cx={p.x} cy={p.y} r={4} fill={DRAW_IN_FLIGHT} pointerEvents="none" />
           </g>
         )
       })}
@@ -623,7 +635,7 @@ export function BezierTool({
             y1={drag.startChartY}
             x2={drag.handleChartX}
             y2={drag.handleChartY}
-            stroke="#5B9BF6"
+            stroke={DRAW_IN_FLIGHT}
             strokeWidth={1}
             opacity={0.4}
           />
@@ -632,7 +644,7 @@ export function BezierTool({
             y1={drag.startChartY}
             x2={2 * drag.startChartX - drag.handleChartX}
             y2={2 * drag.startChartY - drag.handleChartY}
-            stroke="#5B9BF6"
+            stroke={DRAW_IN_FLIGHT}
             strokeWidth={1}
             opacity={0.4}
           />
@@ -641,7 +653,7 @@ export function BezierTool({
             cy={drag.handleChartY}
             r={3}
             fill="transparent"
-            stroke="#5B9BF6"
+            stroke={DRAW_IN_FLIGHT}
             strokeWidth={1}
           />
           <circle
@@ -649,10 +661,10 @@ export function BezierTool({
             cy={2 * drag.startChartY - drag.handleChartY}
             r={3}
             fill="transparent"
-            stroke="#5B9BF6"
+            stroke={DRAW_IN_FLIGHT}
             strokeWidth={1}
           />
-          <circle cx={drag.startChartX} cy={drag.startChartY} r={4} fill="#5B9BF6" />
+          <circle cx={drag.startChartX} cy={drag.startChartY} r={4} fill={DRAW_IN_FLIGHT} />
         </g>
       )}
 
@@ -664,10 +676,10 @@ export function BezierTool({
           style={{ cursor: 'pointer' }}
           onClick={commit}
         >
-          <circle r={11} fill="#5CF78B" stroke="#1a1a1a" strokeWidth={1.5} />
+          <circle r={11} fill={DRAW_COMMIT_FILL} stroke={DRAW_COMMIT_INK} strokeWidth={1.5} />
           <path
             d="M -4.5 0 L -1 3.5 L 5 -3"
-            stroke="#1a1a1a"
+            stroke={DRAW_COMMIT_INK}
             strokeWidth={2}
             fill="none"
             strokeLinecap="round"

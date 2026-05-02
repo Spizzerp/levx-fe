@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef } from 'react'
 
+import { DRAW_IN_FLIGHT } from '@/lib/drawing/colors'
 import { crossingDetector } from '@/lib/drawing/crossingDetector'
-import { clientToChart } from '@/lib/drawing/pointer'
+import { clientToChart, getFutureRegion } from '@/lib/drawing/pointer'
 import type { CheckpointCrossing, MinimalScale } from '@/lib/drawing/types'
 import { useDrawingStore } from '@/stores/drawingStore'
+import { DrawingOverlayRect } from '@/features/chart/drawingTools/DrawingOverlayRect'
 
 export interface FreehandToolProps {
   xScale: MinimalScale
@@ -177,28 +179,24 @@ export function FreehandTool({
     }
   }, [onStrokeEnd])
 
-  const futureStartX = Math.max(0, Number(xScale(marketStart)))
-  const futureWidth = Math.max(0, innerWidth - futureStartX)
+  const future = getFutureRegion(xScale, marketStart, innerWidth)
 
   return (
     <>
-      <rect
-        x={futureStartX}
-        y={0}
-        width={futureWidth}
+      <DrawingOverlayRect
+        x={future.x}
+        width={future.width}
         height={innerHeight}
-        fill="transparent"
-        style={{ touchAction: 'none', cursor: 'crosshair' }}
+        cursor="crosshair"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={endStroke}
         onPointerCancel={endStroke}
         onLostPointerCapture={onLostCapture}
-        data-testid="drawing-overlay"
       />
       <path
         ref={rawStrokeRef}
-        stroke="#5B9BF6"
+        stroke={DRAW_IN_FLIGHT}
         strokeWidth={1.5}
         fill="none"
         opacity={0.6}

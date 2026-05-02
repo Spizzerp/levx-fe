@@ -4,6 +4,7 @@ import { curveCatmullRom } from '@visx/curve'
 import { selectValues, useDrawingStore } from '@/stores/drawingStore'
 import { useDrawBroadcast, usePublishDrawFrame } from '@/lib/supabase/hooks'
 import { useWalletStore } from '@/stores/walletStore'
+import { DRAW_SELECTED, DRAW_UNSELECTED } from '@/lib/drawing/colors'
 import type { MinimalScale } from '@/lib/drawing/types'
 import { BezierTool } from '@/features/chart/drawingTools/BezierTool'
 import { FreehandTool } from '@/features/chart/drawingTools/FreehandTool'
@@ -12,16 +13,6 @@ import { SelectTool } from '@/features/chart/drawingTools/SelectTool'
 
 /** Centripetal Catmull-Rom with α=0.5 — pre-created once, not per-render. */
 const CATMULL_ROM_ALPHA_05 = curveCatmullRom.alpha(0.5)
-
-/**
- * Drawing palette — picked to avoid collision with chart palette:
- *   white (#FFFFFF history/live), green (#5CF78B bull), gold (#F6CE48 neutral),
- *   red-orange (#FF483B bear/accent), light blue (#5B9BF6 custom prediction).
- * Violet → magenta sits in a hue range nothing else on the chart occupies, and
- * the cool→warm shift between unselected and selected states is a strong cue.
- */
-const DRAW_UNSELECTED = '#8B5CF6'
-const DRAW_SELECTED = '#EC4899'
 
 export interface DrawingLayerProps {
   xScale: MinimalScale
@@ -121,11 +112,13 @@ export function DrawingLayer({
   // Broadcast captured points whenever they change (no-op if no marketId / wallet).
   // Hook MUST be declared before the early return — rules of hooks.
   //
-  // Signature: length + sum of values. Sum changes whenever any value
-  // changes (modulo astronomically rare floating-point collisions on a
-  // single-checkpoint swap), and is O(n) without allocating a string.
+  // Signature: index-weighted sum so swaps between two checkpoints (which
+  // would leave a plain sum unchanged) still update the signature. O(n)
+  // without allocating a string.
   let broadcastSig = capturedPoints.length
-  for (const p of capturedPoints) broadcastSig += p.value
+  for (let i = 0; i < capturedPoints.length; i++) {
+    broadcastSig += capturedPoints[i].value * (i + 1)
+  }
   useEffect(() => {
     if (!isActive || !marketId || !selfWallet || capturedPoints.length === 0) return
     publish({
