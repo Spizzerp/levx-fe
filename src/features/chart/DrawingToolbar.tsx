@@ -14,10 +14,10 @@ interface ToolDef {
 }
 
 const TOOLS: ToolDef[] = [
+  { id: 'select', label: 'Select & Move', shortcut: 'S', Icon: MousePointer2 },
   { id: 'freehand', label: 'Freehand', shortcut: 'F', Icon: Pencil },
   { id: 'line', label: 'Line', shortcut: 'L', Icon: Slash },
   { id: 'bezier', label: 'Bezier', shortcut: 'B', Icon: PenTool },
-  { id: 'select', label: 'Select & Move', shortcut: 'S', Icon: MousePointer2 },
 ]
 
 /**
