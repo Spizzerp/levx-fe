@@ -33,20 +33,41 @@ interface DragState {
   handleDomainY: number
 }
 
-/** Identifies which handle of which committed anchor is being edited. */
-interface HandleEdit {
+/**
+ * Identifies what part of a committed anchor is currently being dragged.
+ * 'out' = stored outgoing handle. 'in' = mirrored incoming handle (we write to
+ * outHandle, mirroring across the anchor — symmetric in v1). 'anchor' = the
+ * anchor itself (handles travel with it; X snaps to nearest checkpoint).
+ */
+interface EditTarget {
   anchorIdx: number
-  /**
-   * 'out' = the stored outgoing handle. 'in' = the mirrored incoming handle —
-   * we still write to anchor.outHandle, mirroring the cursor across the anchor.
-   */
-  side: 'out' | 'in'
+  kind: 'out' | 'in' | 'anchor'
 }
 
 /** Pixel distance below which a click-drag is treated as a plain click (no handle). */
 const HANDLE_THRESHOLD_PX = 4
 /** Hit area radius for handle dots — visual is r=3, hit area generously larger. */
 const HANDLE_HIT_RADIUS = 8
+/** Hit area radius for the anchor dot — visual is r=4, hit area generously larger. */
+const ANCHOR_HIT_RADIUS = 9
+
+/** Snap a domain x to the closest checkpoint timestamp. */
+function snapToNearestCheckpoint(
+  domainX: number,
+  checkpointXs: readonly number[],
+): number {
+  if (checkpointXs.length === 0) return domainX
+  let bestIdx = 0
+  let bestDist = Math.abs(domainX - checkpointXs[0])
+  for (let i = 1; i < checkpointXs.length; i++) {
+    const d = Math.abs(domainX - checkpointXs[i])
+    if (d < bestDist) {
+      bestDist = d
+      bestIdx = i
+    }
+  }
+  return checkpointXs[bestIdx]
+}
 
 /**
  * BezierTool — Illustrator-style pen tool.
@@ -74,7 +95,7 @@ export function BezierTool({
 }: BezierToolProps) {
   const [anchors, setAnchors] = useState<BezierAnchor[]>([])
   const [drag, setDrag] = useState<DragState | null>(null)
-  const [handleEdit, setHandleEdit] = useState<HandleEdit | null>(null)
+  const [editTarget, setEditTarget] = useState<EditTarget | null>(null)
 
   // Refs for keyboard handler to read fresh values without re-binding on every state change.
   const anchorsRef = useRef(anchors)
@@ -82,9 +103,9 @@ export function BezierTool({
     anchorsRef.current = anchors
   }, [anchors])
 
-  // editRef shadows handleEdit so pointermove handlers can read fresh state
+  // editRef shadows editTarget so pointermove handlers can read fresh state
   // without waiting for a re-render — pointermove can fire before React commits.
-  const editRef = useRef<HandleEdit | null>(null)
+  const editRef = useRef<EditTarget | null>(null)
 
   const scalesRef = useRef({ xScale, yScale })
   useEffect(() => {
@@ -257,33 +278,28 @@ export function BezierTool({
   }, [])
 
   // ----------------------------------------------------------------
-  // Handle-edit pointer handlers (drag a placed anchor's handle to reshape)
+  // Component-edit pointer handlers (drag a placed anchor or its handle)
   // ----------------------------------------------------------------
 
-  const onHandlePointerDown = useCallback(
-    (
-      e: React.PointerEvent<SVGCircleElement>,
-      anchorIdx: number,
-      side: 'out' | 'in',
-    ) => {
+  const onComponentPointerDown = useCallback(
+    (e: React.PointerEvent<SVGCircleElement>, target: EditTarget) => {
       // Don't let the overlay rect's pointerdown fire and place a new anchor.
       e.stopPropagation()
       e.currentTarget.setPointerCapture(e.pointerId)
-      const next: HandleEdit = { anchorIdx, side }
-      editRef.current = next
-      setHandleEdit(next)
+      editRef.current = target
+      setEditTarget(target)
     },
     [],
   )
 
-  const onHandlePointerMove = useCallback(
+  const onComponentPointerMove = useCallback(
     (e: React.PointerEvent<SVGCircleElement>) => {
       const cur = editRef.current
       if (!cur) return
       // Pointer was released without firing pointerUp.
       if (e.buttons === 0) {
         editRef.current = null
-        setHandleEdit(null)
+        setEditTarget(null)
         return
       }
 
@@ -294,30 +310,53 @@ export function BezierTool({
       const chartY = e.clientY - svgRect.top - margin.top
 
       const { xScale: xs, yScale: ys } = scalesRef.current
-      const domainX = Number(xs.invert(chartX))
-      const domainY = Number(ys.invert(chartY))
+      const rawDomainX = Number(xs.invert(chartX))
+      const rawDomainY = Number(ys.invert(chartY))
 
       setAnchors((prev) => {
         const a = prev[cur.anchorIdx]
         if (!a) return prev
-        // For 'in' side, mirror the cursor across the anchor — outHandle stays
-        // the source of truth, with the in-handle implicit (symmetric in v1).
+
+        if (cur.kind === 'anchor') {
+          // Snap X to nearest checkpoint; Y stays continuous. Handles travel
+          // with the anchor (relative offset preserved) so symmetric handles
+          // stay symmetric.
+          const snappedX = snapToNearestCheckpoint(rawDomainX, checkpointXs)
+          const dx = snappedX - a.domainX
+          const dy = rawDomainY - a.domainY
+          const newOut = a.outHandle
+            ? {
+                domainX: a.outHandle.domainX + dx,
+                domainY: a.outHandle.domainY + dy,
+              }
+            : null
+          const next = [...prev]
+          next[cur.anchorIdx] = {
+            domainX: snappedX,
+            domainY: rawDomainY,
+            outHandle: newOut,
+          }
+          return next
+        }
+
+        // Handle drag: 'out' writes the cursor directly; 'in' mirrors across
+        // the anchor — outHandle is always the source of truth.
         const newOut =
-          cur.side === 'out'
-            ? { domainX, domainY }
+          cur.kind === 'out'
+            ? { domainX: rawDomainX, domainY: rawDomainY }
             : {
-                domainX: 2 * a.domainX - domainX,
-                domainY: 2 * a.domainY - domainY,
+                domainX: 2 * a.domainX - rawDomainX,
+                domainY: 2 * a.domainY - rawDomainY,
               }
         const next = [...prev]
         next[cur.anchorIdx] = { ...a, outHandle: newOut }
         return next
       })
     },
-    [margin.left, margin.top],
+    [checkpointXs, margin.left, margin.top],
   )
 
-  const onHandlePointerUp = useCallback(
+  const onComponentPointerUp = useCallback(
     (e: React.PointerEvent<SVGCircleElement>) => {
       try {
         e.currentTarget.releasePointerCapture(e.pointerId)
@@ -325,7 +364,7 @@ export function BezierTool({
         // already released
       }
       editRef.current = null
-      setHandleEdit(null)
+      setEditTarget(null)
     },
     [],
   )
@@ -430,12 +469,13 @@ export function BezierTool({
         />
       )}
 
-      {/* Anchor dots + handle indicators + handle hit areas. */}
+      {/* Anchor dots + handle indicators + hit areas. */}
       {anchorPx.map((p, i) => {
         const inX = p.out ? 2 * p.x - p.out.x : null
         const inY = p.out ? 2 * p.y - p.out.y : null
-        const isEditingOut = handleEdit?.anchorIdx === i && handleEdit?.side === 'out'
-        const isEditingIn = handleEdit?.anchorIdx === i && handleEdit?.side === 'in'
+        const isEditingOut = editTarget?.anchorIdx === i && editTarget?.kind === 'out'
+        const isEditingIn = editTarget?.anchorIdx === i && editTarget?.kind === 'in'
+        const isEditingAnchor = editTarget?.anchorIdx === i && editTarget?.kind === 'anchor'
         return (
           <g key={i} data-testid="bezier-anchor">
             {p.out && (
@@ -480,17 +520,17 @@ export function BezierTool({
                   strokeWidth={1}
                   pointerEvents="none"
                 />
-                {/* Hit areas — interactive, larger than the visual dot for easy targeting. */}
+                {/* Handle hit areas — larger than visual dot for easy targeting. */}
                 <circle
                   cx={p.out.x}
                   cy={p.out.y}
                   r={HANDLE_HIT_RADIUS}
                   fill="transparent"
                   style={{ cursor: isEditingOut ? 'grabbing' : 'grab' }}
-                  onPointerDown={(e) => onHandlePointerDown(e, i, 'out')}
-                  onPointerMove={onHandlePointerMove}
-                  onPointerUp={onHandlePointerUp}
-                  onPointerCancel={onHandlePointerUp}
+                  onPointerDown={(e) => onComponentPointerDown(e, { anchorIdx: i, kind: 'out' })}
+                  onPointerMove={onComponentPointerMove}
+                  onPointerUp={onComponentPointerUp}
+                  onPointerCancel={onComponentPointerUp}
                   data-testid="bezier-handle-hit"
                   data-anchor-idx={i}
                   data-side="out"
@@ -501,16 +541,30 @@ export function BezierTool({
                   r={HANDLE_HIT_RADIUS}
                   fill="transparent"
                   style={{ cursor: isEditingIn ? 'grabbing' : 'grab' }}
-                  onPointerDown={(e) => onHandlePointerDown(e, i, 'in')}
-                  onPointerMove={onHandlePointerMove}
-                  onPointerUp={onHandlePointerUp}
-                  onPointerCancel={onHandlePointerUp}
+                  onPointerDown={(e) => onComponentPointerDown(e, { anchorIdx: i, kind: 'in' })}
+                  onPointerMove={onComponentPointerMove}
+                  onPointerUp={onComponentPointerUp}
+                  onPointerCancel={onComponentPointerUp}
                   data-testid="bezier-handle-hit"
                   data-anchor-idx={i}
                   data-side="in"
                 />
               </>
             )}
+            {/* Anchor hit area — drag to reposition the anchor (X snaps to checkpoints). */}
+            <circle
+              cx={p.x}
+              cy={p.y}
+              r={ANCHOR_HIT_RADIUS}
+              fill="transparent"
+              style={{ cursor: isEditingAnchor ? 'grabbing' : 'grab' }}
+              onPointerDown={(e) => onComponentPointerDown(e, { anchorIdx: i, kind: 'anchor' })}
+              onPointerMove={onComponentPointerMove}
+              onPointerUp={onComponentPointerUp}
+              onPointerCancel={onComponentPointerUp}
+              data-testid="bezier-anchor-hit"
+              data-anchor-idx={i}
+            />
             {/* Anchor dot (non-interactive). */}
             <circle cx={p.x} cy={p.y} r={4} fill="#5B9BF6" pointerEvents="none" />
           </g>

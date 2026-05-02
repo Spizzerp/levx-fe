@@ -101,11 +101,12 @@ describe('BezierTool', () => {
 
     const anchor = container.querySelector('[data-testid="bezier-anchor"]') as SVGGElement
     expect(anchor).toBeInTheDocument()
-    // Smooth anchor renders 2 lines (handle + mirror) and 5 circles
-    // (2 visual handle dots + 2 hit-area dots + 1 anchor dot).
+    // Smooth anchor renders 2 lines (handle + mirror) and 6 circles
+    // (2 visual handle dots + 2 handle hit areas + 1 anchor hit area + 1 anchor dot).
     expect(anchor.querySelectorAll('line').length).toBe(2)
-    expect(anchor.querySelectorAll('circle').length).toBe(5)
+    expect(anchor.querySelectorAll('circle').length).toBe(6)
     expect(anchor.querySelectorAll('[data-testid="bezier-handle-hit"]').length).toBe(2)
+    expect(anchor.querySelectorAll('[data-testid="bezier-anchor-hit"]').length).toBe(1)
   })
 
   it('shows the commit ✓ button only after 2+ anchors', () => {
@@ -200,7 +201,7 @@ describe('BezierTool', () => {
     expect(useDrawingStore.getState().state.phase).toBe('ready')
   })
 
-  it('corner anchor has no handle hit areas', () => {
+  it('corner anchor has no handle hit areas but does have an anchor hit area', () => {
     const { container } = renderTool()
     const overlay = container.querySelector('[data-testid="drawing-overlay"]') as SVGRectElement
     stubOverlayMethods(overlay)
@@ -211,6 +212,99 @@ describe('BezierTool', () => {
 
     const anchor = container.querySelector('[data-testid="bezier-anchor"]') as SVGGElement
     expect(anchor.querySelectorAll('[data-testid="bezier-handle-hit"]').length).toBe(0)
+    expect(anchor.querySelectorAll('[data-testid="bezier-anchor-hit"]').length).toBe(1)
+  })
+
+  it('dragging an anchor snaps its X to the nearest checkpoint', () => {
+    const { container } = renderTool()
+    const overlay = container.querySelector('[data-testid="drawing-overlay"]') as SVGRectElement
+    stubOverlayMethods(overlay)
+
+    // Place a corner anchor at clientX=10 (well before the first checkpoint).
+    fireEvent.pointerDown(overlay, { pointerId: 1, clientX: 10, clientY: 200 })
+    fireEvent.pointerUp(overlay, { pointerId: 1, clientX: 10, clientY: 200 })
+
+    const anchorHit = container.querySelector(
+      '[data-testid="bezier-anchor-hit"]',
+    ) as SVGCircleElement
+    stubOverlayMethods(anchorHit)
+    const initialCx = Number(anchorHit.getAttribute('cx'))
+
+    // Drag the anchor to clientX≈420 (between two checkpoints) — should snap.
+    fireEvent.pointerDown(anchorHit, { pointerId: 2, clientX: initialCx, clientY: 200 })
+    fireEvent.pointerMove(anchorHit, { pointerId: 2, buttons: 1, clientX: 420, clientY: 150 })
+    fireEvent.pointerUp(anchorHit, { pointerId: 2, clientX: 420, clientY: 150 })
+
+    const after = container.querySelector(
+      '[data-testid="bezier-anchor-hit"]',
+    ) as SVGCircleElement
+    const afterCx = Number(after.getAttribute('cx'))
+    // Snapping: each checkpoint is 800/48 ≈ 16.67px apart. The cursor at 420 should
+    // snap to the nearest checkpoint pixel — within half a checkpoint width.
+    expect(Math.abs(afterCx - 420)).toBeLessThan(10)
+    // And the snapped X should align exactly with one of the checkpoint pixel positions.
+    const checkpointPxs = checkpointXs.map((t) => Number(xScale(t)))
+    expect(checkpointPxs.some((px) => Math.abs(px - afterCx) < 0.5)).toBe(true)
+    // Y is free, not snapped — should be ~150.
+    expect(Number(after.getAttribute('cy'))).toBeCloseTo(150, 0)
+  })
+
+  it('dragging an anchor moves its handles with it (preserves relative offset)', () => {
+    const { container } = renderTool()
+    const overlay = container.querySelector('[data-testid="drawing-overlay"]') as SVGRectElement
+    stubOverlayMethods(overlay)
+
+    // Smooth anchor at (100, 200) with handle dragged to (150, 180) — handle is
+    // at +50, -20 relative to the anchor.
+    fireEvent.pointerDown(overlay, { pointerId: 1, clientX: 100, clientY: 200 })
+    fireEvent.pointerMove(overlay, { pointerId: 1, buttons: 1, clientX: 150, clientY: 180 })
+    fireEvent.pointerUp(overlay, { pointerId: 1, clientX: 150, clientY: 180 })
+
+    const anchorHit = container.querySelector(
+      '[data-testid="bezier-anchor-hit"]',
+    ) as SVGCircleElement
+    const startCx = Number(anchorHit.getAttribute('cx'))
+    stubOverlayMethods(anchorHit)
+
+    // Drag anchor to a different checkpoint (around clientX=400, should snap).
+    fireEvent.pointerDown(anchorHit, { pointerId: 2, clientX: startCx, clientY: 200 })
+    fireEvent.pointerMove(anchorHit, { pointerId: 2, buttons: 1, clientX: 400, clientY: 250 })
+    fireEvent.pointerUp(anchorHit, { pointerId: 2, clientX: 400, clientY: 250 })
+
+    const anchorAfter = container.querySelector(
+      '[data-testid="bezier-anchor-hit"]',
+    ) as SVGCircleElement
+    const outHitAfter = container.querySelector(
+      '[data-testid="bezier-handle-hit"][data-side="out"]',
+    ) as SVGCircleElement
+
+    // Handle should stay +50, -20 relative to the anchor's new position.
+    const aCx = Number(anchorAfter.getAttribute('cx'))
+    const aCy = Number(anchorAfter.getAttribute('cy'))
+    const oCx = Number(outHitAfter.getAttribute('cx'))
+    const oCy = Number(outHitAfter.getAttribute('cy'))
+    expect(oCx - aCx).toBeCloseTo(50, 5)
+    expect(oCy - aCy).toBeCloseTo(-20, 5)
+  })
+
+  it('anchor drag does not place a new anchor (stopPropagation)', () => {
+    const { container } = renderTool()
+    const overlay = container.querySelector('[data-testid="drawing-overlay"]') as SVGRectElement
+    stubOverlayMethods(overlay)
+
+    fireEvent.pointerDown(overlay, { pointerId: 1, clientX: 100, clientY: 200 })
+    fireEvent.pointerUp(overlay, { pointerId: 1, clientX: 100, clientY: 200 })
+    expect(container.querySelectorAll('[data-testid="bezier-anchor"]').length).toBe(1)
+
+    const anchorHit = container.querySelector(
+      '[data-testid="bezier-anchor-hit"]',
+    ) as SVGCircleElement
+    stubOverlayMethods(anchorHit)
+    fireEvent.pointerDown(anchorHit, { pointerId: 2, clientX: 100, clientY: 200 })
+    fireEvent.pointerUp(anchorHit, { pointerId: 2, clientX: 100, clientY: 200 })
+
+    // Still one anchor — the drag did not propagate to the rect.
+    expect(container.querySelectorAll('[data-testid="bezier-anchor"]').length).toBe(1)
   })
 
   it('dragging the out-handle updates the anchor outHandle and reshapes the path', () => {
