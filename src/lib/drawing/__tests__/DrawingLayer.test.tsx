@@ -221,7 +221,7 @@ describe('DrawingLayer', () => {
     expect(labels[1].textContent).toBe('140')
   })
 
-  it('selected checkpoint dots are filled, unselected are stroke-only', () => {
+  it('selected checkpoint dots use the accent fill, unselected use the ink-strong fill', () => {
     const vals = new Array(totalCheckpoints).fill(null) as (number | null)[]
     vals[5] = 150
     vals[10] = 160
@@ -241,8 +241,8 @@ describe('DrawingLayer', () => {
 
     const selectedCircle = selected!.querySelector('circle') as SVGCircleElement
     const unselectedCircle = unselected!.querySelector('circle') as SVGCircleElement
-    expect(selectedCircle.getAttribute('fill')).toBe('#5B9BF6')
-    expect(unselectedCircle.getAttribute('fill')).toBe('transparent')
+    expect(selectedCircle.getAttribute('fill')).toBe('#EC4899')
+    expect(unselectedCircle.getAttribute('fill')).toBe('#8B5CF6')
   })
 
   it('fades raw stroke to opacity 0 after pointerup', async () => {

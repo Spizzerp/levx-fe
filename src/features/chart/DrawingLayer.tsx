@@ -13,6 +13,16 @@ import { SelectTool } from '@/features/chart/drawingTools/SelectTool'
 const CATMULL_ROM_ALPHA_05 = curveCatmullRom.alpha(0.5)
 
 /**
+ * Drawing palette — picked to avoid collision with chart palette:
+ *   white (#FFFFFF history/live), green (#5CF78B bull), gold (#F6CE48 neutral),
+ *   red-orange (#FF483B bear/accent), light blue (#5B9BF6 custom prediction).
+ * Violet → magenta sits in a hue range nothing else on the chart occupies, and
+ * the cool→warm shift between unselected and selected states is a strong cue.
+ */
+const DRAW_UNSELECTED = '#8B5CF6'
+const DRAW_SELECTED = '#EC4899'
+
+/**
  * Stable empty values array — returned by the Zustand selector when the drawing
  * state has no values field (e.g. idle, submitted). Using a module-level constant
  * prevents the selector from returning a new [] reference each invocation, which
@@ -53,6 +63,8 @@ interface CapturedPoint {
   time: number
   /** Domain price (checkpoint Y captured value). */
   value: number
+  /** Original checkpoint index in the store's values array — needed to test selection. */
+  index: number
 }
 
 /**
@@ -110,8 +122,27 @@ export function DrawingLayer({
   for (let i = 0; i < values.length; i++) {
     const v = values[i]
     if (v !== null && checkpointXs[i] !== undefined) {
-      capturedPoints.push({ time: checkpointXs[i], value: v })
+      capturedPoints.push({ time: checkpointXs[i], value: v, index: i })
     }
+  }
+
+  // Maximal runs of consecutive captured points whose original checkpoint
+  // indices are all in selectedIndices. Each run of length ≥ 2 contains at
+  // least one selected edge (an edge connects two consecutive captured points;
+  // an edge is "selected" iff both endpoints are in selectedIndices).
+  // Rendered as overlay sub-curves on top of the base curve.
+  const selectedRuns: CapturedPoint[][] = []
+  {
+    let run: CapturedPoint[] = []
+    for (const p of capturedPoints) {
+      if (selectedIndices.has(p.index)) {
+        run.push(p)
+      } else {
+        if (run.length >= 2) selectedRuns.push(run)
+        run = []
+      }
+    }
+    if (run.length >= 2) selectedRuns.push(run)
   }
 
   // Broadcast captured points whenever they change (no-op if no marketId / wallet).
@@ -195,13 +226,35 @@ export function DrawingLayer({
           x={(d) => Number(xScale(d.time))}
           y={(d) => Number(yScale(d.value))}
           curve={CATMULL_ROM_ALPHA_05}
-          stroke="#5B9BF6"
+          stroke={DRAW_UNSELECTED}
           strokeWidth={2}
           fill="none"
           pointerEvents="none"
           data-testid="smoothed-curve"
         />
       )}
+
+      {/* Overlay sub-curves over runs of consecutive selected captured points.
+          Re-uses the same Catmull-Rom curve so each segment between two
+          selected nodes renders in the selected color. Slight geometry
+          deviation can occur at run boundaries (the sub-curve uses ghost
+          endpoints from the run's first/last points instead of the underlying
+          curve's neighbours) — sub-pixel for typical curves. */}
+      {selectedRuns.map((run, idx) => (
+        <LinePath<CapturedPoint>
+          key={`sel-${run[0].index}-${run[run.length - 1].index}`}
+          data={run}
+          x={(d) => Number(xScale(d.time))}
+          y={(d) => Number(yScale(d.value))}
+          curve={CATMULL_ROM_ALPHA_05}
+          stroke={DRAW_SELECTED}
+          strokeWidth={2}
+          fill="none"
+          pointerEvents="none"
+          data-testid="selected-segment"
+          data-run-index={idx}
+        />
+      ))}
 
       {/* Ghost paths from other authenticated users currently drawing on this market. */}
       {Object.values(liveDraws).map((frame) => (
@@ -224,6 +277,8 @@ export function DrawingLayer({
       ))}
 
       {/* Checkpoint dots — one per non-null value.
+          Radius adapts to viewport zoom: when checkpoints are densely packed
+          (zoomed out), dots shrink so they don't merge into a thick line.
           Price labels only on the global max and min of the drawn path. */}
       {(() => {
         let globalMax = -Infinity
@@ -236,6 +291,16 @@ export function DrawingLayer({
           if (v > globalMax) { globalMax = v; maxIdx = i }
           if (v < globalMin) { globalMin = v; minIdx = i }
         }
+
+        // Pixel spacing between adjacent checkpoints (constant — checkpoints
+        // are evenly spaced in time). Falls back to a comfortable default when
+        // fewer than two checkpoints exist.
+        const checkpointPixelSpacing = checkpointXs.length >= 2
+          ? Math.abs(Number(xScale(checkpointXs[1])) - Number(xScale(checkpointXs[0])))
+          : 16
+        // Cap visual diameter to ~2/3 of spacing so adjacent dots stay
+        // visually separate; clamp to a sensible min/max.
+        const dotRadius = Math.max(1, Math.min(4, checkpointPixelSpacing / 3))
 
         return values.map((v, i) => {
           if (v === null || checkpointXs[i] === undefined) return null
@@ -254,10 +319,8 @@ export function DrawingLayer({
               <circle
                 cx={cx}
                 cy={cy}
-                r={4}
-                fill={isSelected ? '#5B9BF6' : 'transparent'}
-                stroke="#5B9BF6"
-                strokeWidth={1.5}
+                r={dotRadius}
+                fill={isSelected ? DRAW_SELECTED : DRAW_UNSELECTED}
               />
               {showLabel && (
                 <text
