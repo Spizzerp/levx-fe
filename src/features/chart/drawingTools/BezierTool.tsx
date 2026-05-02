@@ -1,15 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { sampleBezierAtCheckpoints, type BezierAnchor } from '@/lib/drawing/bezierSampling'
+import { clientToChart } from '@/lib/drawing/pointer'
+import { DRAG_THRESHOLD_PX, type MinimalScale } from '@/lib/drawing/types'
 import { useBezierStore } from '@/stores/bezierStore'
 import { useDrawingStore } from '@/stores/drawingStore'
-
-interface MinimalScale {
-  (v: number | Date): number
-  invert(pixel: number): number | Date
-  domain(): readonly (number | Date)[]
-  range(): readonly number[]
-}
 
 export interface BezierToolProps {
   xScale: MinimalScale
@@ -45,8 +40,6 @@ interface EditTarget {
   kind: 'out' | 'in' | 'anchor'
 }
 
-/** Pixel distance below which a click-drag is treated as a plain click (no handle). */
-const HANDLE_THRESHOLD_PX = 4
 /** Hit area radius for handle dots — visual is r=3, hit area generously larger. */
 const HANDLE_HIT_RADIUS = 8
 /** Hit area radius for the anchor dot — visual is r=4, hit area generously larger. */
@@ -116,6 +109,13 @@ export function BezierTool({
 
   // Reset bezier authoring state when the tool unmounts (tool switch / exit
   // draw mode). Keeps the v1 "switch cancels in-progress" rule.
+  //
+  // Known limitation: this also wipes bezier history. If the user commits a
+  // bezier path then switches tools, a Cmd+Z that walks back into the
+  // bezier-commit values change will revert the values but cannot restore the
+  // anchor authoring state — bezier.past was reset on unmount. The values
+  // change is still undoable via drawingStore.undo(); only the anchor-edit
+  // granularity is lost across tool switches.
   useEffect(() => {
     return () => {
       useBezierStore.getState().reset()
@@ -151,14 +151,24 @@ export function BezierTool({
   }, [checkpointXs, onStrokeStart, onStrokeEnd])
 
   const cancel = useCallback(() => {
-    const before = useBezierStore.getState().anchors
+    // If a component drag is in progress, the live anchors hold transient
+    // mid-gesture state. Use the pre-drag snapshot as 'before' so undo
+    // restores the pre-drag shape, not the half-finished one.
+    const live = useBezierStore.getState().anchors
+    const before = preEditRef.current ?? live
     if (before.length === 0) {
       // Nothing to undo. Just clear transient drag state.
       setDrag(null)
+      preEditRef.current = null
+      editRef.current = null
+      setEditTarget(null)
       return
     }
     useBezierStore.getState().pushEdit(before, [])
     setDrag(null)
+    preEditRef.current = null
+    editRef.current = null
+    setEditTarget(null)
   }, [])
 
   // ----------------------------------------------------------------
@@ -204,11 +214,9 @@ export function BezierTool({
     (e: React.PointerEvent<SVGRectElement>) => {
       if (e.button === 1 || e.button === 2) return
 
-      const svg = (e.currentTarget as SVGElement).ownerSVGElement
-      if (!svg) return
-      const svgRect = svg.getBoundingClientRect()
-      const chartX = e.clientX - svgRect.left - margin.left
-      const chartY = e.clientY - svgRect.top - margin.top
+      const pos = clientToChart(e, margin)
+      if (!pos) return
+      const { chartX, chartY } = pos
 
       const { xScale: xs, yScale: ys } = scalesRef.current
       const domainX = Number(xs.invert(chartX))
@@ -237,11 +245,9 @@ export function BezierTool({
       if (drag === null) return
       if (e.buttons === 0) return
 
-      const svg = (e.currentTarget as SVGElement).ownerSVGElement
-      if (!svg) return
-      const svgRect = svg.getBoundingClientRect()
-      const chartX = e.clientX - svgRect.left - margin.left
-      const chartY = e.clientY - svgRect.top - margin.top
+      const pos = clientToChart(e, margin)
+      if (!pos) return
+      const { chartX, chartY } = pos
 
       const { xScale: xs, yScale: ys } = scalesRef.current
       const domainX = Number(xs.invert(chartX))
@@ -272,7 +278,7 @@ export function BezierTool({
         d.handleChartX - d.startChartX,
         d.handleChartY - d.startChartY,
       )
-      const isCorner = dragPx < HANDLE_THRESHOLD_PX
+      const isCorner = dragPx < DRAG_THRESHOLD_PX
 
       const newAnchor: BezierAnchor = {
         domainX: d.startDomainX,
@@ -320,19 +326,24 @@ export function BezierTool({
     (e: React.PointerEvent<SVGCircleElement>) => {
       const cur = editRef.current
       if (!cur) return
-      // Pointer was released without firing pointerUp.
+      // Pointer was released without firing pointerUp (e.g. pointer left the
+      // SVG and the OS dropped capture). Push a single history entry for the
+      // gesture so the transient anchor change remains undoable.
       if (e.buttons === 0) {
+        const before = preEditRef.current
+        const after = useBezierStore.getState().anchors
+        if (before !== null && before !== after) {
+          useBezierStore.getState().pushEdit(before, after)
+        }
         editRef.current = null
         setEditTarget(null)
         preEditRef.current = null
         return
       }
 
-      const svg = (e.currentTarget as SVGElement).ownerSVGElement
-      if (!svg) return
-      const svgRect = svg.getBoundingClientRect()
-      const chartX = e.clientX - svgRect.left - margin.left
-      const chartY = e.clientY - svgRect.top - margin.top
+      const pos = clientToChart(e, margin)
+      if (!pos) return
+      const { chartX, chartY } = pos
 
       const { xScale: xs, yScale: ys } = scalesRef.current
       const rawDomainX = Number(xs.invert(chartX))
@@ -385,8 +396,11 @@ export function BezierTool({
       } catch {
         // already released
       }
-      // Push one history entry for the whole gesture, but only if anchors
-      // actually changed (e.g. a click without drag is a no-op).
+      // Push one history entry for the whole gesture. Every pointermove
+      // allocates a new anchors array via setAnchors, so before !== after
+      // by reference whenever pointermove fired at least once. A click
+      // without drag never triggers setAnchors → references stay equal →
+      // skip the push (no-op gesture, nothing to undo).
       const before = preEditRef.current
       const after = useBezierStore.getState().anchors
       if (before !== null && before !== after) {

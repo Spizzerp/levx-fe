@@ -1,14 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import type { CheckpointCrossing } from '@/lib/drawing/types'
-import { useDrawingStore } from '@/stores/drawingStore'
-
-interface MinimalScale {
-  (v: number | Date): number
-  invert(pixel: number): number | Date
-  domain(): readonly (number | Date)[]
-  range(): readonly number[]
-}
+import { clientToChart } from '@/lib/drawing/pointer'
+import { DRAG_THRESHOLD_PX, type CheckpointCrossing, type MinimalScale } from '@/lib/drawing/types'
+import { selectValues, useDrawingStore } from '@/stores/drawingStore'
 
 export interface SelectToolProps {
   xScale: MinimalScale
@@ -25,11 +19,8 @@ export interface SelectToolProps {
 /** Pixel radius for hit-testing a checkpoint dot under the pointer. Matches
  *  the BezierTool anchor hit area for consistency. */
 const DOT_HIT_RADIUS = 9
-
-/** Minimum marquee diagonal in px before we treat the gesture as a drag.
- *  Below this, pointerup with no dot hit is treated as a click on empty
- *  space → clears selection. */
-const MARQUEE_MIN_PX = 4
+/** Squared form for cheap distance comparisons inside hover-rate handlers. */
+const DOT_HIT_RADIUS_SQ = DOT_HIT_RADIUS * DOT_HIT_RADIUS
 
 /** How a marquee gesture combines its enclosed indices with the existing
  *  selection on pointerup. Set at pointerdown from shift/alt modifiers and
@@ -123,18 +114,18 @@ export function SelectTool({
 
   const hitTestDot = useCallback(
     (chartX: number, chartY: number): number => {
-      const values = readValues()
+      const values = selectValues(useDrawingStore.getState().state)
       const { xScale: xs, yScale: ys } = scalesRef.current
       let bestIdx = -1
-      let bestDist = DOT_HIT_RADIUS
+      let bestDistSq = DOT_HIT_RADIUS_SQ
       for (let i = 0; i < values.length; i++) {
         const v = values[i]
         if (v === null || checkpointXs[i] === undefined) continue
         const dx = chartX - Number(xs(checkpointXs[i]))
         const dy = chartY - Number(ys(v))
-        const d = Math.hypot(dx, dy)
-        if (d <= bestDist) {
-          bestDist = d
+        const dSq = dx * dx + dy * dy
+        if (dSq <= bestDistSq) {
+          bestDistSq = dSq
           bestIdx = i
         }
       }
@@ -151,11 +142,9 @@ export function SelectTool({
     (e: React.PointerEvent<SVGRectElement>) => {
       if (e.button === 1 || e.button === 2) return
 
-      const svg = (e.currentTarget as SVGElement).ownerSVGElement
-      if (!svg) return
-      const svgRect = svg.getBoundingClientRect()
-      const chartX = e.clientX - svgRect.left - margin.left
-      const chartY = e.clientY - svgRect.top - margin.top
+      const pos = clientToChart(e, margin)
+      if (!pos) return
+      const { chartX, chartY } = pos
 
       const hitIdx = hitTestDot(chartX, chartY)
       const shift = e.shiftKey
@@ -201,7 +190,7 @@ export function SelectTool({
 
         // Filter to indices with non-null values (defensive — a stale index
         // pointing at null after undo can't be moved).
-        const values = readValues()
+        const values = selectValues(useDrawingStore.getState().state)
         movable = movable.filter((i) => i >= 0 && i < values.length && values[i] !== null)
         if (movable.length === 0) return
 
@@ -258,11 +247,9 @@ export function SelectTool({
 
   const onPointerMove = useCallback(
     (e: React.PointerEvent<SVGRectElement>) => {
-      const svg = (e.currentTarget as SVGElement).ownerSVGElement
-      if (!svg) return
-      const svgRect = svg.getBoundingClientRect()
-      const chartX = e.clientX - svgRect.left - margin.left
-      const chartY = e.clientY - svgRect.top - margin.top
+      const pos = clientToChart(e, margin)
+      if (!pos) return
+      const { chartX, chartY } = pos
 
       const move = moveRef.current
       const mq = marquee
@@ -342,7 +329,7 @@ export function SelectTool({
       const dy = mq.curChartY - mq.startChartY
       const dragPx = Math.hypot(dx, dy)
 
-      if (dragPx < MARQUEE_MIN_PX) {
+      if (dragPx < DRAG_THRESHOLD_PX) {
         // Click on empty space. With a modifier held, leave selection
         // alone — the user is shift/alt-clicking with no drag, which has no
         // meaningful selection effect. Plain click clears selection.
@@ -357,7 +344,7 @@ export function SelectTool({
       const y1 = Math.min(mq.startChartY, mq.curChartY)
       const y2 = Math.max(mq.startChartY, mq.curChartY)
 
-      const values = readValues()
+      const values = selectValues(useDrawingStore.getState().state)
       const { xScale: xs, yScale: ys } = scalesRef.current
       const inside = new Set<number>()
       for (let i = 0; i < values.length; i++) {
@@ -452,19 +439,4 @@ export function SelectTool({
       })()}
     </>
   )
-}
-
-/** Read the current values array out of the store, regardless of phase. */
-function readValues(): (number | null)[] {
-  const st = useDrawingStore.getState().state
-  if (
-    st.phase === 'drawMode' ||
-    st.phase === 'sweeping' ||
-    st.phase === 'ready' ||
-    st.phase === 'confirming' ||
-    st.phase === 'error'
-  ) {
-    return st.values as (number | null)[]
-  }
-  return []
 }

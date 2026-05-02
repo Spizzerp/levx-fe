@@ -1,9 +1,10 @@
 import { useEffect } from 'react'
 import { LinePath } from '@visx/shape'
 import { curveCatmullRom } from '@visx/curve'
-import { useDrawingStore } from '@/stores/drawingStore'
+import { selectValues, useDrawingStore } from '@/stores/drawingStore'
 import { useDrawBroadcast, usePublishDrawFrame } from '@/lib/supabase/hooks'
 import { useWalletStore } from '@/stores/walletStore'
+import type { MinimalScale } from '@/lib/drawing/types'
 import { BezierTool } from '@/features/chart/drawingTools/BezierTool'
 import { FreehandTool } from '@/features/chart/drawingTools/FreehandTool'
 import { LineTool } from '@/features/chart/drawingTools/LineTool'
@@ -21,22 +22,6 @@ const CATMULL_ROM_ALPHA_05 = curveCatmullRom.alpha(0.5)
  */
 const DRAW_UNSELECTED = '#8B5CF6'
 const DRAW_SELECTED = '#EC4899'
-
-/**
- * Stable empty values array — returned by the Zustand selector when the drawing
- * state has no values field (e.g. idle, submitted). Using a module-level constant
- * prevents the selector from returning a new [] reference each invocation, which
- * would otherwise cause infinite Zustand re-render loops.
- */
-const EMPTY_VALUES: (number | null)[] = []
-
-// Minimal scale interface — see FreehandTool for rationale.
-interface MinimalScale {
-  (v: number | Date): number
-  invert(pixel: number): number | Date
-  domain(): readonly (number | Date)[]
-  range(): readonly number[]
-}
 
 export interface DrawingLayerProps {
   xScale: MinimalScale
@@ -99,19 +84,7 @@ export function DrawingLayer({
   const phase = useDrawingStore((s) => s.state.phase)
   const activeTool = useDrawingStore((s) => s.activeTool)
   const selectedIndices = useDrawingStore((s) => s.selectedIndices)
-  const values = useDrawingStore((s) => {
-    const st = s.state
-    if (
-      st.phase === 'drawMode' ||
-      st.phase === 'sweeping' ||
-      st.phase === 'ready' ||
-      st.phase === 'confirming' ||
-      st.phase === 'error'
-    ) {
-      return st.values as (number | null)[]
-    }
-    return EMPTY_VALUES
-  })
+  const values = useDrawingStore((s) => selectValues(s.state))
 
   const isActive = phase !== 'idle'
 
@@ -147,7 +120,12 @@ export function DrawingLayer({
 
   // Broadcast captured points whenever they change (no-op if no marketId / wallet).
   // Hook MUST be declared before the early return — rules of hooks.
-  const broadcastSig = capturedPoints.map((p) => p.value).join(',')
+  //
+  // Signature: length + sum of values. Sum changes whenever any value
+  // changes (modulo astronomically rare floating-point collisions on a
+  // single-checkpoint swap), and is O(n) without allocating a string.
+  let broadcastSig = capturedPoints.length
+  for (const p of capturedPoints) broadcastSig += p.value
   useEffect(() => {
     if (!isActive || !marketId || !selfWallet || capturedPoints.length === 0) return
     publish({
@@ -156,7 +134,7 @@ export function DrawingLayer({
       timestamp: Date.now(),
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isActive, marketId, selfWallet, capturedPoints.length, broadcastSig])
+  }, [isActive, marketId, selfWallet, broadcastSig])
 
   if (!isActive) return null
 

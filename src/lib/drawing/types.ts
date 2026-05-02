@@ -17,6 +17,25 @@ export interface CheckpointCrossing {
 }
 
 /**
+ * Minimal scale interface satisfied by both Visx ScaleTime and ScaleLinear.
+ * Avoids d3-scale type gymnastics — domain() can return Date[] or number[],
+ * so we widen to (number | Date)[] and let callers `Number(x)` as needed.
+ */
+export interface MinimalScale {
+  (v: number | Date): number
+  invert(pixel: number): number | Date
+  domain(): readonly (number | Date)[]
+  range(): readonly number[]
+}
+
+/**
+ * Pixel distance below which a pointer drag is treated as a stationary click.
+ * Used by BezierTool (corner anchor vs handle drag) and SelectTool (marquee
+ * vs empty-space click). Same value, same intent.
+ */
+export const DRAG_THRESHOLD_PX = 4
+
+/**
  * Authoring tool selected in the floating drawing toolbar.
  * Each tool produces checkpoint y-values via the same store actions, but
  * differs in how the user inputs them (sweep, click anchors, drag handles…).
@@ -33,6 +52,22 @@ export type DrawingPhase =
   | { phase: 'submitted'; txSig: string }
   | { phase: 'error'; message: string; values: number[] }
 
+/**
+ * One entry on the unified undo/redo stack.
+ *
+ * Two kinds are interleaved chronologically:
+ * - `values` — pre-stroke snapshot pushed by `beginStroke()`.
+ * - `selection` — pre-mutation selection pushed by `setSelectedIndices` /
+ *   `clearSelectedIndices` whenever the new selection differs from the
+ *   current one.
+ *
+ * `undo()` pops the most recent entry regardless of kind so Cmd+Z feels
+ * like one merged history. `redo()` is symmetric.
+ */
+export type HistoryEntry =
+  | { kind: 'values'; values: (number | null)[] }
+  | { kind: 'selection'; selection: ReadonlySet<number> }
+
 /** Shape of the full Zustand drawing store slice (actions + state). */
 export interface DrawingStore {
   state: DrawingPhase
@@ -41,22 +76,23 @@ export interface DrawingStore {
   /**
    * Indices of checkpoints currently selected via the SelectTool. Persists
    * across tool switches but is cleared on enterDrawMode / reset / exit /
-   * onTxSuccess. Stale indices (pointing to null values after undo) are
-   * silently filtered at render — the store does not try to keep this in
-   * sync with values changes.
+   * onTxSuccess. Defensively pruned in `undo`/`redo` to drop indices whose
+   * value is null in the restored snapshot.
    */
   selectedIndices: ReadonlySet<number>
   /**
-   * Stack of `values` snapshots captured at each `beginStroke`. Most recent
-   * snapshot is at the end. `undo()` pops and restores. Bounded depth.
+   * Unified chronological history. Each entry is either a values snapshot
+   * (pushed by `beginStroke`) or a selection snapshot (pushed by
+   * `setSelectedIndices` / `clearSelectedIndices`). Most recent at the end.
+   * `undo()` pops the top entry regardless of kind. Bounded depth.
    */
-  undoStack: (number | null)[][]
+  undoStack: HistoryEntry[]
   /**
-   * Counterpart to undoStack — populated by `undo()` (it pushes the current
-   * values before restoring) and consumed by `redo()`. Cleared whenever a
-   * fresh stroke begins (the future has been overwritten).
+   * Counterpart to undoStack — populated by `undo()` (pushes the current
+   * state of the entry's kind before restoring) and consumed by `redo()`.
+   * Cleared whenever a fresh action branches the history.
    */
-  redoStack: (number | null)[][]
+  redoStack: HistoryEntry[]
   enterDrawMode: (totalCheckpoints: number) => void
   beginStroke: () => void
   setCheckpointValues: (crossings: CheckpointCrossing[]) => void

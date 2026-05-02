@@ -250,8 +250,10 @@ describe('SelectTool', () => {
     expect(sel.has(5)).toBe(true)
     expect(sel.has(10)).toBe(true)
     expect(sel.size).toBe(2)
-    // No drag → no undo entry.
-    expect(useDrawingStore.getState().undoStack).toHaveLength(0)
+    // Selection change pushes one entry on the unified stack (no drag → no values entry).
+    const stack = useDrawingStore.getState().undoStack
+    expect(stack).toHaveLength(1)
+    expect(stack[0]).toEqual({ kind: 'selection', selection: new Set([5]) })
   })
 
   it('alt+click on a selected dot removes it from the selection', () => {

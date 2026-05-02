@@ -215,12 +215,12 @@ describe('drawingStore', () => {
       expect(useDrawingStore.getState().undoStack).toEqual([])
     })
 
-    it('beginStroke pushes a snapshot of values onto undoStack', () => {
+    it('beginStroke pushes a values snapshot onto undoStack', () => {
       useDrawingStore.getState().enterDrawMode(3)
       useDrawingStore.getState().beginStroke()
       const stack = useDrawingStore.getState().undoStack
       expect(stack).toHaveLength(1)
-      expect(stack[0]).toEqual([null, null, null])
+      expect(stack[0]).toEqual({ kind: 'values', values: [null, null, null] })
     })
 
     it('two strokes push two snapshots in order', () => {
@@ -235,8 +235,8 @@ describe('drawingStore', () => {
       useDrawingStore.getState().beginStroke() // re-enter sweeping
       const stack = useDrawingStore.getState().undoStack
       expect(stack).toHaveLength(2)
-      expect(stack[0]).toEqual([null, null, null])
-      expect(stack[1]).toEqual([100, 110, 120])
+      expect(stack[0]).toEqual({ kind: 'values', values: [null, null, null] })
+      expect(stack[1]).toEqual({ kind: 'values', values: [100, 110, 120] })
     })
 
     it('undo restores values to the most recent snapshot and pops the stack', () => {
@@ -314,6 +314,25 @@ describe('drawingStore', () => {
       expect(useDrawingStore.getState().undoStack).toEqual([])
     })
 
+    it('undo over a values entry prunes selection indices that become null', () => {
+      // Defensive prune — direct state injection so we can simulate selection
+      // surviving a values rewind in scenarios that bypass the queue
+      // (e.g. test setup, future code paths). Normal user flows go through
+      // the unified stack and undo selection chronologically first.
+      useDrawingStore.setState({
+        state: { phase: 'ready', values: [100, 110, 120] },
+        totalCheckpoints: 3,
+        undoStack: [{ kind: 'values', values: [100, null, null] }],
+        redoStack: [],
+        selectedIndices: new Set([0, 1, 2]),
+      })
+
+      useDrawingStore.getState().undo()
+
+      // Only index 0 survives the rewind → selection pruned to {0}.
+      expect(useDrawingStore.getState().selectedIndices).toEqual(new Set([0]))
+    })
+
     it('undoStack depth is capped at 50', () => {
       useDrawingStore.getState().enterDrawMode(2)
       // 60 strokes, each just begin+end without committing values stays in drawMode
@@ -336,7 +355,9 @@ describe('drawingStore', () => {
       ])
       useDrawingStore.getState().endStroke() // → ready
       useDrawingStore.getState().undo()
-      expect(useDrawingStore.getState().redoStack).toEqual([[100, 110, 120]])
+      expect(useDrawingStore.getState().redoStack).toEqual([
+        { kind: 'values', values: [100, 110, 120] },
+      ])
     })
 
     it('redo restores the most recently undone state', () => {
@@ -421,6 +442,23 @@ describe('drawingStore', () => {
       expect(state.values).toEqual([200, 210, 220])
     })
 
+    it('redo over a values entry prunes selection indices still null in the restored snapshot', () => {
+      // Same defensive guard as undo; direct injection avoids the chronology
+      // tangling that comes from selection mutations branching the redo
+      // future.
+      useDrawingStore.setState({
+        state: { phase: 'drawMode', values: [null, null, null] },
+        totalCheckpoints: 3,
+        undoStack: [],
+        redoStack: [{ kind: 'values', values: [100, null, null] }],
+        selectedIndices: new Set([0, 1, 2]),
+      })
+
+      useDrawingStore.getState().redo()
+
+      expect(useDrawingStore.getState().selectedIndices).toEqual(new Set([0]))
+    })
+
     it('reset clears redoStack', () => {
       useDrawingStore.getState().enterDrawMode(3)
       useDrawingStore.getState().beginStroke()
@@ -437,6 +475,99 @@ describe('drawingStore', () => {
       useDrawingStore.getState().endStroke()
       useDrawingStore.getState().undo()
       useDrawingStore.getState().exitDrawMode()
+      expect(useDrawingStore.getState().redoStack).toEqual([])
+    })
+  })
+
+  describe('unified history (selection + values)', () => {
+    it('setSelectedIndices pushes a selection entry capturing the prior selection', () => {
+      useDrawingStore.getState().enterDrawMode(3)
+      useDrawingStore.getState().setSelectedIndices(new Set([0, 1]))
+      const stack = useDrawingStore.getState().undoStack
+      expect(stack).toHaveLength(1)
+      expect(stack[0]).toEqual({ kind: 'selection', selection: new Set() })
+    })
+
+    it('setSelectedIndices is a noop when content is identical', () => {
+      useDrawingStore.getState().enterDrawMode(3)
+      useDrawingStore.getState().setSelectedIndices(new Set([0, 1]))
+      // Same content, different reference — should NOT push.
+      useDrawingStore.getState().setSelectedIndices(new Set([0, 1]))
+      expect(useDrawingStore.getState().undoStack).toHaveLength(1)
+    })
+
+    it('clearSelectedIndices pushes an entry only when selection was non-empty', () => {
+      useDrawingStore.getState().enterDrawMode(3)
+      useDrawingStore.getState().clearSelectedIndices()
+      expect(useDrawingStore.getState().undoStack).toEqual([])
+
+      useDrawingStore.getState().setSelectedIndices(new Set([2]))
+      useDrawingStore.getState().clearSelectedIndices()
+      // setSelectedIndices push + clearSelectedIndices push = 2 entries.
+      expect(useDrawingStore.getState().undoStack).toHaveLength(2)
+    })
+
+    it('Cmd+Z chronological order: undoes selection then preceding stroke', () => {
+      useDrawingStore.getState().enterDrawMode(3)
+      // Stroke first.
+      useDrawingStore.getState().beginStroke()
+      useDrawingStore.getState().setCheckpointValues([
+        { index: 0, y: 100 },
+        { index: 1, y: 110 },
+        { index: 2, y: 120 },
+      ])
+      useDrawingStore.getState().endStroke() // → ready
+      // Then selection.
+      useDrawingStore.getState().setSelectedIndices(new Set([0, 1, 2]))
+
+      // First undo pops the selection (most recent).
+      useDrawingStore.getState().undo()
+      expect(useDrawingStore.getState().selectedIndices).toEqual(new Set())
+      // Values still intact — phase still ready.
+      const s1 = useDrawingStore.getState().state
+      expect(s1.phase).toBe('ready')
+
+      // Second undo pops the values stroke.
+      useDrawingStore.getState().undo()
+      const s2 = useDrawingStore.getState().state
+      expect(s2.phase).toBe('drawMode')
+      if (s2.phase !== 'drawMode') throw new Error('expected drawMode')
+      expect(s2.values).toEqual([null, null, null])
+    })
+
+    it('Cmd+Shift+Z restores both stroke and selection in original order', () => {
+      useDrawingStore.getState().enterDrawMode(3)
+      useDrawingStore.getState().beginStroke()
+      useDrawingStore.getState().setCheckpointValues([
+        { index: 0, y: 100 },
+        { index: 1, y: 110 },
+        { index: 2, y: 120 },
+      ])
+      useDrawingStore.getState().endStroke()
+      useDrawingStore.getState().setSelectedIndices(new Set([0, 2]))
+
+      // Undo twice — selection then values.
+      useDrawingStore.getState().undo()
+      useDrawingStore.getState().undo()
+
+      // Redo twice — values then selection.
+      useDrawingStore.getState().redo()
+      const afterFirstRedo = useDrawingStore.getState().state
+      expect(afterFirstRedo.phase).toBe('ready')
+      expect(useDrawingStore.getState().selectedIndices).toEqual(new Set())
+
+      useDrawingStore.getState().redo()
+      expect(useDrawingStore.getState().selectedIndices).toEqual(new Set([0, 2]))
+    })
+
+    it('a fresh selection action clears the redo future (branching)', () => {
+      useDrawingStore.getState().enterDrawMode(3)
+      useDrawingStore.getState().beginStroke()
+      useDrawingStore.getState().setCheckpointValues([{ index: 0, y: 100 }])
+      useDrawingStore.getState().endStroke()
+      useDrawingStore.getState().undo()
+      expect(useDrawingStore.getState().redoStack.length).toBeGreaterThan(0)
+      useDrawingStore.getState().setSelectedIndices(new Set([0]))
       expect(useDrawingStore.getState().redoStack).toEqual([])
     })
   })

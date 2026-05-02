@@ -264,7 +264,7 @@ describe('DrawingToolbar', () => {
       state: { phase: 'ready', values: [42, 42] },
       totalCheckpoints: 2,
       activeTool: 'bezier',
-      undoStack: [[null, null]],
+      undoStack: [{ kind: 'values', values: [null, null] }],
       redoStack: [],
     })
     useBezierStore.setState({
@@ -290,7 +290,7 @@ describe('DrawingToolbar', () => {
       state: { phase: 'drawMode', values: [null] },
       totalCheckpoints: 1,
       activeTool: 'bezier',
-      undoStack: [[null]],
+      undoStack: [{ kind: 'values', values: [null] }],
       redoStack: [],
     })
     useBezierStore.setState({ anchors: [], past: [], future: [] })
@@ -310,7 +310,7 @@ describe('DrawingToolbar', () => {
       totalCheckpoints: 2,
       activeTool: 'bezier',
       undoStack: [],
-      redoStack: [[42, 42]],
+      redoStack: [{ kind: 'values', values: [42, 42] }],
     })
     useBezierStore.setState({
       anchors: [{ domainX: 1, domainY: 1, outHandle: null }],
@@ -334,7 +334,7 @@ describe('DrawingToolbar', () => {
       state: { phase: 'drawMode', values: [null] },
       totalCheckpoints: 1,
       activeTool: 'freehand',
-      undoStack: [[null]],
+      undoStack: [{ kind: 'values', values: [null] }],
       redoStack: [],
     })
     useBezierStore.setState({
@@ -382,7 +382,7 @@ describe('DrawingToolbar', () => {
     render(<DrawingToolbar top={40} right={88} />)
     // With no toolbar mounted (idle), the listener never attached.
     // Pre-seed a stack and verify Ctrl+Z does not consume it.
-    useDrawingStore.setState({ undoStack: [[null, null, null]] })
+    useDrawingStore.setState({ undoStack: [{ kind: 'values', values: [null, null, null] }] })
     fireEvent.keyDown(window, { key: 'z', ctrlKey: true })
     expect(useDrawingStore.getState().undoStack).toHaveLength(1)
   })

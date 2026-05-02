@@ -1,14 +1,8 @@
 import { useCallback, useEffect, useRef } from 'react'
 
-import type { CheckpointCrossing } from '@/lib/drawing/types'
+import { clientToChart } from '@/lib/drawing/pointer'
+import type { CheckpointCrossing, MinimalScale } from '@/lib/drawing/types'
 import { useDrawingStore } from '@/stores/drawingStore'
-
-interface MinimalScale {
-  (v: number | Date): number
-  invert(pixel: number): number | Date
-  domain(): readonly (number | Date)[]
-  range(): readonly number[]
-}
 
 export interface LineToolProps {
   xScale: MinimalScale
@@ -60,11 +54,9 @@ export function LineTool({
     (e: React.PointerEvent<SVGRectElement>) => {
       if (e.button === 1 || e.button === 2) return
 
-      const svg = (e.currentTarget as SVGElement).ownerSVGElement
-      if (!svg) return
-      const svgRect = svg.getBoundingClientRect()
-      const chartX = e.clientX - svgRect.left - margin.left
-      const chartY = e.clientY - svgRect.top - margin.top
+      const pos = clientToChart(e, margin)
+      if (!pos) return
+      const { chartX, chartY } = pos
 
       const { xScale: xs, yScale: ys } = scalesRef.current
       const domainX = Number(xs.invert(chartX))
@@ -105,11 +97,9 @@ export function LineTool({
         return
       }
 
-      const svg = (e.currentTarget as SVGElement).ownerSVGElement
-      if (!svg) return
-      const svgRect = svg.getBoundingClientRect()
-      const chartX = e.clientX - svgRect.left - margin.left
-      const chartY = e.clientY - svgRect.top - margin.top
+      const pos = clientToChart(e, margin)
+      if (!pos) return
+      const { chartX, chartY } = pos
 
       const preview = previewRef.current
       if (preview) {
@@ -135,17 +125,14 @@ export function LineTool({
         return
       }
 
-      const svg = (e.currentTarget as SVGElement).ownerSVGElement
       const { xScale: xs, yScale: ys } = scalesRef.current
 
       let endDomainX = start.domainX
       let endDomainY = start.domainY
-      if (svg) {
-        const svgRect = svg.getBoundingClientRect()
-        const chartX = e.clientX - svgRect.left - margin.left
-        const chartY = e.clientY - svgRect.top - margin.top
-        endDomainX = Number(xs.invert(chartX))
-        endDomainY = Number(ys.invert(chartY))
+      const pos = clientToChart(e, margin)
+      if (pos) {
+        endDomainX = Number(xs.invert(pos.chartX))
+        endDomainY = Number(ys.invert(pos.chartY))
       }
 
       // Sample every checkpoint x within the segment's x-range.

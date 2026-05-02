@@ -1,18 +1,9 @@
 import { useCallback, useEffect, useRef } from 'react'
 
 import { crossingDetector } from '@/lib/drawing/crossingDetector'
-import type { CheckpointCrossing } from '@/lib/drawing/types'
+import { clientToChart } from '@/lib/drawing/pointer'
+import type { CheckpointCrossing, MinimalScale } from '@/lib/drawing/types'
 import { useDrawingStore } from '@/stores/drawingStore'
-
-// Minimal scale interface — avoids d3-scale type gymnastics.
-// Visx ScaleTime returns Date[] from domain() and ScaleLinear returns number[].
-// Using readonly number[] here lets both satisfy the interface without assertion errors.
-interface MinimalScale {
-  (v: number | Date): number
-  invert(pixel: number): number | Date
-  domain(): readonly (number | Date)[]
-  range(): readonly number[]
-}
 
 export interface FreehandToolProps {
   xScale: MinimalScale
@@ -68,11 +59,9 @@ export function FreehandTool({
       // Middle / right button → let the viewport pan handler take over.
       if (e.button === 1 || e.button === 2) return
 
-      const svg = (e.currentTarget as SVGElement).ownerSVGElement
-      if (!svg) return
-      const svgRect = svg.getBoundingClientRect()
-      const chartX = e.clientX - svgRect.left - margin.left
-      const chartY = e.clientY - svgRect.top - margin.top
+      const pos = clientToChart(e, margin)
+      if (!pos) return
+      const { chartX, chartY } = pos
 
       const { xScale: xs, yScale: ys } = scalesRef.current
       const domainX = Number(xs.invert(chartX))
@@ -109,11 +98,9 @@ export function FreehandTool({
         return
       }
 
-      const svg = (e.currentTarget as SVGElement).ownerSVGElement
-      if (!svg) return
-      const svgRect = svg.getBoundingClientRect()
-      const chartX = e.clientX - svgRect.left - margin.left
-      const chartY = e.clientY - svgRect.top - margin.top
+      const pos = clientToChart(e, margin)
+      if (!pos) return
+      const { chartX, chartY } = pos
 
       const { xScale: xs, yScale: ys } = scalesRef.current
       const domainX = Number(xs.invert(chartX))
