@@ -30,7 +30,7 @@ vi.mock('@visx/responsive', () => ({
   }) => children({ width: 800, height: 400 }),
 }))
 
-// Mock useParams so MarketPage can render without the full TanStack Router tree
+// Mock useParams and Link so MarketPage can render without the full TanStack Router tree
 vi.mock('@tanstack/react-router', async () => {
   const actual = await vi.importActual<typeof import('@tanstack/react-router')>(
     '@tanstack/react-router',
@@ -38,6 +38,19 @@ vi.mock('@tanstack/react-router', async () => {
   return {
     ...actual,
     useParams: vi.fn(() => ({ id: 'btc' })),
+    Link: ({
+      children,
+      to,
+      className,
+    }: {
+      children: React.ReactNode
+      to: string
+      className?: string
+    }) => (
+      <a href={to} className={className}>
+        {children}
+      </a>
+    ),
   }
 })
 
