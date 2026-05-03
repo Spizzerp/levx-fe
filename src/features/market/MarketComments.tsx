@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useMemo, useRef, useState, type FormEvent } from 'react'
 import { useWalletModal } from '@solana/wallet-adapter-react-ui'
 import { MessageSquare, Send } from 'lucide-react'
 
@@ -45,6 +45,10 @@ function CommentAvatar({ profile }: { profile?: Profile }) {
   return <Glyph size={22} tone="strong" />
 }
 
+/** Minimum rows and max height for the auto-resizing textarea. */
+const TEXTAREA_MIN_ROWS = 2
+const TEXTAREA_MAX_HEIGHT = 160
+
 export function MarketComments({ marketId }: Props) {
   const connected = useWalletStore((s) => s.connected)
   const walletPubkey = useWalletStore((s) => s.publicKey)
@@ -56,6 +60,25 @@ export function MarketComments({ marketId }: Props) {
   const post = usePostComment(marketId, wallet)
 
   const [body, setBody] = useState('')
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Auto-resize the textarea to fit its content up to TEXTAREA_MAX_HEIGHT
+  const autoResize = useCallback(() => {
+    const el = textareaRef.current
+    if (!el) return
+    // Reset to auto so scrollHeight recalculates correctly on shrink
+    el.style.height = 'auto'
+    el.style.height = `${Math.min(el.scrollHeight, TEXTAREA_MAX_HEIGHT)}px`
+  }, [])
+
+  const handleBodyChange = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      setBody(e.target.value)
+      // autoResize on next frame after React has committed the value
+      requestAnimationFrame(autoResize)
+    },
+    [autoResize],
+  )
 
   // Collect unique wallet addresses from comments to batch-fetch profiles
   const walletAddresses = useMemo(() => (comments ?? []).map((c) => c.wallet), [comments])
@@ -66,7 +89,21 @@ export function MarketComments({ marketId }: Props) {
   const onSubmit = (e: FormEvent) => {
     e.preventDefault()
     if (!canPost) return
-    post.mutate({ body: body.trim() }, { onSuccess: () => setBody('') })
+    post.mutate(
+      { body: body.trim() },
+      {
+        onSuccess: () => {
+          setBody('')
+          // Reset height after clearing
+          requestAnimationFrame(() => {
+            const el = textareaRef.current
+            if (el) {
+              el.style.height = 'auto'
+            }
+          })
+        },
+      },
+    )
   }
 
   const commentCount = (comments ?? []).length
@@ -176,53 +213,67 @@ export function MarketComments({ marketId }: Props) {
             Connect wallet to comment
           </Button>
         ) : (
-          <form onSubmit={onSubmit} className="flex flex-col gap-3">
+          <form onSubmit={onSubmit} className="flex flex-col gap-0">
+            {/* Textarea container */}
             <div
               className={cn(
-                'relative flex items-start gap-3 rounded-xl',
+                'relative flex flex-col rounded-xl',
                 'border-line bg-surface-1/50 border',
                 'transition-[border-color] duration-150',
                 'focus-within:border-ink-strong',
               )}
             >
               <textarea
+                ref={textareaRef}
                 value={body}
-                onChange={(e) => setBody(e.target.value)}
+                onChange={handleBodyChange}
                 placeholder="Share your take…"
                 maxLength={2000}
-                rows={2}
+                rows={TEXTAREA_MIN_ROWS}
                 className={cn(
-                  'flex-1 resize-none bg-transparent p-4',
+                  'w-full resize-none bg-transparent px-4 pt-3 pb-2',
                   'text-body-sm text-ink placeholder:text-ink-dim',
                   'focus:outline-none',
                 )}
+                style={{ maxHeight: TEXTAREA_MAX_HEIGHT, overflowY: 'auto' }}
               />
-              <button
-                type="submit"
-                disabled={!canPost || post.isPending}
-                className={cn(
-                  'flex h-9 w-9 shrink-0 items-center justify-center self-end',
-                  'mr-2 mb-2 rounded-lg',
-                  'transition-all duration-150',
-                  canPost && !post.isPending
-                    ? 'from-brand-from to-brand-to text-surface bg-gradient-to-r hover:opacity-90'
-                    : 'bg-line text-ink-dim cursor-not-allowed',
-                )}
-                aria-label="Post comment"
-              >
-                <Send size={14} strokeWidth={2} className={post.isPending ? 'animate-pulse' : ''} />
-              </button>
-            </div>
 
-            <div className="flex items-center justify-between">
-              <span className="text-label text-ink-dim font-mono">{body.length}/2000</span>
-              {post.isPending && (
-                <span className="text-label text-ink-muted animate-pulse font-mono">Posting…</span>
-              )}
+              {/* Footer bar — inside the border container */}
+              <div className="flex items-center justify-between px-4 pb-3 pt-1">
+                <span className="text-label text-ink-dim font-mono tabular-nums">
+                  {body.length}/2000
+                </span>
+
+                <div className="flex items-center gap-2">
+                  {post.isPending && (
+                    <span className="text-label text-ink-muted animate-pulse font-mono">
+                      Posting…
+                    </span>
+                  )}
+                  <button
+                    type="submit"
+                    disabled={!canPost || post.isPending}
+                    className={cn(
+                      'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg',
+                      'transition-all duration-150',
+                      canPost && !post.isPending
+                        ? 'from-brand-from to-brand-to text-surface bg-gradient-to-r hover:opacity-90'
+                        : 'bg-line text-ink-dim cursor-not-allowed',
+                    )}
+                    aria-label="Post comment"
+                  >
+                    <Send
+                      size={14}
+                      strokeWidth={2}
+                      className={post.isPending ? 'animate-pulse' : ''}
+                    />
+                  </button>
+                </div>
+              </div>
             </div>
 
             {post.error && (
-              <p className="text-caption text-accent font-mono">
+              <p className="text-caption text-accent mt-2 font-mono">
                 {post.error.message.startsWith('rate_limit')
                   ? 'Slow down — wait a few seconds before posting again.'
                   : post.error.message.startsWith('permission_denied')
