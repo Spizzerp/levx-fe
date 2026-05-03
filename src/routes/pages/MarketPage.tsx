@@ -475,48 +475,71 @@ export function MarketPage() {
         <aside className="mt-[180px] flex flex-col">
           <Label>Select Paths</Label>
 
-          {showPendingIndicator ? (
-            // Don't render the path list while the pipeline is still
-            // submitting — `aiPaths` is either empty (real market) or
-            // populated with mock fixtures (APP_USE_MOCK=true), and
-            // showing fake "CHRONOS-2 PATH" rows next to a "0/3 paths
-            // arrived" indicator is misleading. Show the loader in
-            // place of the rows; user knows wager controls below are
-            // disabled by the same condition.
-            <div className="border-line mt-5 flex items-center justify-center border-t py-12">
-              <PendingPathsBanner market={market} />
-            </div>
-          ) : (
-            <div className="border-line mt-5 border-0 border-t">
-              {allPaths.map((p, idx) => (
-                <PathRow
-                  key={p.id}
-                  index={idx + 1}
-                  name={p.label}
-                  multiplier={`${p.multiplier.toFixed(2)}×`}
-                  wagered={p.totalWagered}
-                  compositeScore={p.compositeScore}
-                  active={selectedPathIds.has(p.id)}
-                  pending={p.origin === 'user' && p.onChainStatus === 'pending'}
-                  onMouseEnter={() => setHoveredPathId(p.id)}
-                  onMouseLeave={() => setHoveredPathId(null)}
-                  onClick={() =>
-                    setSelectedPathIds((prev) => {
-                      const next = new Set(prev)
-                      if (next.has(p.id)) next.delete(p.id)
-                      else next.add(p.id)
-                      return next
-                    })
-                  }
-                />
-              ))}
-              {selectedPathIds.size > 4 && (
-                <p className="text-accent text-caption px-4 py-2 font-mono">
-                  Max 4 paths per transaction. Deselect some paths.
-                </p>
-              )}
-            </div>
-          )}
+          {(() => {
+            // During pending state we want to:
+            //   - Hide mock AI fixtures (`APP_USE_MOCK=true` paints
+            //     fake "CHRONOS-2 PATH" rows that confuse users while
+            //     real AI paths are still in flight).
+            //   - Always show real content the user produced (a path
+            //     they drew this session) or the chain reflects (a
+            //     partial on-chain AI submission with numPaths < 3).
+            //   - Replace the rows with the heart-pulse loader only
+            //     when there is genuinely nothing real to display.
+            // Outside pending, `allPaths` is authoritative.
+            const hasOnChainPaths = (market.paths?.length ?? 0) > 0
+            const visiblePaths =
+              showPendingIndicator && !hasOnChainPaths ? userPaths : allPaths
+            const showLoaderInSlot = showPendingIndicator && visiblePaths.length === 0
+
+            if (showLoaderInSlot) {
+              return (
+                <div className="border-line mt-5 flex items-center justify-center border-t py-12">
+                  <PendingPathsBanner market={market} />
+                </div>
+              )
+            }
+
+            return (
+              <div className="border-line mt-5 border-0 border-t">
+                {visiblePaths.map((p, idx) => (
+                  <PathRow
+                    key={p.id}
+                    index={idx + 1}
+                    name={p.label}
+                    multiplier={`${p.multiplier.toFixed(2)}×`}
+                    wagered={p.totalWagered}
+                    compositeScore={p.compositeScore}
+                    active={selectedPathIds.has(p.id)}
+                    pending={p.origin === 'user' && p.onChainStatus === 'pending'}
+                    onMouseEnter={() => setHoveredPathId(p.id)}
+                    onMouseLeave={() => setHoveredPathId(null)}
+                    onClick={() =>
+                      setSelectedPathIds((prev) => {
+                        const next = new Set(prev)
+                        if (next.has(p.id)) next.delete(p.id)
+                        else next.add(p.id)
+                        return next
+                      })
+                    }
+                  />
+                ))}
+                {selectedPathIds.size > 4 && (
+                  <p className="text-accent text-caption px-4 py-2 font-mono">
+                    Max 4 paths per transaction. Deselect some paths.
+                  </p>
+                )}
+                {/* Inline AI-generating indicator below the existing
+                    rows so a user who's drawn a path during pending
+                    still sees their work — the loader doesn't
+                    swallow it. */}
+                {showPendingIndicator && (
+                  <div className="border-line border-t px-1 py-3">
+                    <PendingPathsBanner market={market} />
+                  </div>
+                )}
+              </div>
+            )
+          })()}
 
           {/*
           ── Draw button — desktop only (mobile gate: pure Tailwind CSS) ──
