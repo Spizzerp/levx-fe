@@ -1,4 +1,5 @@
-// @ts-nocheck — Supabase Edge (Deno).
+import { SupabaseClient } from 'supabase-js'
+
 //
 // Atomic rate-limit reserve. Delegates to the `try_reserve_faucet_slot`
 // Postgres function (see migration 0005), which serializes concurrent
@@ -30,7 +31,7 @@ export interface RateLimitResult {
  * All concurrency-correctness lives in the Postgres function — this
  * helper just shapes the result for the caller.
  */
-export async function tryReserve(admin: any, wallet: string): Promise<RateLimitResult> {
+export async function tryReserve(admin: SupabaseClient, wallet: string): Promise<RateLimitResult> {
   const { data, error } = await admin.rpc('try_reserve_faucet_slot', {
     p_wallet: wallet,
     p_cooldown_seconds: COOLDOWN_SECS,
@@ -70,7 +71,7 @@ export async function tryReserve(admin: any, wallet: string): Promise<RateLimitR
  * attempt's timestamp.
  */
 export async function releaseReservation(
-  admin: any,
+  admin: SupabaseClient,
   wallet: string,
   priorLastMintedAt: string | null,
 ): Promise<void> {
