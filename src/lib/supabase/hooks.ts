@@ -1,7 +1,10 @@
-import { useCallback, useContext, useEffect, useRef, useState } from 'react'
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  useMutation, useQuery, useQueryClient,
-  type UseQueryResult, type UseMutationResult,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type UseQueryResult,
+  type UseMutationResult,
 } from '@tanstack/react-query'
 
 import { SupabaseAuthContext, type AuthContextValue } from './auth-context'
@@ -60,7 +63,12 @@ export function useComments(marketId: string): UseQueryResult<Comment[]> {
       channel
         .on(
           'postgres_changes',
-          { event: 'INSERT', schema: 'public', table: 'comments', filter: `market_id=eq.${marketId}` },
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'comments',
+            filter: `market_id=eq.${marketId}`,
+          },
           (payload: { new: Comment }) => {
             qc.setQueryData<Comment[]>(['supabase', 'comments', marketId], (prev) => {
               const curr = prev ?? []
@@ -71,7 +79,9 @@ export function useComments(marketId: string): UseQueryResult<Comment[]> {
         )
         .subscribe()
     }
-    return () => { releaseChannel(supabase, name) }
+    return () => {
+      releaseChannel(supabase, name)
+    }
   }, [marketId, qc])
 
   return query
@@ -120,7 +130,9 @@ export function useDrawBroadcast(
   useEffect(() => {
     const supabase = getSupabase()
     const name = `path-draw:${marketId}`
-    const { channel, isFirstAcquire } = acquireChannel(supabase, name, { config: { private: true } })
+    const { channel, isFirstAcquire } = acquireChannel(supabase, name, {
+      config: { private: true },
+    })
     // Each consumer attaches its own listener so it can populate its own
     // `liveDraws` state. This is intentionally per-instance — DrawingLayer is
     // currently the sole consumer per market, so multi-mount does not arise.
@@ -162,8 +174,8 @@ export function usePublishDrawFrame(
   selfWallet: string | null,
 ): (frame: DrawFrame) => void {
   const lastSentRef = useRef<number>(0)
-  const pendingRef  = useRef<DrawFrame | null>(null)
-  const timerRef    = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingRef = useRef<DrawFrame | null>(null)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const flush = useCallback(() => {
     const frame = pendingRef.current
@@ -192,20 +204,23 @@ export function usePublishDrawFrame(
     }
   }, [])
 
-  return useCallback((frame: DrawFrame) => {
-    if (!selfWallet) return
-    const now = Date.now()
-    if (now - lastSentRef.current >= THROTTLE_MS) {
-      pendingRef.current = frame
-      flush()
-    } else {
-      pendingRef.current = frame
-      if (!timerRef.current) {
-        const wait = THROTTLE_MS - (now - lastSentRef.current)
-        timerRef.current = setTimeout(flush, wait)
+  return useCallback(
+    (frame: DrawFrame) => {
+      if (!selfWallet) return
+      const now = Date.now()
+      if (now - lastSentRef.current >= THROTTLE_MS) {
+        pendingRef.current = frame
+        flush()
+      } else {
+        pendingRef.current = frame
+        if (!timerRef.current) {
+          const wait = THROTTLE_MS - (now - lastSentRef.current)
+          timerRef.current = setTimeout(flush, wait)
+        }
       }
-    }
-  }, [selfWallet, flush])
+    },
+    [selfWallet, flush],
+  )
 }
 
 export type SaveProfileInput = {
@@ -234,6 +249,37 @@ export function useProfile(walletAddress: string | null): UseQueryResult<Profile
         .maybeSingle()
       if (error) throw new Error(error.message)
       return (data ?? null) as Profile | null
+    },
+  })
+}
+
+/**
+ * Batch-fetch profiles for a list of wallet addresses.
+ * Returns a map of wallet_address → Profile for quick lookup.
+ * Deduplicates & sorts addresses for a stable query key.
+ */
+export function useProfiles(walletAddresses: string[]): UseQueryResult<Record<string, Profile>> {
+  const sorted = useMemo(
+    () => [...new Set(walletAddresses)].sort(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [walletAddresses.join(',')],
+  )
+  return useQuery<Record<string, Profile>>({
+    queryKey: ['supabase', 'profiles', sorted],
+    enabled: sorted.length > 0,
+    staleTime: 60_000,
+    queryFn: async () => {
+      if (sorted.length === 0) return {}
+      const { data, error } = await getSupabase()
+        .from('users')
+        .select(PROFILE_COLUMNS)
+        .in('wallet_address', sorted)
+      if (error) throw new Error(error.message)
+      const map: Record<string, Profile> = {}
+      for (const row of (data ?? []) as unknown as Profile[]) {
+        map[row.wallet_address] = row
+      }
+      return map
     },
   })
 }
@@ -280,7 +326,9 @@ export function useSaveProfile(): UseMutationResult<Profile, Error, SaveProfileI
           throw new Error('Profile image path is missing')
         }
       } else if (avatarImagePath) {
-        const { error: removeError } = await supabase.storage.from(PROFILE_BUCKET).remove([avatarImagePath])
+        const { error: removeError } = await supabase.storage
+          .from(PROFILE_BUCKET)
+          .remove([avatarImagePath])
         if (removeError) throw new Error(removeError.message)
         avatarImagePath = null
       }
@@ -322,8 +370,7 @@ async function uploadProfileAvatar(walletAddress: string, dataUrl: string): Prom
   const filePath = `${walletAddress}/avatar.png`
   const blob = await dataUrlToBlob(dataUrl)
   const { error } = await getSupabase()
-    .storage
-    .from(PROFILE_BUCKET)
+    .storage.from(PROFILE_BUCKET)
     .upload(filePath, blob, {
       cacheControl: '3600',
       contentType: blob.type || 'image/png',
