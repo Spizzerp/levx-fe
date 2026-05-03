@@ -20,6 +20,7 @@ import { useChartViewport } from '@/lib/chart/useChartViewport'
 import { useYAxisViewport } from '@/lib/chart/useYAxisViewport'
 import { computeVisiblePriceDomain } from '@/lib/chart/computeVisiblePriceDomain'
 import { DrawingGrid } from '@/features/chart/DrawingGrid'
+import { DrawingToolbar } from '@/features/chart/DrawingToolbar'
 import { ChartMorphLine } from '@/features/chart/ChartMorphLine'
 import { Stub } from '@/ui/Stub'
 
@@ -668,16 +669,22 @@ function ChartInner({
         {/* ── Drawing overlay (render prop) ──────────
             Rendered LAST so its pointer-receiving <rect> sits above the hit-area
             <Bar> in SVG paint order. Otherwise the transparent Bar intercepts
-            pointerdown and the drawing layer never fires. */}
-        {renderDrawingOverlay?.({
-          xScale: timeScale,
-          yScale: priceScale,
-          innerWidth,
-          innerHeight,
-          checkpointXs,
-          marketStart,
-          margin: MARGIN,
-        })}
+            pointerdown and the drawing layer never fires.
+            Wrapped in the same clipPath as the chart content so in-progress
+            bezier paths and freehand/line strokes don't overflow chart bounds.
+            Clipping affects rendering only — pointer events on the overlay
+            rect still fire normally. */}
+        <g clipPath={`url(#${clipId})`}>
+          {renderDrawingOverlay?.({
+            xScale: timeScale,
+            yScale: priceScale,
+            innerWidth,
+            innerHeight,
+            checkpointXs,
+            marketStart,
+            margin: MARGIN,
+          })}
+        </g>
 
         {/* ── X-axis pan area — drag here to pan even during draw mode ── */}
         <rect
@@ -748,6 +755,7 @@ function LevXChartOuter(props: LevXChartProps) {
           <ChartInner {...props} width={width} height={parentHeight} />
         )}
       </ParentSize>
+      <DrawingToolbar top={MARGIN.top + 8} right={MARGIN.right + 8} />
     </div>
   )
 }

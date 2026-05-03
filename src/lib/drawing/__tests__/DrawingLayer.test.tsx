@@ -221,6 +221,30 @@ describe('DrawingLayer', () => {
     expect(labels[1].textContent).toBe('140')
   })
 
+  it('selected checkpoint dots use the accent fill, unselected use the ink-strong fill', () => {
+    const vals = new Array(totalCheckpoints).fill(null) as (number | null)[]
+    vals[5] = 150
+    vals[10] = 160
+    useDrawingStore.setState({
+      state: { phase: 'drawMode', values: vals },
+      totalCheckpoints,
+      selectedIndices: new Set<number>([5]),
+    })
+    const { container } = renderLayer()
+    const dots = container.querySelectorAll('[data-testid="checkpoint-dot"]')
+    expect(dots).toHaveLength(2)
+
+    const selected = container.querySelector('[data-testid="checkpoint-dot"][data-selected="true"]')
+    const unselected = container.querySelector('[data-testid="checkpoint-dot"][data-selected="false"]')
+    expect(selected).toBeInTheDocument()
+    expect(unselected).toBeInTheDocument()
+
+    const selectedCircle = selected!.querySelector('circle') as SVGCircleElement
+    const unselectedCircle = unselected!.querySelector('circle') as SVGCircleElement
+    expect(selectedCircle.getAttribute('fill')).toBe('#EC4899')
+    expect(unselectedCircle.getAttribute('fill')).toBe('#8B5CF6')
+  })
+
   it('fades raw stroke to opacity 0 after pointerup', async () => {
     vi.useFakeTimers()
     useDrawingStore.setState({
