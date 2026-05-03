@@ -13,6 +13,8 @@ import {
 import { SIGILS } from '@/ui/Sigils'
 import { useWalletStore } from '@/stores/walletStore'
 import { cn } from '@/lib/cn'
+import { Modal } from '@/ui/Modal'
+import { Button } from '@/ui/Button'
 import type { Profile } from '@/lib/supabase/types'
 
 type Props = { marketId: string }
@@ -61,6 +63,7 @@ export function MarketComments({ marketId }: Props) {
   const remove = useDeleteComment(marketId, wallet)
 
   const [body, setBody] = useState('')
+  const [deleteId, setDeleteId] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   // Auto-resize the textarea to fit its content up to TEXTAREA_MAX_HEIGHT
@@ -82,8 +85,9 @@ export function MarketComments({ marketId }: Props) {
   )
 
   const onDelete = (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this comment?')) return
-    remove.mutate(id)
+    remove.mutate(id, {
+      onSuccess: () => setDeleteId(null),
+    })
   }
 
   // Collect unique wallet addresses from comments to batch-fetch profiles
@@ -192,7 +196,7 @@ export function MarketComments({ marketId }: Props) {
                     {/* Actions (only for own comment) */}
                     {c.wallet === wallet && (
                       <button
-                        onClick={() => onDelete(c.id)}
+                        onClick={() => setDeleteId(c.id)}
                         className={cn(
                           'flex items-center gap-1 font-mono transition-colors',
                           'text-micro text-accent/30 hover:text-accent',
@@ -332,6 +336,44 @@ export function MarketComments({ marketId }: Props) {
           </form>
         )}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        open={Boolean(deleteId)}
+        onOpenChange={(open) => !open && setDeleteId(null)}
+        size="sm"
+        hideHeader
+      >
+        <div className="flex flex-col gap-6 p-8">
+          <div className="flex flex-col gap-1.5 text-center">
+            <Modal.Title className="text-ui-lg text-ink font-mono font-bold tracking-tight uppercase">
+              Delete Comment?
+            </Modal.Title>
+            <Modal.Description className="text-body-sm text-ink-dim leading-relaxed">
+              Are you sure? This cannot be undone.
+            </Modal.Description>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Button
+              variant="secondary"
+              onClick={() => setDeleteId(null)}
+              disabled={remove.isPending}
+              className="min-h-10 px-4 py-2 text-label"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => deleteId && onDelete(deleteId)}
+              disabled={remove.isPending}
+              className="min-h-10 px-4 py-2 text-label"
+            >
+              {remove.isPending ? 'Deleting…' : 'Delete'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </section>
   )
 }
