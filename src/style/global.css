@@ -81,8 +81,14 @@
   }
 }
 
+/*
+  Duration scales with strip length. Strip is now 30 SETs wide (was 5),
+  so to keep the same per-SET scroll speed (~8s/SET) the duration is
+  30 × 8s = 240s. Adjust this single number to retune speed without
+  touching the JS or the strip composition.
+*/
 .streaming-banner-track {
-  animation: streaming-banner 40s linear infinite;
+  animation: streaming-banner 240s linear infinite;
 }
 
 button:hover .streaming-banner-track {

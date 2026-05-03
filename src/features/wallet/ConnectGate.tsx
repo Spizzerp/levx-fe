@@ -36,8 +36,13 @@ export function ConnectGate({ children }: PropsWithChildren) {
         onClick={() => setVisible(true)}
         className={cn(
           baseSlot,
-          'border border-dashed border-line-strong bg-transparent text-ink-muted',
-          'hover:border-ink hover:text-ink-strong',
+          // Primary CTA styling — matches the brand-gradient pill +
+          // dither/glow used by the Button component's `primary`
+          // variant. `btn-gradient-glow` is the shared class defined
+          // in features/chart/ChartFrame.css; reusing it keeps the
+          // hover effect identical to other gradient buttons.
+          'from-brand-from to-brand-to text-surface bg-gradient-to-r',
+          'btn-gradient-glow',
         )}
       >
         Connect wallet to continue
