@@ -1,10 +1,11 @@
 import { useCallback, useMemo, useRef, useState, type FormEvent } from 'react'
 import { useWalletModal } from '@solana/wallet-adapter-react-ui'
-import { MessageSquare, Send } from 'lucide-react'
+import { MessageSquare, Send, Trash2 } from 'lucide-react'
 
 import {
   useComments,
   usePostComment,
+  useDeleteComment,
   useProfiles,
   useSupabaseAuth,
   getProfileImageUrl,
@@ -57,6 +58,7 @@ export function MarketComments({ marketId }: Props) {
 
   const { data: comments, isLoading, error } = useComments(marketId)
   const post = usePostComment(marketId, wallet)
+  const remove = useDeleteComment(marketId, wallet)
 
   const [body, setBody] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -78,6 +80,11 @@ export function MarketComments({ marketId }: Props) {
     },
     [autoResize],
   )
+
+  const onDelete = (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this comment?')) return
+    remove.mutate(id)
+  }
 
   // Collect unique wallet addresses from comments to batch-fetch profiles
   const walletAddresses = useMemo(() => (comments ?? []).map((c) => c.wallet), [comments])
@@ -150,7 +157,6 @@ export function MarketComments({ marketId }: Props) {
           const displayName =
             profile?.display_name || `${c.wallet.slice(0, 4)}…${c.wallet.slice(-4)}`
           const username = profile?.username
-
           return (
             <article
               key={c.id}
@@ -181,11 +187,28 @@ export function MarketComments({ marketId }: Props) {
                       @{username}
                     </span>
                   )}
-                  <span className="text-label text-ink-dim ml-auto shrink-0 font-mono whitespace-nowrap">
-                    {timeAgo(c.created_at)}
-                    {c.edited_at && <span className="ml-1 italic opacity-60">(edited)</span>}
-                  </span>
+
+                  <div className="ml-auto flex items-center gap-3">
+                    {/* Actions (only for own comment) */}
+                    {c.wallet === wallet && (
+                      <button
+                        onClick={() => onDelete(c.id)}
+                        className={cn(
+                          'flex items-center gap-1 font-mono transition-colors',
+                          'text-micro text-accent/30 hover:text-accent',
+                        )}
+                      >
+                        <Trash2 size={10} strokeWidth={2} />
+                        delete
+                      </button>
+                    )}
+                    <span className="text-label text-ink-dim shrink-0 font-mono whitespace-nowrap">
+                      {timeAgo(c.created_at)}
+                      {c.edited_at && <span className="ml-1 italic opacity-60">(edited)</span>}
+                    </span>
+                  </div>
                 </div>
+
                 <p className="text-body-sm text-ink leading-relaxed whitespace-pre-wrap">
                   {c.body}
                 </p>
@@ -213,24 +236,22 @@ export function MarketComments({ marketId }: Props) {
             onClick={() => setVisible(true)}
             className={cn(
               'group flex w-full flex-col rounded-xl',
-              'border border-dashed border-line-strong bg-surface-1/30',
+              'border-line-strong bg-surface-1/30 border border-dashed',
               'transition-all duration-200',
               'hover:border-ink-muted hover:bg-surface-1/50',
             )}
           >
             {/* Fake textarea placeholder */}
             <div className="px-4 pt-3 pb-2 text-left">
-              <span className="text-body-sm text-ink-dim italic opacity-50">
-                Share your take…
-              </span>
+              <span className="text-body-sm text-ink-dim italic opacity-50">Share your take…</span>
             </div>
             {/* Footer bar */}
-            <div className="flex items-center justify-between px-4 pb-3 pt-1">
+            <div className="flex items-center justify-between px-4 pt-1 pb-3">
               <span className="text-label text-ink-dim font-mono opacity-40">0/2000</span>
               <span
                 className={cn(
                   'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5',
-                  'bg-gradient-to-r from-brand-from to-brand-to text-surface',
+                  'from-brand-from to-brand-to text-surface bg-gradient-to-r',
                   'text-label font-mono font-bold tracking-wide uppercase',
                   'transition-opacity duration-150 group-hover:opacity-90',
                 )}
@@ -266,7 +287,7 @@ export function MarketComments({ marketId }: Props) {
               />
 
               {/* Footer bar — inside the border container */}
-              <div className="flex items-center justify-between px-4 pb-3 pt-1">
+              <div className="flex items-center justify-between px-4 pt-1 pb-3">
                 <span className="text-label text-ink-dim font-mono tabular-nums">
                   {body.length}/2000
                 </span>
