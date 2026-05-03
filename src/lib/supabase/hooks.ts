@@ -69,11 +69,27 @@ export function useComments(marketId: string): UseQueryResult<Comment[]> {
             table: 'comments',
             filter: `market_id=eq.${marketId}`,
           },
-          (payload: { new: Comment }) => {
+          (payload) => {
+            const row = payload.new as Comment
             qc.setQueryData<Comment[]>(['supabase', 'comments', marketId], (prev) => {
               const curr = prev ?? []
-              if (curr.some((c) => c.id === payload.new.id)) return curr
-              return [payload.new, ...curr]
+              if (curr.some((c) => c.id === row.id)) return curr
+              return [row, ...curr]
+            })
+          },
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'DELETE',
+            schema: 'public',
+            table: 'comments',
+            filter: `market_id=eq.${marketId}`,
+          },
+          (payload) => {
+            const id = (payload.old as { id: string }).id
+            qc.setQueryData<Comment[]>(['supabase', 'comments', marketId], (prev) => {
+              return (prev ?? []).filter((c) => c.id !== id)
             })
           },
         )
@@ -113,6 +129,33 @@ export function usePostComment(
         const curr = prev ?? []
         if (curr.some((c) => c.id === row.id)) return curr
         return [row, ...curr]
+      })
+    },
+  })
+}
+
+export function useDeleteComment(
+  marketId: string,
+  wallet: string | null,
+): UseMutationResult<void, Error, string> {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (id) => {
+      if (!wallet) throw new Error('not_connected')
+      const { error } = await getSupabase()
+        .from('comments')
+        .delete()
+        .eq('id', id)
+        .eq('wallet', wallet)
+      if (error) {
+        const code = (error as { code?: string }).code
+        if (code === '42501') throw new Error(`permission_denied: ${error.message}`)
+        throw new Error(error.message)
+      }
+    },
+    onSuccess: (_, id) => {
+      qc.setQueryData<Comment[]>(['supabase', 'comments', marketId], (prev) => {
+        return (prev ?? []).filter((c) => c.id !== id)
       })
     },
   })

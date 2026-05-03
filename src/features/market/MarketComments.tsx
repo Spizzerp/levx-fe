@@ -1,10 +1,11 @@
 import { useCallback, useMemo, useRef, useState, type FormEvent } from 'react'
 import { useWalletModal } from '@solana/wallet-adapter-react-ui'
-import { MessageSquare, Send } from 'lucide-react'
+import { MessageSquare, Send, Trash2 } from 'lucide-react'
 
 import {
   useComments,
   usePostComment,
+  useDeleteComment,
   useProfiles,
   useSupabaseAuth,
   getProfileImageUrl,
@@ -12,6 +13,8 @@ import {
 import { SIGILS } from '@/ui/Sigils'
 import { useWalletStore } from '@/stores/walletStore'
 import { cn } from '@/lib/cn'
+import { Modal } from '@/ui/Modal'
+import { Button } from '@/ui/Button'
 import type { Profile } from '@/lib/supabase/types'
 
 type Props = { marketId: string }
@@ -57,8 +60,10 @@ export function MarketComments({ marketId }: Props) {
 
   const { data: comments, isLoading, error } = useComments(marketId)
   const post = usePostComment(marketId, wallet)
+  const remove = useDeleteComment(marketId, wallet)
 
   const [body, setBody] = useState('')
+  const [deleteId, setDeleteId] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   // Auto-resize the textarea to fit its content up to TEXTAREA_MAX_HEIGHT
@@ -78,6 +83,12 @@ export function MarketComments({ marketId }: Props) {
     },
     [autoResize],
   )
+
+  const onDelete = (id: string) => {
+    remove.mutate(id, {
+      onSuccess: () => setDeleteId(null),
+    })
+  }
 
   // Collect unique wallet addresses from comments to batch-fetch profiles
   const walletAddresses = useMemo(() => (comments ?? []).map((c) => c.wallet), [comments])
@@ -150,7 +161,6 @@ export function MarketComments({ marketId }: Props) {
           const displayName =
             profile?.display_name || `${c.wallet.slice(0, 4)}…${c.wallet.slice(-4)}`
           const username = profile?.username
-
           return (
             <article
               key={c.id}
@@ -181,11 +191,28 @@ export function MarketComments({ marketId }: Props) {
                       @{username}
                     </span>
                   )}
-                  <span className="text-label text-ink-dim ml-auto shrink-0 font-mono whitespace-nowrap">
-                    {timeAgo(c.created_at)}
-                    {c.edited_at && <span className="ml-1 italic opacity-60">(edited)</span>}
-                  </span>
+
+                  <div className="ml-auto flex items-center gap-3">
+                    {/* Actions (only for own comment) */}
+                    {c.wallet === wallet && (
+                      <button
+                        onClick={() => setDeleteId(c.id)}
+                        className={cn(
+                          'flex items-center gap-1 font-mono transition-colors',
+                          'text-micro text-accent/30 hover:text-accent',
+                        )}
+                      >
+                        <Trash2 size={10} strokeWidth={2} />
+                        delete
+                      </button>
+                    )}
+                    <span className="text-label text-ink-dim shrink-0 font-mono whitespace-nowrap">
+                      {timeAgo(c.created_at)}
+                      {c.edited_at && <span className="ml-1 italic opacity-60">(edited)</span>}
+                    </span>
+                  </div>
                 </div>
+
                 <p className="text-body-sm text-ink leading-relaxed whitespace-pre-wrap">
                   {c.body}
                 </p>
@@ -196,7 +223,6 @@ export function MarketComments({ marketId }: Props) {
 
         {commentCount === 0 && !isLoading && (
           <div className="flex flex-col items-center gap-2 py-10 text-center">
-            <MessageSquare size={28} strokeWidth={1} className="text-ink-dim opacity-40" />
             <p className="text-caption text-ink-dim font-mono tracking-wide uppercase">
               No comments yet
             </p>
@@ -213,24 +239,22 @@ export function MarketComments({ marketId }: Props) {
             onClick={() => setVisible(true)}
             className={cn(
               'group flex w-full flex-col rounded-xl',
-              'border border-dashed border-line-strong bg-surface-1/30',
+              'border-line-strong bg-surface-1/30 border border-dashed',
               'transition-all duration-200',
               'hover:border-ink-muted hover:bg-surface-1/50',
             )}
           >
             {/* Fake textarea placeholder */}
             <div className="px-4 pt-3 pb-2 text-left">
-              <span className="text-body-sm text-ink-dim italic opacity-50">
-                Share your take…
-              </span>
+              <span className="text-body-sm text-ink-dim italic opacity-50">Share your take…</span>
             </div>
             {/* Footer bar */}
-            <div className="flex items-center justify-between px-4 pb-3 pt-1">
+            <div className="flex items-center justify-between px-4 pt-1 pb-3">
               <span className="text-label text-ink-dim font-mono opacity-40">0/2000</span>
               <span
                 className={cn(
                   'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5',
-                  'bg-gradient-to-r from-brand-from to-brand-to text-surface',
+                  'from-brand-from to-brand-to text-surface bg-gradient-to-r',
                   'text-label font-mono font-bold tracking-wide uppercase',
                   'transition-opacity duration-150 group-hover:opacity-90',
                 )}
@@ -266,7 +290,7 @@ export function MarketComments({ marketId }: Props) {
               />
 
               {/* Footer bar — inside the border container */}
-              <div className="flex items-center justify-between px-4 pb-3 pt-1">
+              <div className="flex items-center justify-between px-4 pt-1 pb-3">
                 <span className="text-label text-ink-dim font-mono tabular-nums">
                   {body.length}/2000
                 </span>
@@ -311,6 +335,44 @@ export function MarketComments({ marketId }: Props) {
           </form>
         )}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        open={Boolean(deleteId)}
+        onOpenChange={(open) => !open && setDeleteId(null)}
+        size="sm"
+        hideHeader
+      >
+        <div className="flex flex-col gap-6 p-8">
+          <div className="flex flex-col gap-1.5 text-center">
+            <Modal.Title className="text-ui-lg text-ink font-mono font-bold tracking-tight uppercase">
+              Delete Comment?
+            </Modal.Title>
+            <Modal.Description className="text-body-sm text-ink-dim leading-relaxed">
+              Are you sure? This cannot be undone.
+            </Modal.Description>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Button
+              variant="secondary"
+              onClick={() => setDeleteId(null)}
+              disabled={remove.isPending}
+              className="min-h-10 px-4 py-2 text-label"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => deleteId && onDelete(deleteId)}
+              disabled={remove.isPending}
+              className="min-h-10 px-4 py-2 text-label"
+            >
+              {remove.isPending ? 'Deleting…' : 'Delete'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </section>
   )
 }
