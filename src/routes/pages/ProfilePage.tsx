@@ -57,7 +57,6 @@ export function ProfilePage() {
   const { status, authenticate } = useSupabaseAuth()
   const connected = useWalletStore((s) => s.connected)
   const publicKey = useWalletStore((s) => s.publicKey)
-  const cluster = useWalletStore((s) => s.cluster)
   const walletAddress = publicKey?.toBase58() ?? null
   const { wallet: walletAdapter } = useWallet()
   const walletName = walletAdapter?.adapter.name ?? 'Unknown Wallet'
@@ -237,73 +236,63 @@ export function ProfilePage() {
         subtitle="Your public profile"
         summaryBar={
           <div className="pb-8">
-            {/* Stats row */}
-            <div className="flex flex-wrap items-center gap-12">
-              <div>
-                <div className="text-label text-ink-muted mb-2 font-mono uppercase">Season Rank</div>
-                <div className="text-ink-strong font-mono text-3xl font-bold tracking-[0.02em]">
-                  #{SEASON_STATS.rank}
+            <div className="flex flex-wrap items-center justify-between gap-x-12 gap-y-6">
+              {/* Stats row — left side */}
+              <div className="flex flex-wrap items-center gap-12">
+                <div>
+                  <div className="text-label text-ink-muted mb-2 font-mono uppercase">Season Rank</div>
+                  <div className="text-ink-strong font-mono text-3xl font-bold tracking-[0.02em]">
+                    #{SEASON_STATS.rank}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-label text-ink-muted mb-2 font-mono uppercase">Accuracy</div>
+                  <div className="text-ink-strong font-mono text-3xl font-bold tracking-[0.02em]">
+                    {SEASON_STATS.accuracy.toFixed(1)}%
+                  </div>
+                </div>
+                <div>
+                  <div className="text-label text-ink-muted mb-2 font-mono uppercase">Markets</div>
+                  <div className="text-ink-strong font-mono text-3xl font-bold tracking-[0.02em]">
+                    {SEASON_STATS.markets}
+                  </div>
                 </div>
               </div>
-              <div>
-                <div className="text-label text-ink-muted mb-2 font-mono uppercase">Accuracy</div>
-                <div className="text-ink-strong font-mono text-3xl font-bold tracking-[0.02em]">
-                  {SEASON_STATS.accuracy.toFixed(1)}%
-                </div>
-              </div>
-              <div>
-                <div className="text-label text-ink-muted mb-2 font-mono uppercase">Markets</div>
-                <div className="text-ink-strong font-mono text-3xl font-bold tracking-[0.02em]">
-                  {SEASON_STATS.markets}
-                </div>
-              </div>
-            </div>
 
-            {/* Wallet address row */}
-            {walletAddress && (
-              <div className="border-line mt-6 flex items-center border-t pt-5">
+              {/* Wallet address row — right side */}
+              {walletAddress && (
                 <div className="flex items-center gap-3">
                   <span className="text-label text-ink-muted font-mono tracking-wider uppercase">
                     Wallet
                   </span>
-                  <div className="flex items-center gap-3">
-                    <span className="text-ink tracking-snug font-mono text-sm">
-                      {formatAddress(walletAddress)}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={onCopyAddress}
-                      aria-label="Copy address"
-                      className={cn(
-                        'flex shrink-0 items-center gap-1.5',
-                        'text-ink-muted text-micro font-mono tracking-wider uppercase',
-                        'hover:text-ink-strong transition-colors',
-                      )}
-                    >
-                      {copied ? (
-                        <>
-                          <Check size={12} strokeWidth={2} className="text-brand-to" />
-                          <span className="text-brand-to">Copied</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy size={12} strokeWidth={1.5} />
-                          <span>Copy</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                  {cluster && (
-                    <>
-                      <span className="text-line-strong">·</span>
-                      <span className="text-ink-muted text-caption font-mono uppercase">{cluster}</span>
-                    </>
-                  )}
-                  <span className="text-line-strong">·</span>
-                  <span className="text-ink-muted text-caption font-mono uppercase">{walletName}</span>
+                  <span className="text-ink tracking-snug font-mono text-sm">
+                    {formatAddress(walletAddress)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={onCopyAddress}
+                    aria-label="Copy address"
+                    className={cn(
+                      'flex shrink-0 items-center gap-1.5',
+                      'text-ink-muted text-micro font-mono tracking-wider uppercase',
+                      'hover:text-ink-strong transition-colors',
+                    )}
+                  >
+                    {copied ? (
+                      <>
+                        <Check size={12} strokeWidth={2} className="text-brand-to" />
+                        <span className="text-brand-to">Copied</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy size={12} strokeWidth={1.5} />
+                        <span>Copy</span>
+                      </>
+                    )}
+                  </button>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         }
       >
