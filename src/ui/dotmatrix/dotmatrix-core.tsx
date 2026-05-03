@@ -1,3 +1,13 @@
+/*
+ * Vendored from `@dotmatrix` (https://dotmatrix.zzzzshawn.cloud/).
+ * Kept structurally identical to the upstream source so we can pull in
+ * future updates without merge conflicts. `react-refresh/only-export-
+ * components` is disabled file-wide because this file mixes the
+ * `DotMatrixBase` component with the pattern math + helpers it needs.
+ * Splitting them would fork the upstream layout; HMR is a dev-only DX
+ * concern, and the loader itself doesn't need refresh.
+ */
+/* eslint-disable react-refresh/only-export-components */
 "use client";
 
 import type { CSSProperties } from "react";

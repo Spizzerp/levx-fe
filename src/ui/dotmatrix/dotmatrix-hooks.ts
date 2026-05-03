@@ -1,3 +1,13 @@
+/*
+ * Vendored from `@dotmatrix` (https://dotmatrix.zzzzshawn.cloud/).
+ * Kept structurally identical to the upstream source so we can pull
+ * in future updates without merge conflicts. `react-hooks/set-state-
+ * in-effect` is disabled file-wide because upstream calls
+ * `setPhase(0)` / `setStep(idleStep)` from inside `useEffect` to
+ * reset state when `active` flips false. Refactoring to derived state
+ * would change the animation loop semantics.
+ */
+/* eslint-disable react-hooks/set-state-in-effect */
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -8,6 +18,16 @@ export function usePrefersReducedMotion(): boolean {
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
 
   useEffect(() => {
+    // jsdom (vitest default env) doesn't implement matchMedia, so the
+    // upstream-vendored unguarded `window.matchMedia(...)` call would
+    // throw at render time during unit tests. Bail out cleanly when
+    // the API is unavailable — `false` (= no preference, animate as
+    // usual) is a safe default both for tests and any non-browser
+    // runtime that ever picks this up.
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+      return;
+    }
+
     const query = window.matchMedia("(prefers-reduced-motion: reduce)");
 
     const update = () => {

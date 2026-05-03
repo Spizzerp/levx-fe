@@ -328,10 +328,18 @@ describe('MarketPage state-gated controls', () => {
     expect(wagerPanelQuery()).toBeInTheDocument()
   })
 
-  it('does NOT mount the wager panel when market.state is Pending (MARKET-04)', async () => {
+  it('mounts the wager panel when market.state is Pending so users see the form behind the AI loader (MARKET-04)', async () => {
+    // Pending markets used to mount a standalone PendingPathsBanner
+    // aside instead of the wager panel; that left a big empty rail
+    // for the duration of AI path generation. The current behavior
+    // mounts the same wager rail as Active/Sampling — controls
+    // disabled (the existing market.state !== 'active' gate handles
+    // that) and the path-list slot is replaced by a heart-pulse
+    // loader. Net: users see the bet they'll place rather than an
+    // empty waiting room.
     await setMarketState('pending')
     renderMarketPage()
-    expect(wagerPanelQuery()).not.toBeInTheDocument()
+    expect(wagerPanelQuery()).toBeInTheDocument()
   })
 
   it('does NOT mount the wager panel when market.state is Settling (MARKET-04)', async () => {
