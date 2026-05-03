@@ -48,12 +48,11 @@ export function CommonLayout({ children }: PropsWithChildren) {
         {children}
       </div>
       <footer className="mt-auto border-t border-ink-dim/25">
-        <div className="mx-auto flex max-w-[1680px] items-center justify-between px-10 py-4">
-          <span className="text-ink-dim font-mono text-xs">
-            © Not Your Business LLC
+        <div className="mx-auto grid max-w-[1680px] grid-cols-3 items-center px-10 py-4">
+          <span className="text-ink-dim font-mono text-xs justify-self-start">
+            Not Your Business LLC ©
           </span>
-          <div className="flex items-center gap-4">
-            {showKeeperHealth && <KeeperHealthDot />}
+          <div className="flex items-center gap-4 justify-self-center">
             <a
               href="https://x.com/LevXtrade"
               target="_blank"
@@ -70,6 +69,9 @@ export function CommonLayout({ children }: PropsWithChildren) {
             >
               <FileText size={15} strokeWidth={1.5} aria-hidden="true" />
             </Link>
+          </div>
+          <div className="flex items-center justify-self-end">
+            {showKeeperHealth && <KeeperHealthDot />}
           </div>
         </div>
       </footer>

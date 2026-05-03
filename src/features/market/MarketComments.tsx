@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState, type FormEvent } from 'react'
 import { useWalletModal } from '@solana/wallet-adapter-react-ui'
-import { MessageSquare, Send, Trash2 } from 'lucide-react'
+import { Send, Trash2 } from 'lucide-react'
 
 import {
   useComments,
@@ -122,17 +122,14 @@ export function MarketComments({ marketId }: Props) {
     <section className="flex flex-col gap-0">
       {/* Header */}
       <div className={cn('flex items-center gap-3 py-4', 'border-line border-b')}>
-        <MessageSquare size={16} strokeWidth={1.5} className="text-ink-dim" />
         <h3 className="text-ui text-ink-muted font-mono tracking-wide uppercase">Comments</h3>
         {commentCount > 0 && (
-          <span
-            className={cn(
-              'inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5',
-              'bg-line-strong text-micro text-ink-muted font-mono font-bold',
-            )}
-          >
-            {commentCount}
-          </span>
+          <>
+            <span aria-hidden="true" className="bg-line-strong h-4 w-px" />
+            <span className="text-ui text-ink-muted font-mono font-bold">
+              {commentCount}
+            </span>
+          </>
         )}
       </div>
 
@@ -166,7 +163,7 @@ export function MarketComments({ marketId }: Props) {
               key={c.id}
               className={cn(
                 'group flex items-start gap-3 py-4',
-                'border-line border-b',
+                'border-line border-b last:border-b-0',
                 'transition-colors duration-150',
               )}
             >
@@ -192,8 +189,14 @@ export function MarketComments({ marketId }: Props) {
                     </span>
                   )}
 
-                  <div className="ml-auto flex items-center gap-3">
-                    {/* Actions (only for own comment) */}
+                  <div className="ml-auto flex flex-col items-end gap-1">
+                    <span className="text-label text-ink-dim shrink-0 font-mono whitespace-nowrap">
+                      {timeAgo(c.created_at)}
+                      {c.edited_at && <span className="ml-1 italic opacity-60">(edited)</span>}
+                    </span>
+                    {/* Delete (only for own comment) — sits below the
+                        timestamp so the time stays the dominant read
+                        and the destructive action is one row removed. */}
                     {c.wallet === wallet && (
                       <button
                         onClick={() => setDeleteId(c.id)}
@@ -206,10 +209,6 @@ export function MarketComments({ marketId }: Props) {
                         delete
                       </button>
                     )}
-                    <span className="text-label text-ink-dim shrink-0 font-mono whitespace-nowrap">
-                      {timeAgo(c.created_at)}
-                      {c.edited_at && <span className="ml-1 italic opacity-60">(edited)</span>}
-                    </span>
                   </div>
                 </div>
 
@@ -234,9 +233,16 @@ export function MarketComments({ marketId }: Props) {
       {/* Input area */}
       <div className="pt-4">
         {!connected ? (
+          // Unconnected: render the same composer shape as the
+          // connected state (dashed border, placeholder, char counter,
+          // send icon) but as a single big button. Clicking anywhere —
+          // including the send icon — triggers the wallet modal.
+          // Visually consistent with the connected composer rather
+          // than swapping in a different button style.
           <button
             type="button"
             onClick={() => setVisible(true)}
+            aria-label="Connect wallet to comment"
             className={cn(
               'group flex w-full flex-col rounded-xl',
               'border-line-strong bg-surface-1/30 border border-dashed',
@@ -248,18 +254,19 @@ export function MarketComments({ marketId }: Props) {
             <div className="px-4 pt-3 pb-2 text-left">
               <span className="text-body-sm text-ink-dim italic opacity-50">Share your take…</span>
             </div>
-            {/* Footer bar */}
+            {/* Footer bar — char counter + (disabled-looking) send icon */}
             <div className="flex items-center justify-between px-4 pt-1 pb-3">
               <span className="text-label text-ink-dim font-mono opacity-40">0/2000</span>
               <span
+                aria-hidden="true"
                 className={cn(
-                  'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5',
-                  'from-brand-from to-brand-to text-surface bg-gradient-to-r',
-                  'text-label font-mono font-bold tracking-wide uppercase',
-                  'transition-opacity duration-150 group-hover:opacity-90',
+                  'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg',
+                  'border border-dashed border-line-strong bg-transparent text-ink-dim',
+                  'transition-colors duration-150',
+                  'group-hover:border-ink-strong',
                 )}
               >
-                Connect wallet
+                <Send size={14} strokeWidth={2} />
               </span>
             </div>
           </button>
