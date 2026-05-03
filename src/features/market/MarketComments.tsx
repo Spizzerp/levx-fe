@@ -11,7 +11,6 @@ import {
 } from '@/lib/supabase/hooks'
 import { SIGILS } from '@/ui/Sigils'
 import { useWalletStore } from '@/stores/walletStore'
-import { Button } from '@/ui/Button'
 import { cn } from '@/lib/cn'
 import type { Profile } from '@/lib/supabase/types'
 
@@ -209,9 +208,37 @@ export function MarketComments({ marketId }: Props) {
       {/* Input area */}
       <div className="pt-4">
         {!connected ? (
-          <Button variant="dashed" fullWidth onClick={() => setVisible(true)} type="button">
-            Connect wallet to comment
-          </Button>
+          <button
+            type="button"
+            onClick={() => setVisible(true)}
+            className={cn(
+              'group flex w-full flex-col rounded-xl',
+              'border border-dashed border-line-strong bg-surface-1/30',
+              'transition-all duration-200',
+              'hover:border-ink-muted hover:bg-surface-1/50',
+            )}
+          >
+            {/* Fake textarea placeholder */}
+            <div className="px-4 pt-3 pb-2 text-left">
+              <span className="text-body-sm text-ink-dim italic opacity-50">
+                Share your take…
+              </span>
+            </div>
+            {/* Footer bar */}
+            <div className="flex items-center justify-between px-4 pb-3 pt-1">
+              <span className="text-label text-ink-dim font-mono opacity-40">0/2000</span>
+              <span
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5',
+                  'bg-gradient-to-r from-brand-from to-brand-to text-surface',
+                  'text-label font-mono font-bold tracking-wide uppercase',
+                  'transition-opacity duration-150 group-hover:opacity-90',
+                )}
+              >
+                Connect wallet
+              </span>
+            </div>
+          </button>
         ) : (
           <form onSubmit={onSubmit} className="flex flex-col gap-0">
             {/* Textarea container */}
