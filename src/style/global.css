@@ -70,3 +70,36 @@
     transform: translateX(0);
   }
 }
+
+/* Streaming banner — infinite marquee scroll */
+@keyframes streaming-banner {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.streaming-banner-track {
+  animation: streaming-banner 40s linear infinite;
+}
+
+button:hover .streaming-banner-track {
+  animation-play-state: paused;
+}
+
+/* Disable all hover effects on touch/coarse-pointer devices */
+@media (hover: none) and (pointer: coarse) {
+  *:hover {
+    color: inherit;
+    background: inherit;
+    background-color: inherit;
+    border-color: inherit;
+    opacity: inherit;
+    transform: inherit;
+    box-shadow: inherit;
+    text-decoration: inherit;
+    filter: inherit;
+  }
+}

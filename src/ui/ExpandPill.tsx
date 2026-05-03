@@ -1,3 +1,4 @@
+import { X } from 'lucide-react'
 import { useCallback, useState, type ReactNode } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 
@@ -102,6 +103,18 @@ export function ExpandPill<T extends string = string>({
                   {o.label.toUpperCase()}
                 </motion.button>
               ))}
+
+              <motion.button
+                type="button"
+                onClick={() => setOpen(false)}
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.2, delay: 0.1 + ordered.length * 0.03 }}
+                className="text-ink-dim hover:text-ink-strong ml-1 mr-2 flex h-6 w-6 items-center justify-center rounded-full transition-colors"
+                aria-label="Close filters"
+              >
+                <X size={14} strokeWidth={2.5} />
+              </motion.button>
             </motion.div>
           )}
         </AnimatePresence>

@@ -1,6 +1,6 @@
-import { useParams } from '@tanstack/react-router'
+import { Link, useParams } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
-import { Plus } from 'lucide-react'
+import { ArrowLeft, Plus } from 'lucide-react'
 
 import { Button } from '@/ui/Button'
 import { ChartFrame } from '@/features/chart/ChartFrame'
@@ -130,13 +130,17 @@ export function MarketPage() {
   const [hoveredPathId, setHoveredPathId] = useState<string | null>(null)
   const [leverage, setLeverage] = useState(22)
   const [collateral, setCollateral] = useState('25.00')
-  const [mountTime] = useState(() => Date.now())
+  const [now, setNow] = useState(() => Date.now())
   const [showOtherPositions] = useState(false)
+
+  // Update `now` every second so countdowns tick in real time.
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [])
 
   // Exit draw mode on unmount so a user navigating away doesn't leave the store in sweeping state.
   useEffect(() => () => exitDrawMode(), [exitDrawMode])
-
-  const now = mountTime
 
   // Chart schedule from on-chain market params
   const chartMarketStart = market?.startTime ?? now
@@ -332,8 +336,7 @@ export function MarketPage() {
   const showClaimCard = market.state === 'settled'
   const showVoidPanel = market.state === 'void'
   const showPendingPaths = market.state === 'pending' && market.numPaths < 3
-  const showPositionRail =
-    !showWagerRail && !showVoidPanel && !showPendingPaths && !!userPosition
+  const showPositionRail = !showWagerRail && !showVoidPanel && !showPendingPaths && !!userPosition
   const showRail =
     showWagerRail ||
     showMaturityCard ||
@@ -352,6 +355,18 @@ export function MarketPage() {
     >
       {/* ── Chart column ─────────────────────────────── */}
       <section>
+        <Link
+          to="/markets"
+          className="group mb-5 flex items-center gap-1 text-ink-dim hover:text-ink-strong transition-colors"
+        >
+          <ArrowLeft
+            size={14}
+            strokeWidth={2}
+            className="duration-short ease-levx transition-transform group-hover:-translate-x-0.5"
+          />
+          <span className="text-micro font-mono tracking-wider uppercase">Markets</span>
+        </Link>
+
         <div className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1">
           <span className="text-ink-muted font-mono text-xs tracking-widest uppercase">
             {market.pair.replace('/', ' / ')}

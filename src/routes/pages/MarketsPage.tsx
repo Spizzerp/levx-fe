@@ -1,6 +1,6 @@
 import { useNavigate } from '@tanstack/react-router'
 import { ArrowRight, Filter } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { ChartFrame } from '@/features/chart/ChartFrame'
 import { TokenPairIcon } from '@/ui/TokenPairIcon'
@@ -56,8 +56,7 @@ function matchesFilter(state: MarketState, filter: StateFilter): boolean {
   return filter === 'all' || state === filter
 }
 
-function endsInLabel(m: Market): string {
-  const now = Date.now()
+function endsInLabel(m: Market, now: number): string {
   if (m.state === 'pending') {
     const diff = m.startTime - now
     return diff > 0 ? `STARTS IN ${formatCountdown(diff)}` : 'STARTS SOON'
@@ -70,88 +69,101 @@ function endsInLabel(m: Market): string {
 // Hidden below 1200px (matches old @media rule that hid columns 6 & 7)
 const NARROW_HIDE = '[@media(max-width:1200px)]:hidden'
 
-const COLUMNS: DataTableColumn<Market>[] = [
-  {
-    key: 'pair',
-    header: 'MARKET',
-    headerClassName: 'pl-6',
-    cellClassName: 'pl-6',
-    render: (m) => (
-      <span className="flex items-center gap-3">
-        <span className="text-ink-strong font-mono text-sm font-bold tracking-wide uppercase">{m.base}</span>
-        <TokenPairIcon base={m.base} quote={m.quote} size={32} />
-      </span>
-    ),
-  },
-  {
-    key: 'state',
-    header: 'STATE',
-    render: (m) => <StatusDot status={m.state}>{STATE_LABELS[m.state]}</StatusDot>,
-  },
-  {
-    key: 'ends',
-    header: 'EXPIRES',
-    headerClassName: 'text-right',
-    cellClassName: NUM_CELL,
-    render: (m) => endsInLabel(m),
-  },
-  {
-    key: 'pool',
-    header: 'POOL',
-    headerClassName: 'text-right',
-    cellClassName: NUM_CELL,
-    render: (m) => `${formatUSD(m.pool)} USDC`,
-  },
-  {
-    key: 'paths',
-    header: 'PATHS',
-    headerClassName: 'text-right',
-    cellClassName: NUM_CELL,
-    render: (m) => (m.paths.length > 0 ? String(m.paths.length) : '—'),
-  },
-  {
-    key: 'checkpoints',
-    header: 'PROGRESS',
-    headerClassName: cn('text-right', NARROW_HIDE),
-    cellClassName: cn(NARROW_HIDE, 'flex items-center justify-end gap-2'),
-    render: (m) => {
-      const pct = m.totalCheckpoints > 0 ? (m.completedCheckpoints / m.totalCheckpoints) * 100 : 0
-      return (
-        <span className="flex items-center gap-2">
-          <span className="relative h-1.5 w-16 overflow-hidden rounded-full bg-line-strong">
-            <span
-              className="absolute inset-y-0 left-0 rounded-full"
-              style={{
-                width: `${pct}%`,
-                background: 'linear-gradient(90deg, #F4FA4D, #5CF78B)',
-              }}
-            />
+function useNowTick(intervalMs = 1000): number {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), intervalMs)
+    return () => clearInterval(id)
+  }, [intervalMs])
+  return now
+}
+
+function buildColumns(now: number): DataTableColumn<Market>[] {
+  return [
+    {
+      key: 'pair',
+      header: 'MARKET',
+      headerClassName: 'pl-6',
+      cellClassName: 'pl-6',
+      render: (m) => (
+        <span className="flex items-center gap-3">
+          <span className="text-ink-strong font-mono text-sm font-bold tracking-wide uppercase">
+            {m.base}
           </span>
-          <span className="font-mono text-value text-ink-muted">
-            {m.completedCheckpoints}/{m.totalCheckpoints}
-          </span>
+          <TokenPairIcon base={m.base} quote={m.quote} size={32} />
         </span>
-      )
+      ),
     },
-  },
-  {
-    key: 'traders',
-    header: 'TRADERS',
-    headerClassName: cn('text-right', NARROW_HIDE),
-    cellClassName: cn(NUM_CELL, NARROW_HIDE),
-    render: (m) => m.traders.toLocaleString(),
-  },
-  {
-    key: 'arrow',
-    header: '',
-    cellClassName: cn(
-      'text-ink-dim flex justify-end',
-      'duration-short ease-levx transition-[color,transform]',
-      'group-hover:text-ink-strong group-hover:translate-x-1',
-    ),
-    render: () => <ArrowRight size={16} strokeWidth={1.75} aria-hidden />,
-  },
-]
+    {
+      key: 'state',
+      header: 'STATE',
+      render: (m) => <StatusDot status={m.state}>{STATE_LABELS[m.state]}</StatusDot>,
+    },
+    {
+      key: 'ends',
+      header: 'EXPIRES',
+      headerClassName: 'text-right',
+      cellClassName: NUM_CELL,
+      render: (m) => endsInLabel(m, now),
+    },
+    {
+      key: 'pool',
+      header: 'POOL',
+      headerClassName: 'text-right',
+      cellClassName: NUM_CELL,
+      render: (m) => `${formatUSD(m.pool)} USDC`,
+    },
+    {
+      key: 'paths',
+      header: 'PATHS',
+      headerClassName: 'text-right',
+      cellClassName: NUM_CELL,
+      render: (m) => (m.paths.length > 0 ? String(m.paths.length) : '—'),
+    },
+    {
+      key: 'checkpoints',
+      header: 'PROGRESS',
+      headerClassName: cn('text-right', NARROW_HIDE),
+      cellClassName: cn(NARROW_HIDE, 'flex items-center justify-end gap-2'),
+      render: (m) => {
+        const pct = m.totalCheckpoints > 0 ? (m.completedCheckpoints / m.totalCheckpoints) * 100 : 0
+        return (
+          <span className="flex items-center gap-2">
+            <span className="bg-line-strong relative h-1.5 w-16 overflow-hidden rounded-full">
+              <span
+                className="absolute inset-y-0 left-0 rounded-full"
+                style={{
+                  width: `${pct}%`,
+                  background: 'linear-gradient(90deg, #F4FA4D, #5CF78B)',
+                }}
+              />
+            </span>
+            <span className="text-value text-ink-muted font-mono">
+              {m.completedCheckpoints}/{m.totalCheckpoints}
+            </span>
+          </span>
+        )
+      },
+    },
+    {
+      key: 'traders',
+      header: 'TRADERS',
+      headerClassName: cn('text-right', NARROW_HIDE),
+      cellClassName: cn(NUM_CELL, NARROW_HIDE),
+      render: (m) => m.traders.toLocaleString(),
+    },
+    {
+      key: 'arrow',
+      header: '',
+      cellClassName: cn(
+        'text-ink-dim flex justify-end',
+        'duration-short ease-levx transition-[color,transform]',
+        'group-hover:text-ink-strong group-hover:translate-x-1',
+      ),
+      render: () => <ArrowRight size={16} strokeWidth={1.75} aria-hidden />,
+    },
+  ]
+}
 
 export function MarketsPage() {
   const navigate = useNavigate()
@@ -159,6 +171,8 @@ export function MarketsPage() {
   const [filter, setFilter] = useState<StateFilter>('all')
   const [page, setPage] = useState(0)
   const PAGE_SIZE = 10
+  const now = useNowTick(1000)
+  const COLUMNS = useMemo(() => buildColumns(now), [now])
 
   const visible = useMemo(
     () =>
@@ -184,50 +198,51 @@ export function MarketsPage() {
       title="Markets"
       subtitle="Predict the path, not the destination."
       subtitleInline
-      summaryBar={hasAnyMarkets ? (
-        <div className="flex items-end gap-4 pb-5">
-          {/* Stats */}
-          <div className="flex items-center gap-12">
-            <div>
-              <div className="text-label text-ink-dim mb-1 font-mono uppercase">Volume</div>
-              <div className="text-ink-strong font-mono text-4xl font-bold tracking-snug">
-                {formatUSD(markets?.reduce((s, m) => s + m.pool, 0) ?? 0)}
+      summaryBar={
+        hasAnyMarkets ? (
+          <div className="flex items-end gap-4 pb-5">
+            {/* Stats */}
+            <div className="flex items-center gap-12">
+              <div>
+                <div className="text-label text-ink-dim mb-1 font-mono uppercase">Volume</div>
+                <div className="text-ink-strong tracking-snug font-mono text-4xl font-bold">
+                  {formatUSD(markets?.reduce((s, m) => s + m.pool, 0) ?? 0)}
+                </div>
+              </div>
+              <div>
+                <div className="text-label text-ink-dim mb-1 font-mono uppercase">Active</div>
+                <div className="text-ink-strong tracking-snug flex items-center gap-2 font-mono text-4xl font-bold">
+                  {markets?.filter((m) => m.state === 'active').length ?? 0}
+                  <span className="inline-flex items-center gap-1">
+                    <span className="bg-success h-2 w-2 animate-pulse rounded-full" />
+                    <span className="text-success text-label font-normal tracking-wide">Live</span>
+                  </span>
+                </div>
+              </div>
+              <div>
+                <div className="text-label text-ink-dim mb-1 font-mono uppercase">Markets</div>
+                <div className="text-ink-strong tracking-snug font-mono text-4xl font-bold">
+                  {markets?.length ?? 0}
+                </div>
+              </div>
+              <div>
+                <div className="text-label text-ink-dim mb-1 font-mono uppercase">Traders</div>
+                <div className="text-ink-strong tracking-snug font-mono text-4xl font-bold">
+                  {(markets?.reduce((s, m) => s + m.traders, 0) ?? 0).toLocaleString()}
+                </div>
               </div>
             </div>
-            <div>
-              <div className="text-label text-ink-dim mb-1 font-mono uppercase">Active</div>
-              <div className="text-ink-strong font-mono text-4xl font-bold tracking-snug flex items-center gap-2">
-                {markets?.filter((m) => m.state === 'active').length ?? 0}
-                <span className="inline-flex items-center gap-1">
-                  <span className="h-2 w-2 rounded-full bg-success animate-pulse" />
-                  <span className="text-success text-label font-normal tracking-wide">Live</span>
-                </span>
-              </div>
-            </div>
-            <div>
-              <div className="text-label text-ink-dim mb-1 font-mono uppercase">Markets</div>
-              <div className="text-ink-strong font-mono text-4xl font-bold tracking-snug">
-                {markets?.length ?? 0}
-              </div>
-            </div>
-            <div>
-              <div className="text-label text-ink-dim mb-1 font-mono uppercase">Traders</div>
-              <div className="text-ink-strong font-mono text-4xl font-bold tracking-snug">
-                {(markets?.reduce((s, m) => s + m.traders, 0) ?? 0).toLocaleString()}
-              </div>
-            </div>
+
+            <ExpandPill
+              options={FILTERS}
+              value={filter}
+              onChange={handleFilterChange}
+              icon={<Filter size={14} strokeWidth={1.5} />}
+              className="ml-auto"
+            />
           </div>
-
-          <ExpandPill
-            options={FILTERS}
-            value={filter}
-            onChange={handleFilterChange}
-            icon={<Filter size={14} strokeWidth={1.5} />}
-            className="ml-auto"
-          />
-
-        </div>
-      ) : undefined}
+        ) : undefined
+      }
     >
       {isLoading && <MarketsTableSkeleton />}
 
@@ -240,10 +255,8 @@ export function MarketsPage() {
       )}
 
       {!isLoading && !isError && !hasAnyMarkets && (
-        <div className="flex flex-col items-center justify-center gap-4 py-24 border border-dashed border-line-strong rounded-2xl">
-          <p className="text-ink-muted font-mono text-label uppercase">
-            [ No active markets ]
-          </p>
+        <div className="border-line-strong flex flex-col items-center justify-center gap-4 rounded-2xl border border-dashed py-24">
+          <p className="text-ink-muted text-label font-mono uppercase">[ No active markets ]</p>
         </div>
       )}
 
@@ -259,20 +272,22 @@ export function MarketsPage() {
             emptyMessage="[ NO MARKETS MATCH FILTER ]"
           />
           {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-3 border-t border-line bg-surface-1 px-4 py-3 rounded-b-2xl">
+            <div className="border-line bg-surface-1 flex items-center justify-center gap-3 rounded-b-2xl border-t px-4 py-3">
               <button
                 type="button"
                 disabled={page === 0}
                 onClick={() => setPage((p) => p - 1)}
                 className={cn(
-                  'font-mono text-label uppercase tracking-wider px-3 py-1 rounded-full border border-line-strong',
+                  'text-label border-line-strong rounded-full border px-3 py-1 font-mono tracking-wider uppercase',
                   'duration-short ease-levx transition-colors',
-                  page === 0 ? 'text-ink-dim cursor-not-allowed' : 'text-ink-muted hover:text-ink-strong hover:border-ink',
+                  page === 0
+                    ? 'text-ink-dim cursor-not-allowed'
+                    : 'text-ink-muted hover:text-ink-strong hover:border-ink',
                 )}
               >
                 Prev
               </button>
-              <span className="font-mono text-label text-ink-muted uppercase tracking-wider">
+              <span className="text-label text-ink-muted font-mono tracking-wider uppercase">
                 {page + 1} / {totalPages}
               </span>
               <button
@@ -280,9 +295,11 @@ export function MarketsPage() {
                 disabled={page >= totalPages - 1}
                 onClick={() => setPage((p) => p + 1)}
                 className={cn(
-                  'font-mono text-label uppercase tracking-wider px-3 py-1 rounded-full border border-line-strong',
+                  'text-label border-line-strong rounded-full border px-3 py-1 font-mono tracking-wider uppercase',
                   'duration-short ease-levx transition-colors',
-                  page >= totalPages - 1 ? 'text-ink-dim cursor-not-allowed' : 'text-ink-muted hover:text-ink-strong hover:border-ink',
+                  page >= totalPages - 1
+                    ? 'text-ink-dim cursor-not-allowed'
+                    : 'text-ink-muted hover:text-ink-strong hover:border-ink',
                 )}
               >
                 Next
