@@ -113,6 +113,8 @@ vi.mock('@/lib/supabase/hooks', () => ({
     isPending: false,
     error: null,
   }),
+  useProfiles: () => ({ data: {}, isLoading: false, error: null }),
+  getProfileImageUrl: (path: string | null) => path ? `https://mock-storage/${path}` : null,
   useDrawBroadcast: () => ({ liveDraws: {} }),
   usePublishDrawFrame: () => () => {},
 }))

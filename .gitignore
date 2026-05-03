@@ -17,6 +17,7 @@ dist-ssr
 .planning/
 
 .claude/
+.opencode/
 
 # Editor directories and files
 .vscode/*

@@ -1,7 +1,10 @@
-// @ts-nocheck — Supabase Edge (Deno).
 
 const RAW = Deno.env.get('APP_ORIGIN') ?? '*'
-const ALLOWED = RAW.split(',').map((s) => s.trim()).filter(Boolean)
+const ALLOWED = ['http://localhost:3030'].concat(
+  RAW.split(',')
+    .map((s) => s.trim())
+    .filter(Boolean),
+)
 
 /**
  * Build CORS headers for a single request. Matches the incoming `Origin`
@@ -14,15 +17,16 @@ const ALLOWED = RAW.split(',').map((s) => s.trim()).filter(Boolean)
  */
 export function corsHeadersFor(req: Request) {
   const origin = req.headers.get('Origin') ?? ''
-  const allow =
-    ALLOWED.includes('*') ? '*'
-    : ALLOWED.includes(origin) ? origin
-    : ALLOWED[0] ?? '*'
+  const allow = ALLOWED.includes('*')
+    ? '*'
+    : ALLOWED.includes(origin)
+      ? origin
+      : (ALLOWED[0] ?? '*')
 
   return {
-    'Access-Control-Allow-Origin':  allow,
+    'Access-Control-Allow-Origin': allow,
     'Access-Control-Allow-Headers': 'apikey, Content-Type, Authorization, x-client-info',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Vary': 'Origin',
+    Vary: 'Origin',
   }
 }
