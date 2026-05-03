@@ -223,7 +223,6 @@ export function MarketComments({ marketId }: Props) {
 
         {commentCount === 0 && !isLoading && (
           <div className="flex flex-col items-center gap-2 py-10 text-center">
-            <MessageSquare size={28} strokeWidth={1} className="text-ink-dim opacity-40" />
             <p className="text-caption text-ink-dim font-mono tracking-wide uppercase">
               No comments yet
             </p>
