@@ -29,9 +29,19 @@ const indexRoute = createRoute({
   component: LandingPage,
 })
 
-const marketsRoute = createRoute({
+export type MarketsSearchParams = {
+  view?: 'table' | 'grid'
+}
+
+export const marketsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/markets',
+  validateSearch: (search: Record<string, unknown>): MarketsSearchParams => {
+    const view = search.view as string
+    return {
+      view: (view === 'grid' || view === 'table' ? view : undefined) as 'table' | 'grid' | undefined,
+    }
+  },
   component: MarketsPage,
 })
 

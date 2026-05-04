@@ -1,4 +1,4 @@
-import { useNavigate } from '@tanstack/react-router'
+import { useNavigate, useSearch } from '@tanstack/react-router'
 import { ArrowRight, Filter, LayoutGrid, List } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 
@@ -168,11 +168,30 @@ function buildColumns(now: number): DataTableColumn<Market>[] {
 }
 
 export function MarketsPage() {
-  const navigate = useNavigate()
+  const navigate = useNavigate({ from: '/markets' })
+  const { view: viewParam } = useSearch({ from: '/markets' })
+  const viewMode = viewParam ?? 'table'
+
   const { data: markets, isLoading, isError, refetch } = useMarkets()
   const [filter, setFilter] = useState<StateFilter>('all')
-  const [viewMode, setViewMode] = useState<ViewMode>('table')
   const [page, setPage] = useState(0)
+
+  // Sync with localStorage for stickiness across navigations
+  useEffect(() => {
+    const stored = localStorage.getItem('levx-view-mode') as ViewMode | null
+    
+    if (!viewParam && stored && stored !== 'table') {
+      // 1. URL has no param, but we have a stored preference (that isn't the default)
+      navigate({ search: (prev) => ({ ...prev, view: stored }), replace: true })
+    } else if (viewParam) {
+      // 2. URL has a param (either 'table' or 'grid'), update the stored preference
+      localStorage.setItem('levx-view-mode', viewParam)
+    }
+  }, [viewParam, navigate])
+
+  const setViewMode = (view: ViewMode) => {
+    navigate({ search: (prev) => ({ ...prev, view }) })
+  }
   const PAGE_SIZE = 10
   const now = useNowTick(1000)
   const COLUMNS = useMemo(() => buildColumns(now), [now])
