@@ -1,6 +1,6 @@
 import { useNavigate, useSearch } from '@tanstack/react-router'
-import { ArrowRight, Filter, LayoutGrid, List } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { ArrowRight, Filter, LayoutGrid, List, Loader2 } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { ChartFrame } from '@/features/chart/ChartFrame'
 import { MarketCard } from '@/features/market/MarketCard'
@@ -175,6 +175,7 @@ export function MarketsPage() {
   const { data: markets, isLoading, isError, refetch } = useMarkets()
   const [filter, setFilter] = useState<StateFilter>('all')
   const [page, setPage] = useState(0)
+  const [visibleCount, setVisibleCount] = useState(20) // Start with 20 for grid
 
   // Sync with localStorage for stickiness across navigations
   useEffect(() => {
@@ -205,12 +206,33 @@ export function MarketsPage() {
   )
 
   const totalPages = Math.ceil(visible.length / PAGE_SIZE)
-  const paged = visible.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+  const tableItems = visible.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+  const gridItems = visible.slice(0, visibleCount)
+
+  // Infinite Scroll Observer
+  const loadMoreRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (viewMode !== 'grid') return
+    if (visibleCount >= visible.length) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setVisibleCount((prev) => prev + 20)
+        }
+      },
+      { rootMargin: '200px' },
+    )
+
+    if (loadMoreRef.current) observer.observe(loadMoreRef.current)
+    return () => observer.disconnect()
+  }, [viewMode, visibleCount, visible.length])
 
   // Reset page when filter changes
   const handleFilterChange = (id: StateFilter) => {
     setFilter(id)
     setPage(0)
+    setVisibleCount(20)
   }
 
   const hasAnyMarkets = !isLoading && !isError && (markets?.length ?? 0) > 0
@@ -320,7 +342,7 @@ export function MarketsPage() {
         <ChartFrame glow>
           <DataTable
             columns={COLUMNS}
-            data={paged}
+            data={tableItems}
             gridCols="grid-cols-[160px_1fr_160px_160px_80px_24px]"
             gridColsWide="[@media(min-width:1201px)]:grid-cols-[200px_1fr_200px_200px_120px_160px_120px_24px]"
             keyExtractor={(m) => m.id}
@@ -373,8 +395,8 @@ export function MarketsPage() {
               'grid-cols-1 sm:grid-cols-2 [@media(min-width:1201px)]:grid-cols-3',
             )}
           >
-            {paged.length > 0 ? (
-              paged.map((m) => (
+            {gridItems.length > 0 ? (
+              gridItems.map((m) => (
                 <MarketCard
                   key={m.id}
                   market={m}
@@ -389,39 +411,11 @@ export function MarketsPage() {
               </div>
             )}
           </div>
-          {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-3 pt-4">
-              <button
-                type="button"
-                disabled={page === 0}
-                onClick={() => setPage((p) => p - 1)}
-                className={cn(
-                  'text-label border-line-strong rounded-full border px-3 py-1 font-mono tracking-wider uppercase',
-                  'duration-short ease-levx transition-colors',
-                  page === 0
-                    ? 'text-ink-dim cursor-not-allowed'
-                    : 'text-ink-muted hover:text-ink-strong hover:border-ink',
-                )}
-              >
-                Prev
-              </button>
-              <span className="text-label text-ink-muted font-mono tracking-wider uppercase">
-                {page + 1} / {totalPages}
-              </span>
-              <button
-                type="button"
-                disabled={page >= totalPages - 1}
-                onClick={() => setPage((p) => p + 1)}
-                className={cn(
-                  'text-label border-line-strong rounded-full border px-3 py-1 font-mono tracking-wider uppercase',
-                  'duration-short ease-levx transition-colors',
-                  page >= totalPages - 1
-                    ? 'text-ink-dim cursor-not-allowed'
-                    : 'text-ink-muted hover:text-ink-strong hover:border-ink',
-                )}
-              >
-                Next
-              </button>
+          
+          {/* Infinite Scroll Trigger */}
+          {visibleCount < visible.length && (
+            <div ref={loadMoreRef} className="flex items-center justify-center py-12">
+              <Loader2 className="text-ink-dim h-6 w-6 animate-spin" />
             </div>
           )}
         </>
