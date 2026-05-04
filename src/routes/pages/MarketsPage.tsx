@@ -1,8 +1,9 @@
 import { useNavigate } from '@tanstack/react-router'
-import { ArrowRight, Filter } from 'lucide-react'
+import { ArrowRight, Filter, LayoutGrid, List } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 
 import { ChartFrame } from '@/features/chart/ChartFrame'
+import { MarketCard } from '@/features/market/MarketCard'
 import { TokenPairIcon } from '@/ui/TokenPairIcon'
 import { DataTable, NUM_CELL, type DataTableColumn } from '@/ui/DataTable'
 import { ExpandPill } from '@/ui/ExpandPill'
@@ -16,6 +17,7 @@ import { PageLayout } from '@/layouts/PageLayout'
 import type { Market, MarketState } from '@/types/market'
 
 type StateFilter = 'all' | MarketState
+type ViewMode = 'table' | 'grid'
 
 const STATE_LABELS: Record<MarketState, string> = {
   pending: 'Pending',
@@ -169,6 +171,7 @@ export function MarketsPage() {
   const navigate = useNavigate()
   const { data: markets, isLoading, isError, refetch } = useMarkets()
   const [filter, setFilter] = useState<StateFilter>('all')
+  const [viewMode, setViewMode] = useState<ViewMode>('table')
   const [page, setPage] = useState(0)
   const PAGE_SIZE = 10
   const now = useNowTick(1000)
@@ -233,13 +236,47 @@ export function MarketsPage() {
               </div>
             </div>
 
-            <ExpandPill
-              options={FILTERS}
-              value={filter}
-              onChange={handleFilterChange}
-              icon={<Filter size={14} strokeWidth={1.5} />}
-              className="ml-auto"
-            />
+            <div className="ml-auto flex items-center gap-2">
+              <ExpandPill
+                options={FILTERS}
+                value={filter}
+                onChange={handleFilterChange}
+                icon={<Filter size={14} strokeWidth={1.5} />}
+              />
+
+              {/* View mode toggle */}
+              <div className="inline-flex h-9 items-center rounded-full border border-line-strong bg-surface">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('table')}
+                  aria-label="Table view"
+                  className={cn(
+                    'flex h-full items-center px-3 rounded-l-full',
+                    'duration-short ease-levx transition-colors',
+                    viewMode === 'table'
+                      ? 'text-ink-strong'
+                      : 'text-ink-dim hover:text-ink-muted',
+                  )}
+                >
+                  <List size={14} strokeWidth={1.75} />
+                </button>
+                <span className="bg-line-strong h-4 w-px" aria-hidden />
+                <button
+                  type="button"
+                  onClick={() => setViewMode('grid')}
+                  aria-label="Grid view"
+                  className={cn(
+                    'flex h-full items-center px-3 rounded-r-full',
+                    'duration-short ease-levx transition-colors',
+                    viewMode === 'grid'
+                      ? 'text-ink-strong'
+                      : 'text-ink-dim hover:text-ink-muted',
+                  )}
+                >
+                  <LayoutGrid size={14} strokeWidth={1.75} />
+                </button>
+              </div>
+            </div>
           </div>
         ) : undefined
       }
@@ -260,7 +297,7 @@ export function MarketsPage() {
         </div>
       )}
 
-      {hasAnyMarkets && (
+      {hasAnyMarkets && viewMode === 'table' && (
         <ChartFrame glow>
           <DataTable
             columns={COLUMNS}
@@ -307,6 +344,68 @@ export function MarketsPage() {
             </div>
           )}
         </ChartFrame>
+      )}
+
+      {hasAnyMarkets && viewMode === 'grid' && (
+        <>
+          <div
+            className={cn(
+              'grid gap-4',
+              'grid-cols-1 sm:grid-cols-2 [@media(min-width:1201px)]:grid-cols-3',
+            )}
+          >
+            {paged.length > 0 ? (
+              paged.map((m) => (
+                <MarketCard
+                  key={m.id}
+                  market={m}
+                  onClick={() => navigate({ to: '/market/$id', params: { id: m.id } })}
+                />
+              ))
+            ) : (
+              <div className="col-span-full border-line-strong flex flex-col items-center justify-center gap-4 rounded-2xl border border-dashed py-24">
+                <p className="text-ink-muted text-label font-mono uppercase">
+                  [ No markets match filter ]
+                </p>
+              </div>
+            )}
+          </div>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-3 pt-4">
+              <button
+                type="button"
+                disabled={page === 0}
+                onClick={() => setPage((p) => p - 1)}
+                className={cn(
+                  'text-label border-line-strong rounded-full border px-3 py-1 font-mono tracking-wider uppercase',
+                  'duration-short ease-levx transition-colors',
+                  page === 0
+                    ? 'text-ink-dim cursor-not-allowed'
+                    : 'text-ink-muted hover:text-ink-strong hover:border-ink',
+                )}
+              >
+                Prev
+              </button>
+              <span className="text-label text-ink-muted font-mono tracking-wider uppercase">
+                {page + 1} / {totalPages}
+              </span>
+              <button
+                type="button"
+                disabled={page >= totalPages - 1}
+                onClick={() => setPage((p) => p + 1)}
+                className={cn(
+                  'text-label border-line-strong rounded-full border px-3 py-1 font-mono tracking-wider uppercase',
+                  'duration-short ease-levx transition-colors',
+                  page >= totalPages - 1
+                    ? 'text-ink-dim cursor-not-allowed'
+                    : 'text-ink-muted hover:text-ink-strong hover:border-ink',
+                )}
+              >
+                Next
+              </button>
+            </div>
+          )}
+        </>
       )}
     </PageLayout>
   )

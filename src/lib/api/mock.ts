@@ -8,7 +8,14 @@
  * Types stay the same; the hooks in ./hooks.ts don't need to change.
  */
 
-import type { CurrentPrice, Market, UserPosition } from '@/types/market'
+import type {
+  CurrentPrice,
+  Market,
+  PathTone,
+  PredictionPath,
+  PricePoint,
+  UserPosition,
+} from '@/types/market'
 
 /* ── Fixture data ───────────────────────────────────────────── */
 
@@ -65,6 +72,45 @@ function makeMarket(overrides: Partial<Market> & Pick<Market, 'id' | 'marketId' 
   }
 }
 
+function generateHistory(start: number, count: number, price: number): PricePoint[] {
+  return Array.from({ length: count }, (_, i) => ({
+    time: start + i * HOUR,
+    value: price + Math.sin(i / 10) * (price * 0.05) + (Math.random() - 0.5) * (price * 0.02),
+  }))
+}
+
+function generatePaths(start: number, price: number): PredictionPath[] {
+  const tones: PathTone[] = ['ultra-bull', 'bull', 'neutral', 'bear', 'ultra-bear']
+  return tones.map((tone, i) => ({
+    id: `path-${tone}`,
+    label: tone.charAt(0).toUpperCase() + tone.slice(1),
+    tone,
+    origin: 'ai',
+    multiplier: 1.5 + Math.random(),
+    data: Array.from({ length: 24 }, (_, j) => ({
+      time: start + (j + 1) * HOUR,
+      value: price * (1 + (i - 2) * 0.05 + Math.sin(j / 5) * 0.02),
+    })),
+    pathIndex: i,
+    predictedPrices: [],
+    numCheckpoints: 24,
+    generationTimestamp: start,
+    creator: 'mock',
+    cumulativeAction: 0,
+    compositeScore: 80,
+    peakAmplitude: 1,
+    amplitudeAtDecoherence: 0,
+    dissolved: false,
+    dissolvedAtCheckpoint: 0,
+    checkpointsProcessed: 24,
+    totalWagered: 1000,
+    totalLeveragedExposure: 1000,
+    lmsrSharesOutstanding: 1000,
+    totalTimeWeightedExposure: 1000,
+    currentImpliedProbability: 2000,
+  }))
+}
+
 const NOW = Date.now()
 
 const MARKETS: Market[] = [
@@ -81,6 +127,8 @@ const MARKETS: Market[] = [
     startTime: NOW - 7 * DAY,
     endTime: NOW + 7 * DAY,
     completedCheckpoints: 168,
+    history: generateHistory(NOW - 7 * DAY, 168, 65000),
+    paths: generatePaths(NOW, 67000),
   }),
   // ── Sampling (wagers still accepted, checkpoints processing) ──
   makeMarket({
@@ -95,6 +143,8 @@ const MARKETS: Market[] = [
     startTime: NOW - 4 * DAY,
     endTime: NOW + 3 * DAY,
     completedCheckpoints: 96,
+    history: generateHistory(NOW - 4 * DAY, 96, 3500),
+    paths: generatePaths(NOW, 3600),
   }),
   // ── Pending (paths locking, wagers not yet open) ──────────
   makeMarket({
@@ -109,6 +159,8 @@ const MARKETS: Market[] = [
     startTime: NOW + 6 * HOUR,
     endTime: NOW + 7 * DAY + 6 * HOUR,
     completedCheckpoints: 0,
+    history: generateHistory(NOW - 1 * DAY, 24, 145),
+    paths: [],
   }),
   // ── Settling (all checkpoints done, scoring paths) ────────
   makeMarket({
@@ -125,6 +177,8 @@ const MARKETS: Market[] = [
     completedCheckpoints: 168,
     totalCheckpoints: 168,
     pathsScored: 3,
+    history: generateHistory(NOW - 7 * DAY, 168, 64000),
+    paths: generatePaths(NOW - 30 * MINUTE, 64500),
   }),
   // ── Maturing (dispute window open) ────────────────────────
   makeMarket({
@@ -141,6 +195,8 @@ const MARKETS: Market[] = [
     completedCheckpoints: 168,
     totalCheckpoints: 168,
     pathsScored: 5,
+    history: generateHistory(NOW - 7 * DAY, 168, 3400),
+    paths: generatePaths(NOW - 2 * HOUR, 3450),
   }),
   // ── Settled (claims open) ─────────────────────────────────
   makeMarket({
@@ -157,6 +213,8 @@ const MARKETS: Market[] = [
     completedCheckpoints: 168,
     totalCheckpoints: 168,
     pathsScored: 5,
+    history: generateHistory(NOW - 14 * DAY, 168, 140),
+    paths: generatePaths(NOW - 7 * DAY, 145),
   }),
   // ── Void (emergency refund) ───────────────────────────────
   makeMarket({
@@ -173,16 +231,18 @@ const MARKETS: Market[] = [
     completedCheckpoints: 42,
     totalCheckpoints: 168,
     pathsDissolved: 4,
+    history: generateHistory(NOW - 3 * DAY, 42, 63000),
+    paths: [],
   }),
   // ── Additional markets for pagination ────────────────────
-  makeMarket({ id: 'eth-active-2', marketId: 7, pair: 'ETH/USDC', base: 'ETH', quote: 'USDC', state: 'active', pool: 89_200, traders: 421, startTime: NOW - 5 * DAY, endTime: NOW + 2 * DAY, completedCheckpoints: 120 }),
-  makeMarket({ id: 'sol-active', marketId: 8, pair: 'SOL/USDC', base: 'SOL', quote: 'USDC', state: 'active', pool: 176_400, traders: 932, startTime: NOW - 3 * DAY, endTime: NOW + 4 * DAY, completedCheckpoints: 72 }),
-  makeMarket({ id: 'btc-sampling-2', marketId: 9, pair: 'BTC/USDC', base: 'BTC', quote: 'USDC', state: 'sampling', pool: 310_000, traders: 1580, startTime: NOW - 6 * DAY, endTime: NOW + 1 * DAY, completedCheckpoints: 144 }),
-  makeMarket({ id: 'eth-pending', marketId: 10, pair: 'ETH/USDC', base: 'ETH', quote: 'USDC', state: 'pending', pool: 0, traders: 0, startTime: NOW + 12 * HOUR, endTime: NOW + 7 * DAY + 12 * HOUR, completedCheckpoints: 0 }),
-  makeMarket({ id: 'sol-settling', marketId: 11, pair: 'SOL/USDC', base: 'SOL', quote: 'USDC', state: 'settling', pool: 95_600, traders: 467, startTime: NOW - 7 * DAY, endTime: NOW - 1 * HOUR, completedCheckpoints: 168, totalCheckpoints: 168, pathsScored: 4 }),
-  makeMarket({ id: 'btc-settled-2', marketId: 12, pair: 'BTC/USDC', base: 'BTC', quote: 'USDC', state: 'settled', pool: 220_100, traders: 1102, startTime: NOW - 14 * DAY, endTime: NOW - 7 * DAY, completedCheckpoints: 168, totalCheckpoints: 168, pathsScored: 5 }),
-  makeMarket({ id: 'eth-active-3', marketId: 13, pair: 'ETH/USDC', base: 'ETH', quote: 'USDC', state: 'active', pool: 64_300, traders: 298, startTime: NOW - 2 * DAY, endTime: NOW + 5 * DAY, completedCheckpoints: 48 }),
-  makeMarket({ id: 'sol-maturing-2', marketId: 14, pair: 'SOL/USDC', base: 'SOL', quote: 'USDC', state: 'maturing', pool: 47_800, traders: 215, startTime: NOW - 7 * DAY, endTime: NOW - 3 * HOUR, completedCheckpoints: 168, totalCheckpoints: 168, pathsScored: 5 }),
+  makeMarket({ id: 'eth-active-2', marketId: 7, pair: 'ETH/USDC', base: 'ETH', quote: 'USDC', state: 'active', pool: 89_200, traders: 421, startTime: NOW - 5 * DAY, endTime: NOW + 2 * DAY, completedCheckpoints: 120, history: generateHistory(NOW - 5 * DAY, 120, 3550), paths: generatePaths(NOW, 3600) }),
+  makeMarket({ id: 'sol-active', marketId: 8, pair: 'SOL/USDC', base: 'SOL', quote: 'USDC', state: 'active', pool: 176_400, traders: 932, startTime: NOW - 3 * DAY, endTime: NOW + 4 * DAY, completedCheckpoints: 72, history: generateHistory(NOW - 3 * DAY, 72, 148), paths: generatePaths(NOW, 150) }),
+  makeMarket({ id: 'btc-sampling-2', marketId: 9, pair: 'BTC/USDC', base: 'BTC', quote: 'USDC', state: 'sampling', pool: 310_000, traders: 1580, startTime: NOW - 6 * DAY, endTime: NOW + 1 * DAY, completedCheckpoints: 144, history: generateHistory(NOW - 6 * DAY, 144, 66000), paths: generatePaths(NOW, 66500) }),
+  makeMarket({ id: 'eth-pending', marketId: 10, pair: 'ETH/USDC', base: 'ETH', quote: 'USDC', state: 'pending', pool: 0, traders: 0, startTime: NOW + 12 * HOUR, endTime: NOW + 7 * DAY + 12 * HOUR, completedCheckpoints: 0, history: generateHistory(NOW - 1 * DAY, 24, 3480), paths: [] }),
+  makeMarket({ id: 'sol-settling', marketId: 11, pair: 'SOL/USDC', base: 'SOL', quote: 'USDC', state: 'settling', pool: 95_600, traders: 467, startTime: NOW - 7 * DAY, endTime: NOW - 1 * HOUR, completedCheckpoints: 168, totalCheckpoints: 168, pathsScored: 4, history: generateHistory(NOW - 7 * DAY, 168, 142), paths: generatePaths(NOW - 1 * HOUR, 144) }),
+  makeMarket({ id: 'btc-settled-2', marketId: 12, pair: 'BTC/USDC', base: 'BTC', quote: 'USDC', state: 'settled', pool: 220_100, traders: 1102, startTime: NOW - 14 * DAY, endTime: NOW - 7 * DAY, completedCheckpoints: 168, totalCheckpoints: 168, pathsScored: 5, history: generateHistory(NOW - 14 * DAY, 168, 62000), paths: generatePaths(NOW - 7 * DAY, 62500) }),
+  makeMarket({ id: 'eth-active-3', marketId: 13, pair: 'ETH/USDC', base: 'ETH', quote: 'USDC', state: 'active', pool: 64_300, traders: 298, startTime: NOW - 2 * DAY, endTime: NOW + 5 * DAY, completedCheckpoints: 48, history: generateHistory(NOW - 2 * DAY, 48, 3620), paths: generatePaths(NOW, 3650) }),
+  makeMarket({ id: 'sol-maturing-2', marketId: 14, pair: 'SOL/USDC', base: 'SOL', quote: 'USDC', state: 'maturing', pool: 47_800, traders: 215, startTime: NOW - 7 * DAY, endTime: NOW - 3 * HOUR, completedCheckpoints: 168, totalCheckpoints: 168, pathsScored: 5, history: generateHistory(NOW - 7 * DAY, 168, 146), paths: generatePaths(NOW - 3 * HOUR, 148) }),
 ]
 
 /* ── Mock user positions ─────────────────────────────────────
