@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react'
 
+import { cn } from '@/lib/cn'
 import { DOT_GRADIENT } from '@/lib/constants'
 
 type Status = 'active' | 'pending' | 'sampling' | 'settling' | 'maturing' | 'settled' | 'void'
@@ -7,6 +8,7 @@ type Status = 'active' | 'pending' | 'sampling' | 'settling' | 'maturing' | 'set
 interface StatusDotProps {
   status: Status
   children: ReactNode
+  className?: string
 }
 
 const statusDots: Record<Status, { bg: string; glow: string }> = {
@@ -19,7 +21,7 @@ const statusDots: Record<Status, { bg: string; glow: string }> = {
   void: { bg: DOT_GRADIENT.negative, glow: 'rgba(255, 69, 58, 0.25)' },
 }
 
-export function StatusDot({ status, children }: StatusDotProps) {
+export function StatusDot({ status, children, className }: StatusDotProps) {
   const { bg, glow } = statusDots[status]
   const dotStyle: CSSProperties = {
     background: bg,
@@ -27,7 +29,12 @@ export function StatusDot({ status, children }: StatusDotProps) {
   }
 
   return (
-    <span className="text-label text-ink-muted inline-flex items-center gap-2 font-mono uppercase">
+    <span
+      className={cn(
+        'text-label text-ink-muted inline-flex items-center gap-2 font-mono uppercase',
+        className,
+      )}
+    >
       <span className="h-1.5 w-1.5 rounded-full" style={dotStyle} aria-hidden />
       {children}
     </span>

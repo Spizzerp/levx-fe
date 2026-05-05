@@ -52,6 +52,14 @@ export function formatMarketDurationLabel(startMs: number, endMs: number): strin
   return `${days} Day Market`
 }
 
+/** e.g. May 7 */
+export function formatShortDate(epochMs: number): string {
+  return new Date(epochMs).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+  })
+}
+
 /** Max leverage cap by duration (§9.2 of the architecture doc) */
 export function maxLeverageByDuration(durationMs: number): number {
   const days = durationMs / (24 * 60 * 60 * 1000)

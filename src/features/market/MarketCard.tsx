@@ -1,7 +1,7 @@
 import { StatusDot } from '@/ui/StatusDot'
 import { TokenPairIcon } from '@/ui/TokenPairIcon'
 import { cn } from '@/lib/cn'
-import { formatCountdown, formatMarketDurationLabel } from '@/lib/format'
+import { formatCountdown, formatMarketDurationLabel, formatShortDate } from '@/lib/format'
 
 import type { Market, MarketState } from '@/types/market'
 import { useBenchmarksHistory } from '@/lib/pyth/useBenchmarksHistory'
@@ -60,6 +60,7 @@ export function MarketCard({ market, now, onClick }: MarketCardProps) {
   const { value: pctChange, isPositive } = calculatePctChange({ ...market, history: historyToUse })
   const timeLabel = marketTimeLabel(market, now)
   const durationLabel = formatMarketDurationLabel(market.startTime, market.endTime)
+  const endDateLabel = formatShortDate(market.endTime)
 
   return (
     <button
@@ -123,8 +124,8 @@ export function MarketCard({ market, now, onClick }: MarketCardProps) {
         {/* Top Section: Title & Status */}
         <div className="flex items-start justify-between p-6 pb-0">
           <div className="flex min-w-0 flex-col gap-1 pr-4">
-            <span className="text-ink-strong font-display text-2xl leading-none font-bold tracking-tight">
-              {market.base}
+            <span className="text-ink-strong font-display text-xl leading-tight font-bold">
+              Where will {market.base} be by {endDateLabel}?
             </span>
             <span
               className={cn(
@@ -144,7 +145,9 @@ export function MarketCard({ market, now, onClick }: MarketCardProps) {
               )}
             </span>
           </div>
-          <StatusDot status={market.state}>{STATE_LABELS[market.state]}</StatusDot>
+          <StatusDot status={market.state} className="text-nano">
+            {STATE_LABELS[market.state]}
+          </StatusDot>
         </div>
 
         {/* Middle Section: Chart */}
