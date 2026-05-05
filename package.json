@@ -38,6 +38,7 @@
     "@tanstack/react-router": "^1.157.16",
     "@visx/axis": "^3.12.0",
     "@visx/curve": "^3.12.0",
+    "@visx/gradient": "^3.12.0",
     "@visx/grid": "^3.12.0",
     "@visx/group": "^3.12.0",
     "@visx/responsive": "^3.12.0",
