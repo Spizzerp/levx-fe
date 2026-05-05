@@ -19,6 +19,7 @@ import { useYAxisFreeze } from '@/lib/drawing/yFreeze'
 import { useChartViewport } from '@/lib/chart/useChartViewport'
 import { useYAxisViewport } from '@/lib/chart/useYAxisViewport'
 import { computeVisiblePriceDomain } from '@/lib/chart/computeVisiblePriceDomain'
+import { projectPredictionPathsForChart } from '@/lib/chart/projectPredictionPaths'
 import { DrawingGrid } from '@/features/chart/DrawingGrid'
 import { DrawingToolbar } from '@/features/chart/DrawingToolbar'
 import { ChartMorphLine } from '@/features/chart/ChartMorphLine'
@@ -139,11 +140,20 @@ function ChartInner({
   const clipId = useId()
 
   /* ── Morph animation state ─────────────────────────────────── */
-  const [chartRevealing, setChartRevealing] = useState(!isLoading)
-  useEffect(() => {
-    if (isLoading) setChartRevealing(false)
-  }, [isLoading])
-  const handleRevealChart = useCallback(() => setChartRevealing(true), [])
+  const [chartReveal, setChartReveal] = useState(() => ({
+    isLoading,
+    revealed: !isLoading,
+  }))
+  if (chartReveal.isLoading !== isLoading) {
+    setChartReveal({
+      isLoading,
+      revealed: false,
+    })
+  }
+  const handleRevealChart = useCallback(
+    () => setChartReveal((state) => ({ ...state, revealed: true })),
+    [],
+  )
 
   /* ── Pyth live tick subscription ────────────────────────── */
   const feedId = pair ? feedIdForPair(pair) : null
@@ -156,6 +166,20 @@ function ChartInner({
     if (lastHistoryPoint && latestTick.time <= lastHistoryPoint.time) return history
     return [...history, { time: latestTick.time, value: latestTick.value }]
   }, [history, latestTick])
+
+  const lastHistoryPoint = mergedHistory[mergedHistory.length - 1]
+
+  const projectedPredictions = useMemo(
+    () =>
+      projectPredictionPathsForChart({
+        predictions,
+        nowTime,
+        marketStart,
+        marketEnd,
+        anchorValue: lastHistoryPoint?.value,
+      }),
+    [predictions, nowTime, marketStart, marketEnd, lastHistoryPoint?.value],
+  )
 
   /* ── Drawing store subscription ─────────────────────────── */
   const isDrawMode = useDrawingStore((s) => s.state.phase !== 'idle')
@@ -173,7 +197,7 @@ function ChartInner({
     // Right edge: extend to marketEnd if it's in the future (blank space for
     // predictions / drawing), or to the end of prediction data, whichever is later.
     let rightEdge = Math.max(lastData, marketEnd)
-    predictions.forEach((p) => {
+    projectedPredictions.forEach((p) => {
       const last = p.data[p.data.length - 1]
       if (last && last.time > rightEdge) rightEdge = last.time
     })
@@ -185,7 +209,7 @@ function ChartInner({
     }
 
     return [first, rightEdge]
-  }, [mergedHistory, predictions, marketEnd, nowTime])
+  }, [mergedHistory, projectedPredictions, marketEnd, nowTime])
 
   const maxSpanMs = useMemo(() => {
     const totalSpan = timeDomain[1] - timeDomain[0]
@@ -222,8 +246,8 @@ function ChartInner({
 
   /* ── Price domain: envelope of data visible in viewport ──── */
   const priceDomainLive = useMemo<[number, number]>(
-    () => computeVisiblePriceDomain(mergedHistory, predictions, viewportTimeDomain),
-    [mergedHistory, predictions, viewportTimeDomain],
+    () => computeVisiblePriceDomain(mergedHistory, projectedPredictions, viewportTimeDomain),
+    [mergedHistory, projectedPredictions, viewportTimeDomain],
   )
 
   /* ── Y-axis freeze: domain held fixed during sweeping phase ── */
@@ -262,7 +286,7 @@ function ChartInner({
   )
 
   /** True once the morph is close enough that real chart elements can fade in */
-  const chartRevealed = chartRevealing && !isLoading
+  const chartRevealed = !isLoading && chartReveal.isLoading === isLoading && chartReveal.revealed
 
   /* ── Crosshair state ─────────────────────────────────────── */
   // Store only the data-space coords (time, value). Pixel positions are
@@ -285,7 +309,7 @@ function ChartInner({
       // In the past → read from history. In the future → read from selected prediction (if any).
       let sourceData: PricePoint[] = mergedHistory
       if (t > nowTime && selectedPathId) {
-        const selected = predictions.find((p) => p.id === selectedPathId)
+        const selected = projectedPredictions.find((p) => p.id === selectedPathId)
         if (selected) sourceData = selected.data
       }
       if (sourceData.length === 0) return
@@ -295,7 +319,7 @@ function ChartInner({
       const d = !d1 ? d0 : !d0 ? d1 : t - d0.time > d1.time - t ? d1 : d0
       if (d) setHover({ time: d.time, value: d.value })
     },
-    [innerWidth, selectedPathId, timeScale, mergedHistory, predictions, nowTime],
+    [innerWidth, selectedPathId, timeScale, mergedHistory, projectedPredictions, nowTime],
   )
 
   const handleLeave = useCallback(() => setHover(null), [])
@@ -303,8 +327,7 @@ function ChartInner({
   if (innerWidth <= 0 || innerHeight <= 0) return null
 
   const nowX = timeScale(nowTime)
-  const selected = predictions.find((p) => p.id === selectedPathId)
-  const lastHistoryPoint = mergedHistory[mergedHistory.length - 1]
+  const selected = projectedPredictions.find((p) => p.id === selectedPathId)
   const showMarketStartMarker = marketStart > nowTime
   const marketStartX = timeScale(marketStart)
   const showMarketEndMarker = marketEnd > nowTime
@@ -359,7 +382,7 @@ function ChartInner({
         {/* ── Chart data (fades in after morph) ──────── */}
         <g style={{ opacity: chartRevealed ? 1 : 0, transition: 'opacity 400ms ease' }}>
           {/* ── Prediction paths ────────────────────── */}
-          {predictions.map((path) => {
+          {projectedPredictions.map((path) => {
             const style = TONE_STYLES[path.tone]
             const isSelected = selectedPathId === path.id || selectedPathIds?.has(path.id)
             return (
@@ -381,7 +404,7 @@ function ChartInner({
 
           {/* ── Other positions overlay (wagered paths, not selected) ── */}
           {showOtherPositions &&
-            predictions
+            projectedPredictions
               .filter((p) => p.id !== selectedPathId && p.totalWagered > 0)
               .map((path) => (
                 <LinePath<PricePoint>
@@ -399,7 +422,7 @@ function ChartInner({
               ))}
 
           {/* ── Selected prediction overlays — solid line for each selected path ── */}
-          {selectionInteractive && predictions
+          {selectionInteractive && projectedPredictions
             .filter((p) => selectedPathIds?.has(p.id) || p.id === selectedPathId)
             .map((path) => (
               <LinePath<PricePoint>
