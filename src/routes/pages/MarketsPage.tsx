@@ -1,8 +1,10 @@
-import { useNavigate } from '@tanstack/react-router'
-import { ArrowRight, Filter } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useNavigate, useSearch } from '@tanstack/react-router'
+import { ArrowRight, Filter, LayoutGrid, List, Loader2 } from 'lucide-react'
+import { AnimatePresence, motion } from 'motion/react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { ChartFrame } from '@/features/chart/ChartFrame'
+import { MarketCard } from '@/features/market/MarketCard'
 import { TokenPairIcon } from '@/ui/TokenPairIcon'
 import { DataTable, NUM_CELL, type DataTableColumn } from '@/ui/DataTable'
 import { ExpandPill } from '@/ui/ExpandPill'
@@ -16,6 +18,7 @@ import { PageLayout } from '@/layouts/PageLayout'
 import type { Market, MarketState } from '@/types/market'
 
 type StateFilter = 'all' | MarketState
+type ViewMode = 'table' | 'grid'
 
 const STATE_LABELS: Record<MarketState, string> = {
   pending: 'Pending',
@@ -166,10 +169,31 @@ function buildColumns(now: number): DataTableColumn<Market>[] {
 }
 
 export function MarketsPage() {
-  const navigate = useNavigate()
+  const navigate = useNavigate({ from: '/markets' })
+  const { view: viewParam } = useSearch({ from: '/markets' })
+  const viewMode = viewParam ?? 'table'
+
   const { data: markets, isLoading, isError, refetch } = useMarkets()
   const [filter, setFilter] = useState<StateFilter>('all')
   const [page, setPage] = useState(0)
+  const [visibleCount, setVisibleCount] = useState(20) // Start with 20 for grid
+
+  // Sync with localStorage for stickiness across navigations
+  useEffect(() => {
+    const stored = localStorage.getItem('levx-view-mode') as ViewMode | null
+    
+    if (!viewParam && stored && stored !== 'table') {
+      // 1. URL has no param, but we have a stored preference (that isn't the default)
+      navigate({ search: (prev) => ({ ...prev, view: stored }), replace: true })
+    } else if (viewParam) {
+      // 2. URL has a param (either 'table' or 'grid'), update the stored preference
+      localStorage.setItem('levx-view-mode', viewParam)
+    }
+  }, [viewParam, navigate])
+
+  const setViewMode = (view: ViewMode) => {
+    navigate({ search: (prev) => ({ ...prev, view }) })
+  }
   const PAGE_SIZE = 10
   const now = useNowTick(1000)
   const COLUMNS = useMemo(() => buildColumns(now), [now])
@@ -183,12 +207,33 @@ export function MarketsPage() {
   )
 
   const totalPages = Math.ceil(visible.length / PAGE_SIZE)
-  const paged = visible.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+  const tableItems = visible.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+  const gridItems = visible.slice(0, visibleCount)
+
+  // Infinite Scroll Observer
+  const loadMoreRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (viewMode !== 'grid') return
+    if (visibleCount >= visible.length) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setVisibleCount((prev) => prev + 20)
+        }
+      },
+      { rootMargin: '200px' },
+    )
+
+    if (loadMoreRef.current) observer.observe(loadMoreRef.current)
+    return () => observer.disconnect()
+  }, [viewMode, visibleCount, visible.length])
 
   // Reset page when filter changes
   const handleFilterChange = (id: StateFilter) => {
     setFilter(id)
     setPage(0)
+    setVisibleCount(20)
   }
 
   const hasAnyMarkets = !isLoading && !isError && (markets?.length ?? 0) > 0
@@ -233,13 +278,47 @@ export function MarketsPage() {
               </div>
             </div>
 
-            <ExpandPill
-              options={FILTERS}
-              value={filter}
-              onChange={handleFilterChange}
-              icon={<Filter size={14} strokeWidth={1.5} />}
-              className="ml-auto"
-            />
+            <div className="ml-auto flex items-center gap-2">
+              <ExpandPill
+                options={FILTERS}
+                value={filter}
+                onChange={handleFilterChange}
+                icon={<Filter size={14} strokeWidth={1.5} />}
+              />
+
+              {/* View mode toggle */}
+              <div className="inline-flex h-9 items-center rounded-full border border-line-strong bg-surface">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('table')}
+                  aria-label="Table view"
+                  className={cn(
+                    'flex h-full items-center px-3 rounded-l-full',
+                    'duration-short ease-levx transition-colors',
+                    viewMode === 'table'
+                      ? 'text-ink-strong'
+                      : 'text-ink-dim hover:text-ink-muted',
+                  )}
+                >
+                  <List size={14} strokeWidth={1.75} />
+                </button>
+                <span className="bg-line-strong h-4 w-px" aria-hidden />
+                <button
+                  type="button"
+                  onClick={() => setViewMode('grid')}
+                  aria-label="Grid view"
+                  className={cn(
+                    'flex h-full items-center px-3 rounded-r-full',
+                    'duration-short ease-levx transition-colors',
+                    viewMode === 'grid'
+                      ? 'text-ink-strong'
+                      : 'text-ink-dim hover:text-ink-muted',
+                  )}
+                >
+                  <LayoutGrid size={14} strokeWidth={1.75} />
+                </button>
+              </div>
+            </div>
           </div>
         ) : undefined
       }
@@ -260,11 +339,11 @@ export function MarketsPage() {
         </div>
       )}
 
-      {hasAnyMarkets && (
+      {hasAnyMarkets && viewMode === 'table' && (
         <ChartFrame glow>
           <DataTable
             columns={COLUMNS}
-            data={paged}
+            data={tableItems}
             gridCols="grid-cols-[160px_1fr_160px_160px_80px_24px]"
             gridColsWide="[@media(min-width:1201px)]:grid-cols-[200px_1fr_200px_200px_120px_160px_120px_24px]"
             keyExtractor={(m) => m.id}
@@ -307,6 +386,64 @@ export function MarketsPage() {
             </div>
           )}
         </ChartFrame>
+      )}
+
+      {hasAnyMarkets && viewMode === 'grid' && (
+        <>
+          <motion.div
+            layout
+            className={cn(
+              'grid gap-6',
+              'grid-cols-1 sm:grid-cols-2 [@media(min-width:1201px)]:grid-cols-3',
+            )}
+          >
+            <AnimatePresence mode="popLayout">
+              {gridItems.length > 0 ? (
+                gridItems.map((m, i) => (
+                  <motion.div
+                    key={m.id}
+                    layout
+                    className="w-full"
+                    initial={{ opacity: 0, scale: 0.92, y: 16 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.88, y: -8 }}
+                    transition={{
+                      duration: 0.3,
+                      delay: i * 0.03,
+                      ease: [0.25, 0.46, 0.45, 0.94],
+                      layout: { duration: 0.35, ease: [0.25, 0.46, 0.45, 0.94] },
+                    }}
+                  >
+                    <MarketCard
+                      market={m}
+                      onClick={() => navigate({ to: '/market/$id', params: { id: m.id } })}
+                    />
+                  </motion.div>
+                ))
+              ) : (
+                <motion.div
+                  key="empty"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="col-span-full border-line-strong flex flex-col items-center justify-center gap-4 rounded-2xl border border-dashed py-24"
+                >
+                  <p className="text-ink-muted text-label font-mono uppercase">
+                    [ No markets match filter ]
+                  </p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+
+          {/* Infinite Scroll Trigger */}
+          {visibleCount < visible.length && (
+            <div ref={loadMoreRef} className="flex items-center justify-center py-12">
+              <Loader2 className="text-ink-dim h-6 w-6 animate-spin" />
+            </div>
+          )}
+        </>
       )}
     </PageLayout>
   )
