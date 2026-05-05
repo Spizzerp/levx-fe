@@ -339,111 +339,128 @@ export function MarketsPage() {
         </div>
       )}
 
-      {hasAnyMarkets && viewMode === 'table' && (
-        <ChartFrame glow>
-          <DataTable
-            columns={COLUMNS}
-            data={tableItems}
-            gridCols="grid-cols-[160px_1fr_160px_160px_80px_24px]"
-            gridColsWide="[@media(min-width:1201px)]:grid-cols-[200px_1fr_200px_200px_120px_160px_120px_24px]"
-            keyExtractor={(m) => m.id}
-            onRowClick={(m) => navigate({ to: '/market/$id', params: { id: m.id } })}
-            emptyMessage="[ NO MARKETS MATCH FILTER ]"
-          />
-          {totalPages > 1 && (
-            <div className="border-line bg-surface-1 flex items-center justify-center gap-3 rounded-b-2xl border-t px-4 py-3">
-              <button
-                type="button"
-                disabled={page === 0}
-                onClick={() => setPage((p) => p - 1)}
+      {hasAnyMarkets && (
+        <AnimatePresence mode="wait" initial={false}>
+          {viewMode === 'table' ? (
+            <motion.div
+              key="table"
+              initial={{ opacity: 0, y: 14, scale: 0.985 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -10, scale: 0.985 }}
+              transition={{ duration: 0.24, ease: [0.25, 0.46, 0.45, 0.94] }}
+            >
+              <ChartFrame glow>
+                <DataTable
+                  columns={COLUMNS}
+                  data={tableItems}
+                  gridCols="grid-cols-[160px_1fr_160px_160px_80px_24px]"
+                  gridColsWide="[@media(min-width:1201px)]:grid-cols-[200px_1fr_200px_200px_120px_160px_120px_24px]"
+                  keyExtractor={(m) => m.id}
+                  onRowClick={(m) => navigate({ to: '/market/$id', params: { id: m.id } })}
+                  emptyMessage="[ NO MARKETS MATCH FILTER ]"
+                />
+                {totalPages > 1 && (
+                  <div className="border-line bg-surface-1 flex items-center justify-center gap-3 rounded-b-2xl border-t px-4 py-3">
+                    <button
+                      type="button"
+                      disabled={page === 0}
+                      onClick={() => setPage((p) => p - 1)}
+                      className={cn(
+                        'text-label border-line-strong rounded-full border px-3 py-1 font-mono tracking-wider uppercase',
+                        'duration-short ease-levx transition-colors',
+                        page === 0
+                          ? 'text-ink-dim cursor-not-allowed'
+                          : 'text-ink-muted hover:text-ink-strong hover:border-ink',
+                      )}
+                    >
+                      Prev
+                    </button>
+                    <span className="text-label text-ink-muted font-mono tracking-wider uppercase">
+                      {page + 1} / {totalPages}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={page >= totalPages - 1}
+                      onClick={() => setPage((p) => p + 1)}
+                      className={cn(
+                        'text-label border-line-strong rounded-full border px-3 py-1 font-mono tracking-wider uppercase',
+                        'duration-short ease-levx transition-colors',
+                        page >= totalPages - 1
+                          ? 'text-ink-dim cursor-not-allowed'
+                          : 'text-ink-muted hover:text-ink-strong hover:border-ink',
+                      )}
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
+              </ChartFrame>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="grid"
+              initial={{ opacity: 0, y: 14, scale: 0.985 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -10, scale: 0.985 }}
+              transition={{ duration: 0.24, ease: [0.25, 0.46, 0.45, 0.94] }}
+            >
+              <motion.div
+                layout
                 className={cn(
-                  'text-label border-line-strong rounded-full border px-3 py-1 font-mono tracking-wider uppercase',
-                  'duration-short ease-levx transition-colors',
-                  page === 0
-                    ? 'text-ink-dim cursor-not-allowed'
-                    : 'text-ink-muted hover:text-ink-strong hover:border-ink',
+                  'grid gap-6',
+                  'grid-cols-1 sm:grid-cols-2 [@media(min-width:1201px)]:grid-cols-3',
                 )}
               >
-                Prev
-              </button>
-              <span className="text-label text-ink-muted font-mono tracking-wider uppercase">
-                {page + 1} / {totalPages}
-              </span>
-              <button
-                type="button"
-                disabled={page >= totalPages - 1}
-                onClick={() => setPage((p) => p + 1)}
-                className={cn(
-                  'text-label border-line-strong rounded-full border px-3 py-1 font-mono tracking-wider uppercase',
-                  'duration-short ease-levx transition-colors',
-                  page >= totalPages - 1
-                    ? 'text-ink-dim cursor-not-allowed'
-                    : 'text-ink-muted hover:text-ink-strong hover:border-ink',
-                )}
-              >
-                Next
-              </button>
-            </div>
-          )}
-        </ChartFrame>
-      )}
+                <AnimatePresence mode="popLayout">
+                  {gridItems.length > 0 ? (
+                    gridItems.map((m, i) => (
+                      <motion.div
+                        key={m.id}
+                        layout
+                        className="w-full"
+                        initial={{ opacity: 0, scale: 0.92, y: 16 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.88, y: -8 }}
+                        transition={{
+                          duration: 0.3,
+                          delay: i * 0.03,
+                          ease: [0.25, 0.46, 0.45, 0.94],
+                          layout: { duration: 0.35, ease: [0.25, 0.46, 0.45, 0.94] },
+                        }}
+                      >
+                        <MarketCard
+                          market={m}
+                          now={now}
+                          onClick={() => navigate({ to: '/market/$id', params: { id: m.id } })}
+                        />
+                      </motion.div>
+                    ))
+                  ) : (
+                    <motion.div
+                      key="empty"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="col-span-full border-line-strong flex flex-col items-center justify-center gap-4 rounded-2xl border border-dashed py-24"
+                    >
+                      <p className="text-ink-muted text-label font-mono uppercase">
+                        [ No markets match filter ]
+                      </p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
 
-      {hasAnyMarkets && viewMode === 'grid' && (
-        <>
-          <motion.div
-            layout
-            className={cn(
-              'grid gap-6',
-              'grid-cols-1 sm:grid-cols-2 [@media(min-width:1201px)]:grid-cols-3',
-            )}
-          >
-            <AnimatePresence mode="popLayout">
-              {gridItems.length > 0 ? (
-                gridItems.map((m, i) => (
-                  <motion.div
-                    key={m.id}
-                    layout
-                    className="w-full"
-                    initial={{ opacity: 0, scale: 0.92, y: 16 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.88, y: -8 }}
-                    transition={{
-                      duration: 0.3,
-                      delay: i * 0.03,
-                      ease: [0.25, 0.46, 0.45, 0.94],
-                      layout: { duration: 0.35, ease: [0.25, 0.46, 0.45, 0.94] },
-                    }}
-                  >
-                    <MarketCard
-                      market={m}
-                      onClick={() => navigate({ to: '/market/$id', params: { id: m.id } })}
-                    />
-                  </motion.div>
-                ))
-              ) : (
-                <motion.div
-                  key="empty"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="col-span-full border-line-strong flex flex-col items-center justify-center gap-4 rounded-2xl border border-dashed py-24"
-                >
-                  <p className="text-ink-muted text-label font-mono uppercase">
-                    [ No markets match filter ]
-                  </p>
-                </motion.div>
+              {/* Infinite Scroll Trigger */}
+              {visibleCount < visible.length && (
+                <div ref={loadMoreRef} className="flex items-center justify-center py-12">
+                  <Loader2 className="text-ink-dim h-6 w-6 animate-spin" />
+                </div>
               )}
-            </AnimatePresence>
-          </motion.div>
-
-          {/* Infinite Scroll Trigger */}
-          {visibleCount < visible.length && (
-            <div ref={loadMoreRef} className="flex items-center justify-center py-12">
-              <Loader2 className="text-ink-dim h-6 w-6 animate-spin" />
-            </div>
+            </motion.div>
           )}
-        </>
+        </AnimatePresence>
       )}
     </PageLayout>
   )

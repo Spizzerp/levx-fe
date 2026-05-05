@@ -37,10 +37,19 @@ export function formatCountdown(ms: number): string {
   return `${days}D · ${pad(hours)}:${pad(minutes)}:${pad(seconds)}`
 }
 
-/** e.g. 7 days → "7D MARKET" */
+/** e.g. 7 days -> "7 Day Market", 12 hours -> "12 Hour Market" */
 export function formatMarketDurationLabel(startMs: number, endMs: number): string {
-  const days = Math.round((endMs - startMs) / (24 * 60 * 60 * 1000))
-  return `${days}D MARKET`
+  const durationMs = Math.max(0, endMs - startMs)
+  const hourMs = 60 * 60 * 1000
+  const dayMs = 24 * hourMs
+
+  if (durationMs < dayMs) {
+    const hours = Math.max(1, Math.round(durationMs / hourMs))
+    return `${hours} Hour Market`
+  }
+
+  const days = Math.max(1, Math.round(durationMs / dayMs))
+  return `${days} Day Market`
 }
 
 /** Max leverage cap by duration (§9.2 of the architecture doc) */

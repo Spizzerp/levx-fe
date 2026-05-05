@@ -146,5 +146,61 @@
   display: none;
 }
 
+/* -- Market card hover dither ---------------------------- */
+
+.market-card-hover-glow {
+  isolation: isolate;
+}
+
+:root.dark .market-card-hover-glow:hover {
+  box-shadow:
+    0 0 18px rgba(255, 255, 255, 0.10),
+    0 0 46px rgba(255, 255, 255, 0.06),
+    0 0 90px rgba(255, 255, 255, 0.03);
+}
+
+:root:not(.dark) .market-card-hover-glow::after {
+  background: radial-gradient(
+    ellipse 100% 80% at 50% 50%,
+    rgba(0, 0, 0, 0.08) 0%,
+    rgba(0, 0, 0, 0.04) 42%,
+    transparent 70%
+  );
+}
+
+:root.dark .market-card-hover-glow::after {
+  background: radial-gradient(
+    ellipse 100% 80% at 50% 50%,
+    rgba(255, 255, 255, 0.16) 0%,
+    rgba(255, 255, 255, 0.08) 42%,
+    transparent 70%
+  );
+}
+
+.market-card-hover-glow::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  mask-image:
+    radial-gradient(ellipse 100% 80% at 50% 50%, black 0%, rgba(0,0,0,0.7) 36%, transparent 72%),
+    url("data:image/svg+xml,%3Csvg width='3' height='3' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='1' height='1' fill='white'/%3E%3C/svg%3E");
+  mask-size: 100% 100%, 3px 3px;
+  mask-composite: intersect;
+  -webkit-mask-image:
+    radial-gradient(ellipse 100% 80% at 50% 50%, black 0%, rgba(0,0,0,0.7) 36%, transparent 72%),
+    url("data:image/svg+xml,%3Csvg width='3' height='3' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='1' height='1' fill='white'/%3E%3C/svg%3E");
+  -webkit-mask-size: 100% 100%, 3px 3px;
+  -webkit-mask-composite: source-in;
+  transition: opacity 250ms cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+.market-card-hover-glow:hover::after {
+  opacity: 1;
+}
+
 /* Landing-page-specific CSS (dither, rise, typing cursor, marker-hide)
    lives in src/routes/pages/landing.css — imported by LandingPage.tsx. */

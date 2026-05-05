@@ -1,6 +1,7 @@
 import { StatusDot } from '@/ui/StatusDot'
 import { TokenPairIcon } from '@/ui/TokenPairIcon'
 import { cn } from '@/lib/cn'
+import { formatCountdown, formatMarketDurationLabel } from '@/lib/format'
 
 import type { Market, MarketState } from '@/types/market'
 import { useBenchmarksHistory } from '@/lib/pyth/useBenchmarksHistory'
@@ -18,6 +19,7 @@ const STATE_LABELS: Record<MarketState, string> = {
 
 interface MarketCardProps {
   market: Market
+  now: number
   onClick: () => void
 }
 
@@ -36,7 +38,19 @@ function calculatePctChange(market: Market): { value: number; isPositive: boolea
   return { value: Math.abs(diff), isPositive: diff >= 0 }
 }
 
-export function MarketCard({ market, onClick }: MarketCardProps) {
+function marketTimeLabel(market: Market, now: number): { label: string; value: string } | null {
+  if (market.state === 'pending' || market.startTime > now) {
+    return { label: 'Opens in:', value: formatCountdown(Math.max(0, market.startTime - now)) }
+  }
+
+  if (market.state !== 'settled' && market.state !== 'void' && market.endTime > now) {
+    return { label: 'Ends in:', value: formatCountdown(market.endTime - now) }
+  }
+
+  return null
+}
+
+export function MarketCard({ market, now, onClick }: MarketCardProps) {
   const { data: realHistory } = useBenchmarksHistory({
     pair: market.pair,
     interval: '1h',
@@ -44,6 +58,8 @@ export function MarketCard({ market, onClick }: MarketCardProps) {
 
   const historyToUse = realHistory && realHistory.length > 0 ? realHistory : market.history
   const { value: pctChange, isPositive } = calculatePctChange({ ...market, history: historyToUse })
+  const timeLabel = marketTimeLabel(market, now)
+  const durationLabel = formatMarketDurationLabel(market.startTime, market.endTime)
 
   return (
     <button
@@ -56,6 +72,7 @@ export function MarketCard({ market, onClick }: MarketCardProps) {
         'border-line from-surface-1 to-surface-2 rounded-[24px] border bg-gradient-to-b',
         'text-left',
         'duration-medium ease-levx transition-all',
+        'market-card-hover-glow',
         'hover:-translate-y-1.5 hover:shadow-[0_32px_64px_-16px_rgba(0,0,0,0.7)]',
         isPositive ? 'hover:border-success/50' : 'hover:border-accent/50',
       )}
@@ -70,7 +87,7 @@ export function MarketCard({ market, onClick }: MarketCardProps) {
 
       {/* ── Background Dot Pattern ── */}
       <div
-        className="pointer-events-none absolute inset-0 z-0 opacity-[0.03] transition-opacity duration-500 group-hover:opacity-[0.08]"
+        className="pointer-events-none absolute inset-0 z-0 opacity-[0.03] transition-opacity duration-500 group-hover:opacity-[0.05]"
         style={{
           backgroundImage: 'radial-gradient(circle, var(--ink-strong) 1px, transparent 1px)',
           backgroundSize: '12px 12px',
@@ -79,7 +96,7 @@ export function MarketCard({ market, onClick }: MarketCardProps) {
 
       {/* ── Background Vignette ── */}
       <div
-        className="pointer-events-none absolute inset-0 z-0 opacity-40 transition-opacity duration-500 group-hover:opacity-60"
+        className="pointer-events-none absolute inset-0 z-0 opacity-40 transition-opacity duration-500 group-hover:opacity-50"
         style={{
           background: `radial-gradient(circle at 50% 50%, transparent 0%, var(--surface) 100%)`,
         }}
@@ -87,13 +104,13 @@ export function MarketCard({ market, onClick }: MarketCardProps) {
 
       {/* ── Hover Shine Sweep ── */}
       <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden">
-        <div className="absolute inset-0 h-full w-[200%] -translate-x-full rotate-[35deg] bg-gradient-to-r from-transparent via-white/[0.05] to-transparent transition-transform duration-1000 ease-in-out group-hover:translate-x-full" />
+        <div className="absolute inset-0 h-full w-[200%] -translate-x-full rotate-[35deg] bg-gradient-to-r from-transparent via-white/[0.02] to-transparent transition-transform duration-500 ease-in-out group-hover:translate-x-full" />
       </div>
 
       {/* Top edge accent — on hover */}
       <span
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 z-20 h-px opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+        className="pointer-events-none absolute inset-x-0 top-0 z-20 h-px opacity-0 transition-opacity duration-300 group-hover:opacity-60"
         style={{
           background: isPositive
             ? 'linear-gradient(90deg, transparent 0%, #5CF78B 45%, #F4FA4D 55%, transparent 100%)'
@@ -105,19 +122,27 @@ export function MarketCard({ market, onClick }: MarketCardProps) {
       <div className="relative z-10 flex h-full w-full flex-col">
         {/* Top Section: Title & Status */}
         <div className="flex items-start justify-between p-6 pb-0">
-          <div className="flex flex-col gap-1">
-            <span className="text-ink-strong font-display text-2xl leading-none font-bold tracking-tight transition-colors duration-300 group-hover:text-white">
+          <div className="flex min-w-0 flex-col gap-1 pr-4">
+            <span className="text-ink-strong font-display text-2xl leading-none font-bold tracking-tight">
               {market.base}
             </span>
-            <div className="flex items-center gap-1.5">
-              <span className="text-ink-dim font-mono text-[9px] tracking-[0.15em] uppercase opacity-70">
-                {market.quote} Protocol
-              </span>
-              <div className="bg-line-strong h-0.5 w-0.5 rounded-full" />
-              <span className="text-ink-muted font-mono text-[9px] tracking-[0.15em] uppercase opacity-70">
-                v1.0
-              </span>
-            </div>
+            <span
+              className={cn(
+                'flex flex-wrap items-center gap-x-1.5 gap-y-1',
+                'font-mono text-[10px] leading-none',
+              )}
+            >
+              <span className="text-ink-dim">{durationLabel}</span>
+              {timeLabel && (
+                <>
+                  <span aria-hidden className="bg-line-strong h-2.5 w-px opacity-70" />
+                  <span>
+                    <span className="text-ink-dim">{timeLabel.label}</span>{' '}
+                    <span className="text-ink-muted">{timeLabel.value}</span>
+                  </span>
+                </>
+              )}
+            </span>
           </div>
           <StatusDot status={market.state}>{STATE_LABELS[market.state]}</StatusDot>
         </div>
@@ -153,7 +178,6 @@ export function MarketCard({ market, onClick }: MarketCardProps) {
           <div className="flex items-center gap-3">
             <div className="relative">
               <TokenPairIcon base={market.base} quote={market.quote} size={30} />
-              <div className="bg-ink-strong/5 absolute -inset-1.5 rounded-full blur-[4px]" />
             </div>
             <div className="flex flex-col">
               <span className="text-ink-muted font-mono text-[11px] leading-none font-bold tracking-widest uppercase">
@@ -192,7 +216,7 @@ export function MarketCard({ market, onClick }: MarketCardProps) {
         aria-hidden
         className="pointer-events-none absolute -right-12 -bottom-12 z-0 h-48 w-48 rounded-full opacity-0 blur-3xl transition-opacity duration-700 group-hover:opacity-100"
         style={{
-          background: isPositive ? 'rgba(92,247,139,0.08)' : 'rgba(255,72,59,0.08)',
+          background: isPositive ? 'rgba(92,247,139,0.04)' : 'rgba(255,72,59,0.04)',
         }}
       />
     </button>
