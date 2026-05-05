@@ -391,7 +391,7 @@ export function MarketsPage() {
         <>
           <div
             className={cn(
-              'grid gap-4',
+              'grid gap-6',
               'grid-cols-1 sm:grid-cols-2 [@media(min-width:1201px)]:grid-cols-3',
             )}
           >
