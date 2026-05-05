@@ -1,5 +1,6 @@
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { ArrowRight, Filter, LayoutGrid, List, Loader2 } from 'lucide-react'
+import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { ChartFrame } from '@/features/chart/ChartFrame'
@@ -389,29 +390,53 @@ export function MarketsPage() {
 
       {hasAnyMarkets && viewMode === 'grid' && (
         <>
-          <div
+          <motion.div
+            layout
             className={cn(
               'grid gap-6',
               'grid-cols-1 sm:grid-cols-2 [@media(min-width:1201px)]:grid-cols-3',
             )}
           >
-            {gridItems.length > 0 ? (
-              gridItems.map((m) => (
-                <MarketCard
-                  key={m.id}
-                  market={m}
-                  onClick={() => navigate({ to: '/market/$id', params: { id: m.id } })}
-                />
-              ))
-            ) : (
-              <div className="col-span-full border-line-strong flex flex-col items-center justify-center gap-4 rounded-2xl border border-dashed py-24">
-                <p className="text-ink-muted text-label font-mono uppercase">
-                  [ No markets match filter ]
-                </p>
-              </div>
-            )}
-          </div>
-          
+            <AnimatePresence mode="popLayout">
+              {gridItems.length > 0 ? (
+                gridItems.map((m, i) => (
+                  <motion.div
+                    key={m.id}
+                    layout
+                    className="w-full"
+                    initial={{ opacity: 0, scale: 0.92, y: 16 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.88, y: -8 }}
+                    transition={{
+                      duration: 0.3,
+                      delay: i * 0.03,
+                      ease: [0.25, 0.46, 0.45, 0.94],
+                      layout: { duration: 0.35, ease: [0.25, 0.46, 0.45, 0.94] },
+                    }}
+                  >
+                    <MarketCard
+                      market={m}
+                      onClick={() => navigate({ to: '/market/$id', params: { id: m.id } })}
+                    />
+                  </motion.div>
+                ))
+              ) : (
+                <motion.div
+                  key="empty"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="col-span-full border-line-strong flex flex-col items-center justify-center gap-4 rounded-2xl border border-dashed py-24"
+                >
+                  <p className="text-ink-muted text-label font-mono uppercase">
+                    [ No markets match filter ]
+                  </p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+
           {/* Infinite Scroll Trigger */}
           {visibleCount < visible.length && (
             <div ref={loadMoreRef} className="flex items-center justify-center py-12">

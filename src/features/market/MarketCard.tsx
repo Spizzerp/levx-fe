@@ -44,25 +44,30 @@ export function MarketCard({ market, onClick }: MarketCardProps) {
 
   const historyToUse = realHistory && realHistory.length > 0 ? realHistory : market.history
   const { value: pctChange, isPositive } = calculatePctChange({ ...market, history: historyToUse })
-  const isActive = market.state === 'active' || market.state === 'sampling'
 
   return (
     <button
       type="button"
       onClick={onClick}
       className={cn(
-        'group relative flex flex-col',
+        'group relative flex w-full flex-col',
         'overflow-hidden',
-        'h-[280px]',
-        'rounded-2xl border',
+        'h-[290px]',
+        'border-line from-surface-1 to-surface-2 rounded-[24px] border bg-gradient-to-b',
         'text-left',
         'duration-medium ease-levx transition-all',
-        'hover:-translate-y-1 hover:shadow-[0_20px_48px_-12px_rgba(0,0,0,0.6)]',
-        isActive
-          ? 'border-line-strong bg-surface-1 hover:border-success/40'
-          : 'border-line bg-surface hover:border-line-strong',
+        'hover:-translate-y-1.5 hover:shadow-[0_32px_64px_-16px_rgba(0,0,0,0.7)]',
+        isPositive ? 'hover:border-success/50' : 'hover:border-accent/50',
       )}
     >
+      {/* ── Background Noise Texture ── */}
+      <div
+        className="pointer-events-none absolute inset-0 z-0 opacity-[0.02] mix-blend-overlay"
+        style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
+        }}
+      />
+
       {/* ── Background Dot Pattern ── */}
       <div
         className="pointer-events-none absolute inset-0 z-0 opacity-[0.03] transition-opacity duration-500 group-hover:opacity-[0.08]"
@@ -99,17 +104,17 @@ export function MarketCard({ market, onClick }: MarketCardProps) {
       {/* ── Content ── */}
       <div className="relative z-10 flex h-full w-full flex-col">
         {/* Top Section: Title & Status */}
-        <div className="flex items-start justify-between p-5 pb-0">
+        <div className="flex items-start justify-between p-6 pb-0">
           <div className="flex flex-col gap-1">
-            <span className="text-ink-strong font-display text-2xl leading-none font-bold tracking-tight">
+            <span className="text-ink-strong font-display text-2xl leading-none font-bold tracking-tight transition-colors duration-300 group-hover:text-white">
               {market.base}
             </span>
             <div className="flex items-center gap-1.5">
-              <span className="text-ink-dim font-mono text-[10px] tracking-widest uppercase">
+              <span className="text-ink-dim font-mono text-[9px] tracking-[0.15em] uppercase opacity-70">
                 {market.quote} Protocol
               </span>
-              <div className="bg-line-strong h-1 w-1 rounded-full" />
-              <span className="text-ink-muted font-mono text-[10px] tracking-widest uppercase">
+              <div className="bg-line-strong h-0.5 w-0.5 rounded-full" />
+              <span className="text-ink-muted font-mono text-[9px] tracking-[0.15em] uppercase opacity-70">
                 v1.0
               </span>
             </div>
@@ -119,7 +124,7 @@ export function MarketCard({ market, onClick }: MarketCardProps) {
 
         {/* Middle Section: Chart */}
         <div
-          className="relative min-h-0 flex-1 px-2"
+          className="relative min-h-0 flex-1 px-4"
           style={{
             maskImage:
               'linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%)',
@@ -136,42 +141,42 @@ export function MarketCard({ market, onClick }: MarketCardProps) {
         {/* Bottom Section: Metrics (Glassmorphism Panel) */}
         <div
           className={cn(
-            'relative mt-auto flex items-center justify-between px-5 py-4',
-            'border-line/50 bg-surface/40 border-t backdrop-blur-md',
-            'group-hover:bg-surface/80 group-hover:border-t-line-strong/50 transition-all duration-500',
+            'relative mt-auto flex items-center justify-between px-6 py-4',
+            'bg-surface/40 backdrop-blur-xl',
+            'group-hover:bg-surface/80 transition-all duration-500',
           )}
         >
+          {/* Dashed Top Border (Tech Detail) */}
+          <div className="absolute inset-x-0 top-0 h-px bg-[radial-gradient(circle_at_center,_var(--color-line-strong)_1px,_transparent_1px)] bg-[length:4px_1px] opacity-30" />
+
           {/* Token pair */}
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-3">
             <div className="relative">
-              <TokenPairIcon base={market.base} quote={market.quote} size={28} />
-              <div className="bg-ink-strong/5 absolute -inset-1 rounded-full blur-[2px]" />
+              <TokenPairIcon base={market.base} quote={market.quote} size={30} />
+              <div className="bg-ink-strong/5 absolute -inset-1.5 rounded-full blur-[4px]" />
             </div>
             <div className="flex flex-col">
-              <span className="text-ink-muted font-mono text-[11px] leading-none font-bold tracking-wider uppercase">
+              <span className="text-ink-muted font-mono text-[11px] leading-none font-bold tracking-widest uppercase">
                 {market.base}/{market.quote}
               </span>
-              <span className="text-ink-dim font-mono text-[9px] tracking-tight uppercase">
-                Pair Index
+              <span className="text-ink-dim mt-1 font-mono text-[8px] font-medium tracking-[0.15em] uppercase opacity-50">
+                ID: {market.id.slice(0, 8)}
               </span>
             </div>
           </div>
 
           {/* % change */}
           <div className="flex flex-col items-end">
-            <span className="text-ink-dim mb-1 font-mono text-[10px] leading-none tracking-wide uppercase">
-              Performance
-            </span>
             <div className="flex items-baseline gap-1">
               <span
                 className={cn(
-                  'font-mono text-lg leading-none font-bold tracking-tighter',
+                  'font-mono text-xl leading-none font-bold tracking-tighter',
                   isPositive ? 'text-success' : 'text-accent',
                 )}
                 style={{
                   textShadow: isPositive
-                    ? '0 0 12px rgba(92,247,139,0.3)'
-                    : '0 0 12px rgba(255,72,59,0.3)',
+                    ? '0 0 20px rgba(92,247,139,0.4)'
+                    : '0 0 20px rgba(255,72,59,0.4)',
                 }}
               >
                 {isPositive ? '+' : '-'}
