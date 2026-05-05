@@ -25,9 +25,7 @@ function calculatePctChange(market: Market): { value: number; isPositive: boolea
   if (market.history.length === 0) return { value: 0, isPositive: true }
 
   const startPricePoint = market.history.reduce((prev, curr) =>
-    Math.abs(curr.time - market.startTime) < Math.abs(prev.time - market.startTime)
-      ? curr
-      : prev
+    Math.abs(curr.time - market.startTime) < Math.abs(prev.time - market.startTime) ? curr : prev,
   )
 
   const latestPrice = market.history[market.history.length - 1].value
@@ -59,12 +57,21 @@ export function MarketCard({ market, onClick }: MarketCardProps) {
         'rounded-2xl border',
         'text-left',
         'duration-medium ease-levx transition-all',
-        'hover:scale-[1.01] hover:shadow-[0_12px_40px_-12px_rgba(0,0,0,0.5)]',
+        'hover:-translate-y-1 hover:shadow-[0_20px_48px_-12px_rgba(0,0,0,0.6)]',
         isActive
-          ? 'border-line-strong bg-surface-1 hover:border-success/30'
+          ? 'border-line-strong bg-surface-1 hover:border-success/40'
           : 'border-line bg-surface hover:border-line-strong',
       )}
     >
+      {/* ── Background Dot Pattern ── */}
+      <div
+        className="pointer-events-none absolute inset-0 z-0 opacity-[0.03] transition-opacity duration-500 group-hover:opacity-[0.08]"
+        style={{
+          backgroundImage: 'radial-gradient(circle, var(--ink-strong) 1px, transparent 1px)',
+          backgroundSize: '12px 12px',
+        }}
+      />
+
       {/* ── Background Vignette ── */}
       <div
         className="pointer-events-none absolute inset-0 z-0 opacity-40 transition-opacity duration-500 group-hover:opacity-60"
@@ -72,6 +79,11 @@ export function MarketCard({ market, onClick }: MarketCardProps) {
           background: `radial-gradient(circle at 50% 50%, transparent 0%, var(--surface) 100%)`,
         }}
       />
+
+      {/* ── Hover Shine Sweep ── */}
+      <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden">
+        <div className="absolute inset-0 h-full w-[200%] -translate-x-full rotate-[35deg] bg-gradient-to-r from-transparent via-white/[0.05] to-transparent transition-transform duration-1000 ease-in-out group-hover:translate-x-full" />
+      </div>
 
       {/* Top edge accent — on hover */}
       <span
@@ -86,19 +98,18 @@ export function MarketCard({ market, onClick }: MarketCardProps) {
 
       {/* ── Content ── */}
       <div className="relative z-10 flex h-full w-full flex-col">
-        
         {/* Top Section: Title & Status */}
         <div className="flex items-start justify-between p-5 pb-0">
           <div className="flex flex-col gap-1">
-            <span className="text-ink-strong font-display text-2xl font-bold leading-none tracking-tight">
+            <span className="text-ink-strong font-display text-2xl leading-none font-bold tracking-tight">
               {market.base}
             </span>
             <div className="flex items-center gap-1.5">
-              <span className="text-ink-dim text-[10px] font-mono tracking-widest uppercase">
+              <span className="text-ink-dim font-mono text-[10px] tracking-widest uppercase">
                 {market.quote} Protocol
               </span>
-              <div className="h-1 w-1 rounded-full bg-line-strong" />
-              <span className="text-ink-muted text-[10px] font-mono tracking-widest uppercase">
+              <div className="bg-line-strong h-1 w-1 rounded-full" />
+              <span className="text-ink-muted font-mono text-[10px] tracking-widest uppercase">
                 v1.0
               </span>
             </div>
@@ -110,8 +121,10 @@ export function MarketCard({ market, onClick }: MarketCardProps) {
         <div
           className="relative min-h-0 flex-1 px-2"
           style={{
-            maskImage: 'linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%)',
-            WebkitMaskImage: 'linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%)',
+            maskImage:
+              'linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%)',
+            WebkitMaskImage:
+              'linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%)',
           }}
         >
           <MarketMiniChart
@@ -121,22 +134,24 @@ export function MarketCard({ market, onClick }: MarketCardProps) {
         </div>
 
         {/* Bottom Section: Metrics (Glassmorphism Panel) */}
-        <div className={cn(
-          "relative mt-auto flex items-center justify-between px-5 py-4",
-          "border-t border-line/50 bg-surface/40 backdrop-blur-md",
-          "transition-colors duration-300 group-hover:bg-surface/60"
-        )}>
+        <div
+          className={cn(
+            'relative mt-auto flex items-center justify-between px-5 py-4',
+            'border-line/50 bg-surface/40 border-t backdrop-blur-md',
+            'group-hover:bg-surface/80 group-hover:border-t-line-strong/50 transition-all duration-500',
+          )}
+        >
           {/* Token pair */}
           <div className="flex items-center gap-2.5">
             <div className="relative">
               <TokenPairIcon base={market.base} quote={market.quote} size={28} />
-              <div className="absolute -inset-1 rounded-full bg-ink-strong/5 blur-[2px]" />
+              <div className="bg-ink-strong/5 absolute -inset-1 rounded-full blur-[2px]" />
             </div>
             <div className="flex flex-col">
-              <span className="text-ink-muted font-mono text-[11px] font-bold tracking-wider uppercase leading-none">
+              <span className="text-ink-muted font-mono text-[11px] leading-none font-bold tracking-wider uppercase">
                 {market.base}/{market.quote}
               </span>
-              <span className="text-ink-dim text-[9px] font-mono uppercase tracking-tight">
+              <span className="text-ink-dim font-mono text-[9px] tracking-tight uppercase">
                 Pair Index
               </span>
             </div>
@@ -144,13 +159,13 @@ export function MarketCard({ market, onClick }: MarketCardProps) {
 
           {/* % change */}
           <div className="flex flex-col items-end">
-            <span className="text-ink-dim text-[10px] font-mono uppercase tracking-wide leading-none mb-1">
+            <span className="text-ink-dim mb-1 font-mono text-[10px] leading-none tracking-wide uppercase">
               Performance
             </span>
             <div className="flex items-baseline gap-1">
               <span
                 className={cn(
-                  'font-mono text-lg font-bold leading-none tracking-tighter',
+                  'font-mono text-lg leading-none font-bold tracking-tighter',
                   isPositive ? 'text-success' : 'text-accent',
                 )}
                 style={{
@@ -159,18 +174,18 @@ export function MarketCard({ market, onClick }: MarketCardProps) {
                     : '0 0 12px rgba(255,72,59,0.3)',
                 }}
               >
-                {isPositive ? '+' : '-'}{pctChange.toFixed(2)}%
+                {isPositive ? '+' : '-'}
+                {pctChange.toFixed(2)}%
               </span>
             </div>
           </div>
         </div>
-
       </div>
 
       {/* Subtle bottom-right glow on hover */}
       <span
         aria-hidden
-        className="pointer-events-none absolute -bottom-12 -right-12 z-0 h-48 w-48 rounded-full opacity-0 blur-3xl transition-opacity duration-700 group-hover:opacity-100"
+        className="pointer-events-none absolute -right-12 -bottom-12 z-0 h-48 w-48 rounded-full opacity-0 blur-3xl transition-opacity duration-700 group-hover:opacity-100"
         style={{
           background: isPositive ? 'rgba(92,247,139,0.08)' : 'rgba(255,72,59,0.08)',
         }}
