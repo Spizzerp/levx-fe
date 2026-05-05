@@ -19,7 +19,7 @@ import { useYAxisFreeze } from '@/lib/drawing/yFreeze'
 import { useChartViewport } from '@/lib/chart/useChartViewport'
 import { useYAxisViewport } from '@/lib/chart/useYAxisViewport'
 import { computeVisiblePriceDomain } from '@/lib/chart/computeVisiblePriceDomain'
-import { projectPredictionPathsForChart } from '@/lib/chart/projectPredictionPaths'
+import { segmentPredictionPathAtTime } from '@/lib/chart/segmentPredictionPath'
 import { DrawingGrid } from '@/features/chart/DrawingGrid'
 import { DrawingToolbar } from '@/features/chart/DrawingToolbar'
 import { ChartMorphLine } from '@/features/chart/ChartMorphLine'
@@ -168,18 +168,7 @@ function ChartInner({
   }, [history, latestTick])
 
   const lastHistoryPoint = mergedHistory[mergedHistory.length - 1]
-
-  const projectedPredictions = useMemo(
-    () =>
-      projectPredictionPathsForChart({
-        predictions,
-        nowTime,
-        marketStart,
-        marketEnd,
-        anchorValue: lastHistoryPoint?.value,
-      }),
-    [predictions, nowTime, marketStart, marketEnd, lastHistoryPoint?.value],
-  )
+  const isMarketInProgress = nowTime > marketStart && nowTime < marketEnd
 
   /* ── Drawing store subscription ─────────────────────────── */
   const isDrawMode = useDrawingStore((s) => s.state.phase !== 'idle')
@@ -197,7 +186,7 @@ function ChartInner({
     // Right edge: extend to marketEnd if it's in the future (blank space for
     // predictions / drawing), or to the end of prediction data, whichever is later.
     let rightEdge = Math.max(lastData, marketEnd)
-    projectedPredictions.forEach((p) => {
+    predictions.forEach((p) => {
       const last = p.data[p.data.length - 1]
       if (last && last.time > rightEdge) rightEdge = last.time
     })
@@ -209,7 +198,7 @@ function ChartInner({
     }
 
     return [first, rightEdge]
-  }, [mergedHistory, projectedPredictions, marketEnd, nowTime])
+  }, [mergedHistory, predictions, marketEnd, nowTime])
 
   const maxSpanMs = useMemo(() => {
     const totalSpan = timeDomain[1] - timeDomain[0]
@@ -246,8 +235,8 @@ function ChartInner({
 
   /* ── Price domain: envelope of data visible in viewport ──── */
   const priceDomainLive = useMemo<[number, number]>(
-    () => computeVisiblePriceDomain(mergedHistory, projectedPredictions, viewportTimeDomain),
-    [mergedHistory, projectedPredictions, viewportTimeDomain],
+    () => computeVisiblePriceDomain(mergedHistory, predictions, viewportTimeDomain),
+    [mergedHistory, predictions, viewportTimeDomain],
   )
 
   /* ── Y-axis freeze: domain held fixed during sweeping phase ── */
@@ -309,7 +298,7 @@ function ChartInner({
       // In the past → read from history. In the future → read from selected prediction (if any).
       let sourceData: PricePoint[] = mergedHistory
       if (t > nowTime && selectedPathId) {
-        const selected = projectedPredictions.find((p) => p.id === selectedPathId)
+        const selected = predictions.find((p) => p.id === selectedPathId)
         if (selected) sourceData = selected.data
       }
       if (sourceData.length === 0) return
@@ -319,7 +308,7 @@ function ChartInner({
       const d = !d1 ? d0 : !d0 ? d1 : t - d0.time > d1.time - t ? d1 : d0
       if (d) setHover({ time: d.time, value: d.value })
     },
-    [innerWidth, selectedPathId, timeScale, mergedHistory, projectedPredictions, nowTime],
+    [innerWidth, selectedPathId, timeScale, mergedHistory, predictions, nowTime],
   )
 
   const handleLeave = useCallback(() => setHover(null), [])
@@ -327,7 +316,7 @@ function ChartInner({
   if (innerWidth <= 0 || innerHeight <= 0) return null
 
   const nowX = timeScale(nowTime)
-  const selected = projectedPredictions.find((p) => p.id === selectedPathId)
+  const selected = predictions.find((p) => p.id === selectedPathId)
   const showMarketStartMarker = marketStart > nowTime
   const marketStartX = timeScale(marketStart)
   const showMarketEndMarker = marketEnd > nowTime
@@ -382,77 +371,162 @@ function ChartInner({
         {/* ── Chart data (fades in after morph) ──────── */}
         <g style={{ opacity: chartRevealed ? 1 : 0, transition: 'opacity 400ms ease' }}>
           {/* ── Prediction paths ────────────────────── */}
-          {projectedPredictions.map((path) => {
+          {predictions.map((path) => {
             const style = TONE_STYLES[path.tone]
             const isSelected = selectedPathId === path.id || selectedPathIds?.has(path.id)
+            const segments = isMarketInProgress
+              ? segmentPredictionPathAtTime(path.data, nowTime)
+              : { elapsed: [], future: path.data }
             return (
-              <LinePath<PricePoint>
-                key={path.id}
-                data={path.data}
-                x={(d) => timeScale(d.time)}
-                y={(d) => priceScale(d.value)}
-                stroke={style.stroke}
-                strokeWidth={1.5}
-                strokeDasharray={style.dash}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                opacity={isSelected ? 0 : style.opacity}
-                curve={CATMULL_ROM_ALPHA_05}
-              />
+              <g key={path.id}>
+                {segments.elapsed.length > 1 && (
+                  <LinePath<PricePoint>
+                    data={segments.elapsed}
+                    x={(d) => timeScale(d.time)}
+                    y={(d) => priceScale(d.value)}
+                    stroke={style.stroke}
+                    strokeWidth={1.25}
+                    strokeDasharray={style.dash}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    opacity={isSelected ? 0 : style.opacity * 0.3}
+                    curve={CATMULL_ROM_ALPHA_05}
+                  />
+                )}
+                {segments.future.length > 1 && (
+                  <LinePath<PricePoint>
+                    data={segments.future}
+                    x={(d) => timeScale(d.time)}
+                    y={(d) => priceScale(d.value)}
+                    stroke={style.stroke}
+                    strokeWidth={1.5}
+                    strokeDasharray={style.dash}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    opacity={isSelected ? 0 : style.opacity}
+                    curve={CATMULL_ROM_ALPHA_05}
+                  />
+                )}
+              </g>
             )
           })}
 
           {/* ── Other positions overlay (wagered paths, not selected) ── */}
           {showOtherPositions &&
-            projectedPredictions
+            predictions
               .filter((p) => p.id !== selectedPathId && p.totalWagered > 0)
-              .map((path) => (
-                <LinePath<PricePoint>
-                  key={`wager-${path.id}`}
-                  data={path.data}
-                  x={(d) => timeScale(d.time)}
-                  y={(d) => priceScale(d.value)}
-                  stroke={C.line}
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  opacity={0.3}
-                  curve={CATMULL_ROM_ALPHA_05}
-                />
-              ))}
+              .map((path) => {
+                const segments = isMarketInProgress
+                  ? segmentPredictionPathAtTime(path.data, nowTime)
+                  : { elapsed: [], future: path.data }
+                return (
+                  <g key={`wager-${path.id}`}>
+                    {segments.elapsed.length > 1 && (
+                      <LinePath<PricePoint>
+                        data={segments.elapsed}
+                        x={(d) => timeScale(d.time)}
+                        y={(d) => priceScale(d.value)}
+                        stroke={C.line}
+                        strokeWidth={1.5}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        opacity={0.12}
+                        curve={CATMULL_ROM_ALPHA_05}
+                      />
+                    )}
+                    {segments.future.length > 1 && (
+                      <LinePath<PricePoint>
+                        data={segments.future}
+                        x={(d) => timeScale(d.time)}
+                        y={(d) => priceScale(d.value)}
+                        stroke={C.line}
+                        strokeWidth={2}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        opacity={0.3}
+                        curve={CATMULL_ROM_ALPHA_05}
+                      />
+                    )}
+                  </g>
+                )
+              })}
 
           {/* ── Selected prediction overlays — solid line for each selected path ── */}
-          {selectionInteractive && projectedPredictions
+          {selectionInteractive && predictions
             .filter((p) => selectedPathIds?.has(p.id) || p.id === selectedPathId)
-            .map((path) => (
-              <LinePath<PricePoint>
-                key={`sel-${path.id}`}
-                data={path.data}
-                x={(d) => timeScale(d.time)}
-                y={(d) => priceScale(d.value)}
-                stroke={C.line}
-                strokeWidth={2.5}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                curve={CATMULL_ROM_ALPHA_05}
-              />
-            ))}
+            .map((path) => {
+              const segments = isMarketInProgress
+                ? segmentPredictionPathAtTime(path.data, nowTime)
+                : { elapsed: [], future: path.data }
+              return (
+                <g key={`sel-${path.id}`}>
+                  {segments.elapsed.length > 1 && (
+                    <LinePath<PricePoint>
+                      data={segments.elapsed}
+                      x={(d) => timeScale(d.time)}
+                      y={(d) => priceScale(d.value)}
+                      stroke={C.line}
+                      strokeWidth={1.75}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      opacity={0.32}
+                      curve={CATMULL_ROM_ALPHA_05}
+                    />
+                  )}
+                  {segments.future.length > 1 && (
+                    <LinePath<PricePoint>
+                      data={segments.future}
+                      x={(d) => timeScale(d.time)}
+                      y={(d) => priceScale(d.value)}
+                      stroke={C.line}
+                      strokeWidth={2.5}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      curve={CATMULL_ROM_ALPHA_05}
+                    />
+                  )}
+                </g>
+              )
+            })}
 
           {/* ── Non-interactive selected overlay (quiet dotted preview) ── */}
-          {selected && !selectionInteractive && (
-            <LinePath<PricePoint>
-              data={selected.data}
-              x={(d) => timeScale(d.time)}
-              y={(d) => priceScale(d.value)}
-              stroke={C.muted}
-              strokeWidth={1.5}
-              strokeDasharray="2 4"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              opacity={0.65}
-              curve={CATMULL_ROM_ALPHA_05}
-            />
-          )}
+          {selected && !selectionInteractive && (() => {
+            const segments = isMarketInProgress
+              ? segmentPredictionPathAtTime(selected.data, nowTime)
+              : { elapsed: [], future: selected.data }
+            return (
+              <>
+                {segments.elapsed.length > 1 && (
+                  <LinePath<PricePoint>
+                    data={segments.elapsed}
+                    x={(d) => timeScale(d.time)}
+                    y={(d) => priceScale(d.value)}
+                    stroke={C.muted}
+                    strokeWidth={1.25}
+                    strokeDasharray="2 4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    opacity={0.25}
+                    curve={CATMULL_ROM_ALPHA_05}
+                  />
+                )}
+                {segments.future.length > 1 && (
+                  <LinePath<PricePoint>
+                    data={segments.future}
+                    x={(d) => timeScale(d.time)}
+                    y={(d) => priceScale(d.value)}
+                    stroke={C.muted}
+                    strokeWidth={1.5}
+                    strokeDasharray="2 4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    opacity={0.65}
+                    curve={CATMULL_ROM_ALPHA_05}
+                  />
+                )}
+              </>
+            )
+          })()}
 
           {/* ── Historical price line ───────────────── */}
           <LinePath<PricePoint>
