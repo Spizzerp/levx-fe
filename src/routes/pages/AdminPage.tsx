@@ -52,19 +52,22 @@ const DURATION_UNITS: { id: DurationUnit; label: string; toHours: (n: number) =>
   { id: 'years', label: 'Years', toHours: (n) => n * 365 * 24 },
 ]
 
-const INTERVAL_PRESETS = [
-  { label: '15m', sec: 900 },
-  { label: '30m', sec: 1800 },
-  { label: '1h', sec: 3600 },
-  { label: '2h', sec: 7200 },
-  { label: '4h', sec: 14400 },
-]
-
 // Mirrors `validate_checkpoint_schedule` in programs/levx/src/instructions/create_market.rs.
 // MAX is bounded by the Solana TX-size limit on `add_path` (≈25 + N×8 bytes payload,
 // ≈200B overhead at the 1232B cap → ≤120). MIN is what the program rejects below.
 const MIN_CHECKPOINTS = 4
 const MAX_CHECKPOINTS = 120
+// Target checkpoints per market. The interval is derived as ceil(duration / TARGET),
+// which the program then floor-divides back to a derived total ≤ TARGET. Ceiling
+// (not floor) is required: floor(D/120) can produce on-chain total > 120 for
+// non-multiple durations and get rejected as CheckpointMismatch.
+const TARGET_CHECKPOINTS = 120
+
+function formatInterval(sec: number): string {
+  if (sec >= 3600 && sec % 3600 === 0) return `${sec / 3600}h`
+  if (sec >= 60 && sec % 60 === 0) return `${sec / 60}m`
+  return `${sec}s`
+}
 
 /* ── AI provider options ─────────────────────────────────── */
 
@@ -349,7 +352,9 @@ export function AdminPage() {
   const [durationValue, setDurationValue] = useState(7)
   const [durationUnit, setDurationUnit] = useState<DurationUnit>('days')
   const durationHours = DURATION_UNITS.find((u) => u.id === durationUnit)!.toHours(durationValue)
-  const [checkpointInterval, setCheckpointInterval] = useState(3600)
+  // Pack TARGET_CHECKPOINTS evenly across the duration. Use ceil so the program's
+  // floor(D/interval) derivation can't exceed MAX_CHECKPOINTS.
+  const checkpointInterval = Math.max(1, Math.ceil((durationHours * 3600) / TARGET_CHECKPOINTS))
   const [lambda, setLambda] = useState('0')
   const [decoherenceRate, setDecoherenceRate] = useState('0.5')
   const [minimumProbability, setMinimumProbability] = useState('0.01')
@@ -746,44 +751,21 @@ export function AdminPage() {
             </div>
           </div>
 
-          {/* Checkpoint interval */}
-          <Label>Checkpoint interval</Label>
-          <div className="mt-3 flex gap-2">
-            {INTERVAL_PRESETS.map((p) => {
-              const count = Math.floor((durationHours * 3600) / p.sec)
-              const presetInRange = count >= MIN_CHECKPOINTS && count <= MAX_CHECKPOINTS
-              const tooMany = count > MAX_CHECKPOINTS
-              return (
-                <button
-                  key={p.sec}
-                  type="button"
-                  disabled={!presetInRange}
-                  title={
-                    presetInRange
-                      ? `${count} checkpoints`
-                      : `${count} checkpoints — ${tooMany ? 'over' : 'under'} the ${MIN_CHECKPOINTS}–${MAX_CHECKPOINTS} range`
-                  }
-                  className={cn(
-                    CHIP,
-                    p.sec === checkpointInterval ? CHIP_ACTIVE : CHIP_INACTIVE,
-                    !presetInRange && 'cursor-not-allowed opacity-40',
-                  )}
-                  onClick={() => presetInRange && setCheckpointInterval(p.sec)}
-                >
-                  {p.label}
-                </button>
-              )
-            })}
-          </div>
-          <div className="text-caption mt-2 mb-12 font-mono tracking-wide">
-            <span className="text-ink-muted">Total checkpoints: </span>
+          {/* Checkpoint schedule (derived from duration) */}
+          <Label>Checkpoint schedule</Label>
+          <div className="text-caption mt-3 mb-12 font-mono tracking-wide">
             <span className={cn(checkpointsValid ? 'text-ink-strong' : 'text-accent')}>
               {totalCheckpoints}
             </span>
-            <span className="text-ink-dim">
-              {' '}
-              (must be {MIN_CHECKPOINTS}–{MAX_CHECKPOINTS})
-            </span>
+            <span className="text-ink-muted"> checkpoints · </span>
+            <span className="text-ink-strong">{formatInterval(checkpointInterval)}</span>
+            <span className="text-ink-muted"> apart</span>
+            {!checkpointsValid && (
+              <span className="text-accent">
+                {' '}
+                (must be {MIN_CHECKPOINTS}–{MAX_CHECKPOINTS})
+              </span>
+            )}
           </div>
 
           {/* Protocol params */}
