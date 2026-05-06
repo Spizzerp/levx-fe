@@ -46,22 +46,58 @@ export async function getMarkets(): Promise<Market[]> {
     return []
   }
 
-  const markets: Market[] = []
-  for (const acc of allMarkets) {
-    try {
-      const raw = acc.account
-      const marketId = raw.marketId.toNumber()
-      const market = anchorMarketToFE(raw, String(marketId))
+  const marketResults = await Promise.all(
+    allMarkets.map(async (acc): Promise<Market | null> => {
+      let raw: any
+      let marketId = 0
+      let market: Market
+
+      try {
+        raw = acc.account
+        marketId = raw.marketId.toNumber()
+        market = anchorMarketToFE(raw, String(marketId))
+      } catch {
+        // Skip accounts that can't be deserialized (layout mismatch)
+        return null
+      }
+
       const pairInfo = resolveBaseMintLabel(raw.baseMint)
       market.pair = pairInfo.pair
       market.base = pairInfo.base
       market.quote = pairInfo.quote
-      markets.push(market)
-    } catch {
-      // Skip accounts that can't be deserialized (layout mismatch)
-    }
-  }
-  return markets
+
+      const numPaths = raw.numPaths as number
+      if (numPaths > 0) {
+        const startTimeMs = raw.startTime.toNumber() * 1000
+        const checkpointInterval = raw.checkpointInterval as number
+        const pathRaws = await Promise.all(
+          Array.from({ length: numPaths }, async (_, i) => {
+            try {
+              const [pathPda] = derivePathPda(marketId, i)
+              return await program.account.pathOutcome.fetch(pathPda)
+            } catch (err) {
+              console.warn(
+                `[onchain] Failed to fetch path ${i} for market ${marketId}:`,
+                (err as Error).message,
+              )
+              return null
+            }
+          }),
+        )
+
+        market.paths = pathRaws.flatMap((pathRaw: any) => {
+          if (!pathRaw) return []
+          const path = anchorPathToFE(pathRaw, startTimeMs, checkpointInterval)
+          path.tone = deriveTone(path.predictedPrices)
+          return [path]
+        })
+      }
+
+      return market
+    }),
+  )
+
+  return marketResults.filter((market): market is Market => market !== null)
 }
 
 export async function getMarket(id: string): Promise<Market> {
