@@ -9,7 +9,7 @@ import { bisector } from 'd3-array'
 import { useCallback, useEffect, useId, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 
-import type { PathTone, PredictionPath, PricePoint } from '@/types/market'
+import type { PredictionPath, PricePoint } from '@/types/market'
 import type { Market } from '@/types/market'
 import { useDrawingStore } from '@/stores/drawingStore'
 import { useLatestPrice } from '@/lib/pyth/hooks'
@@ -32,13 +32,29 @@ const CATMULL_ROM_ALPHA_05 = curveCatmullRom.alpha(0.5)
 
 /* ── Visual config — derived from Nothing tokens ────────────────── */
 
-const TONE_STYLES: Record<PathTone, { stroke: string; dash: string; opacity: number }> = {
-  'ultra-bull': { stroke: '#5CF78B', dash: '5 4', opacity: 0.95 },
-  bull: { stroke: '#5CF78B', dash: '4 4', opacity: 0.45 },
-  neutral: { stroke: '#F6CE48', dash: '2 4', opacity: 0.65 },
-  bear: { stroke: '#FF483B', dash: '4 4', opacity: 0.45 },
-  'ultra-bear': { stroke: '#FF483B', dash: '5 4', opacity: 0.95 },
-  custom: { stroke: '#5B9BF6', dash: '3 3', opacity: 0.85 },
+// Path stroke colors are assigned by on-chain pathIndex so every viewer sees
+// the same line in the same color across reloads. Avoids the bull/bear red-green
+// spectrum (which collapses to all-neutral when on-chain price trajectories
+// don't diverge enough for deriveTone to classify) and gives 5 distinct hues.
+const AI_PATH_PALETTE: readonly string[] = [
+  '#5CC8FF', // cyan
+  '#FF6BD6', // magenta
+  '#F6CE48', // amber
+  '#9AE85B', // lime
+  '#A78BFA', // violet
+]
+
+const USER_DRAWN_STYLE = { stroke: '#8FA3C9', dash: '3 3', opacity: 0.85 } as const
+const AI_PATH_DASH = '4 4'
+const AI_PATH_OPACITY = 0.7
+
+function pathStyle(path: PredictionPath): { stroke: string; dash: string; opacity: number } {
+  if (path.origin === 'user') return USER_DRAWN_STYLE
+  return {
+    stroke: AI_PATH_PALETTE[path.pathIndex % AI_PATH_PALETTE.length],
+    dash: AI_PATH_DASH,
+    opacity: AI_PATH_OPACITY,
+  }
 }
 
 const MARGIN = { top: 32, right: 80, bottom: 40, left: 16 }
@@ -372,7 +388,7 @@ function ChartInner({
         <g style={{ opacity: chartRevealed ? 1 : 0, transition: 'opacity 400ms ease' }}>
           {/* ── Prediction paths ────────────────────── */}
           {predictions.map((path) => {
-            const style = TONE_STYLES[path.tone]
+            const style = pathStyle(path)
             const isSelected = selectedPathId === path.id || selectedPathIds?.has(path.id)
             const segments = isMarketInProgress
               ? segmentPredictionPathAtTime(path.data, nowTime)
