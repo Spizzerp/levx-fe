@@ -16,6 +16,9 @@ const AI_PATH_PALETTE: readonly string[] = ['#5CC8FF', '#FF6BD6', '#F6CE48', '#9
 const USER_DRAWN_STYLE = { stroke: '#8FA3C9', dash: '3 3', opacity: 0.85 } as const
 const AI_PATH_DASH = '4 4'
 const AI_PATH_OPACITY = 0.7
+const HOUR_MS = 60 * 60 * 1000
+const DAY_MS = 24 * HOUR_MS
+const MAX_HISTORY_LEAD_MS = 3 * DAY_MS
 
 const C = {
   line: 'var(--chart-line, #FFFFFF)',
@@ -41,26 +44,24 @@ function pathStyle(path: PredictionPath): { stroke: string; dash: string; opacit
 }
 
 function buildTimeDomain(args: {
-  history: PricePoint[]
-  paths: PredictionPath[]
   nowTime: number
   marketStart: number
   marketEnd: number
 }): [number, number] {
-  const times = [
-    ...args.history.map((point) => point.time),
-    ...args.paths.flatMap((path) => path.data.map((point) => point.time)),
-    args.nowTime,
-    args.marketStart,
-    args.marketEnd,
-  ].filter(Number.isFinite)
+  const duration = args.marketEnd - args.marketStart
+  if (!Number.isFinite(duration) || duration <= 0) {
+    return [args.nowTime - HOUR_MS, args.nowTime + HOUR_MS]
+  }
 
-  if (times.length === 0) return [args.nowTime - 60 * 60 * 1000, args.nowTime + 60 * 60 * 1000]
+  // Keep the thumbnail focused on the forecast window while retaining a small
+  // lead-in of real price history before the market start.
+  const historyLead = Math.min(
+    Math.max(duration * 0.3, Math.min(6 * HOUR_MS, duration)),
+    MAX_HISTORY_LEAD_MS,
+    duration,
+  )
 
-  const min = Math.min(...times)
-  const max = Math.max(...times)
-  if (min === max) return [min - 60 * 60 * 1000, max + 60 * 60 * 1000]
-  return [min, max]
+  return [args.marketStart - historyLead, args.marketEnd]
 }
 
 function buildPriceDomain(history: PricePoint[], paths: PredictionPath[]): [number, number] {
@@ -82,6 +83,10 @@ function buildPriceDomain(history: PricePoint[], paths: PredictionPath[]): [numb
   return [min - pad, max + pad]
 }
 
+function filterPointsToDomain(points: PricePoint[], [from, to]: [number, number]): PricePoint[] {
+  return points.filter((point) => point.time >= from && point.time <= to)
+}
+
 function pathSegments(path: PredictionPath, nowTime: number, marketEnd: number) {
   if (nowTime >= marketEnd) return { elapsed: path.data, future: [] }
   return segmentPredictionPathAtTime(path.data, nowTime)
@@ -101,15 +106,22 @@ function MiniChartInner({
   const innerHeight = Math.max(0, height - margin.top - margin.bottom)
 
   const timeDomain = useMemo(
-    () => buildTimeDomain({ history, paths, nowTime, marketStart, marketEnd }),
-    [history, marketEnd, marketStart, nowTime, paths],
+    () => buildTimeDomain({ nowTime, marketStart, marketEnd }),
+    [marketEnd, marketStart, nowTime],
   )
-  const priceDomain = useMemo(() => buildPriceDomain(history, paths), [history, paths])
+  const visibleHistory = useMemo(
+    () => filterPointsToDomain(history, timeDomain),
+    [history, timeDomain],
+  )
+  const priceDomain = useMemo(
+    () => buildPriceDomain(visibleHistory, paths),
+    [visibleHistory, paths],
+  )
 
   const timeScale = scaleTime({ range: [0, innerWidth], domain: timeDomain })
   const priceScale = scaleLinear({ range: [innerHeight, 0], domain: priceDomain })
 
-  const lastHistory = history[history.length - 1]
+  const lastHistory = visibleHistory[visibleHistory.length - 1]
   const markerLabel = nowTime < marketStart ? '[ OPENS ]' : '[ START ]'
   const gridRows = [0.25, 0.5, 0.75]
   const marketStartX = timeScale(marketStart) ?? 0
@@ -216,7 +228,7 @@ function MiniChartInner({
         })}
 
         <LinePath<PricePoint>
-          data={history}
+          data={visibleHistory}
           x={(d) => timeScale(d.time) ?? 0}
           y={(d) => priceScale(d.value) ?? 0}
           stroke={C.line}
