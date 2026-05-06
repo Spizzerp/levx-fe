@@ -163,6 +163,9 @@ export function MarketCard({ market, now, onClick }: MarketCardProps) {
           <MarketMiniChart
             history={historyToUse}
             paths={market.paths.length > 0 ? market.paths : undefined}
+            nowTime={now}
+            marketStart={market.startTime}
+            marketEnd={market.endTime}
           />
         </div>
 
