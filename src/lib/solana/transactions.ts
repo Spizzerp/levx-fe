@@ -14,13 +14,7 @@
  */
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import {
-  AnchorProvider,
-  BN,
-  parseIdlErrors,
-  Program,
-  translateError,
-} from '@coral-xyz/anchor'
+import { AnchorProvider, BN, parseIdlErrors, Program, translateError } from '@coral-xyz/anchor'
 import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress } from '@solana/spl-token'
 import { SystemProgram, Transaction, type TransactionInstruction } from '@solana/web3.js'
 
@@ -30,14 +24,11 @@ import { CU_LIMITS, MAX_CU_PER_TX, SCALE } from '@/lib/constants'
 import { toast } from '@/stores/toastStore'
 import { getSlippageTolerance } from '@/stores/slippageStore'
 import { ERROR_MAP, formatDecoded, lookupError } from './errorMap'
+import { logTransactionError } from './logTransactionError'
 import { deriveMarketPda, derivePathPda, derivePositionPda, deriveProtocolPda } from './pda'
 import { buildTransaction } from '@/lib/chain/buildTransaction'
 import { getPriorityFee } from '@/lib/chain/priorityFee'
-import {
-  applySlippageFloor,
-  estimateLmsrExitPayout,
-  estimateLmsrSharesOut,
-} from './lmsr'
+import { applySlippageFloor, estimateLmsrExitPayout, estimateLmsrSharesOut } from './lmsr'
 
 const MAX_BATCH_SIZE = 4
 
@@ -93,6 +84,15 @@ async function sendInstructions(
   try {
     return await provider.sendAndConfirm(tx)
   } catch (err) {
+    await logTransactionError('sendInstructions failed', err, {
+      connection: provider.connection,
+      details: {
+        computeUnitLimit,
+        priorityFeeMicroLamports,
+        originalInstructionCount: instructions.length,
+        finalInstructionCount: finalIxs.length,
+      },
+    })
     throw translateError(err, parseIdlErrors(program.idl))
   }
 }
@@ -166,11 +166,7 @@ function placeWagerMinSharesOut(
  * on `user_payout` after the settlement rake. Returns `BN(0)` if
  * tolerance is 0 or the position has no shares to sell.
  */
-function exitPositionMinPayoutOut(
-  marketAcc: any,
-  protocolAcc: any,
-  positionAcc: any,
-): BN {
+function exitPositionMinPayoutOut(marketAcc: any, protocolAcc: any, positionAcc: any): BN {
   const tol = getSlippageTolerance()
   if (tol <= 0) return new BN(0)
   const sharesHuman = (positionAcc.lmsrShares as BN).toNumber() / SCALE
@@ -398,7 +394,8 @@ export function usePlaceBatchWager() {
       queryClient.invalidateQueries({ queryKey: ['userPosition', String(marketId)] })
       queryClient.invalidateQueries({ queryKey: ['userPositions'] })
       queryClient.invalidateQueries({ queryKey: ['markets'] })
-      const label = pathIndices.length === 1 ? 'Position opened' : `${pathIndices.length} positions opened`
+      const label =
+        pathIndices.length === 1 ? 'Position opened' : `${pathIndices.length} positions opened`
       toast.success(label, { txSig: sig })
     },
     onError: (err) => {

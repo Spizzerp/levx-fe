@@ -25,6 +25,7 @@ import type { PathTone, PredictionPath, PricePoint } from '@/types/market'
 import { useIsAdmin } from '@/lib/hooks/useIsAdmin'
 import { useProgram, getReadOnlyProgram } from '@/lib/solana/program'
 import { deriveMarketPda, deriveProtocolPda } from '@/lib/solana/pda'
+import { logTransactionError } from '@/lib/solana/logTransactionError'
 import { resolveBaseMintLabel } from '@/lib/api/pairLabels'
 import { toast } from '@/stores/toastStore'
 import { useWalletStore } from '@/stores/walletStore'
@@ -537,6 +538,26 @@ export function AdminPage() {
       try {
         sig = await provider.sendAndConfirm(tx, [vaultKeypair])
       } catch (sendErr) {
+        await logTransactionError('admin.createMarket sendAndConfirm failed', sendErr, {
+          connection: provider.connection,
+          details: {
+            adminWallet: publicKey.toBase58(),
+            marketId: nextMarketId,
+            pair: pair.label,
+            baseMint: pair.baseMint,
+            quoteMint: pair.quoteMint,
+            protocolPda: protocolPda.toBase58(),
+            marketPda: marketPda.toBase58(),
+            vault: vaultKeypair.publicKey.toBase58(),
+            creatorTokenAccount: creatorTokenAccount.toBase58(),
+            instructionLabels: [
+              '0: setComputeUnitLimit',
+              '1: setComputeUnitPrice',
+              '2: createAssociatedTokenAccountIdempotent',
+              '3: createMarket',
+            ],
+          },
+        })
         throw translateError(sendErr, parseIdlErrors(program.idl))
       }
 
@@ -830,6 +851,20 @@ function AddSupportedPairForm() {
       try {
         sig = await provider.sendAndConfirm(tx)
       } catch (sendErr) {
+        await logTransactionError('admin.addSupportedPair sendAndConfirm failed', sendErr, {
+          connection: provider.connection,
+          details: {
+            adminWallet: publicKey.toBase58(),
+            baseMint: baseKey.toBase58(),
+            quoteMint: quoteKey.toBase58(),
+            protocolPda: protocolPda.toBase58(),
+            instructionLabels: [
+              '0: setComputeUnitLimit',
+              '1: setComputeUnitPrice',
+              '2: addSupportedPair',
+            ],
+          },
+        })
         throw translateError(sendErr, parseIdlErrors(program.idl))
       }
       toast.success('Supported pair added', { txSig: sig })
@@ -941,6 +976,19 @@ function ManageSupportedPairsTable() {
       try {
         sig = await provider.sendAndConfirm(tx)
       } catch (sendErr) {
+        await logTransactionError('admin.removeSupportedPair sendAndConfirm failed', sendErr, {
+          connection: provider.connection,
+          details: {
+            adminWallet: publicKey.toBase58(),
+            pairIndex: index,
+            protocolPda: protocolPda.toBase58(),
+            instructionLabels: [
+              '0: setComputeUnitLimit',
+              '1: setComputeUnitPrice',
+              '2: removeSupportedPair',
+            ],
+          },
+        })
         throw translateError(sendErr, parseIdlErrors(program.idl))
       }
       toast.success('Supported pair removed', { txSig: sig })
