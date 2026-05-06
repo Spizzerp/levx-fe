@@ -60,6 +60,12 @@ const INTERVAL_PRESETS = [
   { label: '4h', sec: 14400 },
 ]
 
+// Mirrors `validate_checkpoint_schedule` in programs/levx/src/instructions/create_market.rs.
+// MAX is bounded by the Solana TX-size limit on `add_path` (≈25 + N×8 bytes payload,
+// ≈200B overhead at the 1232B cap → ≤120). MIN is what the program rejects below.
+const MIN_CHECKPOINTS = 4
+const MAX_CHECKPOINTS = 120
+
 /* ── AI provider options ─────────────────────────────────── */
 
 const AI_PROVIDERS = [
@@ -400,7 +406,9 @@ export function AdminPage() {
   const now = Date.now()
   const chartMarketStart = new Date(startTimeInput).getTime() || now
   const chartMarketEnd = chartMarketStart + durationHours * 3600 * 1000
-  const chartTotalCheckpoints = Math.floor((durationHours * 3600) / checkpointInterval)
+  const totalCheckpoints = Math.floor((durationHours * 3600) / checkpointInterval)
+  const checkpointsValid =
+    totalCheckpoints >= MIN_CHECKPOINTS && totalCheckpoints <= MAX_CHECKPOINTS
 
   // Use benchmarks as history; fallback to empty
   const chartHistory = useMemo(() => benchmarks ?? [], [benchmarks])
@@ -418,7 +426,7 @@ export function AdminPage() {
             basePrice,
             chartMarketStart,
             checkpointInterval,
-            chartTotalCheckpoints,
+            totalCheckpoints,
             selectedPair,
           )
         : [],
@@ -427,7 +435,7 @@ export function AdminPage() {
       basePrice,
       chartMarketStart,
       checkpointInterval,
-      chartTotalCheckpoints,
+      totalCheckpoints,
       selectedPair,
     ],
   )
@@ -468,6 +476,19 @@ export function AdminPage() {
             `Either pick a pair whose quote mint is the protocol collateral, ` +
             `or call update_collateral_mint.`,
         )
+        setIsPending(false)
+        return
+      }
+
+      // The on-chain `validate_checkpoint_schedule` rejects counts <4 or >120
+      // with CheckpointMismatch (6008). Catch it here with a clear message
+      // instead of letting it surface as a generic simulation failure.
+      if (!checkpointsValid) {
+        toast.error('Checkpoint count out of range', {
+          message:
+            `Got ${totalCheckpoints}; must be between ${MIN_CHECKPOINTS} and ${MAX_CHECKPOINTS}. ` +
+            `Adjust the duration or interval.`,
+        })
         setIsPending(false)
         return
       }
@@ -604,7 +625,7 @@ export function AdminPage() {
               market={{
                 startTime: chartMarketStart,
                 checkpointInterval,
-                totalCheckpoints: chartTotalCheckpoints,
+                totalCheckpoints: totalCheckpoints,
               }}
             />
           </ChartFrame>
@@ -727,17 +748,42 @@ export function AdminPage() {
 
           {/* Checkpoint interval */}
           <Label>Checkpoint interval</Label>
-          <div className="mt-3 mb-12 flex gap-2">
-            {INTERVAL_PRESETS.map((p) => (
-              <button
-                key={p.sec}
-                type="button"
-                className={cn(CHIP, p.sec === checkpointInterval ? CHIP_ACTIVE : CHIP_INACTIVE)}
-                onClick={() => setCheckpointInterval(p.sec)}
-              >
-                {p.label}
-              </button>
-            ))}
+          <div className="mt-3 flex gap-2">
+            {INTERVAL_PRESETS.map((p) => {
+              const count = Math.floor((durationHours * 3600) / p.sec)
+              const presetInRange = count >= MIN_CHECKPOINTS && count <= MAX_CHECKPOINTS
+              const tooMany = count > MAX_CHECKPOINTS
+              return (
+                <button
+                  key={p.sec}
+                  type="button"
+                  disabled={!presetInRange}
+                  title={
+                    presetInRange
+                      ? `${count} checkpoints`
+                      : `${count} checkpoints — ${tooMany ? 'over' : 'under'} the ${MIN_CHECKPOINTS}–${MAX_CHECKPOINTS} range`
+                  }
+                  className={cn(
+                    CHIP,
+                    p.sec === checkpointInterval ? CHIP_ACTIVE : CHIP_INACTIVE,
+                    !presetInRange && 'cursor-not-allowed opacity-40',
+                  )}
+                  onClick={() => presetInRange && setCheckpointInterval(p.sec)}
+                >
+                  {p.label}
+                </button>
+              )
+            })}
+          </div>
+          <div className="text-caption mt-2 mb-12 font-mono tracking-wide">
+            <span className="text-ink-muted">Total checkpoints: </span>
+            <span className={cn(checkpointsValid ? 'text-ink-strong' : 'text-accent')}>
+              {totalCheckpoints}
+            </span>
+            <span className="text-ink-dim">
+              {' '}
+              (must be {MIN_CHECKPOINTS}–{MAX_CHECKPOINTS})
+            </span>
           </div>
 
           {/* Protocol params */}
@@ -787,7 +833,7 @@ export function AdminPage() {
           <Button
             variant="primary"
             fullWidth
-            disabled={isPending || !program}
+            disabled={isPending || !program || !checkpointsValid}
             onClick={handleCreateMarket}
           >
             {isPending ? 'Creating…' : 'Create Market'}
