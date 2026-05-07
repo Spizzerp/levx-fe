@@ -4,6 +4,7 @@ import { StatusDot } from '@/ui/StatusDot'
 import { TokenPairIcon } from '@/ui/TokenPairIcon'
 import { cn } from '@/lib/cn'
 import { formatCountdown, formatMarketDurationLabel, formatShortDate } from '@/lib/format'
+import { getMarketDisplayState } from '@/lib/market/status'
 
 import type { Market, MarketState } from '@/types/market'
 import type { PythTick } from '@/lib/pyth/types'
@@ -89,6 +90,7 @@ export function MarketCard({ market, now, onClick }: MarketCardProps) {
   const timeLabel = marketTimeLabel(market, now)
   const durationLabel = formatMarketDurationLabel(market.startTime, market.endTime)
   const endDateLabel = formatShortDate(market.endTime)
+  const displayState = getMarketDisplayState(market)
 
   return (
     <button
@@ -217,8 +219,8 @@ export function MarketCard({ market, now, onClick }: MarketCardProps) {
               <span className="text-ink-muted font-mono text-[11px] leading-none font-bold tracking-widest uppercase">
                 {market.base}/{market.quote}
               </span>
-              <StatusDot status={market.state} size="compact" className="mt-1">
-                {STATE_LABELS[market.state]}
+              <StatusDot status={displayState} size="compact" className="mt-1">
+                {STATE_LABELS[displayState]}
               </StatusDot>
             </div>
           </div>

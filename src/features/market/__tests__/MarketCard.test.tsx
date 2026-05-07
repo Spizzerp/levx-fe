@@ -82,5 +82,6 @@ describe('MarketCard', () => {
 
     expect(screen.getByText('+10.00%')).toBeInTheDocument()
     expect(screen.getByText('ID: 30')).toBeInTheDocument()
+    expect(screen.getByText('Active')).toBeInTheDocument()
   })
 })

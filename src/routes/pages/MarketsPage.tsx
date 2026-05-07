@@ -13,6 +13,7 @@ import { QueryErrorState } from '@/ui/QueryErrorState'
 import { StatusDot } from '@/ui/StatusDot'
 import { cn } from '@/lib/cn'
 import { useMarkets } from '@/lib/chain'
+import { getMarketDisplayState } from '@/lib/market/status'
 import { feedIdForPair } from '@/lib/pyth/feedIds'
 import { usePythFeed } from '@/lib/pyth/hooks'
 import { formatCountdown, formatUSD } from '@/lib/format'
@@ -129,7 +130,10 @@ function buildColumns(now: number): DataTableColumn<Market>[] {
     {
       key: 'state',
       header: 'STATE',
-      render: (m) => <StatusDot status={m.state}>{STATE_LABELS[m.state]}</StatusDot>,
+      render: (m) => {
+        const displayState = getMarketDisplayState(m)
+        return <StatusDot status={displayState}>{STATE_LABELS[displayState]}</StatusDot>
+      },
     },
     {
       key: 'ends',
@@ -230,8 +234,10 @@ export function MarketsPage() {
   const visible = useMemo(
     () =>
       (markets ?? [])
-        .filter((m) => matchesFilter(m.state, filter))
-        .sort((a, b) => STATE_ORDER[a.state] - STATE_ORDER[b.state]),
+        .filter((m) => matchesFilter(getMarketDisplayState(m), filter))
+        .sort(
+          (a, b) => STATE_ORDER[getMarketDisplayState(a)] - STATE_ORDER[getMarketDisplayState(b)],
+        ),
     [markets, filter],
   )
 
@@ -286,7 +292,7 @@ export function MarketsPage() {
               <div>
                 <div className="text-label text-ink-dim mb-1 font-mono uppercase">Active</div>
                 <div className="text-ink-strong tracking-snug flex items-center gap-2 font-mono text-4xl font-bold">
-                  {markets?.filter((m) => m.state === 'active').length ?? 0}
+                  {markets?.filter((m) => getMarketDisplayState(m) === 'active').length ?? 0}
                   <span className="inline-flex items-center gap-1">
                     <span className="bg-success h-2 w-2 animate-pulse rounded-full" />
                     <span className="text-success text-label font-normal tracking-wide">Live</span>
@@ -316,17 +322,15 @@ export function MarketsPage() {
               />
 
               {/* View mode toggle */}
-              <div className="inline-flex h-9 items-center rounded-full border border-line-strong bg-surface">
+              <div className="border-line-strong bg-surface inline-flex h-9 items-center rounded-full border">
                 <button
                   type="button"
                   onClick={() => setViewMode('table')}
                   aria-label="Table view"
                   className={cn(
-                    'flex h-full items-center px-3 rounded-l-full',
+                    'flex h-full items-center rounded-l-full px-3',
                     'duration-short ease-levx transition-colors',
-                    viewMode === 'table'
-                      ? 'text-ink-strong'
-                      : 'text-ink-dim hover:text-ink-muted',
+                    viewMode === 'table' ? 'text-ink-strong' : 'text-ink-dim hover:text-ink-muted',
                   )}
                 >
                   <List size={14} strokeWidth={1.75} />
@@ -337,11 +341,9 @@ export function MarketsPage() {
                   onClick={() => setViewMode('grid')}
                   aria-label="Grid view"
                   className={cn(
-                    'flex h-full items-center px-3 rounded-r-full',
+                    'flex h-full items-center rounded-r-full px-3',
                     'duration-short ease-levx transition-colors',
-                    viewMode === 'grid'
-                      ? 'text-ink-strong'
-                      : 'text-ink-dim hover:text-ink-muted',
+                    viewMode === 'grid' ? 'text-ink-strong' : 'text-ink-dim hover:text-ink-muted',
                   )}
                 >
                   <LayoutGrid size={14} strokeWidth={1.75} />
@@ -473,7 +475,7 @@ export function MarketsPage() {
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
                       transition={{ duration: 0.2 }}
-                      className="col-span-full border-line-strong flex flex-col items-center justify-center gap-4 rounded-2xl border border-dashed py-24"
+                      className="border-line-strong col-span-full flex flex-col items-center justify-center gap-4 rounded-2xl border border-dashed py-24"
                     >
                       <p className="text-ink-muted text-label font-mono uppercase">
                         [ No markets match filter ]

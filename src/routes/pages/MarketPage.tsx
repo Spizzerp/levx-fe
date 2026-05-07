@@ -26,6 +26,7 @@ import { Stub } from '@/ui/Stub'
 import { UserPositionCard } from '@/features/market/UserPositionCard'
 import { cn } from '@/lib/cn'
 import { useMarket, useUserPosition } from '@/lib/chain'
+import { isMarketWageringOpen } from '@/lib/market/status'
 import { useProgram } from '@/lib/solana/program'
 import { deriveMarketPda } from '@/lib/solana/pda'
 import { useAddPath, usePlaceBatchWager, useClaim } from '@/lib/solana/transactions'
@@ -333,19 +334,15 @@ export function MarketPage() {
    *   settling / void  → empty rail
    *   Non-wager states with a user position also show the position card.
    */
-  const showWagerRail =
-    market.state === 'pending' || market.state === 'active' || market.state === 'sampling'
+  const wageringOpen = isMarketWageringOpen(market)
+  const showWagerRail = market.state === 'pending' || wageringOpen
   const showMaturityCard = market.state === 'maturing'
   const showClaimCard = market.state === 'settled'
   const showVoidPanel = market.state === 'void'
   const showPendingIndicator = market.state === 'pending' && market.numPaths < 3
   const showPositionRail = !showWagerRail && !showVoidPanel && !!userPosition
   const showRail =
-    showWagerRail ||
-    showMaturityCard ||
-    showClaimCard ||
-    showVoidPanel ||
-    showPositionRail
+    showWagerRail || showMaturityCard || showClaimCard || showVoidPanel || showPositionRail
 
   return (
     <main
@@ -359,7 +356,7 @@ export function MarketPage() {
       <section>
         <Link
           to="/markets"
-          className="group mb-5 flex items-center gap-1 text-ink-dim hover:text-ink-strong transition-colors"
+          className="group text-ink-dim hover:text-ink-strong mb-5 flex items-center gap-1 transition-colors"
         >
           <ArrowLeft
             size={14}
@@ -487,8 +484,7 @@ export function MarketPage() {
             //     when there is genuinely nothing real to display.
             // Outside pending, `allPaths` is authoritative.
             const hasOnChainPaths = (market.paths?.length ?? 0) > 0
-            const visiblePaths =
-              showPendingIndicator && !hasOnChainPaths ? userPaths : allPaths
+            const visiblePaths = showPendingIndicator && !hasOnChainPaths ? userPaths : allPaths
             const showLoaderInSlot = showPendingIndicator && visiblePaths.length === 0
 
             if (showLoaderInSlot) {
@@ -645,10 +641,7 @@ export function MarketPage() {
               fullWidth
               className="mt-2"
               disabled={
-                market.state !== 'active' ||
-                numWagerable === 0 ||
-                numWagerable > 4 ||
-                placeBatchWager.isPending
+                !wageringOpen || numWagerable === 0 || numWagerable > 4 || placeBatchWager.isPending
               }
               onClick={() => {
                 if (numWagerable === 0) return
