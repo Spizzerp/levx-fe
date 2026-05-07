@@ -19,7 +19,7 @@ function formatDateTime(epochMs: number): string {
 export const STATE_PROSE: Record<MarketState, ProseFn> = {
   pending: (m) => `Wagering opens ${formatDateTime(m.startTime)}`,
   active: (m) => `Wager open until ${formatDateTime(m.endTime)}`,
-  sampling: () => 'Final wagers; checkpoint scoring underway',
+  sampling: () => 'Wagering closed; checkpoint scoring underway',
   settling: () => 'Final score being computed; no new wagers',
   maturing: (m) =>
     `Review window; claims open in ${formatCountdown(Math.max(0, m.endTime - Date.now()))}`,

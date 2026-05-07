@@ -32,9 +32,8 @@ vi.mock('@visx/responsive', () => ({
 
 // Mock useParams and Link so MarketPage can render without the full TanStack Router tree
 vi.mock('@tanstack/react-router', async () => {
-  const actual = await vi.importActual<typeof import('@tanstack/react-router')>(
-    '@tanstack/react-router',
-  )
+  const actual =
+    await vi.importActual<typeof import('@tanstack/react-router')>('@tanstack/react-router')
   return {
     ...actual,
     useParams: vi.fn(() => ({ id: 'btc' })),
@@ -119,7 +118,7 @@ vi.mock('@/lib/supabase/hooks', () => ({
     error: null,
   }),
   useProfiles: () => ({ data: {}, isLoading: false, error: null }),
-  getProfileImageUrl: (path: string | null) => path ? `https://mock-storage/${path}` : null,
+  getProfileImageUrl: (path: string | null) => (path ? `https://mock-storage/${path}` : null),
   useDrawBroadcast: () => ({ liveDraws: {} }),
   usePublishDrawFrame: () => () => {},
 }))
@@ -127,6 +126,7 @@ vi.mock('@/lib/supabase/hooks', () => ({
 import { MarketPage } from '@/routes/pages/MarketPage'
 import { useDrawingStore } from '@/stores/drawingStore'
 import { usePythStore } from '@/stores/pythStore'
+import type { PredictionPath } from '@/types/market'
 
 const TEST_MARKET = {
   id: 'btc',
@@ -157,6 +157,40 @@ const TEST_MARKET = {
   pathMaxAge: 0,
   pathsScored: 0,
   pathsDissolved: 0,
+}
+
+type TestMarketOverride = Partial<Omit<typeof TEST_MARKET, 'paths'> & { paths: PredictionPath[] }>
+
+function makePath(overrides: Partial<PredictionPath> = {}): PredictionPath {
+  return {
+    id: 'path-0',
+    label: 'Path A',
+    tone: 'bull',
+    origin: 'ai',
+    multiplier: 1.25,
+    data: [
+      { time: TEST_MARKET.startTime, value: 72_800 },
+      { time: TEST_MARKET.endTime, value: 74_000 },
+    ],
+    pathIndex: 0,
+    predictedPrices: [72_800, 74_000],
+    numCheckpoints: 2,
+    generationTimestamp: Date.now(),
+    creator: '',
+    cumulativeAction: 0,
+    compositeScore: 0,
+    peakAmplitude: 0,
+    amplitudeAtDecoherence: 0,
+    dissolved: false,
+    dissolvedAtCheckpoint: 0,
+    checkpointsProcessed: 0,
+    totalWagered: 0,
+    totalLeveragedExposure: 0,
+    lmsrSharesOutstanding: 0,
+    totalTimeWeightedExposure: 0,
+    currentImpliedProbability: 0,
+    ...overrides,
+  }
 }
 
 function renderMarketPage() {
@@ -198,18 +232,12 @@ async function selectMarketParams(_user: ReturnType<typeof userEvent.setup>) {
 }
 
 async function setMarketState(
-  state:
-    | 'pending'
-    | 'active'
-    | 'sampling'
-    | 'settling'
-    | 'maturing'
-    | 'settled'
-    | 'void',
+  state: 'pending' | 'active' | 'sampling' | 'settling' | 'maturing' | 'settled' | 'void',
+  overrides: TestMarketOverride = {},
 ) {
   const { useMarket } = await import('@/lib/api/hooks')
   ;(useMarket as ReturnType<typeof vi.fn>).mockReturnValue({
-    data: { ...TEST_MARKET, state },
+    data: { ...TEST_MARKET, state, ...overrides },
     isLoading: false,
     isError: false,
     error: null,
@@ -322,18 +350,24 @@ describe('MarketPage state-gated controls', () => {
     expect(wagerPanelQuery()).toBeInTheDocument()
   })
 
-  it('mounts the wager panel when market.state is Sampling (MARKET-04)', async () => {
+  it('mounts the wager panel when market.state is Sampling before the wagering cutoff (MARKET-04)', async () => {
     await setMarketState('sampling')
     renderMarketPage()
     expect(wagerPanelQuery()).toBeInTheDocument()
+  })
+
+  it('does NOT mount the wager panel when market.state is Sampling at the wagering cutoff (MARKET-04)', async () => {
+    await setMarketState('sampling', { completedCheckpoints: 252 })
+    renderMarketPage()
+    expect(wagerPanelQuery()).not.toBeInTheDocument()
   })
 
   it('mounts the wager panel when market.state is Pending so users see the form behind the AI loader (MARKET-04)', async () => {
     // Pending markets used to mount a standalone PendingPathsBanner
     // aside instead of the wager panel; that left a big empty rail
     // for the duration of AI path generation. The current behavior
-    // mounts the same wager rail as Active/Sampling — controls
-    // disabled (the existing market.state !== 'active' gate handles
+    // mounts the same wager rail chrome as wager-open markets — controls
+    // disabled by the shared wagering-open gate
     // that) and the path-list slot is replaced by a heart-pulse
     // loader. Net: users see the bet they'll place rather than an
     // empty waiting room.
@@ -370,9 +404,7 @@ describe('MarketPage state-gated controls', () => {
     await setMarketState('settled')
     const { unmount } = renderMarketPage()
     // Claim button slot: connect-wallet prompt (disconnected) OR "Claim" CTA (connected)
-    expect(
-      screen.getByText(/market has settled\. claim your payout below/i),
-    ).toBeInTheDocument()
+    expect(screen.getByText(/market has settled\. claim your payout below/i)).toBeInTheDocument()
     unmount()
 
     await setMarketState('active')
@@ -386,24 +418,40 @@ describe('MarketPage state-gated controls', () => {
     await setMarketState('maturing')
     const { unmount } = renderMarketPage()
     // Countdown card has the unique body copy:
-    expect(
-      screen.getByText(/market is in the maturity review window/i),
-    ).toBeInTheDocument()
+    expect(screen.getByText(/market is in the maturity review window/i)).toBeInTheDocument()
     unmount()
 
     await setMarketState('settled')
     renderMarketPage()
-    expect(
-      screen.queryByText(/market is in the maturity review window/i),
-    ).not.toBeInTheDocument()
+    expect(screen.queryByText(/market is in the maturity review window/i)).not.toBeInTheDocument()
   })
 
-  it('renders the MarketStateBadge with the market state label', async () => {
+  it('renders the MarketStateBadge as Active for sampling markets before the wagering cutoff', async () => {
     await setMarketState('sampling')
     renderMarketPage()
     // The badge was simplified to render only the label (no descriptive prose).
     // STATE_PROSE remains exported for any future surface that wants it.
+    expect(screen.getByText(/Active/i)).toBeInTheDocument()
+  })
+
+  it('renders the MarketStateBadge as Sampling once the wagering cutoff is reached', async () => {
+    await setMarketState('sampling', { completedCheckpoints: 252 })
+    renderMarketPage()
     expect(screen.getByText(/Sampling/i)).toBeInTheDocument()
+  })
+
+  it('keeps the submit button enabled for sampling markets before the wagering cutoff', async () => {
+    await setMarketState('sampling', {
+      paths: [makePath()],
+      numPaths: 1,
+    })
+    act(() => connectWallet())
+    const user = userEvent.setup()
+    renderMarketPage()
+
+    await user.click(screen.getByRole('button', { name: /path a/i }))
+
+    expect(screen.getByRole('button', { name: /open long position/i })).not.toBeDisabled()
   })
 
   it('renders a collapsible metadata section with checkpoint schedule, fee rate, pool (MARKET-05)', async () => {
@@ -443,9 +491,7 @@ describe('MarketPage wallet gating', () => {
   it('submit button slot shows "Connect wallet to continue" when walletStore.connected=false (WALLET-04)', async () => {
     await setMarketState('active')
     renderMarketPage()
-    expect(
-      screen.getByRole('button', { name: /connect wallet to continue/i }),
-    ).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /connect wallet to continue/i })).toBeInTheDocument()
     // Real "Open Long/Short Position" button is NOT mounted while disconnected
     expect(
       screen.queryByRole('button', { name: /open (long|short) position/i }),

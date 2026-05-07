@@ -59,8 +59,13 @@ describe('MarketStateBadge', () => {
     expect(screen.getByText(/Active/i)).toBeInTheDocument()
   })
 
-  it('renders Sampling label', () => {
+  it('renders Active label for sampling markets before the wagering cutoff', () => {
     renderState('sampling')
+    expect(screen.getByText(/Active/i)).toBeInTheDocument()
+  })
+
+  it('renders Sampling label once the wagering cutoff is reached', () => {
+    renderState('sampling', { completedCheckpoints: 18 })
     expect(screen.getByText(/Sampling/i)).toBeInTheDocument()
   })
 
@@ -100,7 +105,7 @@ describe('MarketStateBadge', () => {
     const m = makeMarket()
     expect(STATE_PROSE.pending(m)).toMatch(/Wagering opens/i)
     expect(STATE_PROSE.active(m)).toMatch(/Wager open until/i)
-    expect(STATE_PROSE.sampling(m)).toMatch(/Final wagers/i)
+    expect(STATE_PROSE.sampling(m)).toMatch(/Wagering closed/i)
     expect(STATE_PROSE.settling(m)).toMatch(/Final score being computed/i)
     expect(STATE_PROSE.maturing({ ...m, endTime: Date.now() + 60_000 })).toMatch(/Review window/i)
     expect(STATE_PROSE.settled(m)).toMatch(/Claim available/i)

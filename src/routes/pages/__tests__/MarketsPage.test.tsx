@@ -171,44 +171,63 @@ describe('MarketsPage', () => {
     // active/settled have 5 paths, sampling has 4, pending has 3.
     // We assert the numeric cells exist by text — since paths.length is >0, no em-dash.
     for (const m of markets) {
-      expect(
-        screen.getAllByText(new RegExp(`^${m.paths.length}$`)).length,
-      ).toBeGreaterThan(0)
+      expect(screen.getAllByText(new RegExp(`^${m.paths.length}$`)).length).toBeGreaterThan(0)
     }
   })
 
-  it(
-    'rows are ordered by STATE_ORDER: active, sampling, pending, settling, maturing, settled, void (MARKET-01)',
-    async () => {
-      await setUseMarkets({ data: makeMarketsAcrossStates() })
-      renderPage()
-      // Rows are rendered as <button> elements (DataTable with onRowClick).
-      // Filter to data rows that contain a pair cell (skip filter pill buttons).
-      const rows = screen
-        .getAllByRole('button')
-        .filter((el) => /BTC|ETH|SOL|PEPE/.test(el.textContent ?? ''))
-      expect(rows).toHaveLength(4)
-      // Insertion order was: settled, pending, active, sampling
-      // Expected order: active, sampling, pending, settled
-      expect(rows[0]).toHaveTextContent(/BTC/)
-      expect(rows[1]).toHaveTextContent(/ETH/)
-      expect(rows[2]).toHaveTextContent(/SOL/)
-      expect(rows[3]).toHaveTextContent(/PEPE/)
-    },
-  )
+  it('rows are ordered by display state: active, sampling, pending, settling, maturing, settled, void (MARKET-01)', async () => {
+    await setUseMarkets({ data: makeMarketsAcrossStates() })
+    renderPage()
+    // Rows are rendered as <button> elements (DataTable with onRowClick).
+    // Filter to data rows that contain a pair cell (skip filter pill buttons).
+    const rows = screen
+      .getAllByRole('button')
+      .filter((el) => /BTC|ETH|SOL|PEPE/.test(el.textContent ?? ''))
+    expect(rows).toHaveLength(4)
+    // Insertion order was: settled, pending, active, sampling
+    // Expected order: active, sampling, pending, settled
+    expect(rows[0]).toHaveTextContent(/BTC/)
+    expect(rows[1]).toHaveTextContent(/ETH/)
+    expect(rows[2]).toHaveTextContent(/SOL/)
+    expect(rows[3]).toHaveTextContent(/PEPE/)
+  })
 
-  it(
-    'renders the canonical column set (market, state, expires, pool, paths) (MARKET-01)',
-    async () => {
-      await setUseMarkets({ data: makeMarketsAcrossStates() })
-      renderPage()
-      expect(screen.getByText(/^market$/i)).toBeInTheDocument()
-      expect(screen.getByText(/^state$/i)).toBeInTheDocument()
-      expect(screen.getByText(/^expires$/i)).toBeInTheDocument()
-      expect(screen.getByText(/^pool$/i)).toBeInTheDocument()
-      expect(screen.getByText(/^paths$/i)).toBeInTheDocument()
-    },
-  )
+  it('renders raw sampling markets as active before cutoff and sampling after cutoff', async () => {
+    await setUseMarkets({
+      data: [
+        makeMarket({ id: 'active', pair: 'BTC/USDC', state: 'active' }),
+        makeMarket({ id: 'sampling-open', pair: 'ETH/USDC', state: 'sampling' }),
+        makeMarket({
+          id: 'sampling-closed',
+          pair: 'DOGE/USDC',
+          state: 'sampling',
+          completedCheckpoints: 252,
+        }),
+      ],
+    })
+    renderPage()
+
+    const rows = screen
+      .getAllByRole('button')
+      .filter((el) => /BTC|ETH|DOGE/.test(el.textContent ?? ''))
+    expect(rows).toHaveLength(3)
+    expect(rows[0]).toHaveTextContent(/BTC/)
+    expect(rows[0]).toHaveTextContent(/Active/)
+    expect(rows[1]).toHaveTextContent(/ETH/)
+    expect(rows[1]).toHaveTextContent(/Active/)
+    expect(rows[2]).toHaveTextContent(/DOGE/)
+    expect(rows[2]).toHaveTextContent(/Sampling/)
+  })
+
+  it('renders the canonical column set (market, state, expires, pool, paths) (MARKET-01)', async () => {
+    await setUseMarkets({ data: makeMarketsAcrossStates() })
+    renderPage()
+    expect(screen.getByText(/^market$/i)).toBeInTheDocument()
+    expect(screen.getByText(/^state$/i)).toBeInTheDocument()
+    expect(screen.getByText(/^expires$/i)).toBeInTheDocument()
+    expect(screen.getByText(/^pool$/i)).toBeInTheDocument()
+    expect(screen.getByText(/^paths$/i)).toBeInTheDocument()
+  })
 
   it('renders a skeleton component when useMarkets is loading (MARKET-08)', async () => {
     await setUseMarkets({ isLoading: true, data: undefined })
