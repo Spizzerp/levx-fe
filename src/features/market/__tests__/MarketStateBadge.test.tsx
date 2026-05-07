@@ -89,8 +89,11 @@ describe('MarketStateBadge', () => {
     const dot = container.querySelector('span[aria-hidden="true"]') as HTMLElement | null
     expect(dot).not.toBeNull()
     // Active maps to DOT_GRADIENT.positive in StatusDot's statusDots map —
-    // a linear-gradient containing #5CF78B (the success-tone hex).
-    expect(dot!.getAttribute('style') ?? '').toMatch(/#5CF78B/i)
+    // the pulsing ring wraps an inner core with a gradient containing #5CF78B.
+    const dotStyles = Array.from(dot!.querySelectorAll('span'))
+      .map((el) => el.getAttribute('style') ?? '')
+      .join(' ')
+    expect(dotStyles).toMatch(/#5CF78B/i)
   })
 
   it('STATE_PROSE provides phrasing for every market state', () => {

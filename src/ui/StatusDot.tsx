@@ -9,6 +9,7 @@ interface StatusDotProps {
   status: Status
   children: ReactNode
   className?: string
+  size?: 'default' | 'compact'
 }
 
 const statusDots: Record<Status, { bg: string; glow: string }> = {
@@ -21,22 +22,48 @@ const statusDots: Record<Status, { bg: string; glow: string }> = {
   void: { bg: DOT_GRADIENT.negative, glow: 'rgba(255, 69, 58, 0.25)' },
 }
 
-export function StatusDot({ status, children, className }: StatusDotProps) {
+const statusDotSizes = {
+  default: {
+    root: 'text-label gap-2',
+    ring: 'h-3.5 w-3.5',
+    core: 'h-1.5 w-1.5',
+  },
+  compact: {
+    root: 'gap-1.5 text-[10px] leading-none',
+    ring: 'h-2.5 w-2.5',
+    core: 'h-1 w-1',
+  },
+} as const
+
+export function StatusDot({ status, children, className, size = 'default' }: StatusDotProps) {
   const { bg, glow } = statusDots[status]
-  const dotStyle: CSSProperties = {
+  const sizing = statusDotSizes[size]
+  const ringStyle: CSSProperties = {
+    background: `radial-gradient(circle, ${glow} 0%, ${glow} 45%, transparent 78%)`,
+  }
+  const coreStyle: CSSProperties = {
     background: bg,
-    boxShadow: `0 0 0 3px ${glow}`,
   }
 
   return (
     <span
       className={cn(
-        'text-label text-ink-muted inline-flex items-center gap-2 font-mono uppercase',
+        'text-ink-muted inline-flex items-center font-mono uppercase',
+        sizing.root,
         className,
       )}
     >
-      <span className="h-1.5 w-1.5 rounded-full" style={dotStyle} aria-hidden />
       {children}
+      <span
+        className={cn(
+          'relative inline-flex shrink-0 items-center justify-center rounded-full',
+          sizing.ring,
+        )}
+        aria-hidden
+      >
+        <span className="status-dot-ring absolute inset-0 rounded-full" style={ringStyle} />
+        <span className={cn('relative rounded-full', sizing.core)} style={coreStyle} />
+      </span>
     </span>
   )
 }

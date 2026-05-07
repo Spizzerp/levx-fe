@@ -1,9 +1,14 @@
+import { useMemo } from 'react'
+
 import { StatusDot } from '@/ui/StatusDot'
 import { TokenPairIcon } from '@/ui/TokenPairIcon'
 import { cn } from '@/lib/cn'
 import { formatCountdown, formatMarketDurationLabel, formatShortDate } from '@/lib/format'
 
 import type { Market, MarketState } from '@/types/market'
+import type { PythTick } from '@/lib/pyth/types'
+import { feedIdForPair } from '@/lib/pyth/feedIds'
+import { useLatestPrice } from '@/lib/pyth/hooks'
 import { useBenchmarksHistory } from '@/lib/pyth/useBenchmarksHistory'
 import { MarketMiniChart } from './MarketMiniChart'
 
@@ -23,14 +28,28 @@ interface MarketCardProps {
   onClick: () => void
 }
 
-function calculatePctChange(market: Market): { value: number; isPositive: boolean } {
-  if (market.history.length === 0) return { value: 0, isPositive: true }
+function appendLiveTick(
+  history: Market['history'],
+  latestTick: PythTick | null,
+): Market['history'] {
+  if (!latestTick || !Number.isFinite(latestTick.value)) return history
 
-  const startPricePoint = market.history.reduce((prev, curr) =>
-    Math.abs(curr.time - market.startTime) < Math.abs(prev.time - market.startTime) ? curr : prev,
+  const lastHistoryPoint = history[history.length - 1]
+  if (lastHistoryPoint && latestTick.time <= lastHistoryPoint.time) return history
+  return [...history, { time: latestTick.time, value: latestTick.value }]
+}
+
+function calculatePctChange(args: { history: Market['history']; marketStart: number }): {
+  value: number
+  isPositive: boolean
+} {
+  if (args.history.length === 0) return { value: 0, isPositive: true }
+
+  const startPricePoint = args.history.reduce((prev, curr) =>
+    Math.abs(curr.time - args.marketStart) < Math.abs(prev.time - args.marketStart) ? curr : prev,
   )
 
-  const latestPrice = market.history[market.history.length - 1].value
+  const latestPrice = args.history[args.history.length - 1].value
   const startPrice = startPricePoint.value
   if (startPrice === 0) return { value: 0, isPositive: true }
 
@@ -51,13 +70,22 @@ function marketTimeLabel(market: Market, now: number): { label: string; value: s
 }
 
 export function MarketCard({ market, now, onClick }: MarketCardProps) {
+  const feedId = feedIdForPair(market.pair)
+  const latestTick = useLatestPrice(feedId)
   const { data: realHistory } = useBenchmarksHistory({
     pair: market.pair,
     interval: '1h',
   })
 
   const historyToUse = realHistory && realHistory.length > 0 ? realHistory : market.history
-  const { value: pctChange, isPositive } = calculatePctChange({ ...market, history: historyToUse })
+  const liveHistory = useMemo(
+    () => appendLiveTick(historyToUse, latestTick),
+    [historyToUse, latestTick],
+  )
+  const { value: pctChange, isPositive } = calculatePctChange({
+    history: liveHistory,
+    marketStart: market.startTime,
+  })
   const timeLabel = marketTimeLabel(market, now)
   const durationLabel = formatMarketDurationLabel(market.startTime, market.endTime)
   const endDateLabel = formatShortDate(market.endTime)
@@ -121,15 +149,15 @@ export function MarketCard({ market, now, onClick }: MarketCardProps) {
 
       {/* ── Content ── */}
       <div className="relative z-10 flex h-full w-full flex-col">
-        {/* Top Section: Title & Status */}
-        <div className="flex items-start justify-between p-6 pb-0">
-          <div className="flex min-w-0 flex-col gap-1 pr-4">
-            <span className="text-ink-strong font-display text-xl leading-tight font-bold">
-              Where will {market.base} be by {endDateLabel}?
-            </span>
+        {/* Top Section: Title & ID */}
+        <div className="flex flex-col gap-1 p-6 pb-0">
+          <span className="text-ink-strong font-display text-xl leading-tight font-bold">
+            Where will {market.base} be by {endDateLabel}?
+          </span>
+          <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1">
             <span
               className={cn(
-                'flex flex-wrap items-center gap-x-1.5 gap-y-1',
+                'flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1',
                 'font-mono text-[10px] leading-none',
               )}
             >
@@ -144,10 +172,10 @@ export function MarketCard({ market, now, onClick }: MarketCardProps) {
                 </>
               )}
             </span>
+            <span className="text-ink-dim shrink-0 font-mono text-[10px] leading-none tracking-[0.12em] uppercase opacity-60">
+              ID: {market.marketId}
+            </span>
           </div>
-          <StatusDot status={market.state} className="text-nano">
-            {STATE_LABELS[market.state]}
-          </StatusDot>
         </div>
 
         {/* Middle Section: Chart */}
@@ -161,7 +189,7 @@ export function MarketCard({ market, now, onClick }: MarketCardProps) {
           }}
         >
           <MarketMiniChart
-            history={historyToUse}
+            history={liveHistory}
             paths={market.paths.length > 0 ? market.paths : undefined}
             nowTime={now}
             marketStart={market.startTime}
@@ -189,9 +217,9 @@ export function MarketCard({ market, now, onClick }: MarketCardProps) {
               <span className="text-ink-muted font-mono text-[11px] leading-none font-bold tracking-widest uppercase">
                 {market.base}/{market.quote}
               </span>
-              <span className="text-ink-dim mt-1 font-mono text-[8px] font-medium tracking-[0.15em] uppercase opacity-50">
-                ID: {market.id.slice(0, 8)}
-              </span>
+              <StatusDot status={market.state} size="compact" className="mt-1">
+                {STATE_LABELS[market.state]}
+              </StatusDot>
             </div>
           </div>
 
@@ -205,8 +233,8 @@ export function MarketCard({ market, now, onClick }: MarketCardProps) {
                 )}
                 style={{
                   textShadow: isPositive
-                    ? '0 0 20px rgba(92,247,139,0.4)'
-                    : '0 0 20px rgba(255,72,59,0.4)',
+                    ? '0 0 12px rgba(92,247,139,0.24)'
+                    : '0 0 12px rgba(255,72,59,0.24)',
                 }}
               >
                 {isPositive ? '+' : '-'}

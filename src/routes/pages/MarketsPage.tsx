@@ -13,6 +13,8 @@ import { QueryErrorState } from '@/ui/QueryErrorState'
 import { StatusDot } from '@/ui/StatusDot'
 import { cn } from '@/lib/cn'
 import { useMarkets } from '@/lib/chain'
+import { feedIdForPair } from '@/lib/pyth/feedIds'
+import { usePythFeed } from '@/lib/pyth/hooks'
 import { formatCountdown, formatUSD } from '@/lib/format'
 import { PageLayout } from '@/layouts/PageLayout'
 import type { Market, MarketState } from '@/types/market'
@@ -79,6 +81,33 @@ function useNowTick(intervalMs = 1000): number {
     return () => clearInterval(id)
   }, [intervalMs])
   return now
+}
+
+function PythFeedSubscription({ feedId }: { feedId: string }) {
+  usePythFeed(feedId)
+  return null
+}
+
+function MarketGridPythSubscriptions({ markets }: { markets: Market[] }) {
+  const feedIds = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          markets
+            .map((market) => feedIdForPair(market.pair))
+            .filter((feedId): feedId is string => feedId !== null),
+        ),
+      ),
+    [markets],
+  )
+
+  return (
+    <>
+      {feedIds.map((feedId) => (
+        <PythFeedSubscription key={feedId} feedId={feedId} />
+      ))}
+    </>
+  )
 }
 
 function buildColumns(now: number): DataTableColumn<Market>[] {
@@ -181,7 +210,7 @@ export function MarketsPage() {
   // Sync with localStorage for stickiness across navigations
   useEffect(() => {
     const stored = localStorage.getItem('levx-view-mode') as ViewMode | null
-    
+
     if (!viewParam && stored && stored !== 'table') {
       // 1. URL has no param, but we have a stored preference (that isn't the default)
       navigate({ search: (prev) => ({ ...prev, view: stored }), replace: true })
@@ -404,6 +433,8 @@ export function MarketsPage() {
               exit={{ opacity: 0, y: -10, scale: 0.985 }}
               transition={{ duration: 0.24, ease: [0.25, 0.46, 0.45, 0.94] }}
             >
+              <MarketGridPythSubscriptions markets={gridItems} />
+
               <motion.div
                 layout
                 className={cn(

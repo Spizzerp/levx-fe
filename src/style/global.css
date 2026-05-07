@@ -81,6 +81,30 @@
   }
 }
 
+@keyframes status-dot-ring {
+  0%,
+  100% {
+    opacity: 0.72;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 0.38;
+    transform: scale(1.16);
+  }
+}
+
+.status-dot-ring {
+  animation: status-dot-ring 1.9s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-dot-ring {
+    animation: none;
+    opacity: 0.55;
+    transform: none;
+  }
+}
+
 /*
   Duration scales with strip length. Strip is now 30 SETs wide (was 5),
   so to keep the same per-SET scroll speed (~8s/SET) the duration is
