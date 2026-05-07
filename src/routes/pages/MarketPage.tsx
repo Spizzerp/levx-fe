@@ -49,6 +49,58 @@ import type { Market, PredictionPath, PricePoint } from '@/types/market'
 
 const META_SEP = <span className="text-line-strong mx-0.5">·</span>
 
+function isLiveUserDrawingState(state: Market['state'] | undefined): boolean {
+  return state === 'active' || state === 'sampling'
+}
+
+function closestHistoryValue(
+  history: readonly PricePoint[],
+  targetTime: number,
+  fallbackValue: number,
+): number | null {
+  let closestValue = Number.isFinite(fallbackValue) && fallbackValue > 0 ? fallbackValue : null
+  let closestDistance = Number.POSITIVE_INFINITY
+
+  for (const point of history) {
+    if (!Number.isFinite(point.value) || point.value <= 0) continue
+    const distance = Math.abs(point.time - targetTime)
+    if (distance < closestDistance) {
+      closestDistance = distance
+      closestValue = point.value
+    }
+  }
+
+  return closestValue
+}
+
+function buildDrawingInitialValues({
+  totalCheckpoints,
+  completedCheckpoints,
+  marketStart,
+  checkpointIntervalMs,
+  history,
+  fallbackValue,
+  live,
+}: {
+  totalCheckpoints: number
+  completedCheckpoints: number
+  marketStart: number
+  checkpointIntervalMs: number
+  history: readonly PricePoint[]
+  fallbackValue: number
+  live: boolean
+}): (number | null)[] {
+  const values = new Array(totalCheckpoints).fill(null) as (number | null)[]
+  if (!live) return values
+
+  const elapsed = Math.min(completedCheckpoints, totalCheckpoints)
+  for (let i = 0; i < elapsed; i++) {
+    values[i] = closestHistoryValue(history, marketStart + i * checkpointIntervalMs, fallbackValue)
+  }
+
+  return values
+}
+
 /**
  * Placeholder claim action surfaced during Settled state. The real claim
  * transaction lands in Phase 5 (CLAIM-01); Phase 2 just ensures the button is
@@ -148,17 +200,51 @@ export function MarketPage() {
   const chartMarketEnd = market?.endTime ?? now
   const chartCheckpointInterval = market?.checkpointInterval ?? 3600
   const chartTotalCheckpoints = market?.totalCheckpoints ?? 0
+  const chartCheckpointIntervalMs = chartCheckpointInterval * 1000
 
   const durationMs = Math.max(0, chartMarketEnd - chartMarketStart)
   const msRemaining = Math.max(0, chartMarketEnd - now)
   const leverageCap = maxLeverageByDuration(durationMs)
 
   // Prefer real Benchmarks candles; fall back to mock history while loading
-  const chartHistory =
-    benchmarksHistory && benchmarksHistory.length > 0 ? benchmarksHistory : (market?.history ?? [])
+  const chartHistory = useMemo(
+    () =>
+      benchmarksHistory && benchmarksHistory.length > 0
+        ? benchmarksHistory
+        : (market?.history ?? []),
+    [benchmarksHistory, market?.history],
+  )
 
   // Live price from Pyth tick; fall back to last history point
   const priceDisplay = latestTick?.value ?? chartHistory[chartHistory.length - 1]?.value ?? 0
+
+  const drawingInitialValues = useMemo(
+    () =>
+      buildDrawingInitialValues({
+        totalCheckpoints: chartTotalCheckpoints,
+        completedCheckpoints: market?.completedCheckpoints ?? 0,
+        marketStart: chartMarketStart,
+        checkpointIntervalMs: chartCheckpointIntervalMs,
+        history: chartHistory,
+        fallbackValue: priceDisplay,
+        live: isLiveUserDrawingState(market?.state),
+      }),
+    [
+      chartTotalCheckpoints,
+      market?.completedCheckpoints,
+      market?.state,
+      chartMarketStart,
+      chartCheckpointIntervalMs,
+      chartHistory,
+      priceDisplay,
+    ],
+  )
+
+  const drawingStartCheckpoint =
+    market && isLiveUserDrawingState(market.state) && chartTotalCheckpoints > 0
+      ? Math.min(market.completedCheckpoints, chartTotalCheckpoints - 1)
+      : 0
+  const drawingStartTime = chartMarketStart + drawingStartCheckpoint * chartCheckpointIntervalMs
 
   // Use on-chain paths when available. Fall back to fixture paths only
   // in mock mode (APP_USE_MOCK=true) — in real-chain mode an empty
@@ -212,7 +298,11 @@ export function MarketPage() {
   const allPaths = useMemo(() => [...aiPaths, ...userPaths], [aiPaths, userPaths])
 
   const handleConfirmDrawing = async () => {
-    if (drawingState.phase !== 'ready' || !market || !program) return
+    if (drawingState.phase !== 'ready' || !market) return
+    if (!program) {
+      toast.error('Wallet required', { message: 'Connect a wallet to create your path.' })
+      return
+    }
     const values = drawingState.values
     confirmDrawing()
 
@@ -253,7 +343,7 @@ export function MarketPage() {
       amplitudeAtDecoherence: 0,
       dissolved: false,
       dissolvedAtCheckpoint: 0,
-      checkpointsProcessed: 0,
+      checkpointsProcessed: isLiveUserDrawingState(market.state) ? market.completedCheckpoints : 0,
       totalWagered: 0,
       totalLeveragedExposure: 0,
       lmsrSharesOutstanding: 0,
@@ -451,7 +541,7 @@ export function MarketPage() {
                 innerHeight={innerHeight}
                 margin={margin}
                 checkpointXs={checkpointXs}
-                marketStart={marketStart}
+                marketStart={Math.max(marketStart, drawingStartTime)}
                 marketId={market.id}
               />
             )}
@@ -558,7 +648,7 @@ export function MarketPage() {
                   variant="primary"
                   fullWidth
                   onClick={handleConfirmDrawing}
-                  disabled={addPath.isPending}
+                  disabled={drawingState.phase !== 'ready' || addPath.isPending}
                 >
                   {addPath.isPending ? 'Submitting…' : 'Confirm'}
                 </Button>
@@ -569,7 +659,7 @@ export function MarketPage() {
                 fullWidth
                 className="mt-5 gap-2"
                 disabled={chartTotalCheckpoints <= 0}
-                onClick={() => enterDrawMode(chartTotalCheckpoints)}
+                onClick={() => enterDrawMode(chartTotalCheckpoints, drawingInitialValues)}
               >
                 <Plus size={14} strokeWidth={1.75} aria-hidden />
                 Draw Custom Path

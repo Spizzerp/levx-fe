@@ -93,7 +93,7 @@ export interface DrawingStore {
    * Cleared whenever a fresh action branches the history.
    */
   redoStack: HistoryEntry[]
-  enterDrawMode: (totalCheckpoints: number) => void
+  enterDrawMode: (totalCheckpoints: number, initialValues?: readonly (number | null)[]) => void
   beginStroke: () => void
   setCheckpointValues: (crossings: CheckpointCrossing[]) => void
   endStroke: () => void

@@ -15,6 +15,21 @@ const EMPTY_SELECTION: ReadonlySet<number> = new Set<number>()
 
 const EMPTY_VALUES: readonly (number | null)[] = []
 
+function buildInitialValues(
+  totalCheckpoints: number,
+  initialValues?: readonly (number | null)[],
+): (number | null)[] {
+  const values = new Array(totalCheckpoints).fill(null) as (number | null)[]
+  if (!initialValues) return values
+
+  const copyCount = Math.min(totalCheckpoints, initialValues.length)
+  for (let i = 0; i < copyCount; i++) {
+    const value = initialValues[i]
+    values[i] = typeof value === 'number' && Number.isFinite(value) ? value : null
+  }
+  return values
+}
+
 /** True iff two ReadonlySet<number> have identical contents. */
 function selectionsEqual(a: ReadonlySet<number>, b: ReadonlySet<number>): boolean {
   if (a === b) return true
@@ -81,9 +96,14 @@ export const useDrawingStore = create<DrawingStore>((set, get) => ({
   undoStack: [],
   redoStack: [],
 
-  enterDrawMode: (totalCheckpoints) => {
+  enterDrawMode: (totalCheckpoints, initialValues) => {
+    const values = buildInitialValues(totalCheckpoints, initialValues)
+    const allFilled = values.every((v): v is number => v !== null)
+
     set({
-      state: { phase: 'drawMode', values: new Array(totalCheckpoints).fill(null) as null[] },
+      state: allFilled
+        ? { phase: 'ready', values: values as number[] }
+        : { phase: 'drawMode', values },
       totalCheckpoints,
       selectedIndices: EMPTY_SELECTION,
       undoStack: [],

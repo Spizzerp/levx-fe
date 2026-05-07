@@ -272,6 +272,20 @@ describe('MarketPage', () => {
     expect(useDrawingStore.getState().state.phase).toBe('drawMode')
   })
 
+  it('prefills elapsed checkpoints before drawing in an active market', async () => {
+    const user = userEvent.setup()
+    renderMarketPage()
+    await selectMarketParams(user)
+    await user.click(screen.getByRole('button', { name: /draw custom path/i }))
+
+    const state = useDrawingStore.getState().state
+    if (state.phase !== 'drawMode') throw new Error('expected drawMode')
+    expect(state.values.slice(0, TEST_MARKET.completedCheckpoints).every((v) => v === 72_800)).toBe(
+      true,
+    )
+    expect(state.values[TEST_MARKET.completedCheckpoints]).toBeNull()
+  })
+
   it('changes the button label to Cancel after entering draw mode', async () => {
     const user = userEvent.setup()
     renderMarketPage()

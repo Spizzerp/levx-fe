@@ -26,6 +26,20 @@ describe('drawingStore', () => {
     expect(state.values.every((v) => v === null)).toBe(true)
   })
 
+  it('initializes partial values when entering draw mode with seed values', () => {
+    useDrawingStore.getState().enterDrawMode(5, [100, 101, null])
+    const state = useDrawingStore.getState().state
+    if (state.phase !== 'drawMode') throw new Error('expected drawMode')
+    expect(state.values).toEqual([100, 101, null, null, null])
+  })
+
+  it('enters ready when seeded values fill every checkpoint', () => {
+    useDrawingStore.getState().enterDrawMode(3, [100, 101, 102])
+    const state = useDrawingStore.getState().state
+    if (state.phase !== 'ready') throw new Error('expected ready')
+    expect(state.values).toEqual([100, 101, 102])
+  })
+
   it('transitions drawMode -> sweeping on beginStroke', () => {
     useDrawingStore.getState().enterDrawMode(5)
     useDrawingStore.getState().beginStroke()
@@ -369,8 +383,8 @@ describe('drawingStore', () => {
         { index: 2, y: 120 },
       ])
       useDrawingStore.getState().endStroke() // → ready, values=[100,110,120]
-      useDrawingStore.getState().undo()       // → drawMode, values=[null,null,null]
-      useDrawingStore.getState().redo()       // → ready, values=[100,110,120]
+      useDrawingStore.getState().undo() // → drawMode, values=[null,null,null]
+      useDrawingStore.getState().redo() // → ready, values=[100,110,120]
       const state = useDrawingStore.getState().state
       expect(state.phase).toBe('ready')
       if (state.phase !== 'ready') throw new Error('expected ready')
@@ -387,7 +401,7 @@ describe('drawingStore', () => {
       useDrawingStore.getState().enterDrawMode(3)
       useDrawingStore.getState().beginStroke()
       useDrawingStore.getState().endStroke() // → drawMode (still partial)
-      useDrawingStore.getState().undo()       // populates redoStack
+      useDrawingStore.getState().undo() // populates redoStack
       useDrawingStore.getState().beginStroke() // → sweeping
       const stackBefore = useDrawingStore.getState().redoStack
       useDrawingStore.getState().redo()
@@ -398,9 +412,7 @@ describe('drawingStore', () => {
     it('beginning a new stroke clears the redoStack (branching)', () => {
       useDrawingStore.getState().enterDrawMode(3)
       useDrawingStore.getState().beginStroke()
-      useDrawingStore.getState().setCheckpointValues([
-        { index: 0, y: 100 },
-      ])
+      useDrawingStore.getState().setCheckpointValues([{ index: 0, y: 100 }])
       useDrawingStore.getState().endStroke()
       useDrawingStore.getState().undo()
       expect(useDrawingStore.getState().redoStack.length).toBeGreaterThan(0)
