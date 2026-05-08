@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { ChartFrame } from '@/features/chart/ChartFrame'
 import { MarketCard } from '@/features/market/MarketCard'
+import { MarketCardSkeleton } from '@/features/market/MarketCardSkeleton'
 import { TokenPairIcon } from '@/ui/TokenPairIcon'
 import { DataTable, NUM_CELL, type DataTableColumn } from '@/ui/DataTable'
 import { ExpandPill } from '@/ui/ExpandPill'
@@ -445,7 +446,24 @@ export function MarketsPage() {
                 )}
               >
                 <AnimatePresence mode="popLayout">
-                  {gridItems.length > 0 ? (
+                  {isLoading ? (
+                    Array.from({ length: 6 }).map((_, i) => (
+                      <motion.div
+                        key={`skeleton-${i}`}
+                        layout
+                        className="w-full"
+                        initial={{ opacity: 0, scale: 0.92, y: 16 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        transition={{
+                          duration: 0.3,
+                          delay: i * 0.03,
+                          ease: [0.25, 0.46, 0.45, 0.94],
+                        }}
+                      >
+                        <MarketCardSkeleton />
+                      </motion.div>
+                    ))
+                  ) : gridItems.length > 0 ? (
                     gridItems.map((m, i) => (
                       <motion.div
                         key={m.id}

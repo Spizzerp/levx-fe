@@ -36,45 +36,47 @@ function XIcon({ size = 16 }: { size?: number }) {
 
 export function CommonLayout({ children }: PropsWithChildren) {
   const { pathname } = useLocation()
-  const showChrome = pathname !== '/' && !pathname.startsWith('/docs')
+  const showMainLayout = pathname !== '/' && !pathname.startsWith('/docs')
   const showKeeperHealth = shouldShowKeeperHealth(pathname)
 
   return (
     <>
-      {showChrome && <StreamingBanner />}
-      {showChrome && <Nav />}
+      {showMainLayout && <StreamingBanner />}
+      {showMainLayout && <Nav />}
       <WrongNetworkBanner />
       <div style={{ isolation: 'isolate' }} className="flex-1">
         {children}
       </div>
-      <footer className="mt-auto border-t border-ink-dim/25">
-        <div className="mx-auto grid max-w-[1680px] grid-cols-3 items-center px-10 py-4">
-          <span className="text-ink-dim font-mono text-xs justify-self-start">
-            Not Your Business LLC ©
-          </span>
-          <div className="flex items-center gap-4 justify-self-center">
-            <a
-              href="https://x.com/LevXtrade"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="LevX on X"
-              className="text-ink-dim hover:text-ink-strong duration-short ease-levx transition-colors"
-            >
-              <XIcon size={15} />
-            </a>
-            <Link
-              to="/docs"
-              aria-label="LevX docs"
-              className="text-ink-dim duration-short ease-levx hover:text-ink-strong transition-colors"
-            >
-              <FileText size={15} strokeWidth={1.5} aria-hidden="true" />
-            </Link>
+      {showMainLayout && (
+        <footer className="mt-auto border-t border-ink-dim/25">
+          <div className="mx-auto grid max-w-[1680px] grid-cols-3 items-center px-10 py-4">
+            <span className="text-ink-dim font-mono text-xs justify-self-start">
+              Not Your Business LLC ©
+            </span>
+            <div className="flex items-center gap-4 justify-self-center">
+              <a
+                href="https://x.com/LevXtrade"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="LevX on X"
+                className="text-ink-dim hover:text-ink-strong duration-short ease-levx transition-colors"
+              >
+                <XIcon size={15} />
+              </a>
+              <Link
+                to="/docs"
+                aria-label="LevX docs"
+                className="text-ink-dim duration-short ease-levx hover:text-ink-strong transition-colors"
+              >
+                <FileText size={15} strokeWidth={1.5} aria-hidden="true" />
+              </Link>
+            </div>
+            <div className="flex items-center justify-self-end">
+              {showKeeperHealth && <KeeperHealthDot />}
+            </div>
           </div>
-          <div className="flex items-center justify-self-end">
-            {showKeeperHealth && <KeeperHealthDot />}
-          </div>
-        </div>
-      </footer>
+        </footer>
+      )}
       <ToastContainer />
     </>
   )
