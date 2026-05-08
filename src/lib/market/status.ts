@@ -9,7 +9,7 @@ const WAGERING_STATES: ReadonlySet<MarketState> = new Set(['active', 'sampling']
 
 export function getWageringCutoffCheckpoint(totalCheckpoints: number): number {
   if (!Number.isFinite(totalCheckpoints) || totalCheckpoints <= 0) return 0
-  return Math.floor((totalCheckpoints * WAGERING_CUTOFF_NUMERATOR) / WAGERING_CUTOFF_DENOMINATOR)
+  return Math.ceil((totalCheckpoints * WAGERING_CUTOFF_NUMERATOR) / WAGERING_CUTOFF_DENOMINATOR)
 }
 
 export function isMarketWageringOpen(market: MarketWageringState): boolean {

@@ -13,8 +13,8 @@ const base = {
 
 describe('market status helpers', () => {
   it('mirrors the on-chain 4/5 checkpoint wagering cutoff', () => {
-    expect(getWageringCutoffCheckpoint(42)).toBe(33)
-    expect(getWageringCutoffCheckpoint(336)).toBe(268)
+    expect(getWageringCutoffCheckpoint(42)).toBe(34)
+    expect(getWageringCutoffCheckpoint(336)).toBe(269)
   })
 
   it('treats active and sampling markets as wager-open before the cutoff', () => {
@@ -27,7 +27,7 @@ describe('market status helpers', () => {
       isMarketWageringOpen({
         ...base,
         state: 'sampling',
-        completedCheckpoints: 33,
+        completedCheckpoints: 34,
       }),
     ).toBe(false)
   })
@@ -38,7 +38,7 @@ describe('market status helpers', () => {
       getMarketDisplayState({
         ...base,
         state: 'active',
-        completedCheckpoints: 33,
+        completedCheckpoints: 34,
       }),
     ).toBe('sampling')
   })
