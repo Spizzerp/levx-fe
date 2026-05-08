@@ -371,7 +371,7 @@ describe('MarketPage state-gated controls', () => {
   })
 
   it('does NOT mount the wager panel when market.state is Sampling at the wagering cutoff (MARKET-04)', async () => {
-    await setMarketState('sampling', { completedCheckpoints: 252 })
+    await setMarketState('sampling', { completedCheckpoints: 268 })
     renderMarketPage()
     expect(wagerPanelQuery()).not.toBeInTheDocument()
   })
@@ -449,7 +449,7 @@ describe('MarketPage state-gated controls', () => {
   })
 
   it('renders the MarketStateBadge as Sampling once the wagering cutoff is reached', async () => {
-    await setMarketState('sampling', { completedCheckpoints: 252 })
+    await setMarketState('sampling', { completedCheckpoints: 268 })
     renderMarketPage()
     expect(screen.getByText(/Sampling/i)).toBeInTheDocument()
   })

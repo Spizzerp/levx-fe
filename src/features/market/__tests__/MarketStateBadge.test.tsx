@@ -65,7 +65,7 @@ describe('MarketStateBadge', () => {
   })
 
   it('renders Sampling label once the wagering cutoff is reached', () => {
-    renderState('sampling', { completedCheckpoints: 18 })
+    renderState('sampling', { completedCheckpoints: 19 })
     expect(screen.getByText(/Sampling/i)).toBeInTheDocument()
   })
 

@@ -348,7 +348,7 @@ export function MarketPage() {
     confirmDrawing()
 
     // Pre-fetch pathIndex so the pending row has a real index, AND defend
-    // against a stale FE state cache by re-checking the 75% completion
+    // against a stale FE state cache by re-checking the 80% completion
     // cutoff right before we sign. `add_path` reverts above the cutoff;
     // without this, the user could spend gas on a tx that's guaranteed
     // to fail after a state flip between FE polling cycles.
@@ -364,7 +364,7 @@ export function MarketPage() {
       if (!wageringOpen) {
         exitDrawMode()
         toast.error('Path submission closed', {
-          message: 'Market is more than 75% complete; new paths are no longer accepted.',
+          message: 'Market is more than 80% complete; new paths are no longer accepted.',
         })
         return
       }

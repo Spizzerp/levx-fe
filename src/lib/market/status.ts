@@ -2,8 +2,8 @@ import type { Market, MarketState } from '@/types/market'
 
 type MarketWageringState = Pick<Market, 'state' | 'completedCheckpoints' | 'totalCheckpoints'>
 
-const WAGERING_CUTOFF_NUMERATOR = 3
-const WAGERING_CUTOFF_DENOMINATOR = 4
+const WAGERING_CUTOFF_NUMERATOR = 4
+const WAGERING_CUTOFF_DENOMINATOR = 5
 
 const WAGERING_STATES: ReadonlySet<MarketState> = new Set(['active', 'sampling'])
 
