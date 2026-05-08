@@ -146,7 +146,7 @@ export interface Market {
   /** Number of registered paths (0..16) */
   numPaths: number
   /** Configured path count required before the market can activate */
-  targetNumPaths?: number
+  targetNumPaths: number
   /** Born-rule amplitudes per path (up to 16) */
   amplitudes: number[]
   /** LMSR share quantities per path (up to 16, signed) */

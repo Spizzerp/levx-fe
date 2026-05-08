@@ -21,7 +21,7 @@ interface PendingPathsBannerProps {
  * the bet they could place rather than a blank waiting room.
  */
 export function PendingPathsBanner({ market, className }: PendingPathsBannerProps) {
-  const target = market.targetNumPaths ?? 3
+  const target = market.targetNumPaths
   const have = Math.min(market.numPaths, target)
   return (
     <div

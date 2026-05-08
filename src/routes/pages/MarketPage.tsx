@@ -501,7 +501,7 @@ export function MarketPage() {
   const showMaturityCard = market.state === 'maturing'
   const showClaimCard = market.state === 'settled'
   const showVoidPanel = market.state === 'void'
-  const pendingPathTarget = market.targetNumPaths ?? 3
+  const pendingPathTarget = market.targetNumPaths
   const showPendingIndicator =
     market.state === 'pending' && market.numPaths < pendingPathTarget
   const showPositionRail = !showWagerRail && !showVoidPanel && !!userPosition

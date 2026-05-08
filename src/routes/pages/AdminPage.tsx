@@ -359,9 +359,6 @@ export function AdminPage() {
   const [nudgeRate, setNudgeRate] = useState('0.05')
   const [pathMaxAge, setPathMaxAge] = useState('1800')
   const [numPaths, setNumPaths] = useState(5)
-  const [pathProviders, setPathProviders] = useState<string[]>(() =>
-    Array.from({ length: 7 }, () => AI_PROVIDERS[0].id),
-  )
 
   // Tx state
   const [isPending, setIsPending] = useState(false)
@@ -679,12 +676,8 @@ export function AdminPage() {
                     style={{ background: GRADIENT.css }}
                   />
                   <ProviderSelect
-                    value={pathProviders[idx] ?? AI_PROVIDERS[0].id}
-                    onChange={(id) => {
-                      const next = [...pathProviders]
-                      next[idx] = id
-                      setPathProviders(next)
-                    }}
+                    value={AI_PROVIDERS[0].id}
+                    onChange={() => undefined}
                   />
                 </div>
               ))}
