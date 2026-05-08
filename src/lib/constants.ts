@@ -8,6 +8,7 @@ export const CU_LIMITS = {
   exitPosition: 120_000,
   claim: 120_000,
   createMarket: 250_000,
+  closeMarket: 120_000,
 } as const
 
 /** Solana's hard cap on per-transaction compute units. */

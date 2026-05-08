@@ -1,10 +1,11 @@
 /**
- * Transaction hooks for user-signed instructions:
+ * Transaction hooks for wallet-signed instructions:
  *   - add_path(params)
  *   - place_wager(path_index, amount)
  *   - place_batch_wager(path_indices[], amount)
  *   - exit_position()
  *   - claim()
+ *   - close_market()
  *
  * Every mutation builds instructions manually, routes through
  * buildTransaction (compute-unit limit + dynamic priority fee), and
@@ -60,6 +61,10 @@ interface PlaceBatchWagerInput {
 interface PositionInput {
   marketId: number
   pathIndex: number
+}
+
+interface MarketInput {
+  marketId: number
 }
 
 /**
@@ -515,6 +520,46 @@ export function useClaim() {
     },
     onError: (err) => {
       toast.error('Failed to claim', { message: (err as Error).message })
+    },
+  })
+}
+
+export function useCloseMarket() {
+  const program = useProgram()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ marketId }: MarketInput) => {
+      if (!program) throw new Error('Wallet not connected')
+
+      const authority = program.provider.publicKey!
+      const [protocolPda] = deriveProtocolPda()
+      const [marketPda] = deriveMarketPda(marketId)
+      const marketAcc = await program.account.market.fetch(marketPda)
+
+      const ix = await program.methods
+        .closeMarket()
+        .accountsPartial({
+          protocolState: protocolPda,
+          market: marketPda,
+          vault: marketAcc.vault,
+          authority,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        })
+        .instruction()
+
+      return sendInstructions(program, [ix], CU_LIMITS.closeMarket)
+    },
+    onSuccess: (sig, { marketId }) => {
+      queryClient.removeQueries({ queryKey: ['market', String(marketId)] })
+      queryClient.invalidateQueries({ queryKey: ['markets'] })
+      queryClient.invalidateQueries({ queryKey: ['userPositions'] })
+      toast.success('Market closed', { txSig: sig })
+    },
+    onError: (err) => {
+      toast.error('Failed to close market', {
+        message: describeTxError(err, 'Unknown error'),
+      })
     },
   })
 }
