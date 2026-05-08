@@ -3029,7 +3029,7 @@ export type Levx = {
     {
       "code": 6014,
       "name": "tradingCutoffReached",
-      "msg": "Trading window closed; market has passed 75% of checkpoints"
+      "msg": "Trading window closed; market has passed 80% of checkpoints"
     },
     {
       "code": 6015,

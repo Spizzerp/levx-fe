@@ -201,7 +201,7 @@ describe('MarketsPage', () => {
           id: 'sampling-closed',
           pair: 'DOGE/USDC',
           state: 'sampling',
-          completedCheckpoints: 252,
+          completedCheckpoints: 269,
         }),
       ],
     })

@@ -2,14 +2,14 @@ import type { Market, MarketState } from '@/types/market'
 
 type MarketWageringState = Pick<Market, 'state' | 'completedCheckpoints' | 'totalCheckpoints'>
 
-const WAGERING_CUTOFF_NUMERATOR = 3
-const WAGERING_CUTOFF_DENOMINATOR = 4
+const WAGERING_CUTOFF_NUMERATOR = 4
+const WAGERING_CUTOFF_DENOMINATOR = 5
 
 const WAGERING_STATES: ReadonlySet<MarketState> = new Set(['active', 'sampling'])
 
 export function getWageringCutoffCheckpoint(totalCheckpoints: number): number {
   if (!Number.isFinite(totalCheckpoints) || totalCheckpoints <= 0) return 0
-  return Math.floor((totalCheckpoints * WAGERING_CUTOFF_NUMERATOR) / WAGERING_CUTOFF_DENOMINATOR)
+  return Math.ceil((totalCheckpoints * WAGERING_CUTOFF_NUMERATOR) / WAGERING_CUTOFF_DENOMINATOR)
 }
 
 export function isMarketWageringOpen(market: MarketWageringState): boolean {
