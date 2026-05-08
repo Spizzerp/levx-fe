@@ -143,11 +143,14 @@ function buildPreviewPaths(
       dissolved: false,
       dissolvedAtCheckpoint: 0,
       checkpointsProcessed: 0,
+      createdAtCheckpoint: 0,
+      firstActiveCheckpoint: 0,
       totalWagered: 0,
       totalLeveragedExposure: 0,
       lmsrSharesOutstanding: 0,
       totalTimeWeightedExposure: 0,
       currentImpliedProbability: Math.round(10_000 / count),
+      initialAmplitude: 1_000_000,
     }
   })
 }

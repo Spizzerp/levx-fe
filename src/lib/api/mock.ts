@@ -103,11 +103,14 @@ function generatePaths(start: number, price: number): PredictionPath[] {
     dissolved: false,
     dissolvedAtCheckpoint: 0,
     checkpointsProcessed: 24,
+    createdAtCheckpoint: 0,
+    firstActiveCheckpoint: 0,
     totalWagered: 1000,
     totalLeveragedExposure: 1000,
     lmsrSharesOutstanding: 1000,
     totalTimeWeightedExposure: 1000,
     currentImpliedProbability: 2000,
+    initialAmplitude: 1,
   }))
 }
 

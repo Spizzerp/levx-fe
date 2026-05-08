@@ -184,11 +184,14 @@ function makePath(overrides: Partial<PredictionPath> = {}): PredictionPath {
     dissolved: false,
     dissolvedAtCheckpoint: 0,
     checkpointsProcessed: 0,
+    createdAtCheckpoint: 0,
+    firstActiveCheckpoint: 0,
     totalWagered: 0,
     totalLeveragedExposure: 0,
     lmsrSharesOutstanding: 0,
     totalTimeWeightedExposure: 0,
     currentImpliedProbability: 0,
+    initialAmplitude: 0,
     ...overrides,
   }
 }

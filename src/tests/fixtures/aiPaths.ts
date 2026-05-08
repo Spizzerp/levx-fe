@@ -53,11 +53,14 @@ const PATH_OUTCOME_DEFAULTS = {
   dissolved: false,
   dissolvedAtCheckpoint: 0,
   checkpointsProcessed: 0,
+  createdAtCheckpoint: 0,
+  firstActiveCheckpoint: 0,
   totalWagered: 0,
   totalLeveragedExposure: 0,
   lmsrSharesOutstanding: 0,
   totalTimeWeightedExposure: 0,
   currentImpliedProbability: 2000,
+  initialAmplitude: 1_000_000,
 } as const
 
 /** Build a deterministic set of 5 AI candidate paths with realistic random-walk trajectories. */

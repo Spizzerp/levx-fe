@@ -1741,6 +1741,52 @@ export type Levx = {
       ]
     },
     {
+      "name": "removeSupportedPair",
+      "discriminator": [
+        157,
+        223,
+        173,
+        105,
+        104,
+        9,
+        152,
+        150
+      ],
+      "accounts": [
+        {
+          "name": "protocolState",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "index",
+          "type": "u8"
+        }
+      ]
+    },
+    {
       "name": "resolveDispute",
       "discriminator": [
         231,
@@ -2929,6 +2975,19 @@ export type Levx = {
       ]
     },
     {
+      "name": "supportedPairRemoved",
+      "discriminator": [
+        132,
+        157,
+        47,
+        93,
+        176,
+        229,
+        92,
+        94
+      ]
+    },
+    {
       "name": "vaultInitialized",
       "discriminator": [
         180,
@@ -3093,106 +3152,116 @@ export type Levx = {
     },
     {
       "code": 6027,
+      "name": "pathNotYetActive",
+      "msg": "Path is not active for wagering or scoring yet"
+    },
+    {
+      "code": 6028,
+      "name": "activePathWindowTooShort",
+      "msg": "Not enough checkpoints remain for a live path"
+    },
+    {
+      "code": 6029,
       "name": "duplicateConfigAccount",
       "msg": "Treasury and insurance_fund must be distinct accounts"
     },
     {
-      "code": 6028,
+      "code": 6030,
       "name": "alreadyMigrated",
       "msg": "ProtocolState has already been migrated to v2"
     },
     {
-      "code": 6029,
+      "code": 6031,
       "name": "invalidCollateralMint",
       "msg": "Collateral mint does not match the protocol allowlist"
     },
     {
-      "code": 6030,
+      "code": 6032,
       "name": "slippageExceeded",
       "msg": "Slippage exceeded: received fewer shares/less payout than min_out"
     },
     {
-      "code": 6031,
+      "code": 6033,
       "name": "maturityNotElapsed",
       "msg": "Maturity window has not elapsed; cannot finalize"
     },
     {
-      "code": 6032,
+      "code": 6034,
       "name": "marketDisputed",
       "msg": "Market is disputed; paused for governance review"
     },
     {
-      "code": 6033,
+      "code": 6035,
       "name": "invalidDisputeConfig",
       "msg": "Invalid dispute bond policy or account"
     },
     {
-      "code": 6034,
+      "code": 6036,
       "name": "invalidDisputeBond",
       "msg": "Invalid dispute bond account"
     },
     {
-      "code": 6035,
+      "code": 6037,
       "name": "mathOverflow",
       "msg": "Arithmetic overflow"
     },
     {
-      "code": 6036,
+      "code": 6038,
       "name": "feeExceedsCap",
       "msg": "Fee exceeds maximum cap (5%)"
     },
     {
-      "code": 6037,
+      "code": 6039,
       "name": "leverageNotEnabled",
       "msg": "Leverage is not enabled for this market"
     },
     {
-      "code": 6038,
+      "code": 6040,
       "name": "leverageExceedsMaximum",
       "msg": "Leverage exceeds maximum for this market's timeframe"
     },
     {
-      "code": 6039,
+      "code": 6041,
       "name": "vaultInsufficientCapacity",
       "msg": "Insufficient vault capacity for this leveraged position"
     },
     {
-      "code": 6040,
+      "code": 6042,
       "name": "vaultUtilizationExceeded",
       "msg": "Vault utilization would exceed maximum after this borrow"
     },
     {
-      "code": 6041,
+      "code": 6043,
       "name": "leveragedOiCapExceeded",
       "msg": "Market leveraged open interest cap would be exceeded"
     },
     {
-      "code": 6042,
+      "code": 6044,
       "name": "positionUnderwater",
       "msg": "Position health factor below liquidation threshold"
     },
     {
-      "code": 6043,
+      "code": 6045,
       "name": "positionHealthy",
       "msg": "Position health factor is above liquidation threshold; cannot liquidate"
     },
     {
-      "code": 6044,
+      "code": 6046,
       "name": "unauthorizedBackstopLiquidator",
       "msg": "Caller is not the configured backstop liquidator"
     },
     {
-      "code": 6045,
+      "code": 6047,
       "name": "backstopLiquidatorDisabled",
       "msg": "Backstop liquidator is disabled"
     },
     {
-      "code": 6046,
+      "code": 6048,
       "name": "backstopGracePeriodActive",
       "msg": "Backstop grace period has not elapsed; regular keepers have priority"
     },
     {
-      "code": 6047,
+      "code": 6049,
       "name": "bucketGuardCooldown",
       "msg": "Operation rate-limited; cooldown period has not elapsed"
     }
@@ -4558,6 +4627,20 @@ export type Levx = {
             "type": "u16"
           },
           {
+            "name": "createdAtCheckpoint",
+            "docs": [
+              "Checkpoint count when this path was created. Pending-created paths use 0."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "firstActiveCheckpoint",
+            "docs": [
+              "First checkpoint index this path is eligible to score/wager against."
+            ],
+            "type": "u16"
+          },
+          {
             "name": "totalWagered",
             "type": "u64"
           },
@@ -4580,6 +4663,13 @@ export type Levx = {
           {
             "name": "currentImpliedProbability",
             "type": "u16"
+          },
+          {
+            "name": "initialAmplitude",
+            "docs": [
+              "Amplitude assigned when the path first became active."
+            ],
+            "type": "u64"
           },
           {
             "name": "predQuadraticVariation",
@@ -5117,6 +5207,74 @@ export type Levx = {
           },
           {
             "name": "pythFeedId",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "supportedPairRemoved",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "index",
+            "docs": [
+              "Original index of the pair that was removed."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "newNumSupportedPairs",
+            "docs": [
+              "`num_supported_pairs` after the removal — equivalent to the",
+              "pre-removal index of the entry that was swapped into `index`."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "baseMint",
+            "docs": [
+              "The pair that was removed (sourced from the original slot at",
+              "`index` before the swap-remove ran)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "quoteMint",
+            "type": "pubkey"
+          },
+          {
+            "name": "pythFeedId",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "replacementBaseMint",
+            "docs": [
+              "The pair that moved into `index` as part of swap-remove. When",
+              "`index == new_num_supported_pairs` the swap was a no-op (the",
+              "removed entry was already the last one); in that case this",
+              "field is `TokenPair::default()` so consumers can short-circuit",
+              "without re-reading state."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "replacementQuoteMint",
+            "type": "pubkey"
+          },
+          {
+            "name": "replacementPythFeedId",
             "type": {
               "array": [
                 "u8",
