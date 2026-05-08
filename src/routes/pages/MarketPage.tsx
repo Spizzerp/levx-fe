@@ -315,18 +315,23 @@ export function MarketPage() {
   // matching `PathOutcome`. Without this, the path renders twice on the
   // chart and twice in the path list (once as "Your Path", once with the
   // adapter's default label) until the user navigates away.
-  // Match by (creator, pathIndex) and only after the optimistic has been
-  // marked confirmed — guards against a stale market refetch interleaving
-  // with an in-flight tx and dropping a still-pending row by accident.
+  // Match by the optimistic row's own (creator, pathIndex) — not by the
+  // currently-connected wallet — so a wallet flip between submission and
+  // refetch can't dedupe against an unrelated path. Falls back to
+  // selfWallet only for legacy rows whose creator was never populated.
+  // Only fires once `onChainStatus === 'confirmed'`, guarding against a
+  // stale market refetch interleaving with an in-flight tx and dropping a
+  // still-pending row by accident.
   // Derived (not stateful) so React doesn't see this as a separate write.
   const visibleUserPaths = useMemo(() => {
     if (!market || !selfWallet) return userPaths
     return userPaths.filter((opt) => {
       if (opt.onChainStatus === 'pending') return true
+      const optCreator = opt.creator || selfWallet
       return !market.paths.some(
         (p) =>
           p.origin === 'user' &&
-          p.creator === selfWallet &&
+          p.creator === optCreator &&
           p.pathIndex === opt.pathIndex,
       )
     })

@@ -265,7 +265,9 @@ export function useAddPath() {
       toast.success('Path created on-chain', { txSig: sig })
     },
     onError: (err) => {
-      toast.error('Failed to create path', { message: (err as Error).message })
+      toast.error('Failed to create path', {
+        message: describeTxError(err, 'Unknown error'),
+      })
     },
   })
 }
