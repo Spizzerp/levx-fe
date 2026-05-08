@@ -85,6 +85,10 @@ export interface PredictionPath {
   dissolvedAtCheckpoint: number
   /** Number of checkpoints processed via check_dissolution */
   checkpointsProcessed: number
+  /** Checkpoint index when this path account was created */
+  createdAtCheckpoint: number
+  /** First checkpoint included in scoring, pricing, and wager exposure */
+  firstActiveCheckpoint: number
 
   /* ── Wagering state ──────────────────────────────────────── */
 
@@ -98,6 +102,8 @@ export interface PredictionPath {
   totalTimeWeightedExposure: number
   /** Current implied probability in basis points */
   currentImpliedProbability: number
+  /** Amplitude assigned when the path first became active */
+  initialAmplitude: number
 
   /* ── Client-only ────────────────────────────────────────── */
 

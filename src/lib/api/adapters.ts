@@ -115,11 +115,14 @@ export function anchorPathToFE(raw: any, marketStartTime: number, checkpointInte
     dissolved: raw.dissolved,
     dissolvedAtCheckpoint: raw.dissolvedAtCheckpoint,
     checkpointsProcessed: raw.checkpointsProcessed,
+    createdAtCheckpoint: raw.createdAtCheckpoint,
+    firstActiveCheckpoint: raw.firstActiveCheckpoint,
     totalWagered: bn(raw.totalWagered, true),
     totalLeveragedExposure: bn(raw.totalLeveragedExposure, true),
     lmsrSharesOutstanding: bn(raw.lmsrSharesOutstanding, true),
     totalTimeWeightedExposure: bn(raw.totalTimeWeightedExposure, true),
     currentImpliedProbability: raw.currentImpliedProbability,
+    initialAmplitude: bn(raw.initialAmplitude, true),
   }
 }
 

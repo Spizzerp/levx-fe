@@ -404,11 +404,14 @@ export function MarketPage() {
       dissolved: false,
       dissolvedAtCheckpoint: 0,
       checkpointsProcessed: isLiveUserDrawingState(market.state) ? market.completedCheckpoints : 0,
+      createdAtCheckpoint: isLiveUserDrawingState(market.state) ? market.completedCheckpoints : 0,
+      firstActiveCheckpoint: isLiveUserDrawingState(market.state) ? market.completedCheckpoints : 0,
       totalWagered: 0,
       totalLeveragedExposure: 0,
       lmsrSharesOutstanding: 0,
       totalTimeWeightedExposure: 0,
       currentImpliedProbability: 0,
+      initialAmplitude: 0,
       onChainStatus: 'pending',
     }
     setUserPaths((prev) => [...prev, pendingPath])
@@ -424,7 +427,14 @@ export function MarketPage() {
       setUserPaths((prev) =>
         prev.map((p) =>
           p.id === tempId
-            ? { ...p, onChainStatus: 'confirmed' as const, pathIndex: confirmedIndex }
+            ? {
+                ...p,
+                onChainStatus: 'confirmed' as const,
+                pathIndex: confirmedIndex,
+                firstActiveCheckpoint: isLiveUserDrawingState(market.state)
+                  ? Math.min(market.completedCheckpoints + 1, market.totalCheckpoints)
+                  : 0,
+              }
             : p,
         ),
       )
@@ -442,7 +452,9 @@ export function MarketPage() {
 
   // All selected paths and the subset eligible for wagering
   const selectedPaths = allPaths.filter((p) => selectedPathIds.has(p.id))
-  const wagerablePaths = selectedPaths.filter((p) => p.onChainStatus !== 'pending')
+  const wagerablePaths = selectedPaths.filter(
+    (p) => p.onChainStatus !== 'pending' && (market?.completedCheckpoints ?? 0) >= p.firstActiveCheckpoint,
+  )
   const numWagerable = wagerablePaths.length
 
   // Chart highlight: last-added path in the set (most recent click)

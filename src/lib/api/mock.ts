@@ -98,16 +98,19 @@ function generatePaths(start: number, price: number): PredictionPath[] {
     creator: 'mock',
     cumulativeAction: 0,
     compositeScore: 80,
-    peakAmplitude: 1,
+    peakAmplitude: 1_000_000,
     amplitudeAtDecoherence: 0,
     dissolved: false,
     dissolvedAtCheckpoint: 0,
     checkpointsProcessed: 24,
+    createdAtCheckpoint: 0,
+    firstActiveCheckpoint: 0,
     totalWagered: 1000,
     totalLeveragedExposure: 1000,
     lmsrSharesOutstanding: 1000,
     totalTimeWeightedExposure: 1000,
     currentImpliedProbability: 2000,
+    initialAmplitude: 1_000_000,
   }))
 }
 

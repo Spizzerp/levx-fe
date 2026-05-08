@@ -184,11 +184,14 @@ function makePath(overrides: Partial<PredictionPath> = {}): PredictionPath {
     dissolved: false,
     dissolvedAtCheckpoint: 0,
     checkpointsProcessed: 0,
+    createdAtCheckpoint: 0,
+    firstActiveCheckpoint: 0,
     totalWagered: 0,
     totalLeveragedExposure: 0,
     lmsrSharesOutstanding: 0,
     totalTimeWeightedExposure: 0,
     currentImpliedProbability: 0,
+    initialAmplitude: 0,
     ...overrides,
   }
 }
@@ -466,6 +469,20 @@ describe('MarketPage state-gated controls', () => {
     await user.click(screen.getByRole('button', { name: /path a/i }))
 
     expect(screen.getByRole('button', { name: /open long position/i })).not.toBeDisabled()
+  })
+
+  it('keeps not-yet-active selected paths out of the wagerable set', async () => {
+    await setMarketState('active', {
+      paths: [makePath({ firstActiveCheckpoint: TEST_MARKET.completedCheckpoints + 1 })],
+      numPaths: 1,
+    })
+    act(() => connectWallet())
+    const user = userEvent.setup()
+    renderMarketPage()
+
+    await user.click(screen.getByRole('button', { name: /path a/i }))
+
+    expect(screen.getByRole('button', { name: /open long position/i })).toBeDisabled()
   })
 
   it('renders a collapsible metadata section with checkpoint schedule, fee rate, pool (MARKET-05)', async () => {
