@@ -27,12 +27,13 @@ vi.mock('@/lib/pyth/hooks', () => ({
 
 function makeMarket(overrides: Partial<Market> = {}): Market {
   const startTime = Date.UTC(2026, 4, 7, 12)
-  return {
+  const base: Market = {
     id: '30',
     marketId: 30,
     pair: 'SOL/USDC',
     base: 'SOL',
     quote: 'USDC',
+    vault: '',
     state: 'sampling',
     pool: 0,
     traders: 0,
@@ -47,6 +48,7 @@ function makeMarket(overrides: Partial<Market> = {}): Market {
     history: [],
     paths: [],
     numPaths: 0,
+    targetNumPaths: 3,
     amplitudes: [],
     lmsrShareQuantities: [],
     lmsrAlpha: 0,
@@ -57,8 +59,8 @@ function makeMarket(overrides: Partial<Market> = {}): Market {
     pathMaxAge: 0,
     pathsScored: 0,
     pathsDissolved: 0,
-    ...overrides,
   }
+  return { ...base, ...overrides }
 }
 
 describe('MarketCard', () => {

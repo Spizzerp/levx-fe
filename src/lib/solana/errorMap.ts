@@ -88,6 +88,16 @@ export const ERROR_MAP: Readonly<Record<string, DecodedError>> = {
     name: 'AlreadyClaimed',
     userMessage: 'You have already claimed this position.',
   },
+  MarketHasOpenPositions: {
+    name: 'MarketHasOpenPositions',
+    userMessage: 'Market still has open positions.',
+    hint: 'All users must claim or exit before the market can be closed.',
+  },
+  MarketVaultNotEmpty: {
+    name: 'MarketVaultNotEmpty',
+    userMessage: 'Market vault is not empty.',
+    hint: 'Outstanding payouts must be claimed before cleanup.',
+  },
   MarketDisputed: {
     name: 'MarketDisputed',
     userMessage: 'Market is paused while a settlement dispute is reviewed.',

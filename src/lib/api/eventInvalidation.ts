@@ -92,6 +92,7 @@ export const EVENT_INVALIDATION_MAP: Readonly<Record<string, InvalidationFactory
   MarketSettled: withMarket((mk) => [['market', mk], ['markets'], ['userPositions']]),
   MarketFinalized: withMarket((mk) => [['market', mk], ['markets'], ['userPositions']]),
   MarketVoided: withMarket((mk) => [['market', mk], ['markets'], ['userPositions']]),
+  MarketClosed: withMarket((mk) => [['market', mk], ['markets'], ['userPositions']]),
   DisputedMarketFinalized: withMarket((mk) => [
     ['market', mk],
     ['markets'],

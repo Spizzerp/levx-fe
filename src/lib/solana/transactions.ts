@@ -1,10 +1,11 @@
 /**
- * Transaction hooks for user-signed instructions:
+ * Transaction hooks for wallet-signed instructions:
  *   - add_path(params)
  *   - place_wager(path_index, amount)
  *   - place_batch_wager(path_indices[], amount)
  *   - exit_position()
  *   - claim()
+ *   - close_market()
  *
  * Every mutation builds instructions manually, routes through
  * buildTransaction (compute-unit limit + dynamic priority fee), and
@@ -16,7 +17,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { AnchorProvider, BN, parseIdlErrors, Program, translateError } from '@coral-xyz/anchor'
 import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress } from '@solana/spl-token'
-import { SystemProgram, Transaction, type TransactionInstruction } from '@solana/web3.js'
+import { PublicKey, SystemProgram, Transaction, type TransactionInstruction } from '@solana/web3.js'
 
 import type { Levx } from '@/idl/levx'
 import { useProgram } from './program'
@@ -60,6 +61,11 @@ interface PlaceBatchWagerInput {
 interface PositionInput {
   marketId: number
   pathIndex: number
+}
+
+interface MarketInput {
+  marketId: number
+  vault?: string | PublicKey
 }
 
 /**
@@ -515,6 +521,49 @@ export function useClaim() {
     },
     onError: (err) => {
       toast.error('Failed to claim', { message: (err as Error).message })
+    },
+  })
+}
+
+export function useCloseMarket() {
+  const program = useProgram()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ marketId, vault }: MarketInput) => {
+      if (!program) throw new Error('Wallet not connected')
+
+      const authority = program.provider.publicKey!
+      const [protocolPda] = deriveProtocolPda()
+      const [marketPda] = deriveMarketPda(marketId)
+      const vaultPda =
+        typeof vault === 'string'
+          ? new PublicKey(vault)
+          : vault ?? (await program.account.market.fetch(marketPda)).vault
+
+      const ix = await program.methods
+        .closeMarket()
+        .accountsPartial({
+          protocolState: protocolPda,
+          market: marketPda,
+          vault: vaultPda,
+          authority,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        })
+        .instruction()
+
+      return sendInstructions(program, [ix], CU_LIMITS.closeMarket)
+    },
+    onSuccess: (sig, { marketId }) => {
+      queryClient.removeQueries({ queryKey: ['market', String(marketId)] })
+      queryClient.invalidateQueries({ queryKey: ['markets'] })
+      queryClient.invalidateQueries({ queryKey: ['userPositions'] })
+      toast.success('Market closed', { txSig: sig })
+    },
+    onError: (err) => {
+      toast.error('Failed to close market', {
+        message: describeTxError(err, 'Unknown error'),
+      })
     },
   })
 }

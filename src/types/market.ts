@@ -120,10 +120,12 @@ export interface Market {
   pair: string // "BTC/USDC"
   base: string // "BTC"
   quote: string // "USDC"
+  /** On-chain market vault token account (base-58). */
+  vault: string
   state: MarketState
 
   pool: number // USDC (on-chain: total_pool)
-  traders: number // on-chain: num_positions
+  traders: number // on-chain: open Position PDA count
 
   /** unix ms */
   startTime: number
@@ -145,6 +147,8 @@ export interface Market {
 
   /** Number of registered paths (0..16) */
   numPaths: number
+  /** Configured path count required before the market can activate */
+  targetNumPaths: number
   /** Born-rule amplitudes per path (up to 16) */
   amplitudes: number[]
   /** LMSR share quantities per path (up to 16, signed) */

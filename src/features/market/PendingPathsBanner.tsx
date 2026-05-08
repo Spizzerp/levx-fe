@@ -7,11 +7,9 @@ interface PendingPathsBannerProps {
   className?: string
 }
 
-const TARGET_PATHS = 3
-
 /**
  * Slim inline status indicator for `Pending` markets that have not yet
- * reached the minimum path count required for activation. The pipeline
+ * reached the configured path count required for activation. The pipeline
  * submits AI paths via `add_path` over a short window before
  * `start_time`; until then the user sees an "AI is generating paths…"
  * line that updates live as PR2's `PathAdded` events invalidate
@@ -23,7 +21,8 @@ const TARGET_PATHS = 3
  * the bet they could place rather than a blank waiting room.
  */
 export function PendingPathsBanner({ market, className }: PendingPathsBannerProps) {
-  const have = Math.min(market.numPaths, TARGET_PATHS)
+  const target = market.targetNumPaths
+  const have = Math.min(market.numPaths, target)
   return (
     <div
       className={cn('flex items-center gap-3', className)}
@@ -36,7 +35,7 @@ export function PendingPathsBanner({ market, className }: PendingPathsBannerProp
           AI is generating paths…
         </p>
         <p className="text-ink-muted text-caption font-mono">
-          {have} / {TARGET_PATHS} paths arrived
+          {have} / {target} paths arrived
         </p>
       </div>
     </div>

@@ -46,9 +46,12 @@ function parsePathOrigin(raw: Record<string, unknown>): PathOrigin {
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+const warnedLegacyTargetNumPaths = new Set<number>()
+
 export function anchorMarketToFE(raw: any, id: string): Market {
   const marketId = bn(raw.marketId)
   const numPaths = raw.numPaths as number
+  const targetNumPaths = targetNumPathsOrLegacy(raw, marketId)
   const startTimeMs = i64(raw.startTime) * 1000
   const endTimeMs = i64(raw.endTime) * 1000
 
@@ -60,6 +63,7 @@ export function anchorMarketToFE(raw: any, id: string): Market {
     pair: '',
     base: '',
     quote: '',
+    vault: raw.vault.toBase58(),
     state: parseMarketState(raw.state),
     pool: bn(raw.totalPool, true),
     traders: raw.numPositions,
@@ -74,6 +78,7 @@ export function anchorMarketToFE(raw: any, id: string): Market {
     history: [],
     paths: [],
     numPaths,
+    targetNumPaths,
     amplitudes: (raw.amplitudes as BN[]).slice(0, numPaths).map((a) => bn(a, true)),
     lmsrShareQuantities: (raw.lmsrShareQuantities as BN[]).slice(0, numPaths).map((q) => i64(q)),
     lmsrAlpha: bn(raw.lmsrAlpha, true),
@@ -85,6 +90,18 @@ export function anchorMarketToFE(raw: any, id: string): Market {
     pathsScored: raw.pathsScored,
     pathsDissolved: raw.pathsDissolved,
   }
+}
+
+function targetNumPathsOrLegacy(raw: Record<string, unknown>, marketId: number): number {
+  if (typeof raw.targetNumPaths === 'number') return raw.targetNumPaths
+
+  if (!warnedLegacyTargetNumPaths.has(marketId)) {
+    warnedLegacyTargetNumPaths.add(marketId)
+    console.warn(
+      `[onchain] Market ${marketId} missing targetNumPaths; falling back to legacy target=3`,
+    )
+  }
+  return 3
 }
 
 export function anchorPathToFE(raw: any, marketStartTime: number, checkpointInterval: number): PredictionPath {

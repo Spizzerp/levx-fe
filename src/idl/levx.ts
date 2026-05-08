@@ -416,6 +416,92 @@ export type Levx = {
       "args": []
     },
     {
+      "name": "closeMarket",
+      "docs": [
+        "Admin-only terminal cleanup. Closes a Settled/Void market once all",
+        "positions have claimed/exited and the market vault is empty."
+      ],
+      "discriminator": [
+        88,
+        154,
+        248,
+        186,
+        48,
+        14,
+        123,
+        244
+      ],
+      "accounts": [
+        {
+          "name": "protocolState",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "relations": [
+            "market"
+          ]
+        },
+        {
+          "name": "authority",
+          "docs": [
+            "Protocol authority receives the reclaimed Market and vault rent."
+          ],
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "protocolState"
+          ]
+        },
+        {
+          "name": "tokenProgram",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "closePathOutcome",
       "docs": [
         "F7: the path's original creator closes a PathOutcome belonging to a",
@@ -499,6 +585,7 @@ export type Levx = {
             "32-byte market pubkey). Market is self-authenticating via its own",
             "seed derivation, so a user can't supply a spoofed Market here."
           ],
+          "writable": true,
           "pda": {
             "seeds": [
               {
@@ -527,10 +614,12 @@ export type Levx = {
         {
           "name": "user",
           "docs": [
-            "Rent destination — must match the user stored in the position."
+            "Permissionless cleanup rent destination. Rent is returned only to the",
+            "pubkey stored on the Position via `has_one = user`; no signer authority",
+            "is granted by this account.",
+            ""
           ],
           "writable": true,
-          "signer": true,
           "relations": [
             "position"
           ]
@@ -1473,6 +1562,65 @@ export type Levx = {
           "name": "authority",
           "writable": true,
           "signer": true
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "migrateMarketV2",
+      "docs": [
+        "One-time Market v1 -> v2 migration. Reallocs old market accounts by",
+        "one byte and backfills `target_num_paths = MIN_TARGET_NUM_PATHS`."
+      ],
+      "discriminator": [
+        53,
+        150,
+        38,
+        89,
+        165,
+        103,
+        103,
+        59
+      ],
+      "accounts": [
+        {
+          "name": "protocolState",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "market",
+          "docs": [
+            "cannot deserialize. The handler validates owner, discriminator, and PDA."
+          ],
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "protocolState"
+          ]
         },
         {
           "name": "systemProgram",
@@ -2793,6 +2941,19 @@ export type Levx = {
       ]
     },
     {
+      "name": "marketClosed",
+      "discriminator": [
+        86,
+        91,
+        119,
+        43,
+        94,
+        0,
+        217,
+        113
+      ]
+    },
+    {
       "name": "marketCreated",
       "discriminator": [
         88,
@@ -2816,6 +2977,19 @@ export type Levx = {
         76,
         234,
         179
+      ]
+    },
+    {
+      "name": "marketMigratedV2",
+      "discriminator": [
+        192,
+        129,
+        38,
+        209,
+        135,
+        32,
+        214,
+        175
       ]
     },
     {
@@ -3037,231 +3211,246 @@ export type Levx = {
     },
     {
       "code": 6004,
+      "name": "targetPathCountOutOfRange",
+      "msg": "Target path count must be between 3 and MAX_PATHS"
+    },
+    {
+      "code": 6005,
       "name": "invalidMarketState",
       "msg": "Market is not in the expected state for this operation"
     },
     {
-      "code": 6005,
+      "code": 6006,
       "name": "alreadyClaimed",
       "msg": "Position has already been claimed"
     },
     {
-      "code": 6006,
+      "code": 6007,
       "name": "pathDissolved",
       "msg": "Cannot wager on dissolved path"
     },
     {
-      "code": 6007,
+      "code": 6008,
       "name": "unauthorized",
       "msg": "Unauthorized signer for this operation"
     },
     {
-      "code": 6008,
+      "code": 6009,
       "name": "checkpointMismatch",
       "msg": "Checkpoint count mismatch"
     },
     {
-      "code": 6009,
+      "code": 6010,
       "name": "wagersNotAccepted",
       "msg": "Market is not accepting wagers in current state"
     },
     {
-      "code": 6010,
+      "code": 6011,
       "name": "wagerTooSmall",
       "msg": "Wager amount too small or yields zero shares"
     },
     {
-      "code": 6011,
+      "code": 6012,
       "name": "checkpointNotDue",
       "msg": "Checkpoint not yet due"
     },
     {
-      "code": 6012,
+      "code": 6013,
       "name": "checkpointAlreadySampled",
       "msg": "Checkpoint already sampled"
     },
     {
-      "code": 6013,
+      "code": 6014,
       "name": "oracleConfidenceTooLow",
       "msg": "Oracle confidence too low or price invalid"
     },
     {
-      "code": 6014,
+      "code": 6015,
       "name": "tradingCutoffReached",
       "msg": "Trading window closed; market has passed 80% of checkpoints"
     },
     {
-      "code": 6015,
+      "code": 6016,
       "name": "pathAlreadyDissolved",
       "msg": "Path has already been dissolved"
     },
     {
-      "code": 6016,
+      "code": 6017,
       "name": "quantumStateCollapsed",
       "msg": "All path amplitudes collapsed to zero"
     },
     {
-      "code": 6017,
+      "code": 6018,
       "name": "eigenNonConvergence",
       "msg": "Eigendecomposition did not converge within iteration limit"
     },
     {
-      "code": 6018,
+      "code": 6019,
       "name": "eigenVerificationFailed",
       "msg": "Eigendecomposition verification failed: reconstruction error exceeds tolerance"
     },
     {
-      "code": 6019,
+      "code": 6020,
       "name": "lambdaExceedsMax",
       "msg": "Lambda exceeds maximum allowed coupling strength"
     },
     {
-      "code": 6020,
+      "code": 6021,
       "name": "nudgeRateExceedsMax",
       "msg": "Nudge rate exceeds maximum (500_000 = 50%)"
     },
     {
-      "code": 6021,
+      "code": 6022,
       "name": "settlementIncomplete",
       "msg": "Settlement not complete; not all paths scored"
     },
     {
-      "code": 6022,
+      "code": 6023,
       "name": "marketNotSettled",
       "msg": "Market not in Settled or Void state; cannot claim"
     },
     {
-      "code": 6023,
+      "code": 6024,
+      "name": "marketHasOpenPositions",
+      "msg": "Market still has open positions; cannot close"
+    },
+    {
+      "code": 6025,
+      "name": "marketVaultNotEmpty",
+      "msg": "Market vault is not empty; cannot close"
+    },
+    {
+      "code": 6026,
       "name": "noSurvivingPaths",
       "msg": "No surviving paths to settle"
     },
     {
-      "code": 6024,
+      "code": 6027,
       "name": "invalidScoringWeights",
       "msg": "Invalid scoring weights; must sum to 10000"
     },
     {
-      "code": 6025,
+      "code": 6028,
       "name": "invalidPathIndex",
       "msg": "Invalid path index"
     },
     {
-      "code": 6026,
+      "code": 6029,
       "name": "invalidProbability",
       "msg": "Initial probability must be in basis-point range [0, 10_000]"
     },
     {
-      "code": 6027,
+      "code": 6030,
       "name": "pathNotYetActive",
       "msg": "Path is not active for wagering or scoring yet"
     },
     {
-      "code": 6028,
+      "code": 6031,
       "name": "activePathWindowTooShort",
       "msg": "Not enough checkpoints remain for a live path"
     },
     {
-      "code": 6029,
+      "code": 6032,
       "name": "duplicateConfigAccount",
       "msg": "Treasury and insurance_fund must be distinct accounts"
     },
     {
-      "code": 6030,
+      "code": 6033,
       "name": "alreadyMigrated",
       "msg": "ProtocolState has already been migrated to v2"
     },
     {
-      "code": 6031,
+      "code": 6034,
       "name": "invalidCollateralMint",
       "msg": "Collateral mint does not match the protocol allowlist"
     },
     {
-      "code": 6032,
+      "code": 6035,
       "name": "slippageExceeded",
       "msg": "Slippage exceeded: received fewer shares/less payout than min_out"
     },
     {
-      "code": 6033,
+      "code": 6036,
       "name": "maturityNotElapsed",
       "msg": "Maturity window has not elapsed; cannot finalize"
     },
     {
-      "code": 6034,
+      "code": 6037,
       "name": "marketDisputed",
       "msg": "Market is disputed; paused for governance review"
     },
     {
-      "code": 6035,
+      "code": 6038,
       "name": "invalidDisputeConfig",
       "msg": "Invalid dispute bond policy or account"
     },
     {
-      "code": 6036,
+      "code": 6039,
       "name": "invalidDisputeBond",
       "msg": "Invalid dispute bond account"
     },
     {
-      "code": 6037,
+      "code": 6040,
       "name": "mathOverflow",
       "msg": "Arithmetic overflow"
     },
     {
-      "code": 6038,
+      "code": 6041,
       "name": "feeExceedsCap",
       "msg": "Fee exceeds maximum cap (5%)"
     },
     {
-      "code": 6039,
+      "code": 6042,
       "name": "leverageNotEnabled",
       "msg": "Leverage is not enabled for this market"
     },
     {
-      "code": 6040,
+      "code": 6043,
       "name": "leverageExceedsMaximum",
       "msg": "Leverage exceeds maximum for this market's timeframe"
     },
     {
-      "code": 6041,
+      "code": 6044,
       "name": "vaultInsufficientCapacity",
       "msg": "Insufficient vault capacity for this leveraged position"
     },
     {
-      "code": 6042,
+      "code": 6045,
       "name": "vaultUtilizationExceeded",
       "msg": "Vault utilization would exceed maximum after this borrow"
     },
     {
-      "code": 6043,
+      "code": 6046,
       "name": "leveragedOiCapExceeded",
       "msg": "Market leveraged open interest cap would be exceeded"
     },
     {
-      "code": 6044,
+      "code": 6047,
       "name": "positionUnderwater",
       "msg": "Position health factor below liquidation threshold"
     },
     {
-      "code": 6045,
+      "code": 6048,
       "name": "positionHealthy",
       "msg": "Position health factor is above liquidation threshold; cannot liquidate"
     },
     {
-      "code": 6046,
+      "code": 6049,
       "name": "unauthorizedBackstopLiquidator",
       "msg": "Caller is not the configured backstop liquidator"
     },
     {
-      "code": 6047,
+      "code": 6050,
       "name": "backstopLiquidatorDisabled",
       "msg": "Backstop liquidator is disabled"
     },
     {
-      "code": 6048,
+      "code": 6051,
       "name": "backstopGracePeriodActive",
       "msg": "Backstop grace period has not elapsed; regular keepers have priority"
     },
     {
-      "code": 6049,
+      "code": 6052,
       "name": "bucketGuardCooldown",
       "msg": "Operation rate-limited; cooldown period has not elapsed"
     }
@@ -3478,6 +3667,14 @@ export type Levx = {
           {
             "name": "pathMaxAge",
             "type": "i64"
+          },
+          {
+            "name": "targetNumPaths",
+            "docs": [
+              "Number of AI paths the internal generation pipeline should submit",
+              "before the market can activate."
+            ],
+            "type": "u8"
           },
           {
             "name": "lambda",
@@ -4193,11 +4390,23 @@ export type Levx = {
             "type": "u64"
           },
           {
+            "name": "targetNumPaths",
+            "docs": [
+              "Required AI path count for activation. Configured at market creation."
+            ],
+            "type": "u8"
+          },
+          {
             "name": "numPaths",
             "type": "u8"
           },
           {
             "name": "numPositions",
+            "docs": [
+              "Open Position PDA count. Incremented by place_wager and decremented",
+              "only when a claimed/exited Position account is closed, so terminal",
+              "market cleanup cannot run while position accounts still exist."
+            ],
             "type": "u32"
           },
           {
@@ -4325,6 +4534,30 @@ export type Levx = {
       }
     },
     {
+      "name": "marketClosed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "marketId",
+            "type": "u64"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "marketRentRefunded",
+            "type": "u64"
+          },
+          {
+            "name": "vaultRentRefunded",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
       "name": "marketCreated",
       "type": {
         "kind": "struct",
@@ -4372,6 +4605,22 @@ export type Levx = {
           {
             "name": "finalizedAt",
             "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "marketMigratedV2",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "marketId",
+            "type": "u64"
+          },
+          {
+            "name": "targetNumPaths",
+            "type": "u8"
           }
         ]
       }

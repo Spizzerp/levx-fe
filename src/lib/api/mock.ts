@@ -27,6 +27,7 @@ const MINUTE = 60 * 1000
 const ON_CHAIN_DEFAULTS: Pick<
   Market,
   | 'numPaths'
+  | 'targetNumPaths'
   | 'amplitudes'
   | 'lmsrShareQuantities'
   | 'lmsrAlpha'
@@ -39,6 +40,7 @@ const ON_CHAIN_DEFAULTS: Pick<
   | 'pathsDissolved'
 > = {
   numPaths: 0,
+  targetNumPaths: 3,
   amplitudes: [],
   lmsrShareQuantities: [],
   lmsrAlpha: 100_000,
@@ -57,6 +59,7 @@ function makeMarket(overrides: Partial<Market> & Pick<Market, 'id' | 'marketId' 
   return {
     pool: 100_000,
     traders: 500,
+    vault: '',
     startTime: now - 7 * DAY,
     endTime: now + 7 * DAY,
     checkpointInterval: 3600,
