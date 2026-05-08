@@ -689,7 +689,7 @@ DisputeBond:   ["dispute_bond", market]`}</CodeBlock>
 
       <Section id="trading-pricing" num="04" heading="Trading and pricing">
         <P>
-          Users can place wagers during <Code>Active</Code> and <Code>Sampling</Code> until the 75%
+          Users can place wagers during <Code>Active</Code> and <Code>Sampling</Code> until the 80%
           checkpoint cutoff. Entry fees are split between treasury and insurance, while collateral
           enters the market vault. Each wager mints path exposure, updates the path's wager totals,
           and creates a <Code>Position</Code> PDA for the user and path.

@@ -3082,7 +3082,7 @@
     {
       "code": 6014,
       "name": "TradingCutoffReached",
-      "msg": "Trading window closed; market has passed 75% of checkpoints"
+      "msg": "Trading window closed; market has passed 80% of checkpoints"
     },
     {
       "code": 6015,

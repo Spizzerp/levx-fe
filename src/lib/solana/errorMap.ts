@@ -56,7 +56,7 @@ export const ERROR_MAP: Readonly<Record<string, DecodedError>> = {
   TradingCutoffReached: {
     name: 'TradingCutoffReached',
     userMessage: 'Trading window closed.',
-    hint: 'Wagers stop after 75% of checkpoints to prevent late-information advantage.',
+    hint: 'Wagers stop after 80% of checkpoints to prevent late-information advantage.',
   },
   WagerTooSmall: {
     name: 'WagerTooSmall',
