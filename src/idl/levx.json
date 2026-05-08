@@ -3474,6 +3474,14 @@
             "type": "i64"
           },
           {
+            "name": "target_num_paths",
+            "docs": [
+              "Number of AI paths the internal generation pipeline should submit",
+              "before the market can activate."
+            ],
+            "type": "u8"
+          },
+          {
             "name": "lambda",
             "docs": [
               "Quantum coupling strength (0 = no correlation, reduces to LMSR pricing)."
@@ -4185,6 +4193,13 @@
           {
             "name": "current_leveraged_oi",
             "type": "u64"
+          },
+          {
+            "name": "target_num_paths",
+            "docs": [
+              "Required AI path count for activation. Configured at market creation."
+            ],
+            "type": "u8"
           },
           {
             "name": "num_paths",

@@ -490,7 +490,7 @@ export function MarketPage() {
   /* ── State-gated right-rail content ──────────────────────────
    *   pending / active / sampling → WagerPanel (renders inline below)
    *     pending shows a "AI is generating paths…" indicator at top
-   *     and disables Place-Wager until numPaths >= 3.
+   *     and disables Place-Wager until numPaths reaches targetNumPaths.
    *   maturing         → MaturityCountdownCard
    *   settled          → ClaimButton (ConnectGate-wrapped)
    *   settling / void  → empty rail
@@ -501,7 +501,9 @@ export function MarketPage() {
   const showMaturityCard = market.state === 'maturing'
   const showClaimCard = market.state === 'settled'
   const showVoidPanel = market.state === 'void'
-  const showPendingIndicator = market.state === 'pending' && market.numPaths < 3
+  const pendingPathTarget = market.targetNumPaths ?? 3
+  const showPendingIndicator =
+    market.state === 'pending' && market.numPaths < pendingPathTarget
   const showPositionRail = !showWagerRail && !showVoidPanel && !!userPosition
   const showRail =
     showWagerRail || showMaturityCard || showClaimCard || showVoidPanel || showPositionRail
@@ -641,7 +643,7 @@ export function MarketPage() {
             //     real AI paths are still in flight).
             //   - Always show real content the user produced (a path
             //     they drew this session) or the chain reflects (a
-            //     partial on-chain AI submission with numPaths < 3).
+            //     partial on-chain AI submission below targetNumPaths).
             //   - Replace the rows with the heart-pulse loader only
             //     when there is genuinely nothing real to display.
             // Outside pending, `allPaths` is authoritative.

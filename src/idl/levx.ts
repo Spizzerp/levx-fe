@@ -3480,6 +3480,14 @@ export type Levx = {
             "type": "i64"
           },
           {
+            "name": "targetNumPaths",
+            "docs": [
+              "Number of AI paths the internal generation pipeline should submit",
+              "before the market can activate."
+            ],
+            "type": "u8"
+          },
+          {
             "name": "lambda",
             "docs": [
               "Quantum coupling strength (0 = no correlation, reduces to LMSR pricing)."
@@ -4191,6 +4199,13 @@ export type Levx = {
           {
             "name": "currentLeveragedOi",
             "type": "u64"
+          },
+          {
+            "name": "targetNumPaths",
+            "docs": [
+              "Required AI path count for activation. Configured at market creation."
+            ],
+            "type": "u8"
           },
           {
             "name": "numPaths",

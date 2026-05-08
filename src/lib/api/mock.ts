@@ -27,6 +27,7 @@ const MINUTE = 60 * 1000
 const ON_CHAIN_DEFAULTS: Pick<
   Market,
   | 'numPaths'
+  | 'targetNumPaths'
   | 'amplitudes'
   | 'lmsrShareQuantities'
   | 'lmsrAlpha'
@@ -39,6 +40,7 @@ const ON_CHAIN_DEFAULTS: Pick<
   | 'pathsDissolved'
 > = {
   numPaths: 0,
+  targetNumPaths: 3,
   amplitudes: [],
   lmsrShareQuantities: [],
   lmsrAlpha: 100_000,

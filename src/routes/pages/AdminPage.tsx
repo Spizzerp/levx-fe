@@ -72,13 +72,8 @@ function formatInterval(sec: number): string {
 /* ── AI provider options ─────────────────────────────────── */
 
 const AI_PROVIDERS = [
-  { id: 'chronos-2', label: 'Chronos-2', type: 'Foundation' },
-  { id: 'timesfm-2.5', label: 'TimesFM 2.5', type: 'Foundation' },
-  { id: 'gjr-garch', label: 'GJR-GARCH', type: 'Statistical' },
-  { id: 'merton-jd', label: 'Merton Jump-Diffusion', type: 'Statistical' },
-  { id: 'copula-ensemble', label: 'Copula Ensemble', type: 'Ensemble' },
-  { id: 'monte-carlo', label: 'Monte Carlo K-Means', type: 'Simulation' },
-]
+  { id: 'internal-levx', label: 'Internal LevX', type: 'Ensemble' },
+] as const
 
 /* ── Preview path generation ─────────────────────────────── */
 
@@ -365,7 +360,7 @@ export function AdminPage() {
   const [pathMaxAge, setPathMaxAge] = useState('1800')
   const [numPaths, setNumPaths] = useState(5)
   const [pathProviders, setPathProviders] = useState<string[]>(() =>
-    Array.from({ length: 7 }, (_, i) => AI_PROVIDERS[i % AI_PROVIDERS.length].id),
+    Array.from({ length: 7 }, () => AI_PROVIDERS[0].id),
   )
 
   // Tx state
@@ -521,6 +516,7 @@ export function AdminPage() {
         minimumProbability: new BN(Math.round(parseFloat(minimumProbability) * SCALE)),
         nudgeRate: new BN(Math.round(parseFloat(nudgeRate) * SCALE)),
         pathMaxAge: new BN(parseInt(pathMaxAge)),
+        targetNumPaths: numPaths,
         lambda: new BN(Math.round(parseFloat(lambda) * SCALE)),
         referenceAction: new BN(1 * SCALE),
         weightQv: new BN(Math.round(0.25 * SCALE)),
