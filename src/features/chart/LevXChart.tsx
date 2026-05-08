@@ -35,13 +35,27 @@ const CATMULL_ROM_ALPHA_05 = curveCatmullRom.alpha(0.5)
 // Path stroke colors are assigned by on-chain pathIndex so every viewer sees
 // the same line in the same color across reloads. Avoids the bull/bear red-green
 // spectrum (which collapses to all-neutral when on-chain price trajectories
-// don't diverge enough for deriveTone to classify) and gives 5 distinct hues.
+// don't diverge enough for deriveTone to classify). 16 distinct hues — one per
+// possible pathIndex — chosen for medium saturation (no neon), readability on
+// both dark and light surfaces, and adequate hue separation between adjacent
+// indices.
 const AI_PATH_PALETTE: readonly string[] = [
-  '#5CC8FF', // cyan
+  '#5CC8FF', // sky
   '#FF6BD6', // magenta
   '#F6CE48', // amber
   '#9AE85B', // lime
   '#A78BFA', // violet
+  '#FF8B5C', // coral
+  '#5CD0B0', // teal
+  '#F472B6', // rose
+  '#FBA94B', // apricot
+  '#7DD3FC', // pale blue
+  '#C0D85B', // chartreuse
+  '#B59FFF', // periwinkle
+  '#FF9AA2', // salmon
+  '#5FAE8B', // jade
+  '#D4A05B', // bronze
+  '#A3B3D6', // slate blue
 ]
 
 const USER_DRAWN_STYLE = { stroke: '#8FA3C9', dash: '3 3', opacity: 0.85 } as const

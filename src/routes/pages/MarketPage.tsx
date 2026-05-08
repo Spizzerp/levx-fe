@@ -26,6 +26,7 @@ import { Stub } from '@/ui/Stub'
 import { UserPositionCard } from '@/features/market/UserPositionCard'
 import { cn } from '@/lib/cn'
 import { useMarket, useUserPosition } from '@/lib/chain'
+import { parseMarketState } from '@/lib/api/adapters'
 import { isMarketWageringOpen } from '@/lib/market/status'
 import { useProgram } from '@/lib/solana/program'
 import { deriveMarketPda } from '@/lib/solana/pda'
@@ -38,6 +39,7 @@ import { useBenchmarksHistory, useLazyHistoryTrigger } from '@/lib/pyth/useBench
 import { buildAiPathFixture } from '@/tests/fixtures/aiPaths'
 
 import { useDrawingStore } from '@/stores/drawingStore'
+import { useWalletStore } from '@/stores/walletStore'
 import {
   formatCountdown,
   formatDeltaBps,
@@ -169,6 +171,7 @@ export function MarketPage() {
   const addPath = useAddPath()
   const placeBatchWager = usePlaceBatchWager()
   const { data: usdcBalance } = useUsdcBalance()
+  const selfWallet = useWalletStore((s) => s.publicKey?.toBase58() ?? null)
 
   const drawingState = useDrawingStore((s) => s.state)
   const drawingPhase = drawingState.phase
@@ -195,12 +198,26 @@ export function MarketPage() {
   // Exit draw mode on unmount so a user navigating away doesn't leave the store in sweeping state.
   useEffect(() => () => exitDrawMode(), [exitDrawMode])
 
-  // Chart schedule from on-chain market params
+  // Chart schedule from on-chain market params.
+  //
+  // We treat the LAST CHECKPOINT as "market end" everywhere user-facing
+  // (chart bar, countdown, leverage-cap duration). The on-chain
+  // `market.endTime` is a free input to `create_market` and is then only
+  // used to derive `total_checkpoints = floor((end - start) / interval)`;
+  // no on-chain control flow keys off it. Settling triggers when
+  // `completed_checkpoints == total_checkpoints` (last sample), at which
+  // point `maturity_end_time` is freshly stamped from the on-chain clock.
+  // So the last checkpoint is the real "end" for every event a user
+  // cares about; surfacing `endTime` would just produce a "ENDS IN 1h"
+  // countdown that ticks after settling has already started.
   const chartMarketStart = market?.startTime ?? now
-  const chartMarketEnd = market?.endTime ?? now
   const chartCheckpointInterval = market?.checkpointInterval ?? 3600
   const chartTotalCheckpoints = market?.totalCheckpoints ?? 0
   const chartCheckpointIntervalMs = chartCheckpointInterval * 1000
+  const chartMarketEnd = market
+    ? market.startTime +
+      Math.max(0, market.totalCheckpoints - 1) * chartCheckpointIntervalMs
+    : now
 
   const durationMs = Math.max(0, chartMarketEnd - chartMarketStart)
   const msRemaining = Math.max(0, chartMarketEnd - now)
@@ -294,8 +311,37 @@ export function MarketPage() {
     priceDisplay,
   ])
 
+  // Hide optimistic user-drawn entries once the on-chain refetch lands the
+  // matching `PathOutcome`. Without this, the path renders twice on the
+  // chart and twice in the path list (once as "Your Path", once with the
+  // adapter's default label) until the user navigates away.
+  // Match by the optimistic row's own (creator, pathIndex) — not by the
+  // currently-connected wallet — so a wallet flip between submission and
+  // refetch can't dedupe against an unrelated path. Falls back to
+  // selfWallet only for legacy rows whose creator was never populated.
+  // Only fires once `onChainStatus === 'confirmed'`, guarding against a
+  // stale market refetch interleaving with an in-flight tx and dropping a
+  // still-pending row by accident.
+  // Derived (not stateful) so React doesn't see this as a separate write.
+  const visibleUserPaths = useMemo(() => {
+    if (!market || !selfWallet) return userPaths
+    return userPaths.filter((opt) => {
+      if (opt.onChainStatus === 'pending') return true
+      const optCreator = opt.creator || selfWallet
+      return !market.paths.some(
+        (p) =>
+          p.origin === 'user' &&
+          p.creator === optCreator &&
+          p.pathIndex === opt.pathIndex,
+      )
+    })
+  }, [userPaths, market, selfWallet])
+
   // Combine AI paths + user-drawn paths for chart
-  const allPaths = useMemo(() => [...aiPaths, ...userPaths], [aiPaths, userPaths])
+  const allPaths = useMemo(
+    () => [...aiPaths, ...visibleUserPaths],
+    [aiPaths, visibleUserPaths],
+  )
 
   const handleConfirmDrawing = async () => {
     if (drawingState.phase !== 'ready' || !market) return
@@ -306,13 +352,27 @@ export function MarketPage() {
     const values = drawingState.values
     confirmDrawing()
 
-    // Pre-fetch pathIndex so the pending row has a real index.
-    // useAddPath re-reads this at submit time; the program's init
-    // constraint catches any race and we roll back in the catch below.
+    // Pre-fetch pathIndex so the pending row has a real index, AND defend
+    // against a stale FE state cache by re-checking the 80% completion
+    // cutoff right before we sign. `add_path` reverts above the cutoff;
+    // without this, the user could spend gas on a tx that's guaranteed
+    // to fail after a state flip between FE polling cycles.
     const [marketPda] = deriveMarketPda(market.marketId)
     let pathIndex: number
     try {
       const marketAcc = await program.account.market.fetch(marketPda)
+      const wageringOpen = isMarketWageringOpen({
+        state: parseMarketState(marketAcc.state as Record<string, unknown>),
+        completedCheckpoints: marketAcc.completedCheckpoints as number,
+        totalCheckpoints: marketAcc.totalCheckpoints as number,
+      })
+      if (!wageringOpen) {
+        exitDrawMode()
+        toast.error('Path submission closed', {
+          message: 'Market is more than 80% complete; new paths are no longer accepted.',
+        })
+        return
+      }
       pathIndex = marketAcc.numPaths
     } catch (err) {
       onTxError((err as Error).message)
@@ -336,7 +396,7 @@ export function MarketPage() {
       predictedPrices: values,
       numCheckpoints: values.length,
       generationTimestamp: Date.now(),
-      creator: '',
+      creator: selfWallet ?? '',
       cumulativeAction: 0,
       compositeScore: 0,
       peakAmplitude: 0,
@@ -693,7 +753,7 @@ export function MarketPage() {
                   <span>1×</span>
                   <span>
                     {leverageCap}× MAX ·{' '}
-                    {formatMarketDurationLabel(market.startTime, market.endTime)}
+                    {formatMarketDurationLabel(market.startTime, chartMarketEnd)}
                   </span>
                 </div>
               </div>
