@@ -59,6 +59,7 @@ function makeMarket(overrides: Partial<Market> & Pick<Market, 'id' | 'marketId' 
   return {
     pool: 100_000,
     traders: 500,
+    vault: '',
     startTime: now - 7 * DAY,
     endTime: now + 7 * DAY,
     checkpointInterval: 3600,

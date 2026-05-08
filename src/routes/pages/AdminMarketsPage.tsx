@@ -22,7 +22,7 @@ export function AdminMarketsPage() {
   const handleCloseMarket = (market: Market) => {
     const label = market.pair || `Market ${market.marketId}`
     if (!window.confirm(`Close ${label}?`)) return
-    closeMarket.mutate({ marketId: market.marketId })
+    closeMarket.mutate({ marketId: market.marketId, vault: market.vault })
   }
 
   if (!isAdmin) {

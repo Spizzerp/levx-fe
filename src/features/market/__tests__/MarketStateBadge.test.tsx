@@ -12,6 +12,7 @@ function makeMarket(overrides: Partial<Market> = {}): Market {
     pair: 'BTC/USDC',
     base: 'BTC',
     quote: 'USDC',
+    vault: '',
     state: 'active',
     pool: 1000,
     traders: 10,

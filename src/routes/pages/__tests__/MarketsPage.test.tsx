@@ -40,10 +40,14 @@ import type { Market, MarketState } from '@/types/market'
 
 function makeMarket(overrides: Partial<Market> & Pick<Market, 'id' | 'pair' | 'state'>): Market {
   const now = Date.now()
-  return {
+  const base: Market = {
+    id: overrides.id,
     marketId: 0,
+    pair: overrides.pair,
     base: overrides.pair.split('/')[0],
     quote: overrides.pair.split('/')[1],
+    vault: '',
+    state: overrides.state,
     pool: 100_000,
     traders: 500,
     startTime: now - 7 * 24 * 3_600_000,
@@ -68,8 +72,8 @@ function makeMarket(overrides: Partial<Market> & Pick<Market, 'id' | 'pair' | 's
     pathMaxAge: 3600,
     pathsScored: 0,
     pathsDissolved: 0,
-    ...overrides,
   }
+  return { ...base, ...overrides }
 }
 
 /**

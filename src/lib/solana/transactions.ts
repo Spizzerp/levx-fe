@@ -17,7 +17,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { AnchorProvider, BN, parseIdlErrors, Program, translateError } from '@coral-xyz/anchor'
 import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress } from '@solana/spl-token'
-import { SystemProgram, Transaction, type TransactionInstruction } from '@solana/web3.js'
+import { PublicKey, SystemProgram, Transaction, type TransactionInstruction } from '@solana/web3.js'
 
 import type { Levx } from '@/idl/levx'
 import { useProgram } from './program'
@@ -65,6 +65,7 @@ interface PositionInput {
 
 interface MarketInput {
   marketId: number
+  vault?: string | PublicKey
 }
 
 /**
@@ -529,20 +530,23 @@ export function useCloseMarket() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ marketId }: MarketInput) => {
+    mutationFn: async ({ marketId, vault }: MarketInput) => {
       if (!program) throw new Error('Wallet not connected')
 
       const authority = program.provider.publicKey!
       const [protocolPda] = deriveProtocolPda()
       const [marketPda] = deriveMarketPda(marketId)
-      const marketAcc = await program.account.market.fetch(marketPda)
+      const vaultPda =
+        typeof vault === 'string'
+          ? new PublicKey(vault)
+          : vault ?? (await program.account.market.fetch(marketPda)).vault
 
       const ix = await program.methods
         .closeMarket()
         .accountsPartial({
           protocolState: protocolPda,
           market: marketPda,
-          vault: marketAcc.vault,
+          vault: vaultPda,
           authority,
           tokenProgram: TOKEN_PROGRAM_ID,
         })

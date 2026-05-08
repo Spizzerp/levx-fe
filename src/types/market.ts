@@ -120,10 +120,12 @@ export interface Market {
   pair: string // "BTC/USDC"
   base: string // "BTC"
   quote: string // "USDC"
+  /** On-chain market vault token account (base-58). */
+  vault: string
   state: MarketState
 
   pool: number // USDC (on-chain: total_pool)
-  traders: number // on-chain: num_positions
+  traders: number // on-chain: open Position PDA count
 
   /** unix ms */
   startTime: number

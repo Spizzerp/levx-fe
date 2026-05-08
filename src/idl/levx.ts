@@ -585,6 +585,7 @@ export type Levx = {
             "32-byte market pubkey). Market is self-authenticating via its own",
             "seed derivation, so a user can't supply a spoofed Market here."
           ],
+          "writable": true,
           "pda": {
             "seeds": [
               {
@@ -613,10 +614,12 @@ export type Levx = {
         {
           "name": "user",
           "docs": [
-            "Rent destination — must match the user stored in the position."
+            "Permissionless cleanup rent destination. Rent is returned only to the",
+            "pubkey stored on the Position via `has_one = user`; no signer authority",
+            "is granted by this account.",
+            ""
           ],
           "writable": true,
-          "signer": true,
           "relations": [
             "position"
           ]
@@ -4399,6 +4402,11 @@ export type Levx = {
           },
           {
             "name": "numPositions",
+            "docs": [
+              "Open Position PDA count. Incremented by place_wager and decremented",
+              "only when a claimed/exited Position account is closed, so terminal",
+              "market cleanup cannot run while position accounts still exist."
+            ],
             "type": "u32"
           },
           {

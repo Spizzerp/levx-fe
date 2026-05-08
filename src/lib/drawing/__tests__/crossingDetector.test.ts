@@ -78,39 +78,42 @@ describe('crossingDetector', () => {
 
 // ---- geometry helpers ----
 
-const mockMarket = (overrides: Partial<Market> = {}): Market => ({
-  id: 'test',
-  marketId: 0,
-  pair: 'SOL/USDC',
-  base: 'SOL',
-  quote: 'USDC',
-  state: 'active',
-  pool: 0,
-  traders: 0,
-  startTime: 1_000_000,
-  endTime: 1_000_000 + 48 * 30 * 60 * 1000,
-  checkpointInterval: 30 * 60, // 30 minutes in seconds
-  completedCheckpoints: 0,
-  totalCheckpoints: 48,
-  leverageEnabled: false,
-  maxLeverage: 1,
-  entryFeeBps: 0,
-  history: [],
-  paths: [],
-  numPaths: 0,
-  targetNumPaths: 3,
-  amplitudes: [],
-  lmsrShareQuantities: [],
-  lmsrAlpha: 100_000,
-  lambda: 0,
-  decoherenceRate: 500_000,
-  minimumProbability: 10_000,
-  nudgeRate: 50_000,
-  pathMaxAge: 3600,
-  pathsScored: 0,
-  pathsDissolved: 0,
-  ...overrides,
-})
+const mockMarket = (overrides: Partial<Market> = {}): Market => {
+  const base: Market = {
+    id: 'test',
+    marketId: 0,
+    pair: 'SOL/USDC',
+    base: 'SOL',
+    quote: 'USDC',
+    vault: '',
+    state: 'active',
+    pool: 0,
+    traders: 0,
+    startTime: 1_000_000,
+    endTime: 1_000_000 + 48 * 30 * 60 * 1000,
+    checkpointInterval: 30 * 60, // 30 minutes in seconds
+    completedCheckpoints: 0,
+    totalCheckpoints: 48,
+    leverageEnabled: false,
+    maxLeverage: 1,
+    entryFeeBps: 0,
+    history: [],
+    paths: [],
+    numPaths: 0,
+    targetNumPaths: 3,
+    amplitudes: [],
+    lmsrShareQuantities: [],
+    lmsrAlpha: 100_000,
+    lambda: 0,
+    decoherenceRate: 500_000,
+    minimumProbability: 10_000,
+    nudgeRate: 50_000,
+    pathMaxAge: 3600,
+    pathsScored: 0,
+    pathsDissolved: 0,
+  }
+  return { ...base, ...overrides }
+}
 
 describe('buildCheckpointXs', () => {
   it('returns array of length market.totalCheckpoints', () => {
