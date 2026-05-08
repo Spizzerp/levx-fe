@@ -26,6 +26,7 @@ import { Stub } from '@/ui/Stub'
 import { UserPositionCard } from '@/features/market/UserPositionCard'
 import { cn } from '@/lib/cn'
 import { useMarket, useUserPosition } from '@/lib/chain'
+import { parseMarketState } from '@/lib/api/adapters'
 import { isMarketWageringOpen } from '@/lib/market/status'
 import { useProgram } from '@/lib/solana/program'
 import { deriveMarketPda } from '@/lib/solana/pda'
@@ -39,7 +40,6 @@ import { buildAiPathFixture } from '@/tests/fixtures/aiPaths'
 
 import { useDrawingStore } from '@/stores/drawingStore'
 import { useWalletStore } from '@/stores/walletStore'
-import { getWageringCutoffCheckpoint } from '@/lib/market/status'
 import {
   formatCountdown,
   formatDeltaBps,
@@ -356,10 +356,12 @@ export function MarketPage() {
     let pathIndex: number
     try {
       const marketAcc = await program.account.market.fetch(marketPda)
-      const total = marketAcc.totalCheckpoints as number
-      const completed = marketAcc.completedCheckpoints as number
-      const cutoff = getWageringCutoffCheckpoint(total)
-      if (cutoff <= 0 || completed >= cutoff) {
+      const wageringOpen = isMarketWageringOpen({
+        state: parseMarketState(marketAcc.state as Record<string, unknown>),
+        completedCheckpoints: marketAcc.completedCheckpoints as number,
+        totalCheckpoints: marketAcc.totalCheckpoints as number,
+      })
+      if (!wageringOpen) {
         exitDrawMode()
         toast.error('Path submission closed', {
           message: 'Market is more than 75% complete; new paths are no longer accepted.',
