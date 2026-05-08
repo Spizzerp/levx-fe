@@ -367,7 +367,14 @@ export function MarketPage() {
       setUserPaths((prev) =>
         prev.map((p) =>
           p.id === tempId
-            ? { ...p, onChainStatus: 'confirmed' as const, pathIndex: confirmedIndex }
+            ? {
+                ...p,
+                onChainStatus: 'confirmed' as const,
+                pathIndex: confirmedIndex,
+                firstActiveCheckpoint: isLiveUserDrawingState(market.state)
+                  ? Math.min(market.completedCheckpoints + 1, market.totalCheckpoints)
+                  : 0,
+              }
             : p,
         ),
       )

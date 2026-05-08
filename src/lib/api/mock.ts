@@ -98,7 +98,7 @@ function generatePaths(start: number, price: number): PredictionPath[] {
     creator: 'mock',
     cumulativeAction: 0,
     compositeScore: 80,
-    peakAmplitude: 1,
+    peakAmplitude: 1_000_000,
     amplitudeAtDecoherence: 0,
     dissolved: false,
     dissolvedAtCheckpoint: 0,
@@ -110,7 +110,7 @@ function generatePaths(start: number, price: number): PredictionPath[] {
     lmsrSharesOutstanding: 1000,
     totalTimeWeightedExposure: 1000,
     currentImpliedProbability: 2000,
-    initialAmplitude: 1,
+    initialAmplitude: 1_000_000,
   }))
 }
 
