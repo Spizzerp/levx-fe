@@ -742,8 +742,8 @@ export function MarketPage() {
                     >
                       <span className="text-ink-dim min-w-0 font-mono text-xs tracking-wide uppercase">
                         {canCancel
-                          ? 'Relay stalled. Intent can be cancelled.'
-                          : `Relay pending. Cancellable in ${formatCountdown(remainingMs)}`}
+                          ? 'Relay stalled. Cleanup and cancel are available.'
+                          : `Relay pending. Cleanup unlocks in ${formatCountdown(remainingMs)}`}
                       </span>
                       <Button
                         variant="secondary"
@@ -763,7 +763,7 @@ export function MarketPage() {
                           })
                         }}
                       >
-                        Cancel
+                        {canCancel ? 'Cleanup + Cancel' : 'Cancel'}
                       </Button>
                     </div>
                   )

@@ -29,6 +29,7 @@ import { ERROR_MAP, formatDecoded, lookupError } from './errorMap'
 import { logTransactionError } from './logTransactionError'
 import {
   deriveMarketPda,
+  derivePathChunkPda,
   derivePathPda,
   derivePathUploadPda,
   derivePositionPda,
@@ -105,6 +106,8 @@ interface CancelPathUploadInput {
   marketId: number
   intentPda: string
 }
+
+const pathUploadBitIsSet = (mask: number, idx: number) => (mask & (1 << idx)) !== 0
 
 /**
  * Builds + signs + confirms a single transaction with the compute-budget
@@ -373,6 +376,7 @@ export function useAddPath() {
       toast.success('Path finalized on-chain', { txSig: sig })
     },
     onError: (err) => {
+      if (err instanceof PathRelayError) return
       toast.error('Failed to create path', {
         message: describeTxError(err, 'Unknown error'),
       })
@@ -390,16 +394,57 @@ export function useCancelPathUpload() {
 
       const user = program.provider.publicKey!
       const [marketPda] = deriveMarketPda(marketId)
+      const pathUploadPda = new PublicKey(intentPda)
+      const pathUpload = await program.account.pathUpload.fetch(pathUploadPda)
+      const now = Math.floor(Date.now() / 1000)
+
+      const chunksWrittenMask = Number(pathUpload.chunksWrittenMask)
+      const chunksClosedMask = Number(pathUpload.chunksClosedMask)
+      const chunkCount = Number(pathUpload.chunkCount)
+      const expiresAt = pathUpload.expiresAt.toNumber()
+      const cleanupIxs: TransactionInstruction[] = []
+
+      if (chunksWrittenMask !== chunksClosedMask) {
+        if (now <= expiresAt) {
+          throw new Error('Upload has written chunks and can be cancelled after expiry.')
+        }
+
+        for (let chunkIndex = 0; chunkIndex < chunkCount; chunkIndex += 1) {
+          const needsCleanup =
+            pathUploadBitIsSet(chunksWrittenMask, chunkIndex) &&
+            !pathUploadBitIsSet(chunksClosedMask, chunkIndex)
+          if (!needsCleanup) continue
+
+          const [pathChunkPda] = derivePathChunkPda(pathUploadPda, chunkIndex)
+          const pathChunk = await program.account.pathChunk.fetch(pathChunkPda)
+          cleanupIxs.push(
+            await program.methods
+              .closeAbandonedPathChunk()
+              .accountsPartial({
+                market: marketPda,
+                pathUpload: pathUploadPda,
+                pathChunk: pathChunkPda,
+                payer: pathChunk.payer,
+              })
+              .instruction(),
+          )
+        }
+      }
+
       const ix = await program.methods
         .cancelPathUpload()
         .accountsPartial({
           market: marketPda,
-          pathUpload: new PublicKey(intentPda),
+          pathUpload: pathUploadPda,
           creator: user,
         })
         .instruction()
 
-      return sendInstructions(program, [ix], CU_LIMITS.cancelPathUpload)
+      const computeUnitLimit = Math.min(
+        CU_LIMITS.cancelPathUpload + cleanupIxs.length * CU_LIMITS.closeAbandonedPathChunk,
+        MAX_CU_PER_TX,
+      )
+      return sendInstructions(program, [...cleanupIxs, ix], computeUnitLimit)
     },
     onSuccess: (sig, { marketId }) => {
       queryClient.invalidateQueries({ queryKey: ['market', String(marketId)] })

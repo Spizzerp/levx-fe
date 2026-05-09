@@ -6,6 +6,7 @@ export const CU_LIMITS = {
   addPath: 100_000,
   createPathUploadIntent: 140_000,
   cancelPathUpload: 100_000,
+  closeAbandonedPathChunk: 90_000,
   placeWager: 200_000,
   exitPosition: 120_000,
   claim: 120_000,
