@@ -93,6 +93,11 @@ export const ERROR_MAP: Readonly<Record<string, DecodedError>> = {
     userMessage: 'Market still has open positions.',
     hint: 'All users must claim or exit before the market can be closed.',
   },
+  MarketHasOpenPaths: {
+    name: 'MarketHasOpenPaths',
+    userMessage: 'Market still has path accounts.',
+    hint: 'Close path chunks and path outcomes before closing the market.',
+  },
   MarketVaultNotEmpty: {
     name: 'MarketVaultNotEmpty',
     userMessage: 'Market vault is not empty.',

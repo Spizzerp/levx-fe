@@ -184,6 +184,9 @@ export function MarketPage() {
   const [selectedPathIds, setSelectedPathIds] = useState<Set<string>>(new Set())
   const [userPaths, setUserPaths] = useState<PredictionPath[]>([])
   const [hoveredPathId, setHoveredPathId] = useState<string | null>(null)
+  const [pathUploadStatus, setPathUploadStatus] = useState<'authorizing' | 'uploading' | null>(
+    null,
+  )
   const [leverage, setLeverage] = useState(22)
   const [collateral, setCollateral] = useState('25.00')
   const [now, setNow] = useState(() => Date.now())
@@ -422,6 +425,7 @@ export function MarketPage() {
         marketId: market.marketId,
         predictedPrices: values,
         numCheckpoints: values.length,
+        onStatus: setPathUploadStatus,
         pathIndex,
       })
       setUserPaths((prev) =>
@@ -447,6 +451,8 @@ export function MarketPage() {
         return next
       })
       onTxError((err as Error).message)
+    } finally {
+      setPathUploadStatus(null)
     }
   }
 
@@ -472,6 +478,12 @@ export function MarketPage() {
   const deltaColor = deltaDisplay >= 0 ? 'text-success' : 'text-accent'
 
   const isInDrawMode = drawingPhase !== 'idle'
+  const confirmPathLabel =
+    pathUploadStatus === 'uploading'
+      ? 'Uploading…'
+      : addPath.isPending
+        ? 'Authorizing…'
+        : 'Confirm'
 
   /* ── Early returns AFTER all hooks ─────────────────────────── */
   if (isLoading) return <Stub title="Loading Market..." />
@@ -724,7 +736,7 @@ export function MarketPage() {
                   onClick={handleConfirmDrawing}
                   disabled={drawingState.phase !== 'ready' || addPath.isPending}
                 >
-                  {addPath.isPending ? 'Submitting…' : 'Confirm'}
+                  {confirmPathLabel}
                 </Button>
               </div>
             ) : (

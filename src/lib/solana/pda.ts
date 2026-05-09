@@ -19,6 +19,30 @@ export function derivePathPda(marketId: number, pathIndex: number): [PublicKey, 
   )
 }
 
+export function derivePathUploadPda(
+  marketId: number,
+  creator: PublicKey,
+  nonce: number | BN,
+): [PublicKey, number] {
+  const nonceBn = BN.isBN(nonce) ? nonce : new BN(nonce)
+  return PublicKey.findProgramAddressSync(
+    [
+      Buffer.from('path_upload'),
+      new BN(marketId).toArrayLike(Buffer, 'le', 8),
+      creator.toBuffer(),
+      nonceBn.toArrayLike(Buffer, 'le', 8),
+    ],
+    PROGRAM_ID,
+  )
+}
+
+export function derivePathChunkPda(pathUpload: PublicKey, chunkIndex: number): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from('path_chunk'), pathUpload.toBuffer(), Buffer.from([chunkIndex])],
+    PROGRAM_ID,
+  )
+}
+
 export function derivePositionPda(
   marketId: number,
   user: PublicKey,

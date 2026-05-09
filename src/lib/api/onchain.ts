@@ -12,7 +12,7 @@ import type { Market, MarketState, UserPosition } from '@/types/market'
 import { anchorMarketToFE, anchorPathToFE, anchorPositionToFE, parseMarketState } from './adapters'
 import { resolveBaseMintLabel } from './pairLabels'
 import { getReadOnlyProgram } from '../solana/program'
-import { deriveMarketPda, derivePathPda, derivePositionPda } from '../solana/pda'
+import { deriveMarketPda, derivePathChunkPda, derivePathPda, derivePositionPda } from '../solana/pda'
 import { estimateLmsrExitPayout } from '../solana/lmsr'
 import { SCALE } from '@/lib/constants'
 
@@ -33,6 +33,27 @@ function deriveTone(predictedPrices: number[]): 'ultra-bull' | 'bull' | 'neutral
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
+
+async function hydrateChunkedPath(program: any, pathRaw: any): Promise<any> {
+  const chunkCount = Number(pathRaw.chunkCount ?? 0)
+  if (chunkCount <= 0) return pathRaw
+
+  try {
+    const chunks = await Promise.all(
+      Array.from({ length: chunkCount }, async (_, chunkIndex) => {
+        const [chunkPda] = derivePathChunkPda(pathRaw.pathUpload, chunkIndex)
+        return program.account.pathChunk.fetch(chunkPda)
+      }),
+    )
+    const predictedPrices = chunks.flatMap((chunk: any) =>
+      (chunk.prices as any[]).slice(0, Number(chunk.len)),
+    )
+    return { ...pathRaw, predictedPrices }
+  } catch (err) {
+    console.warn('[onchain] Failed to hydrate path chunks:', (err as Error).message)
+    return { ...pathRaw, predictedPrices: pathRaw.predictedPrices ?? [] }
+  }
+}
 
 export async function getMarkets(): Promise<Market[]> {
   const program = getReadOnlyProgram()
@@ -85,7 +106,10 @@ export async function getMarkets(): Promise<Market[]> {
           }),
         )
 
-        market.paths = pathRaws.flatMap((pathRaw: any) => {
+        const hydratedPaths = await Promise.all(
+          pathRaws.map((pathRaw: any) => (pathRaw ? hydrateChunkedPath(program, pathRaw) : null)),
+        )
+        market.paths = hydratedPaths.flatMap((pathRaw: any) => {
           if (!pathRaw) return []
           const path = anchorPathToFE(pathRaw, startTimeMs, checkpointInterval)
           path.tone = deriveTone(path.predictedPrices)
@@ -124,7 +148,10 @@ export async function getMarket(id: string): Promise<Market> {
   const startTimeMs = raw.startTime.toNumber() * 1000
   const checkpointInterval = raw.checkpointInterval as number
 
-  market.paths = pathRaws.map((pathRaw: any) => {
+  const hydratedPathRaws = await Promise.all(
+    pathRaws.map((pathRaw: any) => hydrateChunkedPath(program, pathRaw)),
+  )
+  market.paths = hydratedPathRaws.map((pathRaw: any) => {
     const path = anchorPathToFE(pathRaw, startTimeMs, checkpointInterval)
     path.tone = deriveTone(path.predictedPrices)
     return path
@@ -215,7 +242,10 @@ export async function getPosition(
     const [marketPda] = deriveMarketPda(marketId)
     const marketRaw: any = await program.account.market.fetch(marketPda)
     const [pathPda] = derivePathPda(marketId, pathIndex)
-    const pathRaw: any = await program.account.pathOutcome.fetch(pathPda)
+    const pathRaw: any = await hydrateChunkedPath(
+      program,
+      await program.account.pathOutcome.fetch(pathPda),
+    )
     const startTimeMs = marketRaw.startTime.toNumber() * 1000
     const checkpointInterval = marketRaw.checkpointInterval as number
     const path = anchorPathToFE(pathRaw, startTimeMs, checkpointInterval)
@@ -334,7 +364,10 @@ export async function getUserPositions(wallet: PublicKey | null): Promise<UserPo
     if (!pathInfo) {
       try {
         const [pathPda] = derivePathPda(mkt.marketIdNum, pathIndex)
-        const pathRaw: any = await program.account.pathOutcome.fetch(pathPda)
+        const pathRaw: any = await hydrateChunkedPath(
+          program,
+          await program.account.pathOutcome.fetch(pathPda),
+        )
         const path = anchorPathToFE(pathRaw, mkt.startTimeMs, mkt.checkpointInterval)
         const tone = deriveTone(path.predictedPrices)
         pathInfo = { label: path.label, tone, dissolved: path.dissolved }

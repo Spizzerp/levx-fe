@@ -10,7 +10,17 @@ import { useCloseMarket } from '@/lib/solana'
 import type { Market } from '@/types/market'
 
 function canCloseMarket(market: Market): boolean {
-  return (market.state === 'settled' || market.state === 'void') && market.traders === 0
+  return (
+    (market.state === 'settled' || market.state === 'void') &&
+    market.traders === 0 &&
+    market.numPaths === 0
+  )
+}
+
+function closeMarketDisabledReason(market: Market): string {
+  if (market.traders > 0) return 'All positions must be claimed or exited first'
+  if (market.numPaths > 0) return 'Path accounts and chunks must be closed first'
+  return 'Close market'
 }
 
 export function AdminMarketsPage() {
@@ -128,9 +138,7 @@ export function AdminMarketsPage() {
                     variant="destructive"
                     className="min-h-9 px-4 py-2"
                     disabled={!closeable || closing}
-                    title={
-                      closeable ? 'Close market' : 'All positions must be claimed or exited first'
-                    }
+                    title={closeable ? 'Close market' : closeMarketDisabledReason(m)}
                     onClick={(e) => {
                       e.stopPropagation()
                       handleCloseMarket(m)

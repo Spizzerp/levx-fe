@@ -12,6 +12,7 @@ export type AppEnv = {
   APP_NETWORK: 'devnet' | 'mainnet'
   APP_PROGRAM_ID: string
   APP_ADMIN_WALLETS: string[]
+  APP_PATH_UPLOAD_RELAY_FEE_LAMPORTS: number
   APP_SUPABASE_URL: string
   APP_SUPABASE_ANON_KEY: string
 }
@@ -24,6 +25,7 @@ export const env: AppEnv = {
   APP_NETWORK: requireEnv('APP_NETWORK') as AppEnv['APP_NETWORK'],
   APP_PROGRAM_ID: requireEnv('APP_PROGRAM_ID'),
   APP_ADMIN_WALLETS: (import.meta.env.APP_ADMIN_WALLETS ?? '').split(',').map((s: string) => s.trim()).filter(Boolean),
+  APP_PATH_UPLOAD_RELAY_FEE_LAMPORTS: Number(import.meta.env.APP_PATH_UPLOAD_RELAY_FEE_LAMPORTS ?? 50_000),
   APP_SUPABASE_URL: requireEnv('APP_SUPABASE_URL'),
   APP_SUPABASE_ANON_KEY: requireEnv('APP_SUPABASE_ANON_KEY'),
 }
