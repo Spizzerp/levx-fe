@@ -12,7 +12,7 @@ import type { Market, MarketState, UserPosition } from '@/types/market'
 import { anchorMarketToFE, anchorPathToFE, anchorPositionToFE, parseMarketState } from './adapters'
 import { resolveBaseMintLabel } from './pairLabels'
 import { getReadOnlyProgram } from '../solana/program'
-import { deriveMarketPda, derivePathChunkPda, derivePathPda, derivePositionPda } from '../solana/pda'
+import { PROGRAM_ID, deriveMarketPda, derivePathChunkPda, derivePathPda, derivePositionPda } from '../solana/pda'
 import { estimateLmsrExitPayout } from '../solana/lmsr'
 import { SCALE } from '@/lib/constants'
 
@@ -33,6 +33,75 @@ function deriveTone(predictedPrices: number[]): 'ultra-bull' | 'bull' | 'neutral
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
+
+const MAX_PATH_OUTCOME_CHECKPOINTS = 480
+const MAX_PATH_UPLOAD_CHUNKS = 12
+// Byte offsets in the current PathOutcome account, including the 8-byte
+// Anchor discriminator. Guard these before Borsh sees the Vec length; old
+// devnet path accounts have price bytes here and can otherwise trigger huge
+// browser allocations during decode.
+const PATH_OUTCOME_CHUNK_COUNT_OFFSET = 137
+const PATH_OUTCOME_CHUNKS_CLOSED_OFFSET = 138
+const PATH_OUTCOME_GENERATION_METHOD_OFFSET = 139
+const PATH_OUTCOME_PRICES_LEN_OFFSET = 148
+const PATH_OUTCOME_FIXED_ACCOUNT_SIZE = 310
+
+function readU32LE(data: Uint8Array, offset: number): number {
+  return (
+    data[offset] |
+    (data[offset + 1] << 8) |
+    (data[offset + 2] << 16) |
+    (data[offset + 3] << 24)
+  ) >>> 0
+}
+
+function assertCurrentPathOutcomeLayout(data: Uint8Array, label: string): void {
+  if (data.length < PATH_OUTCOME_FIXED_ACCOUNT_SIZE) {
+    throw new Error(`${label} is shorter than the current PathOutcome layout`)
+  }
+
+  const chunkCount = data[PATH_OUTCOME_CHUNK_COUNT_OFFSET]
+  const chunksClosed = data[PATH_OUTCOME_CHUNKS_CLOSED_OFFSET]
+  const generationMethod = data[PATH_OUTCOME_GENERATION_METHOD_OFFSET]
+  const predictedPricesLen = readU32LE(data, PATH_OUTCOME_PRICES_LEN_OFFSET)
+
+  if (
+    chunkCount > MAX_PATH_UPLOAD_CHUNKS ||
+    chunksClosed > chunkCount ||
+    generationMethod > 1 ||
+    predictedPricesLen > MAX_PATH_OUTCOME_CHECKPOINTS
+  ) {
+    throw new Error(`${label} appears to use a legacy/incompatible PathOutcome layout`)
+  }
+
+  const expectedMinSize = PATH_OUTCOME_FIXED_ACCOUNT_SIZE + predictedPricesLen * 8
+  if (data.length < expectedMinSize) {
+    throw new Error(`${label} is truncated for its declared price count`)
+  }
+}
+
+async function fetchPathOutcome(
+  program: any,
+  pathPda: PublicKey,
+  context: { market: PublicKey; marketId: number; pathIndex: number },
+): Promise<any> {
+  const info = await program.provider.connection.getAccountInfo(pathPda)
+  if (!info) {
+    throw new Error(`PathOutcome account not found: ${pathPda.toBase58()}`)
+  }
+  if (!info.owner.equals(PROGRAM_ID)) {
+    throw new Error(`PathOutcome ${pathPda.toBase58()} is not owned by LevX`)
+  }
+
+  const label = `PathOutcome market=${context.marketId} path=${context.pathIndex}`
+  assertCurrentPathOutcomeLayout(info.data, label)
+
+  const raw = program.coder.accounts.decode('pathOutcome', info.data)
+  if (!raw.market.equals(context.market) || raw.pathIndex !== context.pathIndex) {
+    throw new Error(`${label} decoded with mismatched market or path index`)
+  }
+  return raw
+}
 
 async function fetchPathChunks(program: any, chunkPdas: PublicKey[]): Promise<any[]> {
   const chunks: any[] = []
@@ -104,36 +173,6 @@ export async function getMarkets(): Promise<Market[]> {
       market.base = pairInfo.base
       market.quote = pairInfo.quote
 
-      const numPaths = raw.numPaths as number
-      if (numPaths > 0) {
-        const startTimeMs = raw.startTime.toNumber() * 1000
-        const checkpointInterval = raw.checkpointInterval as number
-        const pathRaws = await Promise.all(
-          Array.from({ length: numPaths }, async (_, i) => {
-            try {
-              const [pathPda] = derivePathPda(marketId, i)
-              return await program.account.pathOutcome.fetch(pathPda)
-            } catch (err) {
-              console.warn(
-                `[onchain] Failed to fetch path ${i} for market ${marketId}:`,
-                (err as Error).message,
-              )
-              return null
-            }
-          }),
-        )
-
-        const hydratedPaths = await Promise.all(
-          pathRaws.map((pathRaw: any) => (pathRaw ? hydrateChunkedPath(program, pathRaw) : null)),
-        )
-        market.paths = hydratedPaths.flatMap((pathRaw: any) => {
-          if (!pathRaw) return []
-          const path = anchorPathToFE(pathRaw, startTimeMs, checkpointInterval)
-          path.tone = deriveTone(path.predictedPrices)
-          return [path]
-        })
-      }
-
       return market
     }),
   )
@@ -156,11 +195,19 @@ export async function getMarket(id: string): Promise<Market> {
 
   // Fetch all paths for this market
   const numPaths = raw.numPaths as number
-  const pathPromises = Array.from({ length: numPaths }, (_, i) => {
+  const pathPromises = Array.from({ length: numPaths }, async (_, i) => {
     const [pathPda] = derivePathPda(marketId, i)
-    return program.account.pathOutcome.fetch(pathPda)
+    try {
+      return await fetchPathOutcome(program, pathPda, { market: marketPda, marketId, pathIndex: i })
+    } catch (err) {
+      console.warn(
+        `[onchain] Skipping undecodable path ${i} for market ${marketId}:`,
+        (err as Error).message,
+      )
+      return null
+    }
   })
-  const pathRaws: any[] = await Promise.all(pathPromises)
+  const pathRaws: any[] = (await Promise.all(pathPromises)).filter(Boolean)
 
   const startTimeMs = raw.startTime.toNumber() * 1000
   const checkpointInterval = raw.checkpointInterval as number
@@ -261,7 +308,7 @@ export async function getPosition(
     const [pathPda] = derivePathPda(marketId, pathIndex)
     const pathRaw: any = await hydrateChunkedPath(
       program,
-      await program.account.pathOutcome.fetch(pathPda),
+      await fetchPathOutcome(program, pathPda, { market: marketPda, marketId, pathIndex }),
     )
     const startTimeMs = marketRaw.startTime.toNumber() * 1000
     const checkpointInterval = marketRaw.checkpointInterval as number
@@ -381,9 +428,14 @@ export async function getUserPositions(wallet: PublicKey | null): Promise<UserPo
     if (!pathInfo) {
       try {
         const [pathPda] = derivePathPda(mkt.marketIdNum, pathIndex)
+        const [marketPda] = deriveMarketPda(mkt.marketIdNum)
         const pathRaw: any = await hydrateChunkedPath(
           program,
-          await program.account.pathOutcome.fetch(pathPda),
+          await fetchPathOutcome(program, pathPda, {
+            market: marketPda,
+            marketId: mkt.marketIdNum,
+            pathIndex,
+          }),
         )
         const path = anchorPathToFE(pathRaw, mkt.startTimeMs, mkt.checkpointInterval)
         const tone = deriveTone(path.predictedPrices)

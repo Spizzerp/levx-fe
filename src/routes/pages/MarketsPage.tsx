@@ -155,7 +155,7 @@ function buildColumns(now: number): DataTableColumn<Market>[] {
       header: 'PATHS',
       headerClassName: 'text-right',
       cellClassName: NUM_CELL,
-      render: (m) => (m.paths.length > 0 ? String(m.paths.length) : '—'),
+      render: (m) => (m.numPaths > 0 ? String(m.numPaths) : '—'),
     },
     {
       key: 'checkpoints',

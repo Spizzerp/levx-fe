@@ -171,15 +171,18 @@ describe('MarketsPage', () => {
     expect(screen.getByText(/^paths$/i)).toBeInTheDocument()
   })
 
-  it('Paths column value equals market.paths.length for each row (MARKET-01)', async () => {
+  it('Paths column value equals market.numPaths for each row (MARKET-01)', async () => {
     const markets = makeMarketsAcrossStates()
     await setUseMarkets({ data: markets })
     renderPage()
-    // Each market's paths.length should show up somewhere in a row cell.
-    // active/settled have 5 paths, sampling has 4, pending has 3.
-    // We assert the numeric cells exist by text — since paths.length is >0, no em-dash.
+    // List queries intentionally do not hydrate PathOutcome accounts; nonzero
+    // counts come from Market.numPaths so legacy path layouts cannot crash load.
     for (const m of markets) {
-      expect(screen.getAllByText(new RegExp(`^${m.paths.length}$`)).length).toBeGreaterThan(0)
+      if (m.numPaths === 0) {
+        expect(screen.getAllByText('—').length).toBeGreaterThan(0)
+      } else {
+        expect(screen.getAllByText(new RegExp(`^${m.numPaths}$`)).length).toBeGreaterThan(0)
+      }
     }
   })
 
