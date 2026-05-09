@@ -4029,106 +4029,116 @@
     },
     {
       "code": 6039,
+      "name": "UnauthorizedRelayer",
+      "msg": "Relay fee can only be claimed by the first chunk payer"
+    },
+    {
+      "code": 6040,
+      "name": "PathUploadExpiryTooLong",
+      "msg": "Path upload expiry exceeds the maximum allowed age"
+    },
+    {
+      "code": 6041,
       "name": "DuplicateConfigAccount",
       "msg": "Treasury and insurance_fund must be distinct accounts"
     },
     {
-      "code": 6040,
+      "code": 6042,
       "name": "AlreadyMigrated",
       "msg": "ProtocolState has already been migrated to v2"
     },
     {
-      "code": 6041,
+      "code": 6043,
       "name": "InvalidCollateralMint",
       "msg": "Collateral mint does not match the protocol allowlist"
     },
     {
-      "code": 6042,
+      "code": 6044,
       "name": "SlippageExceeded",
       "msg": "Slippage exceeded: received fewer shares/less payout than min_out"
     },
     {
-      "code": 6043,
+      "code": 6045,
       "name": "MaturityNotElapsed",
       "msg": "Maturity window has not elapsed; cannot finalize"
     },
     {
-      "code": 6044,
+      "code": 6046,
       "name": "MarketDisputed",
       "msg": "Market is disputed; paused for governance review"
     },
     {
-      "code": 6045,
+      "code": 6047,
       "name": "InvalidDisputeConfig",
       "msg": "Invalid dispute bond policy or account"
     },
     {
-      "code": 6046,
+      "code": 6048,
       "name": "InvalidDisputeBond",
       "msg": "Invalid dispute bond account"
     },
     {
-      "code": 6047,
+      "code": 6049,
       "name": "MathOverflow",
       "msg": "Arithmetic overflow"
     },
     {
-      "code": 6048,
+      "code": 6050,
       "name": "FeeExceedsCap",
       "msg": "Fee exceeds maximum cap (5%)"
     },
     {
-      "code": 6049,
+      "code": 6051,
       "name": "LeverageNotEnabled",
       "msg": "Leverage is not enabled for this market"
     },
     {
-      "code": 6050,
+      "code": 6052,
       "name": "LeverageExceedsMaximum",
       "msg": "Leverage exceeds maximum for this market's timeframe"
     },
     {
-      "code": 6051,
+      "code": 6053,
       "name": "VaultInsufficientCapacity",
       "msg": "Insufficient vault capacity for this leveraged position"
     },
     {
-      "code": 6052,
+      "code": 6054,
       "name": "VaultUtilizationExceeded",
       "msg": "Vault utilization would exceed maximum after this borrow"
     },
     {
-      "code": 6053,
+      "code": 6055,
       "name": "LeveragedOICapExceeded",
       "msg": "Market leveraged open interest cap would be exceeded"
     },
     {
-      "code": 6054,
+      "code": 6056,
       "name": "PositionUnderwater",
       "msg": "Position health factor below liquidation threshold"
     },
     {
-      "code": 6055,
+      "code": 6057,
       "name": "PositionHealthy",
       "msg": "Position health factor is above liquidation threshold; cannot liquidate"
     },
     {
-      "code": 6056,
+      "code": 6058,
       "name": "UnauthorizedBackstopLiquidator",
       "msg": "Caller is not the configured backstop liquidator"
     },
     {
-      "code": 6057,
+      "code": 6059,
       "name": "BackstopLiquidatorDisabled",
       "msg": "Backstop liquidator is disabled"
     },
     {
-      "code": 6058,
+      "code": 6060,
       "name": "BackstopGracePeriodActive",
       "msg": "Backstop grace period has not elapsed; regular keepers have priority"
     },
     {
-      "code": 6059,
+      "code": 6061,
       "name": "BucketGuardCooldown",
       "msg": "Operation rate-limited; cooldown period has not elapsed"
     }

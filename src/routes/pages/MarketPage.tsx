@@ -30,7 +30,13 @@ import { parseMarketState } from '@/lib/api/adapters'
 import { isMarketWageringOpen } from '@/lib/market/status'
 import { useProgram } from '@/lib/solana/program'
 import { deriveMarketPda } from '@/lib/solana/pda'
-import { useAddPath, usePlaceBatchWager, useClaim } from '@/lib/solana/transactions'
+import {
+  PathRelayError,
+  useAddPath,
+  useCancelPathUpload,
+  usePlaceBatchWager,
+  useClaim,
+} from '@/lib/solana/transactions'
 import { useUsdcBalance } from '@/lib/api/useUsdcBalance'
 import { toast } from '@/stores/toastStore'
 import { usePythFeed, useLatestPrice } from '@/lib/pyth/hooks'
@@ -169,6 +175,7 @@ export function MarketPage() {
 
   const program = useProgram()
   const addPath = useAddPath()
+  const cancelPathUpload = useCancelPathUpload()
   const placeBatchWager = usePlaceBatchWager()
   const { data: usdcBalance } = useUsdcBalance()
   const selfWallet = useWalletStore((s) => s.publicKey?.toBase58() ?? null)
@@ -444,13 +451,34 @@ export function MarketPage() {
       )
       onTxSuccess(sig)
     } catch (err) {
-      setUserPaths((prev) => prev.filter((p) => p.id !== tempId))
-      setSelectedPathIds((prev) => {
-        const next = new Set(prev)
-        next.delete(tempId)
-        return next
-      })
-      onTxError((err as Error).message)
+      if (err instanceof PathRelayError) {
+        setUserPaths((prev) =>
+          prev.map((p) =>
+            p.id === tempId
+              ? {
+                  ...p,
+                  label: 'Pending Upload',
+                  onChainStatus: 'relay_failed' as const,
+                  uploadIntentPda: err.intentPda,
+                  uploadNonce: err.nonce,
+                  uploadExpiresAt: err.expiresAt,
+                }
+              : p,
+          ),
+        )
+        toast.error('Path upload pending', {
+          message:
+            'Your signed intent is on-chain. If the relayer does not finish, cancel it after expiry.',
+        })
+      } else {
+        setUserPaths((prev) => prev.filter((p) => p.id !== tempId))
+        setSelectedPathIds((prev) => {
+          const next = new Set(prev)
+          next.delete(tempId)
+          return next
+        })
+        onTxError((err as Error).message)
+      }
     } finally {
       setPathUploadStatus(null)
     }
@@ -459,7 +487,9 @@ export function MarketPage() {
   // All selected paths and the subset eligible for wagering
   const selectedPaths = allPaths.filter((p) => selectedPathIds.has(p.id))
   const wagerablePaths = selectedPaths.filter(
-    (p) => p.onChainStatus !== 'pending' && (market?.completedCheckpoints ?? 0) >= p.firstActiveCheckpoint,
+    (p) =>
+      (p.onChainStatus === undefined || p.onChainStatus === 'confirmed') &&
+      (market?.completedCheckpoints ?? 0) >= p.firstActiveCheckpoint,
   )
   const numWagerable = wagerablePaths.length
 
@@ -519,6 +549,7 @@ export function MarketPage() {
   const showPositionRail = !showWagerRail && !showVoidPanel && !!userPosition
   const showRail =
     showWagerRail || showMaturityCard || showClaimCard || showVoidPanel || showPositionRail
+  const relayFailedPaths = visibleUserPaths.filter((p) => p.onChainStatus === 'relay_failed')
 
   return (
     <main
@@ -682,7 +713,10 @@ export function MarketPage() {
                     wagered={p.totalWagered}
                     compositeScore={p.compositeScore}
                     active={selectedPathIds.has(p.id)}
-                    pending={p.origin === 'user' && p.onChainStatus === 'pending'}
+                    pending={
+                      p.origin === 'user' &&
+                      (p.onChainStatus === 'pending' || p.onChainStatus === 'relay_failed')
+                    }
                     onMouseEnter={() => setHoveredPathId(p.id)}
                     onMouseLeave={() => setHoveredPathId(null)}
                     onClick={() =>
@@ -695,6 +729,45 @@ export function MarketPage() {
                     }
                   />
                 ))}
+                {relayFailedPaths.map((p) => {
+                  const remainingMs = Math.max(0, (p.uploadExpiresAt ?? 0) * 1000 - now)
+                  const canCancel = remainingMs === 0 && !!p.uploadIntentPda
+                  return (
+                    <div
+                      key={`${p.id}-relay`}
+                      className={cn(
+                        'border-line flex items-center justify-between gap-3',
+                        'border-0 border-b px-4 py-3',
+                      )}
+                    >
+                      <span className="text-ink-dim min-w-0 font-mono text-xs tracking-wide uppercase">
+                        {canCancel
+                          ? 'Relay stalled. Intent can be cancelled.'
+                          : `Relay pending. Cancellable in ${formatCountdown(remainingMs)}`}
+                      </span>
+                      <Button
+                        variant="secondary"
+                        className="min-h-8 shrink-0 px-3 py-2 text-[10px]"
+                        disabled={!canCancel || cancelPathUpload.isPending}
+                        onClick={async () => {
+                          if (!p.uploadIntentPda || !market) return
+                          await cancelPathUpload.mutateAsync({
+                            marketId: market.marketId,
+                            intentPda: p.uploadIntentPda,
+                          })
+                          setUserPaths((prev) => prev.filter((path) => path.id !== p.id))
+                          setSelectedPathIds((prev) => {
+                            const next = new Set(prev)
+                            next.delete(p.id)
+                            return next
+                          })
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  )
+                })}
                 {selectedPathIds.size > 4 && (
                   <p className="text-accent text-caption px-4 py-2 font-mono">
                     Max 4 paths per transaction. Deselect some paths.

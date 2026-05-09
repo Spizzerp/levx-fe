@@ -3,6 +3,8 @@ import { PublicKey } from '@solana/web3.js'
 export const PATH_CHUNK_SIZE = 40
 export const MAX_CHECKPOINTS = 480
 export const MAX_PATH_UPLOAD_CHUNKS = 12
+export const PATH_ORIGIN_AI = 0
+export const PATH_ORIGIN_USER_DRAWN = 1
 
 const PATH_CHUNK_HASH_DOMAIN = new TextEncoder().encode('levx:path-chunk:v1')
 const PATH_ROOT_HASH_DOMAIN = new TextEncoder().encode('levx:path-root:v1')
@@ -63,6 +65,9 @@ export async function computePathChunkHash(
   chunkIndex: number,
   prices: readonly number[],
 ): Promise<Uint8Array> {
+  if (prices.length > PATH_CHUNK_SIZE) {
+    throw new Error(`Chunk cannot exceed ${PATH_CHUNK_SIZE} prices`)
+  }
   const priceBytes = concatBytes(prices.map((price) => u64Le(price)))
   return sha256([
     PATH_CHUNK_HASH_DOMAIN,
@@ -81,6 +86,9 @@ export async function computePathRoot(
   numCheckpoints: number,
   chunkHashes: readonly Uint8Array[],
 ): Promise<Uint8Array> {
+  if (chunkHashes.length > MAX_PATH_UPLOAD_CHUNKS) {
+    throw new Error(`Path cannot exceed ${MAX_PATH_UPLOAD_CHUNKS} chunks`)
+  }
   return sha256([
     PATH_ROOT_HASH_DOMAIN,
     u64Le(marketId),

@@ -34,17 +34,34 @@ function deriveTone(predictedPrices: number[]): 'ultra-bull' | 'bull' | 'neutral
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+async function fetchPathChunks(program: any, chunkPdas: PublicKey[]): Promise<any[]> {
+  const chunks: any[] = []
+  const connection = program.provider.connection
+
+  for (let i = 0; i < chunkPdas.length; i += 100) {
+    const batch = chunkPdas.slice(i, i + 100)
+    const infos = await connection.getMultipleAccountsInfo(batch)
+    infos.forEach((info: any, batchIndex: number) => {
+      if (!info) {
+        throw new Error(`PathChunk account not found: ${batch[batchIndex].toBase58()}`)
+      }
+      chunks.push(program.coder.accounts.decode('pathChunk', info.data))
+    })
+  }
+
+  return chunks
+}
+
 async function hydrateChunkedPath(program: any, pathRaw: any): Promise<any> {
   const chunkCount = Number(pathRaw.chunkCount ?? 0)
   if (chunkCount <= 0) return pathRaw
 
   try {
-    const chunks = await Promise.all(
-      Array.from({ length: chunkCount }, async (_, chunkIndex) => {
-        const [chunkPda] = derivePathChunkPda(pathRaw.pathUpload, chunkIndex)
-        return program.account.pathChunk.fetch(chunkPda)
-      }),
-    )
+    const chunkPdas = Array.from({ length: chunkCount }, (_, chunkIndex) => {
+      const [chunkPda] = derivePathChunkPda(pathRaw.pathUpload, chunkIndex)
+      return chunkPda
+    })
+    const chunks = await fetchPathChunks(program, chunkPdas)
     const predictedPrices = chunks.flatMap((chunk: any) =>
       (chunk.prices as any[]).slice(0, Number(chunk.len)),
     )

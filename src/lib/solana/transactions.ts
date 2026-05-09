@@ -37,7 +37,7 @@ import {
 import { buildTransaction } from '@/lib/chain/buildTransaction'
 import { getPriorityFee } from '@/lib/chain/priorityFee'
 import { applySlippageFloor, estimateLmsrExitPayout, estimateLmsrSharesOut } from './lmsr'
-import { buildPathChunks, computePathRoot } from './pathCommitments'
+import { buildPathChunks, computePathRoot, PATH_ORIGIN_USER_DRAWN } from './pathCommitments'
 
 const MAX_BATCH_SIZE = 4
 
@@ -62,6 +62,22 @@ interface RelayPathUploadResponse {
   finalize_signature: string
 }
 
+export class PathRelayError extends Error {
+  readonly intentPda: string
+  readonly nonce: number
+  readonly expiresAt: number
+  readonly intentSig: string
+
+  constructor(message: string, args: { intentPda: string; nonce: number; expiresAt: number; intentSig: string }) {
+    super(message)
+    this.name = 'PathRelayError'
+    this.intentPda = args.intentPda
+    this.nonce = args.nonce
+    this.expiresAt = args.expiresAt
+    this.intentSig = args.intentSig
+  }
+}
+
 interface PlaceWagerInput {
   marketId: number
   pathIndex: number
@@ -83,6 +99,11 @@ interface PositionInput {
 interface MarketInput {
   marketId: number
   vault?: string | PublicKey
+}
+
+interface CancelPathUploadInput {
+  marketId: number
+  intentPda: string
 }
 
 /**
@@ -253,7 +274,12 @@ async function relayPathUpload(body: {
   })
   const payload = await res.json().catch(() => null)
   if (!res.ok) {
-    throw new Error(payload?.detail ?? payload?.error ?? `Relayer failed with HTTP ${res.status}`)
+    const detail = payload?.detail
+    const message =
+      typeof detail === 'string'
+        ? detail
+        : detail?.message ?? payload?.error ?? `Relayer failed with HTTP ${res.status}`
+    throw new Error(message)
   }
   return payload as RelayPathUploadResponse
 }
@@ -290,10 +316,11 @@ export function useAddPath() {
       const pathRoot = await computePathRoot(
         marketId,
         user,
-        1,
+        PATH_ORIGIN_USER_DRAWN,
         numCheckpoints,
         chunks.map((chunk) => chunk.chunkHash),
       )
+      const expiresAt = Math.floor(Date.now() / 1000) + 600
 
       const params = {
         nonce: new BN(nonce),
@@ -302,7 +329,7 @@ export function useAddPath() {
         initialProbabilityBps: 0,
         generationMethod: { userDrawn: {} },
         generationTimestamp: new BN(Math.floor(Date.now() / 1000)),
-        expiresAt: new BN(Math.floor(Date.now() / 1000) + 600),
+        expiresAt: new BN(expiresAt),
         relayFeeLamports: new BN(env.APP_PATH_UPLOAD_RELAY_FEE_LAMPORTS),
       }
 
@@ -320,13 +347,24 @@ export function useAddPath() {
       onStatus?.('authorizing')
       const intentSig = await sendInstructions(program, [ix], CU_LIMITS.createPathUploadIntent)
       onStatus?.('uploading')
-      const relay = await relayPathUpload({
-        market_id: marketId,
-        intent_pda: pathUploadPda.toBase58(),
-        user_pubkey: user.toBase58(),
-        nonce,
-        fixed_point_prices: fixedPointPrices,
-      })
+      const intentPda = pathUploadPda.toBase58()
+      let relay: RelayPathUploadResponse
+      try {
+        relay = await relayPathUpload({
+          market_id: marketId,
+          intent_pda: intentPda,
+          user_pubkey: user.toBase58(),
+          nonce,
+          fixed_point_prices: fixedPointPrices,
+        })
+      } catch (err) {
+        throw new PathRelayError((err as Error).message, {
+          intentPda,
+          nonce,
+          expiresAt,
+          intentSig,
+        })
+      }
       return { sig: relay.finalize_signature, intentSig, pathIndex: relay.path_index ?? pathIndex }
     },
     onSuccess: ({ sig }, { marketId }) => {
@@ -336,6 +374,40 @@ export function useAddPath() {
     },
     onError: (err) => {
       toast.error('Failed to create path', {
+        message: describeTxError(err, 'Unknown error'),
+      })
+    },
+  })
+}
+
+export function useCancelPathUpload() {
+  const program = useProgram()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ marketId, intentPda }: CancelPathUploadInput) => {
+      if (!program) throw new Error('Wallet not connected')
+
+      const user = program.provider.publicKey!
+      const [marketPda] = deriveMarketPda(marketId)
+      const ix = await program.methods
+        .cancelPathUpload()
+        .accountsPartial({
+          market: marketPda,
+          pathUpload: new PublicKey(intentPda),
+          creator: user,
+        })
+        .instruction()
+
+      return sendInstructions(program, [ix], CU_LIMITS.cancelPathUpload)
+    },
+    onSuccess: (sig, { marketId }) => {
+      queryClient.invalidateQueries({ queryKey: ['market', String(marketId)] })
+      queryClient.invalidateQueries({ queryKey: ['markets'] })
+      toast.success('Path upload cancelled', { txSig: sig })
+    },
+    onError: (err) => {
+      toast.error('Failed to cancel path upload', {
         message: describeTxError(err, 'Unknown error'),
       })
     },
