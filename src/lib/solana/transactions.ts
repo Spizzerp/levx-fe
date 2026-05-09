@@ -22,14 +22,23 @@ import { PublicKey, SystemProgram, Transaction, type TransactionInstruction } fr
 import type { Levx } from '@/idl/levx'
 import { useProgram } from './program'
 import { CU_LIMITS, MAX_CU_PER_TX, SCALE } from '@/lib/constants'
+import { env } from '@/env/env.config'
 import { toast } from '@/stores/toastStore'
 import { getSlippageTolerance } from '@/stores/slippageStore'
 import { ERROR_MAP, formatDecoded, lookupError } from './errorMap'
 import { logTransactionError } from './logTransactionError'
-import { deriveMarketPda, derivePathPda, derivePositionPda, deriveProtocolPda } from './pda'
+import {
+  deriveMarketPda,
+  derivePathChunkPda,
+  derivePathPda,
+  derivePathUploadPda,
+  derivePositionPda,
+  deriveProtocolPda,
+} from './pda'
 import { buildTransaction } from '@/lib/chain/buildTransaction'
 import { getPriorityFee } from '@/lib/chain/priorityFee'
 import { applySlippageFloor, estimateLmsrExitPayout, estimateLmsrSharesOut } from './lmsr'
+import { buildPathChunks, computePathRoot, PATH_ORIGIN_USER_DRAWN } from './pathCommitments'
 
 const MAX_BATCH_SIZE = 4
 
@@ -37,12 +46,37 @@ interface AddPathInput {
   marketId: number
   predictedPrices: number[]
   numCheckpoints: number
+  onStatus?: (status: 'authorizing' | 'uploading') => void
   /**
    * Optional pre-fetched path index. When the caller has already read
    * `market.numPaths` (e.g. to show an optimistic pending row), passing
    * it here avoids a second RPC hop inside the mutation.
    */
   pathIndex?: number
+}
+
+interface RelayPathUploadResponse {
+  market_id: number
+  path_index: number
+  intent_pda: string
+  signatures: string[]
+  finalize_signature: string
+}
+
+export class PathRelayError extends Error {
+  readonly intentPda: string
+  readonly nonce: number
+  readonly expiresAt: number
+  readonly intentSig: string
+
+  constructor(message: string, args: { intentPda: string; nonce: number; expiresAt: number; intentSig: string }) {
+    super(message)
+    this.name = 'PathRelayError'
+    this.intentPda = args.intentPda
+    this.nonce = args.nonce
+    this.expiresAt = args.expiresAt
+    this.intentSig = args.intentSig
+  }
 }
 
 interface PlaceWagerInput {
@@ -67,6 +101,13 @@ interface MarketInput {
   marketId: number
   vault?: string | PublicKey
 }
+
+interface CancelPathUploadInput {
+  marketId: number
+  intentPda: string
+}
+
+const pathUploadBitIsSet = (mask: number, idx: number) => (mask & (1 << idx)) !== 0
 
 /**
  * Builds + signs + confirms a single transaction with the compute-budget
@@ -218,6 +259,34 @@ function describeTxError(err: unknown, fallback: string): string {
 
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
+async function relayPathUpload(body: {
+  market_id: number
+  intent_pda: string
+  user_pubkey: string
+  nonce: number
+  fixed_point_prices: number[]
+}): Promise<RelayPathUploadResponse> {
+  const baseUrl = env.APP_API_BASE_URL.replace(/\/$/, '')
+  if (!baseUrl) {
+    throw new Error('Path upload relayer is not configured')
+  }
+  const res = await fetch(`${baseUrl}/api/v1/path-uploads/relay`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  const payload = await res.json().catch(() => null)
+  if (!res.ok) {
+    const detail = payload?.detail
+    const message =
+      typeof detail === 'string'
+        ? detail
+        : detail?.message ?? payload?.error ?? `Relayer failed with HTTP ${res.status}`
+    throw new Error(message)
+  }
+  return payload as RelayPathUploadResponse
+}
+
 export function useAddPath() {
   const program = useProgram()
   const queryClient = useQueryClient()
@@ -227,6 +296,7 @@ export function useAddPath() {
       marketId,
       predictedPrices,
       numCheckpoints,
+      onStatus,
       pathIndex: prefetchedIndex,
     }: AddPathInput) => {
       if (!program) throw new Error('Wallet not connected')
@@ -242,36 +312,147 @@ export function useAddPath() {
         pathIndex = marketAcc.numPaths
       }
 
-      const [pathOutcomePda] = derivePathPda(marketId, pathIndex)
+      const nonce = Date.now() * 1000 + Math.floor(Math.random() * 1000)
+      const [pathUploadPda] = derivePathUploadPda(marketId, user, nonce)
+      const fixedPointPrices = predictedPrices.map((p) => Math.round(p * SCALE))
+      const chunks = await buildPathChunks(marketId, pathUploadPda, fixedPointPrices)
+      const pathRoot = await computePathRoot(
+        marketId,
+        user,
+        PATH_ORIGIN_USER_DRAWN,
+        numCheckpoints,
+        chunks.map((chunk) => chunk.chunkHash),
+      )
+      const expiresAt = Math.floor(Date.now() / 1000) + 600
 
       const params = {
-        predictedPrices: predictedPrices.map((p) => new BN(Math.round(p * SCALE))),
+        nonce: new BN(nonce),
+        pathRoot: Array.from(pathRoot),
         numCheckpoints,
         initialProbabilityBps: 0,
         generationMethod: { userDrawn: {} },
         generationTimestamp: new BN(Math.floor(Date.now() / 1000)),
+        expiresAt: new BN(expiresAt),
+        relayFeeLamports: new BN(env.APP_PATH_UPLOAD_RELAY_FEE_LAMPORTS),
       }
 
       const ix = await program.methods
-        .addPath(params)
+        .createPathUploadIntent(params)
         .accountsPartial({
+          protocolState: deriveProtocolPda()[0],
           market: marketPda,
-          pathOutcome: pathOutcomePda,
+          pathUpload: pathUploadPda,
           creator: user,
           systemProgram: SystemProgram.programId,
         })
         .instruction()
 
-      const sig = await sendInstructions(program, [ix], CU_LIMITS.addPath)
-      return { sig, pathIndex }
+      onStatus?.('authorizing')
+      const intentSig = await sendInstructions(program, [ix], CU_LIMITS.createPathUploadIntent)
+      onStatus?.('uploading')
+      const intentPda = pathUploadPda.toBase58()
+      let relay: RelayPathUploadResponse
+      try {
+        relay = await relayPathUpload({
+          market_id: marketId,
+          intent_pda: intentPda,
+          user_pubkey: user.toBase58(),
+          nonce,
+          fixed_point_prices: fixedPointPrices,
+        })
+      } catch (err) {
+        throw new PathRelayError((err as Error).message, {
+          intentPda,
+          nonce,
+          expiresAt,
+          intentSig,
+        })
+      }
+      return { sig: relay.finalize_signature, intentSig, pathIndex: relay.path_index ?? pathIndex }
     },
     onSuccess: ({ sig }, { marketId }) => {
       queryClient.invalidateQueries({ queryKey: ['market', String(marketId)] })
       queryClient.invalidateQueries({ queryKey: ['markets'] })
-      toast.success('Path created on-chain', { txSig: sig })
+      toast.success('Path finalized on-chain', { txSig: sig })
     },
     onError: (err) => {
+      if (err instanceof PathRelayError) return
       toast.error('Failed to create path', {
+        message: describeTxError(err, 'Unknown error'),
+      })
+    },
+  })
+}
+
+export function useCancelPathUpload() {
+  const program = useProgram()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ marketId, intentPda }: CancelPathUploadInput) => {
+      if (!program) throw new Error('Wallet not connected')
+
+      const user = program.provider.publicKey!
+      const [marketPda] = deriveMarketPda(marketId)
+      const pathUploadPda = new PublicKey(intentPda)
+      const pathUpload = await program.account.pathUpload.fetch(pathUploadPda)
+      const now = Math.floor(Date.now() / 1000)
+
+      const chunksWrittenMask = Number(pathUpload.chunksWrittenMask)
+      const chunksClosedMask = Number(pathUpload.chunksClosedMask)
+      const chunkCount = Number(pathUpload.chunkCount)
+      const expiresAt = pathUpload.expiresAt.toNumber()
+      const cleanupIxs: TransactionInstruction[] = []
+
+      if (chunksWrittenMask !== chunksClosedMask) {
+        if (now <= expiresAt) {
+          throw new Error('Upload has written chunks and can be cancelled after expiry.')
+        }
+
+        for (let chunkIndex = 0; chunkIndex < chunkCount; chunkIndex += 1) {
+          const needsCleanup =
+            pathUploadBitIsSet(chunksWrittenMask, chunkIndex) &&
+            !pathUploadBitIsSet(chunksClosedMask, chunkIndex)
+          if (!needsCleanup) continue
+
+          const [pathChunkPda] = derivePathChunkPda(pathUploadPda, chunkIndex)
+          const pathChunk = await program.account.pathChunk.fetch(pathChunkPda)
+          cleanupIxs.push(
+            await program.methods
+              .closeAbandonedPathChunk()
+              .accountsPartial({
+                market: marketPda,
+                pathUpload: pathUploadPda,
+                pathChunk: pathChunkPda,
+                payer: pathChunk.payer,
+              })
+              .instruction(),
+          )
+        }
+      }
+
+      const ix = await program.methods
+        .cancelPathUpload()
+        .accountsPartial({
+          market: marketPda,
+          pathUpload: pathUploadPda,
+          creator: user,
+        })
+        .instruction()
+
+      const computeUnitLimit = Math.min(
+        CU_LIMITS.cancelPathUpload + cleanupIxs.length * CU_LIMITS.closeAbandonedPathChunk,
+        MAX_CU_PER_TX,
+      )
+      return sendInstructions(program, [...cleanupIxs, ix], computeUnitLimit)
+    },
+    onSuccess: (sig, { marketId }) => {
+      queryClient.invalidateQueries({ queryKey: ['market', String(marketId)] })
+      queryClient.invalidateQueries({ queryKey: ['markets'] })
+      toast.success('Path upload cancelled', { txSig: sig })
+    },
+    onError: (err) => {
+      toast.error('Failed to cancel path upload', {
         message: describeTxError(err, 'Unknown error'),
       })
     },

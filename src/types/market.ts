@@ -108,7 +108,10 @@ export interface PredictionPath {
   /* ── Client-only ────────────────────────────────────────── */
 
   /** Tracks on-chain persistence for user-drawn paths. Undefined = confirmed. */
-  onChainStatus?: 'pending' | 'confirmed'
+  onChainStatus?: 'pending' | 'confirmed' | 'relay_failed'
+  uploadIntentPda?: string
+  uploadNonce?: number
+  uploadExpiresAt?: number
 }
 
 /* ── Market ────────────────────────────────────────────────── */

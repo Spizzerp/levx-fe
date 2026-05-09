@@ -93,6 +93,11 @@ export const ERROR_MAP: Readonly<Record<string, DecodedError>> = {
     userMessage: 'Market still has open positions.',
     hint: 'All users must claim or exit before the market can be closed.',
   },
+  MarketHasOpenPaths: {
+    name: 'MarketHasOpenPaths',
+    userMessage: 'Market still has path accounts.',
+    hint: 'Close path chunks and path outcomes before closing the market.',
+  },
   MarketVaultNotEmpty: {
     name: 'MarketVaultNotEmpty',
     userMessage: 'Market vault is not empty.',
@@ -133,6 +138,21 @@ export const ERROR_MAP: Readonly<Record<string, DecodedError>> = {
   MaxPathsReached: {
     name: 'MaxPathsReached',
     userMessage: 'Market is full — no more paths can be added.',
+  },
+  PathRootMismatch: {
+    name: 'PathRootMismatch',
+    userMessage: 'Uploaded path data did not match the signed path commitment.',
+    hint: 'Refresh and try drawing the path again.',
+  },
+  UnauthorizedRelayer: {
+    name: 'UnauthorizedRelayer',
+    userMessage: 'This relayer cannot finalize that path upload.',
+    hint: 'The relay fee is reserved for the relayer that paid the first chunk rent.',
+  },
+  PathUploadExpiryTooLong: {
+    name: 'PathUploadExpiryTooLong',
+    userMessage: 'Path upload expiry is too far in the future.',
+    hint: 'Refresh and submit again with the current client.',
   },
 }
 

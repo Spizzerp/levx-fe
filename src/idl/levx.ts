@@ -251,6 +251,188 @@ export type Levx = {
       ]
     },
     {
+      "name": "appendPathChunk",
+      "discriminator": [
+        172,
+        29,
+        118,
+        193,
+        218,
+        168,
+        241,
+        113
+      ],
+      "accounts": [
+        {
+          "name": "market",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pathUpload",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  116,
+                  104,
+                  95,
+                  117,
+                  112,
+                  108,
+                  111,
+                  97,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "market"
+              },
+              {
+                "kind": "account",
+                "path": "path_upload.creator",
+                "account": "pathUpload"
+              },
+              {
+                "kind": "account",
+                "path": "path_upload.nonce",
+                "account": "pathUpload"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pathChunk",
+          "writable": true
+        },
+        {
+          "name": "relayer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "params",
+          "type": {
+            "defined": {
+              "name": "appendPathChunkParams"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "cancelPathUpload",
+      "discriminator": [
+        167,
+        141,
+        159,
+        65,
+        50,
+        158,
+        205,
+        148
+      ],
+      "accounts": [
+        {
+          "name": "market",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pathUpload",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  116,
+                  104,
+                  95,
+                  117,
+                  112,
+                  108,
+                  111,
+                  97,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "market"
+              },
+              {
+                "kind": "account",
+                "path": "creator"
+              },
+              {
+                "kind": "account",
+                "path": "path_upload.nonce",
+                "account": "pathUpload"
+              }
+            ]
+          }
+        },
+        {
+          "name": "creator",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "checkDissolution",
       "discriminator": [
         43,
@@ -290,6 +472,12 @@ export type Levx = {
         {
           "name": "pathOutcome",
           "writable": true
+        },
+        {
+          "name": "pathChunk",
+          "docs": [
+            "the current checkpoint. Legacy inline paths ignore this account."
+          ]
         },
         {
           "name": "priceSample",
@@ -416,6 +604,95 @@ export type Levx = {
       "args": []
     },
     {
+      "name": "closeAbandonedPathChunk",
+      "discriminator": [
+        60,
+        128,
+        12,
+        11,
+        122,
+        24,
+        104,
+        183
+      ],
+      "accounts": [
+        {
+          "name": "market",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pathUpload",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  116,
+                  104,
+                  95,
+                  117,
+                  112,
+                  108,
+                  111,
+                  97,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "market"
+              },
+              {
+                "kind": "account",
+                "path": "path_upload.creator",
+                "account": "pathUpload"
+              },
+              {
+                "kind": "account",
+                "path": "path_upload.nonce",
+                "account": "pathUpload"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pathChunk",
+          "writable": true
+        },
+        {
+          "name": "payer",
+          "docs": [
+            "Rent destination recorded when the relayer paid for this chunk."
+          ],
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "closeMarket",
       "docs": [
         "Admin-only terminal cleanup. Closes a Settled/Void market once all",
@@ -502,6 +779,64 @@ export type Levx = {
       "args": []
     },
     {
+      "name": "closePathChunk",
+      "docs": [
+        "F7: anyone closes a chunk backing a terminal-market PathOutcome.",
+        "Rent returns to the relayer that paid for that chunk account."
+      ],
+      "discriminator": [
+        191,
+        169,
+        29,
+        181,
+        225,
+        214,
+        25,
+        83
+      ],
+      "accounts": [
+        {
+          "name": "market",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pathOutcome",
+          "writable": true
+        },
+        {
+          "name": "pathChunk",
+          "writable": true
+        },
+        {
+          "name": "payer",
+          "docs": [
+            "Rent destination recorded when the relayer paid for this chunk."
+          ],
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "closePathOutcome",
       "docs": [
         "F7: the path's original creator closes a PathOutcome belonging to a",
@@ -549,11 +884,10 @@ export type Levx = {
         {
           "name": "creator",
           "docs": [
-            "Rent destination AND signer — creator-only closure. See module",
-            "docstring for why this isn't permissionless."
+            "Rent destination recorded on PathOutcome. Permissionless after all",
+            "positions are closed; the `has_one` constraint pins rent flow."
           ],
           "writable": true,
-          "signer": true,
           "relations": [
             "pathOutcome"
           ]
@@ -822,6 +1156,121 @@ export type Levx = {
           "type": {
             "defined": {
               "name": "createMarketParams"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "createPathUploadIntent",
+      "discriminator": [
+        134,
+        103,
+        225,
+        100,
+        213,
+        126,
+        166,
+        147
+      ],
+      "accounts": [
+        {
+          "name": "protocolState",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pathUpload",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  116,
+                  104,
+                  95,
+                  117,
+                  112,
+                  108,
+                  111,
+                  97,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "market"
+              },
+              {
+                "kind": "account",
+                "path": "creator"
+              },
+              {
+                "kind": "arg",
+                "path": "params.nonce"
+              }
+            ]
+          }
+        },
+        {
+          "name": "creator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "params",
+          "type": {
+            "defined": {
+              "name": "createPathUploadIntentParams"
             }
           }
         }
@@ -1292,6 +1741,102 @@ export type Levx = {
             "Permissionless"
           ],
           "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "finalizePathUpload",
+      "discriminator": [
+        169,
+        147,
+        126,
+        26,
+        243,
+        140,
+        120,
+        122
+      ],
+      "accounts": [
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pathUpload",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  116,
+                  104,
+                  95,
+                  117,
+                  112,
+                  108,
+                  111,
+                  97,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "market"
+              },
+              {
+                "kind": "account",
+                "path": "path_upload.creator",
+                "account": "pathUpload"
+              },
+              {
+                "kind": "account",
+                "path": "path_upload.nonce",
+                "account": "pathUpload"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pathOutcome",
+          "writable": true
+        },
+        {
+          "name": "creator",
+          "writable": true
+        },
+        {
+          "name": "relayer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
@@ -2744,6 +3289,19 @@ export type Levx = {
       ]
     },
     {
+      "name": "pathChunk",
+      "discriminator": [
+        71,
+        157,
+        141,
+        211,
+        63,
+        203,
+        119,
+        32
+      ]
+    },
+    {
       "name": "pathOutcome",
       "discriminator": [
         19,
@@ -2754,6 +3312,19 @@ export type Levx = {
         43,
         32,
         129
+      ]
+    },
+    {
+      "name": "pathUpload",
+      "discriminator": [
+        182,
+        42,
+        6,
+        64,
+        186,
+        185,
+        204,
+        127
       ]
     },
     {
@@ -2797,6 +3368,19 @@ export type Levx = {
     }
   ],
   "events": [
+    {
+      "name": "abandonedPathChunkClosed",
+      "discriminator": [
+        123,
+        222,
+        215,
+        129,
+        189,
+        103,
+        115,
+        175
+      ]
+    },
     {
       "name": "authorityAccepted",
       "discriminator": [
@@ -3032,6 +3616,32 @@ export type Levx = {
       ]
     },
     {
+      "name": "pathChunkAppended",
+      "discriminator": [
+        179,
+        125,
+        92,
+        61,
+        91,
+        221,
+        79,
+        86
+      ]
+    },
+    {
+      "name": "pathChunkClosed",
+      "discriminator": [
+        25,
+        253,
+        137,
+        206,
+        228,
+        233,
+        8,
+        136
+      ]
+    },
+    {
       "name": "pathDissolved",
       "discriminator": [
         134,
@@ -3068,6 +3678,45 @@ export type Levx = {
         209,
         230,
         18
+      ]
+    },
+    {
+      "name": "pathUploadCancelled",
+      "discriminator": [
+        158,
+        63,
+        179,
+        138,
+        3,
+        255,
+        20,
+        108
+      ]
+    },
+    {
+      "name": "pathUploadFinalized",
+      "discriminator": [
+        166,
+        106,
+        90,
+        239,
+        90,
+        186,
+        247,
+        13
+      ]
+    },
+    {
+      "name": "pathUploadIntentCreated",
+      "discriminator": [
+        26,
+        106,
+        184,
+        101,
+        36,
+        171,
+        101,
+        72
       ]
     },
     {
@@ -3316,146 +3965,219 @@ export type Levx = {
     },
     {
       "code": 6025,
+      "name": "marketHasOpenPaths",
+      "msg": "Market still has path outcomes; close paths and chunks first"
+    },
+    {
+      "code": 6026,
       "name": "marketVaultNotEmpty",
       "msg": "Market vault is not empty; cannot close"
     },
     {
-      "code": 6026,
+      "code": 6027,
       "name": "noSurvivingPaths",
       "msg": "No surviving paths to settle"
     },
     {
-      "code": 6027,
+      "code": 6028,
       "name": "invalidScoringWeights",
       "msg": "Invalid scoring weights; must sum to 10000"
     },
     {
-      "code": 6028,
+      "code": 6029,
       "name": "invalidPathIndex",
       "msg": "Invalid path index"
     },
     {
-      "code": 6029,
+      "code": 6030,
       "name": "invalidProbability",
       "msg": "Initial probability must be in basis-point range [0, 10_000]"
     },
     {
-      "code": 6030,
+      "code": 6031,
       "name": "pathNotYetActive",
       "msg": "Path is not active for wagering or scoring yet"
     },
     {
-      "code": 6031,
+      "code": 6032,
       "name": "activePathWindowTooShort",
       "msg": "Not enough checkpoints remain for a live path"
     },
     {
-      "code": 6032,
+      "code": 6033,
+      "name": "invalidPathUpload",
+      "msg": "Invalid path upload intent or chunk state"
+    },
+    {
+      "code": 6034,
+      "name": "pathUploadExpired",
+      "msg": "Path upload intent has expired"
+    },
+    {
+      "code": 6035,
+      "name": "pathChunkMissing",
+      "msg": "Path upload is missing one or more chunks"
+    },
+    {
+      "code": 6036,
+      "name": "pathRootMismatch",
+      "msg": "Uploaded path chunks do not match the committed path root"
+    },
+    {
+      "code": 6037,
+      "name": "pathChunksNotClosed",
+      "msg": "Path chunks must be closed before closing the path outcome"
+    },
+    {
+      "code": 6038,
+      "name": "relayFeeTooLow",
+      "msg": "Relay fee is below the configured minimum"
+    },
+    {
+      "code": 6039,
+      "name": "unauthorizedRelayer",
+      "msg": "Relay fee can only be claimed by the first chunk payer"
+    },
+    {
+      "code": 6040,
+      "name": "pathUploadExpiryTooLong",
+      "msg": "Path upload expiry exceeds the maximum allowed age"
+    },
+    {
+      "code": 6041,
       "name": "duplicateConfigAccount",
       "msg": "Treasury and insurance_fund must be distinct accounts"
     },
     {
-      "code": 6033,
+      "code": 6042,
       "name": "alreadyMigrated",
       "msg": "ProtocolState has already been migrated to v2"
     },
     {
-      "code": 6034,
+      "code": 6043,
       "name": "invalidCollateralMint",
       "msg": "Collateral mint does not match the protocol allowlist"
     },
     {
-      "code": 6035,
+      "code": 6044,
       "name": "slippageExceeded",
       "msg": "Slippage exceeded: received fewer shares/less payout than min_out"
     },
     {
-      "code": 6036,
+      "code": 6045,
       "name": "maturityNotElapsed",
       "msg": "Maturity window has not elapsed; cannot finalize"
     },
     {
-      "code": 6037,
+      "code": 6046,
       "name": "marketDisputed",
       "msg": "Market is disputed; paused for governance review"
     },
     {
-      "code": 6038,
+      "code": 6047,
       "name": "invalidDisputeConfig",
       "msg": "Invalid dispute bond policy or account"
     },
     {
-      "code": 6039,
+      "code": 6048,
       "name": "invalidDisputeBond",
       "msg": "Invalid dispute bond account"
     },
     {
-      "code": 6040,
+      "code": 6049,
       "name": "mathOverflow",
       "msg": "Arithmetic overflow"
     },
     {
-      "code": 6041,
+      "code": 6050,
       "name": "feeExceedsCap",
       "msg": "Fee exceeds maximum cap (5%)"
     },
     {
-      "code": 6042,
+      "code": 6051,
       "name": "leverageNotEnabled",
       "msg": "Leverage is not enabled for this market"
     },
     {
-      "code": 6043,
+      "code": 6052,
       "name": "leverageExceedsMaximum",
       "msg": "Leverage exceeds maximum for this market's timeframe"
     },
     {
-      "code": 6044,
+      "code": 6053,
       "name": "vaultInsufficientCapacity",
       "msg": "Insufficient vault capacity for this leveraged position"
     },
     {
-      "code": 6045,
+      "code": 6054,
       "name": "vaultUtilizationExceeded",
       "msg": "Vault utilization would exceed maximum after this borrow"
     },
     {
-      "code": 6046,
+      "code": 6055,
       "name": "leveragedOiCapExceeded",
       "msg": "Market leveraged open interest cap would be exceeded"
     },
     {
-      "code": 6047,
+      "code": 6056,
       "name": "positionUnderwater",
       "msg": "Position health factor below liquidation threshold"
     },
     {
-      "code": 6048,
+      "code": 6057,
       "name": "positionHealthy",
       "msg": "Position health factor is above liquidation threshold; cannot liquidate"
     },
     {
-      "code": 6049,
+      "code": 6058,
       "name": "unauthorizedBackstopLiquidator",
       "msg": "Caller is not the configured backstop liquidator"
     },
     {
-      "code": 6050,
+      "code": 6059,
       "name": "backstopLiquidatorDisabled",
       "msg": "Backstop liquidator is disabled"
     },
     {
-      "code": 6051,
+      "code": 6060,
       "name": "backstopGracePeriodActive",
       "msg": "Backstop grace period has not elapsed; regular keepers have priority"
     },
     {
-      "code": 6052,
+      "code": 6061,
       "name": "bucketGuardCooldown",
       "msg": "Operation rate-limited; cooldown period has not elapsed"
     }
   ],
   "types": [
+    {
+      "name": "abandonedPathChunkClosed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "marketId",
+            "type": "u64"
+          },
+          {
+            "name": "pathUpload",
+            "type": "pubkey"
+          },
+          {
+            "name": "chunkIndex",
+            "type": "u8"
+          },
+          {
+            "name": "payer",
+            "type": "pubkey"
+          },
+          {
+            "name": "rentRefunded",
+            "type": "u64"
+          }
+        ]
+      }
+    },
     {
       "name": "addPathParams",
       "type": {
@@ -3486,6 +4208,24 @@ export type Levx = {
           {
             "name": "generationTimestamp",
             "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "appendPathChunkParams",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "chunkIndex",
+            "type": "u8"
+          },
+          {
+            "name": "prices",
+            "type": {
+              "vec": "u64"
+            }
           }
         ]
       }
@@ -3731,6 +4471,55 @@ export type Levx = {
             "type": {
               "option": "u64"
             }
+          }
+        ]
+      }
+    },
+    {
+      "name": "createPathUploadIntentParams",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "nonce",
+            "type": "u64"
+          },
+          {
+            "name": "pathRoot",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "numCheckpoints",
+            "type": "u16"
+          },
+          {
+            "name": "initialProbabilityBps",
+            "type": "u16"
+          },
+          {
+            "name": "generationMethod",
+            "type": {
+              "defined": {
+                "name": "pathOrigin"
+              }
+            }
+          },
+          {
+            "name": "generationTimestamp",
+            "type": "i64"
+          },
+          {
+            "name": "expiresAt",
+            "type": "i64"
+          },
+          {
+            "name": "relayFeeLamports",
+            "type": "u64"
           }
         ]
       }
@@ -4738,6 +5527,112 @@ export type Levx = {
       }
     },
     {
+      "name": "pathChunk",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "pathUpload",
+            "type": "pubkey"
+          },
+          {
+            "name": "chunkIndex",
+            "type": "u8"
+          },
+          {
+            "name": "len",
+            "type": "u8"
+          },
+          {
+            "name": "prices",
+            "type": {
+              "array": [
+                "u64",
+                40
+              ]
+            }
+          },
+          {
+            "name": "chunkHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "payer",
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "pathChunkAppended",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "marketId",
+            "type": "u64"
+          },
+          {
+            "name": "pathUpload",
+            "type": "pubkey"
+          },
+          {
+            "name": "chunkIndex",
+            "type": "u8"
+          },
+          {
+            "name": "len",
+            "type": "u8"
+          },
+          {
+            "name": "payer",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "pathChunkClosed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "marketId",
+            "type": "u64"
+          },
+          {
+            "name": "pathIndex",
+            "type": "u8"
+          },
+          {
+            "name": "chunkIndex",
+            "type": "u8"
+          },
+          {
+            "name": "payer",
+            "type": "pubkey"
+          },
+          {
+            "name": "rentRefunded",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
       "name": "pathDissolved",
       "docs": [
         "Emitted by `sample_and_dissolve` (sealed, Phase 6.4), once per path",
@@ -4797,6 +5692,40 @@ export type Levx = {
             "type": "pubkey"
           },
           {
+            "name": "pathUpload",
+            "docs": [
+              "Upload intent that committed this path's chunk data.",
+              "Legacy/direct paths use Pubkey::default()."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "pathRoot",
+            "docs": [
+              "Commitment over every uploaded chunk. Empty for legacy/direct paths."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "chunkCount",
+            "docs": [
+              "Number of PathChunk PDAs backing this path. Zero means legacy inline prices."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "chunksClosed",
+            "docs": [
+              "Terminal cleanup counter. close_path_outcome requires this to reach chunk_count."
+            ],
+            "type": "u8"
+          },
+          {
             "name": "generationMethod",
             "type": {
               "defined": {
@@ -4811,9 +5740,8 @@ export type Levx = {
           {
             "name": "predictedPrices",
             "docs": [
-              "Predicted checkpoint prices stored on-chain (fixed-point u64, 6 decimals).",
-              "Populated at path creation via add_path. Immutable after creation.",
-              "Keepers read directly via index — no Merkle proofs needed."
+              "Legacy/direct checkpoint prices. New high-checkpoint paths store prices",
+              "in PathChunk PDAs and leave this Vec empty."
             ],
             "type": {
               "vec": "u64"
@@ -5026,6 +5954,175 @@ export type Levx = {
           {
             "name": "compositeScore",
             "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "pathUpload",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "nonce",
+            "type": "u64"
+          },
+          {
+            "name": "generationMethod",
+            "type": {
+              "defined": {
+                "name": "pathOrigin"
+              }
+            }
+          },
+          {
+            "name": "generationTimestamp",
+            "type": "i64"
+          },
+          {
+            "name": "initialProbabilityBps",
+            "type": "u16"
+          },
+          {
+            "name": "numCheckpoints",
+            "type": "u16"
+          },
+          {
+            "name": "chunkCount",
+            "type": "u8"
+          },
+          {
+            "name": "chunksWrittenMask",
+            "type": "u16"
+          },
+          {
+            "name": "chunksClosedMask",
+            "type": "u16"
+          },
+          {
+            "name": "pathRoot",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "expiresAt",
+            "type": "i64"
+          },
+          {
+            "name": "relayFeeLamports",
+            "type": "u64"
+          },
+          {
+            "name": "finalized",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "pathUploadCancelled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "marketId",
+            "type": "u64"
+          },
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "pathUpload",
+            "type": "pubkey"
+          },
+          {
+            "name": "nonce",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "pathUploadFinalized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "marketId",
+            "type": "u64"
+          },
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "pathUpload",
+            "type": "pubkey"
+          },
+          {
+            "name": "pathIndex",
+            "type": "u8"
+          },
+          {
+            "name": "relayFeeLamports",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "pathUploadIntentCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "marketId",
+            "type": "u64"
+          },
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "pathUpload",
+            "type": "pubkey"
+          },
+          {
+            "name": "nonce",
+            "type": "u64"
+          },
+          {
+            "name": "chunkCount",
+            "type": "u8"
+          },
+          {
+            "name": "numCheckpoints",
+            "type": "u16"
+          },
+          {
+            "name": "relayFeeLamports",
+            "type": "u64"
+          },
+          {
+            "name": "expiresAt",
+            "type": "i64"
           }
         ]
       }

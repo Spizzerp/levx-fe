@@ -105,7 +105,7 @@ function targetNumPathsOrLegacy(raw: Record<string, unknown>, marketId: number):
 }
 
 export function anchorPathToFE(raw: any, marketStartTime: number, checkpointInterval: number): PredictionPath {
-  const predictedPrices: number[] = (raw.predictedPrices as BN[]).map((p) => bn(p, true))
+  const predictedPrices: number[] = ((raw.predictedPrices ?? []) as BN[]).map((p) => bn(p, true))
   const intervalMs = checkpointInterval * 1000
 
   const data: PricePoint[] = predictedPrices.map((price, i) => ({
