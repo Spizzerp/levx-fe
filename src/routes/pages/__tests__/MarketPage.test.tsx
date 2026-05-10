@@ -329,9 +329,9 @@ describe('MarketPage', () => {
       status: 'connected',
     })
     renderMarketPage()
-    // Header H1 should contain the tick value formatted as USD (formatUSD)
+    // Header H1 should contain the live tick with cents precision.
     await waitFor(() => {
-      expect(screen.getByText(/72,856/)).toBeInTheDocument()
+      expect(screen.getByText('72,856.43')).toBeInTheDocument()
     })
   })
 

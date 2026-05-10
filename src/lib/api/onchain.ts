@@ -7,7 +7,7 @@
 
 import { PublicKey } from '@solana/web3.js'
 
-import type { Market, MarketState, UserPosition } from '@/types/market'
+import type { Market, MarketState, PathTone, UserPosition } from '@/types/market'
 
 import { anchorMarketToFE, anchorPathToFE, anchorPositionToFE, parseMarketState } from './adapters'
 import { resolveBaseMintLabel } from './pairLabels'
@@ -15,12 +15,15 @@ import { getReadOnlyProgram } from '../solana/program'
 import { PROGRAM_ID, deriveMarketPda, derivePathChunkPda, derivePathPda, derivePositionPda } from '../solana/pda'
 import { estimateLmsrExitPayout } from '../solana/lmsr'
 import { SCALE } from '@/lib/constants'
+import { formatAiPathLabel } from '@/lib/pathLabels'
+
+type DerivedPathTone = Exclude<PathTone, 'custom'>
 
 /**
  * Derive a PathTone from a path's predicted price trajectory.
  * Compares first and last predicted prices to classify direction.
  */
-function deriveTone(predictedPrices: number[]): 'ultra-bull' | 'bull' | 'neutral' | 'bear' | 'ultra-bear' {
+function deriveTone(predictedPrices: number[]): DerivedPathTone {
   if (predictedPrices.length < 2) return 'neutral'
   const first = predictedPrices[0]
   const last = predictedPrices[predictedPrices.length - 1]
@@ -30,6 +33,20 @@ function deriveTone(predictedPrices: number[]): 'ultra-bull' | 'bull' | 'neutral
   if (pctChange < -0.10) return 'ultra-bear'
   if (pctChange < -0.03) return 'bear'
   return 'neutral'
+}
+
+function applyDerivedPathDisplay(path: {
+  predictedPrices: number[]
+  tone: PathTone
+  origin: string
+  label: string
+}): DerivedPathTone {
+  const tone = deriveTone(path.predictedPrices)
+  path.tone = tone
+  if (path.origin === 'ai') {
+    path.label = formatAiPathLabel(tone)
+  }
+  return tone
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -217,7 +234,7 @@ export async function getMarket(id: string): Promise<Market> {
   )
   market.paths = hydratedPathRaws.map((pathRaw: any) => {
     const path = anchorPathToFE(pathRaw, startTimeMs, checkpointInterval)
-    path.tone = deriveTone(path.predictedPrices)
+    applyDerivedPathDisplay(path)
     return path
   })
 
@@ -313,7 +330,7 @@ export async function getPosition(
     const startTimeMs = marketRaw.startTime.toNumber() * 1000
     const checkpointInterval = marketRaw.checkpointInterval as number
     const path = anchorPathToFE(pathRaw, startTimeMs, checkpointInterval)
-    path.tone = deriveTone(path.predictedPrices)
+    applyDerivedPathDisplay(path)
     const pairInfo = resolveBaseMintLabel(marketRaw.baseMint)
     const marketState = parseMarketState(marketRaw.state) as MarketState
     const numPaths = marketRaw.numPaths as number
@@ -438,7 +455,7 @@ export async function getUserPositions(wallet: PublicKey | null): Promise<UserPo
           }),
         )
         const path = anchorPathToFE(pathRaw, mkt.startTimeMs, mkt.checkpointInterval)
-        const tone = deriveTone(path.predictedPrices)
+        const tone = applyDerivedPathDisplay(path)
         pathInfo = { label: path.label, tone, dissolved: path.dissolved }
       } catch {
         // The keeper's `close_path_outcome` rent-reclaim sweep closes

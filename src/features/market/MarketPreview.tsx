@@ -11,7 +11,13 @@ import { LevXChart } from '@/features/chart/LevXChart'
 import { TimeRangePicker, type CandleInterval } from '@/features/chart/TimeRangePicker'
 import { PathRow } from '@/features/market/PathRow'
 import { cn } from '@/lib/cn'
-import { formatCountdown, formatDeltaBps, formatUSD, maxLeverageByDuration } from '@/lib/format'
+import {
+  formatCountdown,
+  formatDeltaBps,
+  formatPrice,
+  formatUSD,
+  maxLeverageByDuration,
+} from '@/lib/format'
 import type { PredictionPath, PricePoint } from '@/types/market'
 
 const META_SEP = <span className="text-line-strong mx-0.5">·</span>
@@ -165,7 +171,7 @@ export function MarketPreview({
               caption text hangs off the bottom of the display numerals. */}
           <div className="my-1.5 mb-2.5 flex flex-wrap items-baseline gap-x-5 gap-y-1">
             <h1 className="font-display text-ink-strong text-display-lg leading-none font-medium tracking-tighter [font-variation-settings:'ROND'_100]">
-              {formatUSD(latestPrice)}
+              {formatPrice(latestPrice)}
             </h1>
             <div className="text-ink-muted text-caption flex items-baseline gap-3 font-mono">
               <span className={cn('font-bold', deltaColor)}>{formatDeltaBps(deltaBps)}</span>
