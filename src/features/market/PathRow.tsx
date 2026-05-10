@@ -50,7 +50,7 @@ export function PathRow({
       <div className="flex min-w-0 flex-col gap-0.5">
         <span
           className={cn(
-            'truncate font-mono text-xs tracking-wide uppercase',
+            'truncate font-mono text-xs tracking-wide',
             active ? 'text-ink-strong' : 'text-ink',
           )}
         >

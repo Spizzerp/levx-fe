@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
-import { formatPathAccuracyScore, pathAccuracyScoreFromComposite } from '@/lib/format'
+import { formatPathAccuracyScore, formatPrice, pathAccuracyScoreFromComposite } from '@/lib/format'
+
+describe('formatPrice', () => {
+  it('always renders two decimal places for spot prices', () => {
+    expect(formatPrice(96)).toBe('96.00')
+    expect(formatPrice(72_856.43)).toBe('72,856.43')
+  })
+})
 
 describe('pathAccuracyScoreFromComposite', () => {
   it('provides the reusable numeric Path Accuracy Score', () => {

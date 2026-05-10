@@ -16,6 +16,7 @@ import type {
   PricePoint,
   UserPosition,
 } from '@/types/market'
+import { formatAiPathLabel } from '@/lib/pathLabels'
 
 /* ── Fixture data ───────────────────────────────────────────── */
 
@@ -86,7 +87,7 @@ function generatePaths(start: number, price: number): PredictionPath[] {
   const tones: PathTone[] = ['ultra-bull', 'bull', 'neutral', 'bear', 'ultra-bear']
   return tones.map((tone, i) => ({
     id: `path-${tone}`,
-    label: tone.charAt(0).toUpperCase() + tone.slice(1),
+    label: formatAiPathLabel(tone),
     tone,
     origin: 'ai',
     multiplier: 1.5 + Math.random(),
@@ -272,7 +273,7 @@ const USER_POSITIONS: UserPosition[] = [
     quote: 'USDC',
     pathId: 'ai-bull',
     pathIndex: 1,
-    pathLabel: 'Bull',
+    pathLabel: formatAiPathLabel('bull'),
     pathTone: 'bull',
     collateral: 250,
     leverage: 1,
@@ -293,7 +294,7 @@ const USER_POSITIONS: UserPosition[] = [
     quote: 'USDC',
     pathId: 'ai-neutral',
     pathIndex: 2,
-    pathLabel: 'Neutral',
+    pathLabel: formatAiPathLabel('neutral'),
     pathTone: 'neutral',
     collateral: 100,
     leverage: 1,
@@ -314,7 +315,7 @@ const USER_POSITIONS: UserPosition[] = [
     quote: 'USDC',
     pathId: 'ai-ultra-bull',
     pathIndex: 0,
-    pathLabel: 'Ultra Bull',
+    pathLabel: formatAiPathLabel('ultra-bull'),
     pathTone: 'ultra-bull',
     collateral: 50,
     leverage: 1,

@@ -22,6 +22,7 @@ import { LevXChart } from '@/features/chart/LevXChart'
 import { PageLayout } from '@/layouts/PageLayout'
 import { SegmentedSlider } from '@/ui/SegmentedSlider'
 import { cn } from '@/lib/cn'
+import { formatAiPathLabel } from '@/lib/pathLabels'
 import type { PathTone, PredictionPath, PricePoint } from '@/types/market'
 import { useIsAdmin } from '@/lib/hooks/useIsAdmin'
 import { useProgram, getReadOnlyProgram } from '@/lib/solana/program'
@@ -145,7 +146,7 @@ function buildPreviewPaths(
 
     return {
       id: `preview-${idx}`,
-      label: `Path ${String.fromCharCode(65 + idx)}`,
+      label: formatAiPathLabel(tone),
       tone,
       origin: 'ai' as const,
       multiplier: 0,

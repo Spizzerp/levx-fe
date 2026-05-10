@@ -679,7 +679,7 @@ function ChartInner({
           tickFormat={(v) => {
             const n = Number(v)
             if (n >= 1000) return `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}K`
-            if (n >= 1) return n.toFixed(n >= 100 ? 0 : 2)
+            if (n >= 1) return n.toFixed(2)
             return n.toPrecision(3)
           }}
         />

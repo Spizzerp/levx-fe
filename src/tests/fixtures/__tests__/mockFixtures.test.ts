@@ -30,14 +30,14 @@ describe('buildAiPathFixture', () => {
     expect(tones).toEqual(['ultra-bull', 'bull', 'neutral', 'bear', 'ultra-bear'])
   })
 
-  it('paths are labeled with the model-provider names', () => {
+  it('paths are labeled with LevX AI scenario names', () => {
     const labels = buildAiPathFixture(args).map((p) => p.label)
     expect(labels).toEqual([
-      'Chronos-2 Path',
-      'TimesFM Path',
-      'GJR-GARCH Path',
-      'Merton JD Path',
-      'Monte Carlo Path',
+      'LevX AI - Giga Bull',
+      'LevX AI - Bull',
+      'LevX AI - Mild',
+      'LevX AI - Bear',
+      'LevX AI - Mega Bear',
     ])
   })
 

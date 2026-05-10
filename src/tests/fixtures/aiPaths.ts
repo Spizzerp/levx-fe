@@ -2,6 +2,7 @@
  *  Generates realistic random-walk price trajectories per tone.
  */
 import { mulberry32, normalRandom } from '@/lib/rng'
+import { formatAiPathLabel } from '@/lib/pathLabels'
 import type { PredictionPath, PathTone, PricePoint } from '@/types/market'
 
 export interface BuildAiPathFixtureArgs {
@@ -12,8 +13,6 @@ export interface BuildAiPathFixtureArgs {
 }
 
 const TONES: readonly PathTone[] = ['ultra-bull', 'bull', 'neutral', 'bear', 'ultra-bear']
-
-const PROVIDER_NAMES: readonly string[] = ['Chronos-2', 'TimesFM', 'GJR-GARCH', 'Merton JD', 'Monte Carlo']
 
 const MULTIPLIERS: Record<PathTone, number> = {
   'ultra-bull': 1.5,
@@ -90,7 +89,7 @@ export function buildAiPathFixture(args: BuildAiPathFixtureArgs): PredictionPath
 
     return {
       id: `ai-${tone}`,
-      label: `${PROVIDER_NAMES[toneIdx % PROVIDER_NAMES.length]} Path`,
+      label: formatAiPathLabel(tone),
       tone,
       origin: 'ai' as const,
       multiplier: MULTIPLIERS[tone],

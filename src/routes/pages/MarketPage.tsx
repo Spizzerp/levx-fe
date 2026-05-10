@@ -50,6 +50,7 @@ import {
   formatCountdown,
   formatDeltaBps,
   formatMarketDurationLabel,
+  formatPrice,
   formatUSD,
   maxLeverageByDuration,
 } from '@/lib/format'
@@ -581,7 +582,7 @@ export function MarketPage() {
         </div>
 
         <h1 className="font-display text-ink-strong text-display-lg my-1.5 mb-2.5 leading-none font-medium tracking-tighter [font-variation-settings:'ROND'_100]">
-          {formatUSD(priceDisplay)}
+          {formatPrice(priceDisplay)}
         </h1>
 
         <div className="text-ink-muted text-caption flex items-baseline gap-3 font-mono">
