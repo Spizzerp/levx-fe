@@ -20,6 +20,7 @@ import { Input } from '@/ui/Input'
 import { Label } from '@/ui/Label'
 import { LevXChart } from '@/features/chart/LevXChart'
 import { PageLayout } from '@/layouts/PageLayout'
+import { SegmentedSlider } from '@/ui/SegmentedSlider'
 import { cn } from '@/lib/cn'
 import type { PathTone, PredictionPath, PricePoint } from '@/types/market'
 import { useIsAdmin } from '@/lib/hooks/useIsAdmin'
@@ -53,15 +54,12 @@ const DURATION_UNITS: { id: DurationUnit; label: string; toHours: (n: number) =>
 ]
 
 // Mirrors `validate_checkpoint_schedule` in programs/levx/src/instructions/create_market.rs.
-// MAX is bounded by the Solana TX-size limit on `add_path` (≈25 + N×8 bytes payload,
-// ≈200B overhead at the 1232B cap → ≤120). MIN is what the program rejects below.
+// Chunked path uploads now allow up to 12 chunks × 40 checkpoint prices.
 const MIN_CHECKPOINTS = 4
-const MAX_CHECKPOINTS = 120
-// Target checkpoints per market. The interval is derived as ceil(duration / TARGET),
-// which the program then floor-divides back to a derived total ≤ TARGET. Ceiling
-// (not floor) is required: floor(D/120) can produce on-chain total > 120 for
-// non-multiple durations and get rejected as CheckpointMismatch.
-const TARGET_CHECKPOINTS = 120
+const MAX_CHECKPOINTS = 480
+const CHECKPOINT_OPTIONS = [
+  4, 8, 12, 16, 24, 36, 42, 48, 60, 72, 84, 90, 96, 120, 144, 150, 180, 240, 300, 360, 365, 480,
+] as const
 
 function formatInterval(sec: number): string {
   if (sec >= 3600 && sec % 3600 === 0) return `${sec / 3600}h`
@@ -69,11 +67,37 @@ function formatInterval(sec: number): string {
   return `${sec}s`
 }
 
+function clampCheckpointCount(count: number): number {
+  return Math.max(MIN_CHECKPOINTS, Math.min(MAX_CHECKPOINTS, Math.round(count)))
+}
+
+function nearestCheckpointOption(count: number): number {
+  const clamped = clampCheckpointCount(count)
+  return CHECKPOINT_OPTIONS.reduce((best, option) =>
+    Math.abs(option - clamped) < Math.abs(best - clamped) ? option : best,
+  )
+}
+
+function naturalCheckpointTarget(durationHours: number): number {
+  const durationSeconds = Math.max(1, Math.round(durationHours * 3600))
+  const daySeconds = 24 * 3600
+  const naturalInterval =
+    durationSeconds <= daySeconds
+      ? 3600
+      : durationSeconds <= 3 * daySeconds
+        ? 2 * 3600
+        : durationSeconds <= 14 * daySeconds
+          ? 4 * 3600
+          : durationSeconds <= 60 * daySeconds
+            ? 12 * 3600
+            : daySeconds
+
+  return nearestCheckpointOption(Math.floor(durationSeconds / naturalInterval))
+}
+
 /* ── AI provider options ─────────────────────────────────── */
 
-const AI_PROVIDERS = [
-  { id: 'internal-levx', label: 'Internal LevX', type: 'Ensemble' },
-] as const
+const AI_PROVIDERS = [{ id: 'internal-levx', label: 'Internal LevX', type: 'Ensemble' }] as const
 
 /* ── Preview path generation ─────────────────────────────── */
 
@@ -350,9 +374,12 @@ export function AdminPage() {
   const [durationValue, setDurationValue] = useState(7)
   const [durationUnit, setDurationUnit] = useState<DurationUnit>('days')
   const durationHours = DURATION_UNITS.find((u) => u.id === durationUnit)!.toHours(durationValue)
-  // Pack TARGET_CHECKPOINTS evenly across the duration. Use ceil so the program's
-  // floor(D/interval) derivation can't exceed MAX_CHECKPOINTS.
-  const checkpointInterval = Math.max(1, Math.ceil((durationHours * 3600) / TARGET_CHECKPOINTS))
+  const autoCheckpointTarget = useMemo(
+    () => naturalCheckpointTarget(durationHours),
+    [durationHours],
+  )
+  const [checkpointTarget, setCheckpointTarget] = useState(() => naturalCheckpointTarget(7 * 24))
+  const previousAutoCheckpointTarget = useRef(checkpointTarget)
   const [lambda, setLambda] = useState('0')
   const [decoherenceRate, setDecoherenceRate] = useState('0.5')
   const [minimumProbability, setMinimumProbability] = useState('0.01')
@@ -362,6 +389,14 @@ export function AdminPage() {
 
   // Tx state
   const [isPending, setIsPending] = useState(false)
+
+  useEffect(() => {
+    setCheckpointTarget((current) => {
+      const wasStillAuto = current === previousAutoCheckpointTarget.current
+      previousAutoCheckpointTarget.current = autoCheckpointTarget
+      return wasStillAuto ? autoCheckpointTarget : clampCheckpointCount(current)
+    })
+  }, [autoCheckpointTarget])
 
   // Drive the pair dropdown solely from on-chain protocol_state.supportedPairs.
   // Hardcoded pairs were a bootstrap convenience but their (baseMint, quoteMint)
@@ -406,7 +441,9 @@ export function AdminPage() {
   const now = Date.now()
   const chartMarketStart = new Date(startTimeInput).getTime() || now
   const chartMarketEnd = chartMarketStart + durationHours * 3600 * 1000
-  const totalCheckpoints = Math.floor((durationHours * 3600) / checkpointInterval)
+  const durationSeconds = Math.max(1, Math.round(durationHours * 3600))
+  const checkpointInterval = Math.max(1, Math.ceil(durationSeconds / checkpointTarget))
+  const totalCheckpoints = Math.floor(durationSeconds / checkpointInterval)
   const checkpointsValid =
     totalCheckpoints >= MIN_CHECKPOINTS && totalCheckpoints <= MAX_CHECKPOINTS
 
@@ -430,14 +467,7 @@ export function AdminPage() {
             selectedPair,
           )
         : [],
-    [
-      numPaths,
-      basePrice,
-      chartMarketStart,
-      checkpointInterval,
-      totalCheckpoints,
-      selectedPair,
-    ],
+    [numPaths, basePrice, chartMarketStart, checkpointInterval, totalCheckpoints, selectedPair],
   )
 
   if (!isAdmin) {
@@ -480,14 +510,14 @@ export function AdminPage() {
         return
       }
 
-      // The on-chain `validate_checkpoint_schedule` rejects counts <4 or >120
+      // The on-chain `validate_checkpoint_schedule` rejects counts <4 or >480
       // with CheckpointMismatch (6008). Catch it here with a clear message
       // instead of letting it surface as a generic simulation failure.
       if (!checkpointsValid) {
         toast.error('Checkpoint count out of range', {
           message:
             `Got ${totalCheckpoints}; must be between ${MIN_CHECKPOINTS} and ${MAX_CHECKPOINTS}. ` +
-            `Adjust the duration or interval.`,
+            `Adjust the duration or checkpoint count.`,
         })
         setIsPending(false)
         return
@@ -675,10 +705,7 @@ export function AdminPage() {
                     className="h-2 w-2 shrink-0 rounded-full"
                     style={{ background: GRADIENT.css }}
                   />
-                  <ProviderSelect
-                    value={AI_PROVIDERS[0].id}
-                    onChange={() => undefined}
-                  />
+                  <ProviderSelect value={AI_PROVIDERS[0].id} onChange={() => undefined} />
                 </div>
               ))}
             </div>
@@ -743,21 +770,45 @@ export function AdminPage() {
             </div>
           </div>
 
-          {/* Checkpoint schedule (derived from duration) */}
-          <Label>Checkpoint schedule</Label>
-          <div className="text-caption mt-3 mb-12 font-mono tracking-wide">
-            <span className={cn(checkpointsValid ? 'text-ink-strong' : 'text-accent')}>
-              {totalCheckpoints}
-            </span>
-            <span className="text-ink-muted"> checkpoints · </span>
-            <span className="text-ink-strong">{formatInterval(checkpointInterval)}</span>
-            <span className="text-ink-muted"> apart</span>
-            {!checkpointsValid && (
-              <span className="text-accent">
-                {' '}
-                (must be {MIN_CHECKPOINTS}–{MAX_CHECKPOINTS})
+          {/* Checkpoint schedule */}
+          <div className="mb-12">
+            <div className="mb-3.5 flex items-baseline justify-between">
+              <Label>Checkpoint schedule</Label>
+              <span
+                className={cn(
+                  'text-body-sm font-mono font-bold',
+                  checkpointsValid ? 'text-ink-strong' : 'text-accent',
+                )}
+              >
+                {totalCheckpoints}
               </span>
-            )}
+            </div>
+            <SegmentedSlider
+              value={checkpointTarget}
+              min={MIN_CHECKPOINTS}
+              max={MAX_CHECKPOINTS}
+              values={CHECKPOINT_OPTIONS}
+              onChange={setCheckpointTarget}
+              formatAriaValue={(value) => `${value} checkpoints`}
+            />
+            <div className="text-ink-dim text-caption mt-2.5 flex justify-between font-mono uppercase">
+              <span>{MIN_CHECKPOINTS} MIN</span>
+              <span>{MAX_CHECKPOINTS} MAX</span>
+            </div>
+            <div className="text-caption mt-3 font-mono tracking-wide">
+              <span className={cn(checkpointsValid ? 'text-ink-strong' : 'text-accent')}>
+                {totalCheckpoints}
+              </span>
+              <span className="text-ink-muted"> checkpoints · </span>
+              <span className="text-ink-strong">{formatInterval(checkpointInterval)}</span>
+              <span className="text-ink-muted"> apart</span>
+              {!checkpointsValid && (
+                <span className="text-accent">
+                  {' '}
+                  (must be {MIN_CHECKPOINTS}–{MAX_CHECKPOINTS})
+                </span>
+              )}
+            </div>
           </div>
 
           {/* Protocol params */}

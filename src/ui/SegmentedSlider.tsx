@@ -4,7 +4,9 @@ interface SegmentedSliderProps {
   value: number
   max: number
   min?: number
+  values?: readonly number[]
   onChange?: (next: number) => void
+  formatAriaValue?: (value: number) => string
 }
 
 // Brand-gradient endpoints — mirrors --color-brand-from / --color-brand-to
@@ -32,19 +34,32 @@ function lerpBrand(t: number): string {
  * min..max scale. Higher leverage → further along the gradient, so the
  * slider reads as a climbing "intensity" bar rather than a flat fill.
  */
-export function SegmentedSlider({ value, max, min = 1, onChange }: SegmentedSliderProps) {
+export function SegmentedSlider({
+  value,
+  max,
+  min = 1,
+  values,
+  onChange,
+  formatAriaValue = (next) => `${next}x`,
+}: SegmentedSliderProps) {
+  const tickValues =
+    values && values.length > 0
+      ? [...new Set(values)].filter((next) => next >= min && next <= max).sort((a, b) => a - b)
+      : Array.from({ length: max - min + 1 }, (_, i) => min + i)
+
   const ticks = []
-  const span = max - min
-  for (let i = min; i <= max; i++) {
-    const isOn = i < value
-    const isThumb = i === value
-    const fillColor = lerpBrand(span > 0 ? (i - min) / span : 0)
+  const span = Math.max(1, tickValues.length - 1)
+  for (let tickIndex = 0; tickIndex < tickValues.length; tickIndex++) {
+    const nextValue = tickValues[tickIndex]
+    const isOn = nextValue < value
+    const isThumb = nextValue === value
+    const fillColor = lerpBrand(tickIndex / span)
     ticks.push(
       <button
-        key={i}
+        key={nextValue}
         type="button"
-        aria-label={`Set to ${i}x`}
-        onClick={() => onChange?.(i)}
+        aria-label={`Set to ${formatAriaValue(nextValue)}`}
+        onClick={() => onChange?.(nextValue)}
         className={cn(
           'h-3 flex-1 cursor-pointer border-0 p-0',
           'duration-micro ease-levx transition-[background]',
