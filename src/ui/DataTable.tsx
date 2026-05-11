@@ -1,3 +1,4 @@
+import { ChevronDown, ChevronsUpDown, ChevronUp } from 'lucide-react'
 import { type ReactNode } from 'react'
 
 import { cn } from '@/lib/cn'
@@ -5,12 +6,20 @@ import { cn } from '@/lib/cn'
 export const NUM_CELL =
   'text-right whitespace-nowrap font-mono text-xs uppercase tracking-normal text-ink'
 
+export type SortDirection = 'asc' | 'desc'
+
+export interface DataTableSort {
+  key: string
+  dir: SortDirection
+}
+
 export interface DataTableColumn<T> {
   key: string
   header: ReactNode
   headerClassName?: string
   cellClassName?: string
   render: (item: T, index: number) => ReactNode
+  sortAccessor?: (item: T) => number | string
 }
 
 interface DataTableProps<T> {
@@ -22,6 +31,8 @@ interface DataTableProps<T> {
   keyExtractor: (item: T, index: number) => string | number
   onRowClick?: (item: T, index: number) => void
   emptyMessage?: string
+  sort?: DataTableSort | null
+  onSortToggle?: (key: string) => void
 }
 
 export function DataTable<T>({
@@ -33,6 +44,8 @@ export function DataTable<T>({
   keyExtractor,
   onRowClick,
   emptyMessage = '[ NO DATA ]',
+  sort,
+  onSortToggle,
 }: DataTableProps<T>) {
   const rowGridClass = cn('grid items-center gap-4 px-4', gridCols, gridColsWide)
 
@@ -53,11 +66,47 @@ export function DataTable<T>({
           'text-ink-dim font-mono text-tag uppercase',
         )}
       >
-        {columns.map((col) => (
-          <span key={col.key} className={col.headerClassName}>
-            {col.header}
-          </span>
-        ))}
+        {columns.map((col) => {
+          if (!col.sortAccessor || !onSortToggle) {
+            return (
+              <span key={col.key} className={col.headerClassName}>
+                {col.header}
+              </span>
+            )
+          }
+
+          const isActive = sort?.key === col.key
+          const isRightAligned = col.headerClassName?.includes('text-right') ?? false
+
+          return (
+            <button
+              key={col.key}
+              type="button"
+              onClick={() => onSortToggle(col.key)}
+              className={cn(
+                col.headerClassName,
+                'flex items-center gap-1.5',
+                isRightAligned && 'justify-end',
+                'duration-short ease-levx transition-colors',
+                isActive ? 'text-ink-strong' : 'text-ink-dim hover:text-ink-muted',
+              )}
+              aria-sort={
+                isActive ? (sort?.dir === 'asc' ? 'ascending' : 'descending') : 'none'
+              }
+            >
+              <span>{col.header}</span>
+              {isActive ? (
+                sort?.dir === 'asc' ? (
+                  <ChevronUp size={12} strokeWidth={1.75} aria-hidden />
+                ) : (
+                  <ChevronDown size={12} strokeWidth={1.75} aria-hidden />
+                )
+              ) : (
+                <ChevronsUpDown size={12} strokeWidth={1.75} aria-hidden />
+              )}
+            </button>
+          )
+        })}
       </div>
 
       {/* Rows */}

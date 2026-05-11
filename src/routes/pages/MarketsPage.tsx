@@ -7,7 +7,12 @@ import { ChartFrame } from '@/features/chart/ChartFrame'
 import { MarketCard } from '@/features/market/MarketCard'
 import { MarketCardSkeleton } from '@/features/market/MarketCardSkeleton'
 import { TokenPairIcon } from '@/ui/TokenPairIcon'
-import { DataTable, NUM_CELL, type DataTableColumn } from '@/ui/DataTable'
+import {
+  DataTable,
+  NUM_CELL,
+  type DataTableColumn,
+  type DataTableSort,
+} from '@/ui/DataTable'
 import { ExpandPill } from '@/ui/ExpandPill'
 import { MarketsTableSkeleton } from '@/features/market/MarketsTableSkeleton'
 import { QueryErrorState } from '@/ui/QueryErrorState'
@@ -46,6 +51,13 @@ const STATE_ORDER: Record<MarketState, number> = {
   maturing: 4,
   settled: 5,
   void: 6,
+}
+
+const SORT_ACCESSORS: Record<string, (m: Market) => number> = {
+  ends: (m) => m.endTime,
+  pool: (m) => m.pool,
+  paths: (m) => m.numPaths,
+  traders: (m) => m.traders,
 }
 
 const FILTERS: { id: StateFilter; label: string }[] = [
@@ -142,6 +154,7 @@ function buildColumns(now: number): DataTableColumn<Market>[] {
       headerClassName: 'text-right',
       cellClassName: NUM_CELL,
       render: (m) => endsInLabel(m, now),
+      sortAccessor: (m) => m.endTime,
     },
     {
       key: 'pool',
@@ -149,6 +162,7 @@ function buildColumns(now: number): DataTableColumn<Market>[] {
       headerClassName: 'text-right',
       cellClassName: NUM_CELL,
       render: (m) => `${formatUSD(m.pool)} USDC`,
+      sortAccessor: (m) => m.pool,
     },
     {
       key: 'paths',
@@ -156,6 +170,7 @@ function buildColumns(now: number): DataTableColumn<Market>[] {
       headerClassName: 'text-right',
       cellClassName: NUM_CELL,
       render: (m) => (m.numPaths > 0 ? String(m.numPaths) : '—'),
+      sortAccessor: (m) => m.numPaths,
     },
     {
       key: 'checkpoints',
@@ -188,6 +203,7 @@ function buildColumns(now: number): DataTableColumn<Market>[] {
       headerClassName: cn('text-right', NARROW_HIDE),
       cellClassName: cn(NUM_CELL, NARROW_HIDE),
       render: (m) => m.traders.toLocaleString(),
+      sortAccessor: (m) => m.traders,
     },
     {
       key: 'arrow',
@@ -209,6 +225,7 @@ export function MarketsPage() {
 
   const { data: markets, isLoading, isError, refetch } = useMarkets()
   const [filter, setFilter] = useState<StateFilter>('all')
+  const [sort, setSort] = useState<DataTableSort | null>(null)
   const [page, setPage] = useState(0)
   const [visibleCount, setVisibleCount] = useState(20) // Start with 20 for grid
 
@@ -232,15 +249,32 @@ export function MarketsPage() {
   const now = useNowTick(1000)
   const COLUMNS = useMemo(() => buildColumns(now), [now])
 
-  const visible = useMemo(
-    () =>
-      (markets ?? [])
-        .filter((m) => matchesFilter(getMarketDisplayState(m), filter))
-        .sort(
-          (a, b) => STATE_ORDER[getMarketDisplayState(a)] - STATE_ORDER[getMarketDisplayState(b)],
-        ),
-    [markets, filter],
-  )
+  const visible = useMemo(() => {
+    const filtered = (markets ?? []).filter((m) =>
+      matchesFilter(getMarketDisplayState(m), filter),
+    )
+
+    if (!sort) {
+      return filtered.sort(
+        (a, b) => STATE_ORDER[getMarketDisplayState(a)] - STATE_ORDER[getMarketDisplayState(b)],
+      )
+    }
+
+    const accessor = SORT_ACCESSORS[sort.key]
+    if (!accessor) return filtered
+
+    const mult = sort.dir === 'asc' ? 1 : -1
+    return [...filtered].sort((a, b) => (accessor(a) - accessor(b)) * mult)
+  }, [markets, filter, sort])
+
+  const handleSortToggle = (key: string) => {
+    setSort((prev) => {
+      if (!prev || prev.key !== key) return { key, dir: 'desc' }
+      if (prev.dir === 'desc') return { key, dir: 'asc' }
+      return null
+    })
+    setPage(0)
+  }
 
   const totalPages = Math.ceil(visible.length / PAGE_SIZE)
   const tableItems = visible.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
@@ -390,6 +424,8 @@ export function MarketsPage() {
                   keyExtractor={(m) => m.id}
                   onRowClick={(m) => navigate({ to: '/market/$id', params: { id: m.id } })}
                   emptyMessage="[ NO MARKETS MATCH FILTER ]"
+                  sort={sort}
+                  onSortToggle={handleSortToggle}
                 />
                 {totalPages > 1 && (
                   <div className="border-line bg-surface-1 flex items-center justify-center gap-3 rounded-b-2xl border-t px-4 py-3">
