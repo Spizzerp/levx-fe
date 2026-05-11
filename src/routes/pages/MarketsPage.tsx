@@ -1,7 +1,7 @@
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { ArrowRight, Filter, LayoutGrid, List, Loader2 } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
-import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { ChartFrame } from '@/features/chart/ChartFrame'
 import { MarketCard } from '@/features/market/MarketCard'
@@ -54,18 +54,27 @@ const STATE_ORDER: Record<MarketState, number> = {
   void: 6,
 }
 
+// Curated list of pairs surfaced in the MARKET column filter dropdown.
+// Hardcoded on purpose — the markets feed includes deprecated test pairs we
+// don't want users to be able to filter on. To add a new pair: append an
+// entry here. No other wiring needed (filter UI and matching read directly
+// from this list). Order here is the order shown in the dropdown.
 const AVAILABLE_PAIRS: PairOption[] = [
   { pair: 'BTC/USDC', base: 'BTC', quote: 'USDC' },
   { pair: 'ETH/USDC', base: 'ETH', quote: 'USDC' },
   { pair: 'SOL/USDC', base: 'SOL', quote: 'USDC' },
 ]
 
-const SORT_ACCESSORS: Record<string, (m: Market) => number> = {
-  ends: (m) => m.endTime,
-  pool: (m) => m.pool,
-  paths: (m) => m.numPaths,
-  traders: (m) => m.traders,
-}
+// Single source of truth for sortable column accessors. Referenced by
+// `buildColumns` to mark a column sortable in the table header, and by the
+// `visible` memo to actually perform the sort. Adding a sortable column means
+// adding one entry here and referencing it on the corresponding column.
+const SORT_ACCESSORS = {
+  ends: (m: Market) => m.endTime,
+  pool: (m: Market) => m.pool,
+  paths: (m: Market) => m.numPaths,
+  traders: (m: Market) => m.traders,
+} as const
 
 const FILTERS: { id: StateFilter; label: string }[] = [
   { id: 'all', label: 'All' },
@@ -161,7 +170,7 @@ function buildColumns(now: number, marketHeader: ReactNode): DataTableColumn<Mar
       headerClassName: 'text-right',
       cellClassName: NUM_CELL,
       render: (m) => endsInLabel(m, now),
-      sortAccessor: (m) => m.endTime,
+      sortAccessor: SORT_ACCESSORS.ends,
     },
     {
       key: 'pool',
@@ -169,7 +178,7 @@ function buildColumns(now: number, marketHeader: ReactNode): DataTableColumn<Mar
       headerClassName: 'text-right',
       cellClassName: NUM_CELL,
       render: (m) => `${formatUSD(m.pool)} USDC`,
-      sortAccessor: (m) => m.pool,
+      sortAccessor: SORT_ACCESSORS.pool,
     },
     {
       key: 'paths',
@@ -177,7 +186,7 @@ function buildColumns(now: number, marketHeader: ReactNode): DataTableColumn<Mar
       headerClassName: 'text-right',
       cellClassName: NUM_CELL,
       render: (m) => (m.numPaths > 0 ? String(m.numPaths) : '—'),
-      sortAccessor: (m) => m.numPaths,
+      sortAccessor: SORT_ACCESSORS.paths,
     },
     {
       key: 'checkpoints',
@@ -210,7 +219,7 @@ function buildColumns(now: number, marketHeader: ReactNode): DataTableColumn<Mar
       headerClassName: cn('text-right', NARROW_HIDE),
       cellClassName: cn(NUM_CELL, NARROW_HIDE),
       render: (m) => m.traders.toLocaleString(),
-      sortAccessor: (m) => m.traders,
+      sortAccessor: SORT_ACCESSORS.traders,
     },
     {
       key: 'arrow',
@@ -237,11 +246,11 @@ export function MarketsPage() {
   const [page, setPage] = useState(0)
   const [visibleCount, setVisibleCount] = useState(20) // Start with 20 for grid
 
-  const handlePairFilterChange = (next: Set<string>) => {
+  const handlePairFilterChange = useCallback((next: Set<string>) => {
     setSelectedPairs(next)
     setPage(0)
     setVisibleCount(20)
-  }
+  }, [])
 
   // Sync with localStorage for stickiness across navigations
   useEffect(() => {
@@ -270,7 +279,7 @@ export function MarketsPage() {
         onChange={handlePairFilterChange}
       />
     ),
-    [selectedPairs],
+    [selectedPairs, handlePairFilterChange],
   )
 
   const COLUMNS = useMemo(() => buildColumns(now, marketHeader), [now, marketHeader])
@@ -288,7 +297,7 @@ export function MarketsPage() {
       )
     }
 
-    const accessor = SORT_ACCESSORS[sort.key]
+    const accessor = SORT_ACCESSORS[sort.key as keyof typeof SORT_ACCESSORS]
     if (!accessor) return filtered
 
     const mult = sort.dir === 'asc' ? 1 : -1

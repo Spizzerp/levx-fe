@@ -1,6 +1,6 @@
 import { Check, Filter } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
-import { useEffect, useRef, useState } from 'react'
+import { type KeyboardEvent, useEffect, useRef, useState } from 'react'
 
 import { cn } from '@/lib/cn'
 import { TokenPairIcon } from '@/ui/TokenPairIcon'
@@ -19,7 +19,14 @@ interface MarketPairFilterProps {
 
 export function MarketPairFilter({ pairs, selected, onChange }: MarketPairFilterProps) {
   const [open, setOpen] = useState(false)
+  const [focusIndex, setFocusIndex] = useState(0)
   const containerRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const itemRefs = useRef<(HTMLButtonElement | null)[]>([])
+
+  const activeCount = selected.size
+  const isActive = activeCount > 0
+  const itemCount = pairs.length + (isActive ? 1 : 0)
 
   useEffect(() => {
     if (!open) return
@@ -28,19 +35,52 @@ export function MarketPairFilter({ pairs, selected, onChange }: MarketPairFilter
         setOpen(false)
       }
     }
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false)
-    }
     document.addEventListener('mousedown', onClick)
-    document.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('mousedown', onClick)
-      document.removeEventListener('keydown', onKey)
-    }
+    return () => document.removeEventListener('mousedown', onClick)
   }, [open])
 
-  const activeCount = selected.size
-  const isActive = activeCount > 0
+  useEffect(() => {
+    if (open) itemRefs.current[focusIndex]?.focus()
+  }, [open, focusIndex])
+
+  const openMenu = () => {
+    setFocusIndex(0)
+    setOpen(true)
+  }
+
+  const closeAndReturnFocus = () => {
+    setOpen(false)
+    triggerRef.current?.focus()
+  }
+
+  const handleMenuKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (itemCount === 0) return
+    switch (e.key) {
+      case 'Escape':
+        e.preventDefault()
+        closeAndReturnFocus()
+        break
+      case 'ArrowDown':
+        e.preventDefault()
+        setFocusIndex((i) => (i + 1) % itemCount)
+        break
+      case 'ArrowUp':
+        e.preventDefault()
+        setFocusIndex((i) => (i - 1 + itemCount) % itemCount)
+        break
+      case 'Home':
+        e.preventDefault()
+        setFocusIndex(0)
+        break
+      case 'End':
+        e.preventDefault()
+        setFocusIndex(itemCount - 1)
+        break
+      case 'Tab':
+        setOpen(false)
+        break
+    }
+  }
 
   const togglePair = (pair: string) => {
     const next = new Set(selected)
@@ -52,10 +92,11 @@ export function MarketPairFilter({ pairs, selected, onChange }: MarketPairFilter
   return (
     <div ref={containerRef} className="relative inline-flex">
       <button
+        ref={triggerRef}
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => (open ? setOpen(false) : openMenu())}
         aria-expanded={open}
-        aria-haspopup="listbox"
+        aria-haspopup="menu"
         className={cn(
           'flex items-center gap-1.5',
           'duration-short ease-levx transition-colors',
@@ -74,6 +115,9 @@ export function MarketPairFilter({ pairs, selected, onChange }: MarketPairFilter
       <AnimatePresence>
         {open && (
           <motion.div
+            role="menu"
+            aria-label="Filter by pair"
+            onKeyDown={handleMenuKeyDown}
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
@@ -92,20 +136,27 @@ export function MarketPairFilter({ pairs, selected, onChange }: MarketPairFilter
                   No pairs
                 </p>
               ) : (
-                pairs.map((p) => {
+                pairs.map((p, idx) => {
                   const isSelected = selected.has(p.pair)
                   return (
                     <button
                       key={p.pair}
+                      ref={(el) => {
+                        itemRefs.current[idx] = el
+                      }}
                       type="button"
+                      role="menuitemcheckbox"
+                      aria-checked={isSelected}
+                      tabIndex={focusIndex === idx ? 0 : -1}
                       onClick={() => togglePair(p.pair)}
-                      aria-pressed={isSelected}
+                      onFocus={() => setFocusIndex(idx)}
                       className={cn(
                         'flex w-full items-center justify-between gap-3 px-4 py-2',
                         'font-mono text-label uppercase tracking-wide',
                         'duration-short ease-levx transition-colors',
                         isSelected ? 'text-ink-strong' : 'text-ink-muted hover:text-ink-strong',
                         'hover:bg-white/[0.02]',
+                        'focus:outline-none focus-visible:bg-white/[0.04]',
                       )}
                     >
                       <span className="flex items-center gap-2">
@@ -121,13 +172,20 @@ export function MarketPairFilter({ pairs, selected, onChange }: MarketPairFilter
             {isActive && (
               <div className="border-line-strong border-t">
                 <button
+                  ref={(el) => {
+                    itemRefs.current[pairs.length] = el
+                  }}
                   type="button"
+                  role="menuitem"
+                  tabIndex={focusIndex === pairs.length ? 0 : -1}
                   onClick={() => onChange(new Set())}
+                  onFocus={() => setFocusIndex(pairs.length)}
                   className={cn(
                     'w-full px-4 py-2',
                     'font-mono text-tag uppercase tracking-wider',
                     'text-ink-dim hover:text-ink-strong',
                     'duration-short ease-levx transition-colors',
+                    'focus:outline-none focus-visible:bg-white/[0.04]',
                   )}
                 >
                   Clear all
