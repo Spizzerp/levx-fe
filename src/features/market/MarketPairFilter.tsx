@@ -1,0 +1,200 @@
+import { Check, Filter } from 'lucide-react'
+import { AnimatePresence, motion } from 'motion/react'
+import { type KeyboardEvent, useEffect, useRef, useState } from 'react'
+
+import { cn } from '@/lib/cn'
+import { TokenPairIcon } from '@/ui/TokenPairIcon'
+
+export interface PairOption {
+  pair: string
+  base: string
+  quote: string
+}
+
+interface MarketPairFilterProps {
+  pairs: PairOption[]
+  selected: Set<string>
+  onChange: (pairs: Set<string>) => void
+}
+
+export function MarketPairFilter({ pairs, selected, onChange }: MarketPairFilterProps) {
+  const [open, setOpen] = useState(false)
+  const [focusIndex, setFocusIndex] = useState(0)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const itemRefs = useRef<(HTMLButtonElement | null)[]>([])
+
+  const activeCount = selected.size
+  const isActive = activeCount > 0
+  const itemCount = pairs.length + (isActive ? 1 : 0)
+
+  useEffect(() => {
+    if (!open) return
+    const onClick = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onClick)
+    return () => document.removeEventListener('mousedown', onClick)
+  }, [open])
+
+  useEffect(() => {
+    if (open) itemRefs.current[focusIndex]?.focus()
+  }, [open, focusIndex])
+
+  const openMenu = () => {
+    setFocusIndex(0)
+    setOpen(true)
+  }
+
+  const closeAndReturnFocus = () => {
+    setOpen(false)
+    triggerRef.current?.focus()
+  }
+
+  const handleMenuKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (itemCount === 0) return
+    switch (e.key) {
+      case 'Escape':
+        e.preventDefault()
+        closeAndReturnFocus()
+        break
+      case 'ArrowDown':
+        e.preventDefault()
+        setFocusIndex((i) => (i + 1) % itemCount)
+        break
+      case 'ArrowUp':
+        e.preventDefault()
+        setFocusIndex((i) => (i - 1 + itemCount) % itemCount)
+        break
+      case 'Home':
+        e.preventDefault()
+        setFocusIndex(0)
+        break
+      case 'End':
+        e.preventDefault()
+        setFocusIndex(itemCount - 1)
+        break
+      case 'Tab':
+        setOpen(false)
+        break
+    }
+  }
+
+  const togglePair = (pair: string) => {
+    const next = new Set(selected)
+    if (next.has(pair)) next.delete(pair)
+    else next.add(pair)
+    onChange(next)
+  }
+
+  return (
+    <div ref={containerRef} className="relative inline-flex">
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={() => (open ? setOpen(false) : openMenu())}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        className={cn(
+          'flex items-center gap-1.5',
+          'duration-short ease-levx transition-colors',
+          isActive ? 'text-ink-strong' : 'text-ink-dim hover:text-ink-muted',
+        )}
+      >
+        <span>MARKET</span>
+        <Filter size={12} strokeWidth={1.75} aria-hidden />
+        {isActive && (
+          <span className="text-ink-strong font-mono text-tag tabular-nums">
+            ·{activeCount}
+          </span>
+        )}
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            role="menu"
+            aria-label="Filter by pair"
+            onKeyDown={handleMenuKeyDown}
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.15, ease: [0.25, 0.1, 0.25, 1] }}
+            className={cn(
+              'absolute left-0 top-full z-30 mt-2',
+              'w-56',
+              'border-line-strong bg-surface border',
+              'rounded-2xl shadow-lg',
+              'overflow-hidden',
+            )}
+          >
+            <div className="max-h-[320px] overflow-y-auto py-1">
+              {pairs.length === 0 ? (
+                <p className="text-ink-dim font-mono text-tag uppercase px-4 py-3 text-center">
+                  No pairs
+                </p>
+              ) : (
+                pairs.map((p, idx) => {
+                  const isSelected = selected.has(p.pair)
+                  return (
+                    <button
+                      key={p.pair}
+                      ref={(el) => {
+                        itemRefs.current[idx] = el
+                      }}
+                      type="button"
+                      role="menuitemcheckbox"
+                      aria-checked={isSelected}
+                      tabIndex={focusIndex === idx ? 0 : -1}
+                      onClick={() => togglePair(p.pair)}
+                      onFocus={() => setFocusIndex(idx)}
+                      className={cn(
+                        'flex w-full items-center justify-between gap-3 px-4 py-2',
+                        'font-mono text-label uppercase tracking-wide',
+                        'duration-short ease-levx transition-colors',
+                        isSelected ? 'text-ink-strong' : 'text-ink-muted hover:text-ink-strong',
+                        'hover:bg-white/[0.02]',
+                        'focus:outline-none focus-visible:bg-white/[0.04]',
+                      )}
+                    >
+                      <span className="flex items-center gap-2">
+                        <TokenPairIcon base={p.base} quote={p.quote} size={18} />
+                        <span>{p.base}</span>
+                      </span>
+                      {isSelected && <Check size={14} strokeWidth={2} aria-hidden />}
+                    </button>
+                  )
+                })
+              )}
+            </div>
+            {isActive && (
+              <div className="border-line-strong border-t">
+                <button
+                  ref={(el) => {
+                    itemRefs.current[pairs.length] = el
+                  }}
+                  type="button"
+                  role="menuitem"
+                  tabIndex={focusIndex === pairs.length ? 0 : -1}
+                  onClick={() => onChange(new Set())}
+                  onFocus={() => setFocusIndex(pairs.length)}
+                  className={cn(
+                    'w-full px-4 py-2',
+                    'font-mono text-tag uppercase tracking-wider',
+                    'text-ink-dim hover:text-ink-strong',
+                    'duration-short ease-levx transition-colors',
+                    'focus:outline-none focus-visible:bg-white/[0.04]',
+                  )}
+                >
+                  Clear all
+                </button>
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
