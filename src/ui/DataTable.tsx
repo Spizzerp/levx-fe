@@ -69,9 +69,9 @@ export function DataTable<T>({
         {columns.map((col) => {
           if (!col.sortAccessor || !onSortToggle) {
             return (
-              <span key={col.key} className={col.headerClassName}>
+              <div key={col.key} className={col.headerClassName}>
                 {col.header}
-              </span>
+              </div>
             )
           }
 

@@ -1,11 +1,12 @@
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { ArrowRight, Filter, LayoutGrid, List, Loader2 } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 
 import { ChartFrame } from '@/features/chart/ChartFrame'
 import { MarketCard } from '@/features/market/MarketCard'
 import { MarketCardSkeleton } from '@/features/market/MarketCardSkeleton'
+import { MarketPairFilter, type PairOption } from '@/features/market/MarketPairFilter'
 import { TokenPairIcon } from '@/ui/TokenPairIcon'
 import {
   DataTable,
@@ -52,6 +53,12 @@ const STATE_ORDER: Record<MarketState, number> = {
   settled: 5,
   void: 6,
 }
+
+const AVAILABLE_PAIRS: PairOption[] = [
+  { pair: 'BTC/USDC', base: 'BTC', quote: 'USDC' },
+  { pair: 'ETH/USDC', base: 'ETH', quote: 'USDC' },
+  { pair: 'SOL/USDC', base: 'SOL', quote: 'USDC' },
+]
 
 const SORT_ACCESSORS: Record<string, (m: Market) => number> = {
   ends: (m) => m.endTime,
@@ -124,11 +131,11 @@ function MarketGridPythSubscriptions({ markets }: { markets: Market[] }) {
   )
 }
 
-function buildColumns(now: number): DataTableColumn<Market>[] {
+function buildColumns(now: number, marketHeader: ReactNode): DataTableColumn<Market>[] {
   return [
     {
       key: 'pair',
-      header: 'MARKET',
+      header: marketHeader,
       headerClassName: 'pl-6',
       cellClassName: 'pl-6',
       render: (m) => (
@@ -225,9 +232,16 @@ export function MarketsPage() {
 
   const { data: markets, isLoading, isError, refetch } = useMarkets()
   const [filter, setFilter] = useState<StateFilter>('all')
+  const [selectedPairs, setSelectedPairs] = useState<Set<string>>(new Set())
   const [sort, setSort] = useState<DataTableSort | null>(null)
   const [page, setPage] = useState(0)
   const [visibleCount, setVisibleCount] = useState(20) // Start with 20 for grid
+
+  const handlePairFilterChange = (next: Set<string>) => {
+    setSelectedPairs(next)
+    setPage(0)
+    setVisibleCount(20)
+  }
 
   // Sync with localStorage for stickiness across navigations
   useEffect(() => {
@@ -247,11 +261,25 @@ export function MarketsPage() {
   }
   const PAGE_SIZE = 10
   const now = useNowTick(1000)
-  const COLUMNS = useMemo(() => buildColumns(now), [now])
+
+  const marketHeader = useMemo(
+    () => (
+      <MarketPairFilter
+        pairs={AVAILABLE_PAIRS}
+        selected={selectedPairs}
+        onChange={handlePairFilterChange}
+      />
+    ),
+    [selectedPairs],
+  )
+
+  const COLUMNS = useMemo(() => buildColumns(now, marketHeader), [now, marketHeader])
 
   const visible = useMemo(() => {
-    const filtered = (markets ?? []).filter((m) =>
-      matchesFilter(getMarketDisplayState(m), filter),
+    const filtered = (markets ?? []).filter(
+      (m) =>
+        matchesFilter(getMarketDisplayState(m), filter) &&
+        (selectedPairs.size === 0 || selectedPairs.has(m.pair)),
     )
 
     if (!sort) {
@@ -265,7 +293,7 @@ export function MarketsPage() {
 
     const mult = sort.dir === 'asc' ? 1 : -1
     return [...filtered].sort((a, b) => (accessor(a) - accessor(b)) * mult)
-  }, [markets, filter, sort])
+  }, [markets, filter, selectedPairs, sort])
 
   const handleSortToggle = (key: string) => {
     setSort((prev) => {
