@@ -225,6 +225,10 @@ export function MarketPreview({
             // true = hovered + selected paths paint as solid white overlays
             // (same treatment as MarketPage when the wager rail is active).
             selectionInteractive={true}
+            // Landing preview's mock history is sized to exactly span oldest→marketEnd;
+            // legacy auto-fit keeps the chart visually full without coupling the mock
+            // generator to the market-focused default's pre-market padding.
+            defaultView="fit-data"
             market={{
               startTime: marketStart,
               checkpointInterval,

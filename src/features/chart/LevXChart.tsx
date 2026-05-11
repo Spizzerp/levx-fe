@@ -125,6 +125,19 @@ export interface LevXChartProps {
    */
   onViewportChange?: (domain: [number, number]) => void
   /**
+   * Default-view strategy used before the user pans/zooms.
+   *
+   * - `'market-focused'` (default): pre-market history fills the left half;
+   *   the market period (start → end) fills the right half, with a thin pad
+   *   past `marketEnd` for breathing room. Domain is fixed (depends only on
+   *   `marketStart`/`marketEnd`), so lazy backfill safely fires on mount.
+   * - `'fit-data'`: legacy auto-fit — left edge tracks the oldest loaded
+   *   history point, right edge extends to `marketEnd` / prediction tail.
+   *   Domain widens with loaded history, so onViewportChange is gated on
+   *   user interaction to avoid a fetch loop.
+   */
+  defaultView?: 'market-focused' | 'fit-data'
+  /**
    * Optional render prop invoked INSIDE the SVG inner group (after DrawingGrid, before crosshair).
    * Receives live scales and checkpoint Xs so the consumer can mount DrawingLayer with
    * the correct coordinate space. Omitting it is backward-compatible (no overlay rendered).
@@ -163,6 +176,7 @@ function ChartInner({
   market,
   isLoading,
   onViewportChange,
+  defaultView = 'market-focused',
   renderDrawingOverlay,
 }: InnerProps) {
   const innerWidth = Math.max(0, width - MARGIN.left - MARGIN.right)
@@ -208,20 +222,28 @@ function ChartInner({
     [market],
   )
 
-  /* ── Time domain (auto-computed default — all data visible) ── */
-  const timeDomain = useMemo<[number, number]>(() => {
+  /* ── Time domain ────────────────────────────────────────── */
+  // Split into two memos so the active one keeps a stable reference: in
+  // market-focused mode, the domain depends only on marketStart/End and stays
+  // identical across history updates — required for downstream effects (e.g.
+  // the lazy-load emit) not to refire on every page that arrives.
+
+  const marketFocusedDomain = useMemo<[number, number] | null>(() => {
+    const marketDuration = marketEnd - marketStart
+    if (marketDuration <= 0) return null
+    return [marketStart - marketDuration, marketEnd + marketDuration * 0.05]
+  }, [marketStart, marketEnd])
+
+  const fitDataDomain = useMemo<[number, number]>(() => {
     const first = mergedHistory[0]?.time ?? nowTime - 7 * 24 * 60 * 60 * 1000
     const lastData = mergedHistory[mergedHistory.length - 1]?.time ?? nowTime
 
-    // Right edge: extend to marketEnd if it's in the future (blank space for
-    // predictions / drawing), or to the end of prediction data, whichever is later.
     let rightEdge = Math.max(lastData, marketEnd)
     predictions.forEach((p) => {
       const last = p.data[p.data.length - 1]
       if (last && last.time > rightEdge) rightEdge = last.time
     })
 
-    // Small right padding so the live tick / right edge doesn't touch the axis
     if (rightEdge <= lastData) {
       const span = lastData - first || 1
       rightEdge = lastData + span * 0.02
@@ -230,10 +252,27 @@ function ChartInner({
     return [first, rightEdge]
   }, [mergedHistory, predictions, marketEnd, nowTime])
 
+  // Use market-focused when requested AND market timing is valid;
+  // otherwise fall back to fit-data (also covers missing-timing edge cases).
+  const useMarketFocused = defaultView === 'market-focused' && marketFocusedDomain !== null
+  const timeDomain = useMarketFocused ? marketFocusedDomain : fitDataDomain
+
+  // Max zoom-out is sized to the full data range (not the default domain) so
+  // users can still pan/zoom out to see all loaded history despite the
+  // narrower default view.
   const maxSpanMs = useMemo(() => {
-    const totalSpan = timeDomain[1] - timeDomain[0]
-    return Math.max(totalSpan * 3, 7 * 24 * 60 * 60 * 1000) // 3× data span or 7 days
-  }, [timeDomain])
+    const oldest = mergedHistory[0]?.time ?? marketStart
+    let newest = Math.max(
+      mergedHistory[mergedHistory.length - 1]?.time ?? nowTime,
+      marketEnd,
+    )
+    predictions.forEach((p) => {
+      const last = p.data[p.data.length - 1]
+      if (last && last.time > newest) newest = last.time
+    })
+    const fullRange = newest - oldest
+    return Math.max(fullRange * 1.2, 7 * 24 * 60 * 60 * 1000)
+  }, [mergedHistory, predictions, marketStart, marketEnd, nowTime])
 
   /* ── Viewport: pan / zoom ────────────────────────────────── */
   const {
@@ -254,14 +293,15 @@ function ChartInner({
 
   /* ── Notify data layer of viewport changes (for lazy pagination) ──
    *
-   * Gated on `!viewportIsFollowing` so we don't trigger a fetch when the user
-   * hasn't interacted. In following mode, `defaultTimeDomain` widens as older
-   * pages arrive — emitting that would create a self-sustaining load loop where
-   * each new page expands the domain, which emits again, which fetches again. */
+   * In `fit-data` mode the default domain widens with each loaded page, so
+   * emitting in following mode would create a self-sustaining fetch loop —
+   * gate on `!viewportIsFollowing`. In `market-focused` mode the default
+   * domain is fixed (function of marketStart/End only), so emitting on mount
+   * is safe and lets the lazy loader backfill the visible range immediately. */
   useEffect(() => {
-    if (viewportIsFollowing) return
+    if (!useMarketFocused && viewportIsFollowing) return
     onViewportChange?.(viewportTimeDomain)
-  }, [viewportTimeDomain, viewportIsFollowing, onViewportChange])
+  }, [viewportTimeDomain, viewportIsFollowing, onViewportChange, useMarketFocused])
 
   /* ── Price domain: envelope of data visible in viewport ──── */
   const priceDomainLive = useMemo<[number, number]>(
