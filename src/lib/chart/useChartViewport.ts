@@ -296,12 +296,26 @@ export function useChartViewport({
       const iw = innerWidthRef.current
       if (iw <= 0) return
 
+      const currentDomain = viewDomainRef.current ?? defaultDomainRef.current
+      const span = currentDomain[1] - currentDomain[0]
+
+      // Horizontal-dominant trackpad swipe → pan along the time axis.
+      // Skipped when `ctrlKey` is set, which the browser uses to mark a
+      // trackpad pinch (we want pinch to zoom, not pan, even if the gesture
+      // happens to register a small horizontal component).
+      if (!e.ctrlKey && Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+        // Browser convention: deltaX > 0 = scroll right = shift view forward
+        // in time. With macOS natural scrolling, swipe-right yields deltaX < 0
+        // which pans toward the past — the intuitive direction.
+        const deltaTime = (e.deltaX / iw) * span
+        commitDomain([currentDomain[0] + deltaTime, currentDomain[1] + deltaTime])
+        return
+      }
+
+      // Vertical wheel / pinch → zoom anchored at cursor.
       const rect = svgEl.getBoundingClientRect()
       const chartX = e.clientX - rect.left - marginLeftRef.current
       const fraction = Math.max(0, Math.min(1, chartX / iw))
-
-      const currentDomain = viewDomainRef.current ?? defaultDomainRef.current
-      const span = currentDomain[1] - currentDomain[0]
 
       // Positive deltaY = scroll down = zoom out (wider span)
       const factor = 1 + e.deltaY * ZOOM_SENSITIVITY
