@@ -254,12 +254,14 @@ function ChartInner({
 
   // Use market-focused when requested AND market timing is valid;
   // otherwise fall back to fit-data (also covers missing-timing edge cases).
-  const useMarketFocused = defaultView === 'market-focused' && marketFocusedDomain !== null
-  const timeDomain = useMarketFocused ? marketFocusedDomain : fitDataDomain
+  const isMarketFocused = defaultView === 'market-focused' && marketFocusedDomain !== null
+  const timeDomain = isMarketFocused ? marketFocusedDomain : fitDataDomain
 
   // Max zoom-out is sized to the full data range (not the default domain) so
   // users can still pan/zoom out to see all loaded history despite the
-  // narrower default view.
+  // narrower default view. Floored at the current default span so the initial
+  // domain can't exceed the clamp before backfill arrives (market-focused
+  // spans ~2× marketDuration but `fullRange` ≈ marketDuration pre-history).
   const maxSpanMs = useMemo(() => {
     const oldest = mergedHistory[0]?.time ?? marketStart
     let newest = Math.max(
@@ -271,8 +273,9 @@ function ChartInner({
       if (last && last.time > newest) newest = last.time
     })
     const fullRange = newest - oldest
-    return Math.max(fullRange * 1.2, 7 * 24 * 60 * 60 * 1000)
-  }, [mergedHistory, predictions, marketStart, marketEnd, nowTime])
+    const defaultSpan = timeDomain[1] - timeDomain[0]
+    return Math.max(fullRange * 1.2, defaultSpan, 7 * 24 * 60 * 60 * 1000)
+  }, [mergedHistory, predictions, marketStart, marketEnd, nowTime, timeDomain])
 
   /* ── Viewport: pan / zoom ────────────────────────────────── */
   const {
@@ -299,9 +302,9 @@ function ChartInner({
    * domain is fixed (function of marketStart/End only), so emitting on mount
    * is safe and lets the lazy loader backfill the visible range immediately. */
   useEffect(() => {
-    if (!useMarketFocused && viewportIsFollowing) return
+    if (!isMarketFocused && viewportIsFollowing) return
     onViewportChange?.(viewportTimeDomain)
-  }, [viewportTimeDomain, viewportIsFollowing, onViewportChange, useMarketFocused])
+  }, [viewportTimeDomain, viewportIsFollowing, onViewportChange, isMarketFocused])
 
   /* ── Price domain: envelope of data visible in viewport ──── */
   const priceDomainLive = useMemo<[number, number]>(
