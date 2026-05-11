@@ -2175,6 +2175,65 @@ export type Levx = {
       "args": []
     },
     {
+      "name": "migrateMarketV3",
+      "docs": [
+        "One-time Market v2 -> v3 migration. Reallocs old market accounts by",
+        "two bytes and backfills `pricing_active_mask` from current amplitudes."
+      ],
+      "discriminator": [
+        110,
+        196,
+        146,
+        68,
+        50,
+        36,
+        97,
+        1
+      ],
+      "accounts": [
+        {
+          "name": "protocolState",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "market",
+          "docs": [
+            "cannot deserialize. The handler validates owner, discriminator, and PDA."
+          ],
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "protocolState"
+          ]
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "migrateProtocolStateV2",
       "docs": [
         "One-time ProtocolState v1 → v2 migration. Appends the three new fields",
@@ -3577,6 +3636,19 @@ export type Levx = {
       ]
     },
     {
+      "name": "marketMigratedV3",
+      "discriminator": [
+        174,
+        211,
+        10,
+        2,
+        68,
+        197,
+        3,
+        199
+      ]
+    },
+    {
       "name": "marketSettled",
       "discriminator": [
         237,
@@ -4147,6 +4219,11 @@ export type Levx = {
       "code": 6061,
       "name": "bucketGuardCooldown",
       "msg": "Operation rate-limited; cooldown period has not elapsed"
+    },
+    {
+      "code": 6062,
+      "name": "invalidLmsrAlpha",
+      "msg": "LMSR alpha is below the minimum supported value"
     }
   ],
   "types": [
@@ -4463,10 +4540,9 @@ export type Levx = {
           {
             "name": "lmsrAlpha",
             "docs": [
-              "LS-LMSR alpha (fixed-point 6 dec). `None` falls back to 50_000 (0.05).",
-              "Larger values prevent q/b saturation in the softmax at the cost of",
-              "flatter initial pricing — useful for tests or markets that expect",
-              "large sequential wagers without submitting eigendecomp between them."
+              "LS-LMSR alpha (fixed-point 6 dec). `None` falls back to 1_000_000 (1.0).",
+              "Values below 1.0 are rejected because they can drive normal first wagers",
+              "into fixed-point softmax underflow."
             ],
             "type": {
               "option": "u64"
@@ -5061,7 +5137,7 @@ export type Levx = {
           {
             "name": "lmsrAlpha",
             "docs": [
-              "Alpha parameter for adaptive liquidity: b = α × Σ|q_j| (fixed-point 6 dec; default 50_000 = 0.05)"
+              "Alpha parameter for adaptive liquidity: b = α × Σ|q_j| (fixed-point 6 dec; default 1_000_000 = 1.0)"
             ],
             "type": "u64"
           },
@@ -5298,6 +5374,14 @@ export type Levx = {
           {
             "name": "bump",
             "type": "u8"
+          },
+          {
+            "name": "pricingActiveMask",
+            "docs": [
+              "Bit i is set when path i participates in pricing. This is the",
+              "authoritative pricing liveness signal; amplitudes are probability state."
+            ],
+            "type": "u16"
           }
         ]
       }
@@ -5410,6 +5494,22 @@ export type Levx = {
           {
             "name": "targetNumPaths",
             "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "marketMigratedV3",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "marketId",
+            "type": "u64"
+          },
+          {
+            "name": "pricingActiveMask",
+            "type": "u16"
           }
         ]
       }
