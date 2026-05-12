@@ -1,3 +1,5 @@
+import { LMSR_MIN_B, SCALE } from '@/lib/constants'
+
 /**
  * Off-chain estimators for the on-chain LMSR cost-function used by
  * `place_wager` and `exit_position`. These power the slippage UX:
@@ -22,8 +24,8 @@
  */
 
 const EPS = 1e-12
-const FIXED_POINT_SCALE = 1_000_000
-const MIN_B = 10_000 / FIXED_POINT_SCALE
+const FIXED_POINT_ATOM = 1 / SCALE
+const MIN_B = LMSR_MIN_B / SCALE
 
 interface EstimateInput {
   /** Net signed share quantities per path, scaled by SCALE (human units). */
@@ -123,30 +125,34 @@ export function estimateLmsrSharesOut(
 
   const baseCost = adaptiveCost(shareQuantities, active, numPaths, lmsrAlpha)
 
-  const qOne = shareQuantities.slice(0, numPaths)
-  qOne[pathIndex] = (qOne[pathIndex] ?? 0) + 1 / FIXED_POINT_SCALE
-  const costOne = adaptiveCost(qOne, active, numPaths, lmsrAlpha) - baseCost
+  const tradeCost = (sharesOut: number) => {
+    const qNext = shareQuantities.slice(0, numPaths)
+    qNext[pathIndex] = (qNext[pathIndex] ?? 0) + sharesOut
+    return adaptiveCost(qNext, active, numPaths, lmsrAlpha) - baseCost
+  }
+
+  const costOne = tradeCost(FIXED_POINT_ATOM)
   if (costOne > amountScaled) return 0
 
-  const hiCostGrounded = costOne > EPS ? (amountScaled / costOne) * 2 / FIXED_POINT_SCALE : 0
-  const hiFallback = amountScaled * 10_000
+  const hiCostGrounded = costOne > EPS ? (amountScaled / costOne) * 2 * FIXED_POINT_ATOM : 0
+  const hiFallback = amountScaled * numPaths * 2
   let lo = 0
-  let hi = Math.max(hiCostGrounded, hiFallback, 1 / FIXED_POINT_SCALE)
+  let hi = Math.max(hiCostGrounded, hiFallback, FIXED_POINT_ATOM)
+
+  // Start with a marginal-cost bound, then expand until `hi` is above budget.
+  for (let i = 0; i < 32 && tradeCost(hi) <= amountScaled; i += 1) {
+    hi *= 2
+  }
 
   for (let i = 0; i < 80; i += 1) {
     const mid = lo + (hi - lo) / 2
-    if (hi - lo <= 1 / FIXED_POINT_SCALE) break
+    if (hi - lo <= FIXED_POINT_ATOM) break
 
-    const qMid = shareQuantities.slice(0, numPaths)
-    qMid[pathIndex] = (qMid[pathIndex] ?? 0) + mid
-    const costMid = adaptiveCost(qMid, active, numPaths, lmsrAlpha) - baseCost
-    if (costMid <= amountScaled) lo = mid
+    if (tradeCost(mid) <= amountScaled) lo = mid
     else hi = mid
   }
 
-  // Stay one fixed-point atom below the float boundary so min_out cannot exceed
-  // the program's integer result because of frontend rounding noise.
-  return Math.max(0, lo - 1 / FIXED_POINT_SCALE)
+  return Math.max(0, lo)
 }
 
 /**
@@ -180,13 +186,13 @@ export function estimateLmsrExitPayout(
 }
 
 /**
- * Apply slippage tolerance to an expected output and floor at 0.
+ * Apply slippage tolerance to an expected output and return a human-unit float.
  *
  * tolerance is a decimal in [0, 1) — e.g. 0.005 = 0.5%.
  * Fixed-point integer conversion is handled by transaction builders; flooring
  * here would drop sub-unit shares/payouts and silently weaken protection.
  */
-export function applySlippageFloor(expected: number, tolerance: number): number {
+export function applySlippageTolerance(expected: number, tolerance: number): number {
   if (!isFinite(expected) || expected <= 0) return 0
   const t = Math.max(0, Math.min(0.99, tolerance))
   return expected * (1 - t)

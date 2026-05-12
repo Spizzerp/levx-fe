@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 
 import {
-  applySlippageFloor,
+  applySlippageTolerance,
   estimateLmsrExitPayout,
   estimateLmsrSharesOut,
 } from '../lmsr'
@@ -124,18 +124,18 @@ describe('estimateLmsrExitPayout', () => {
   })
 })
 
-describe('applySlippageFloor', () => {
+describe('applySlippageTolerance', () => {
   it('applies tolerance without dropping fixed-point precision', () => {
-    expect(applySlippageFloor(100, 0.005)).toBe(99.5)
-    expect(applySlippageFloor(100, 0.01)).toBe(99)
-    expect(applySlippageFloor(100, 0)).toBe(100)
-    expect(applySlippageFloor(0.533426, 0.005)).toBeCloseTo(0.53075887)
+    expect(applySlippageTolerance(100, 0.005)).toBe(99.5)
+    expect(applySlippageTolerance(100, 0.01)).toBe(99)
+    expect(applySlippageTolerance(100, 0)).toBe(100)
+    expect(applySlippageTolerance(0.533426, 0.005)).toBeCloseTo(0.53075887)
   })
 
   it('clamps tolerance to [0, 0.99] and floors at 0', () => {
-    expect(applySlippageFloor(100, -1)).toBe(100)
-    expect(applySlippageFloor(100, 5)).toBeCloseTo(1)
-    expect(applySlippageFloor(0, 0.5)).toBe(0)
-    expect(applySlippageFloor(-5, 0.5)).toBe(0)
+    expect(applySlippageTolerance(100, -1)).toBe(100)
+    expect(applySlippageTolerance(100, 5)).toBeCloseTo(1)
+    expect(applySlippageTolerance(0, 0.5)).toBe(0)
+    expect(applySlippageTolerance(-5, 0.5)).toBe(0)
   })
 })
