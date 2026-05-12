@@ -4,12 +4,14 @@ import { BN } from '@coral-xyz/anchor'
 import { computeEstimatedPayout } from '@/lib/api/onchain'
 import { SCALE } from '@/lib/constants'
 
-function rawPosition(overrides: Partial<{
-  collateral: BN
-  lmsrShares: BN
-  finalPayout: BN
-  claimed: boolean
-}> = {}) {
+function rawPosition(
+  overrides: Partial<{
+    collateral: BN
+    lmsrShares: BN
+    finalPayout: BN
+    claimed: boolean
+  }> = {},
+) {
   return {
     collateral: overrides.collateral ?? new BN(25 * SCALE),
     lmsrShares: overrides.lmsrShares ?? new BN(45 * SCALE),
@@ -22,6 +24,7 @@ const baseMarket = {
   marketShareQuantitiesScaled: [0, 0, 0, 0],
   marketLmsrAlphaScaled: 100,
   marketAmplitudesScaled: [1, 1, 1, 1],
+  marketPricingActiveMask: 0b1111,
   marketNumPaths: 4,
 }
 
@@ -75,6 +78,7 @@ describe('computeEstimatedPayout', () => {
       marketShareQuantitiesScaled: [0.533426, 0, 0, 0, 0],
       marketLmsrAlphaScaled: 1,
       marketAmplitudesScaled: [1, 1, 1, 1, 1],
+      marketPricingActiveMask: 0b11111,
       marketNumPaths: 5,
     })
     expect(Number.isFinite(result)).toBe(true)
@@ -91,5 +95,22 @@ describe('computeEstimatedPayout', () => {
       ...baseMarket,
     })
     expect(result).toBe(0)
+  })
+
+  it('uses pricingActiveMask instead of rounded amplitudes for LMSR liveness', () => {
+    const result = computeEstimatedPayout({
+      positionRaw: rawPosition({ collateral: new BN(SCALE), lmsrShares: new BN(533_426) }),
+      pathDissolved: false,
+      pathIndex: 1,
+      marketState: 'active',
+      ...baseMarket,
+      marketShareQuantitiesScaled: [0, 0.533426, 0],
+      marketLmsrAlphaScaled: 1,
+      marketAmplitudesScaled: [1, 0, 1],
+      marketPricingActiveMask: 0b111,
+      marketNumPaths: 3,
+    })
+
+    expect(result).toBeGreaterThan(0.8)
   })
 })

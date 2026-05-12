@@ -81,6 +81,10 @@ export function anchorMarketToFE(raw: any, id: string): Market {
     targetNumPaths,
     amplitudes: (raw.amplitudes as BN[]).slice(0, numPaths).map((a) => bn(a, true)),
     lmsrShareQuantities: (raw.lmsrShareQuantities as BN[]).slice(0, numPaths).map((q) => i64(q)),
+    pricingActiveMask:
+      typeof raw.pricingActiveMask?.toNumber === 'function'
+        ? raw.pricingActiveMask.toNumber()
+        : Number(raw.pricingActiveMask ?? 0),
     lmsrAlpha: bn(raw.lmsrAlpha, true),
     lambda: bn(raw.lambda, true),
     decoherenceRate: bn(raw.decoherenceRate, true),
@@ -104,7 +108,11 @@ function targetNumPathsOrLegacy(raw: Record<string, unknown>, marketId: number):
   return 3
 }
 
-export function anchorPathToFE(raw: any, marketStartTime: number, checkpointInterval: number): PredictionPath {
+export function anchorPathToFE(
+  raw: any,
+  marketStartTime: number,
+  checkpointInterval: number,
+): PredictionPath {
   const predictedPrices: number[] = ((raw.predictedPrices ?? []) as BN[]).map((p) => bn(p, true))
   const intervalMs = checkpointInterval * 1000
 
@@ -185,9 +193,8 @@ export function anchorPositionToFE(raw: any, ctx: PositionContext): UserPosition
     collateral: bn(raw.collateral, true),
     leverage: raw.leverage,
     exposure: bn(raw.notionalExposure, true),
-    entryMultiplier: bn(raw.costBasis, true) > 0
-      ? bn(raw.lmsrShares, true) / bn(raw.costBasis, true)
-      : 0,
+    entryMultiplier:
+      bn(raw.costBasis, true) > 0 ? bn(raw.lmsrShares, true) / bn(raw.costBasis, true) : 0,
     entryTime: 0, // not directly stored on-chain; could derive from entered_at_checkpoint
     estimatedPayout: ctx.estimatedPayout,
     dissolved: ctx.pathDissolved,

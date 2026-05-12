@@ -4,6 +4,8 @@ import {
   applySlippageTolerance,
   estimateLmsrExitPayout,
   estimateLmsrSharesOut,
+  estimateQuadraticExitPayout,
+  estimateQuadraticSharesOut,
 } from '../lmsr'
 
 describe('estimateLmsrSharesOut', () => {
@@ -121,6 +123,34 @@ describe('estimateLmsrExitPayout', () => {
         sharesScaled: 0,
       }),
     ).toBe(0)
+  })
+})
+
+describe('EigenCache quadratic estimators', () => {
+  it('matches the on-chain quadratic buy formula in fixed-point units', () => {
+    const shares = estimateQuadraticSharesOut({
+      shareQuantities: [0, 0, 0],
+      checkpointQuantities: [0, 0, 0],
+      cachedPrices: [0.2, 0.5, 0.3],
+      lipschitz: 100,
+      pathIndex: 0,
+      amountScaled: 1,
+    })
+
+    expect(shares).toBeCloseTo(0.139435, 6)
+  })
+
+  it('clamps quadratic sell value at zero when curvature dominates', () => {
+    const payout = estimateQuadraticExitPayout({
+      shareQuantities: [10, 0, 0],
+      checkpointQuantities: [0, 0, 0],
+      cachedPrices: [0.1, 0.45, 0.45],
+      lipschitz: 100,
+      pathIndex: 0,
+      sharesScaled: 10,
+    })
+
+    expect(payout).toBe(0)
   })
 })
 
