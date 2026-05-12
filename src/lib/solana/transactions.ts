@@ -158,8 +158,14 @@ function readLmsrSnapshot(marketAcc: any): LmsrSnapshot {
   const shareQuantities = (marketAcc.lmsrShareQuantities as BN[])
     .slice(0, numPaths)
     .map((q) => q.toNumber() / SCALE)
-  const amplitudes = (marketAcc.amplitudes as BN[]).slice(0, numPaths).map((a) => a.toNumber())
-  const activeMask = amplitudes.map((a) => a > 0)
+  const pricingActiveMask =
+    marketAcc.pricingActiveMask instanceof BN
+      ? marketAcc.pricingActiveMask.toNumber()
+      : Number(marketAcc.pricingActiveMask ?? 0)
+  const activeMask = Array.from(
+    { length: numPaths },
+    (_, idx) => (pricingActiveMask & (1 << idx)) !== 0,
+  )
   const lmsrAlpha = (marketAcc.lmsrAlpha as BN).toNumber() / SCALE
   return { numPaths, shareQuantities, lmsrAlpha, activeMask }
 }
@@ -190,9 +196,23 @@ function placeWagerMinSharesOut(
   pathIndex: number,
   amountHuman: number,
 ): BN {
+  return placeWagerQuoteFromSnapshot(
+    marketAcc,
+    readLmsrSnapshot(marketAcc),
+    protocolAcc,
+    pathIndex,
+    amountHuman,
+  ).minSharesOut
+}
+
+function placeWagerQuoteFromSnapshot(
+  marketAcc: any,
+  snap: LmsrSnapshot,
+  protocolAcc: any,
+  pathIndex: number,
+  amountHuman: number,
+): { minSharesOut: BN; expectedSharesHuman: number } {
   const tol = getSlippageTolerance()
-  if (tol <= 0) return new BN(0)
-  const snap = readLmsrSnapshot(marketAcc)
   const feeBps = entryFeeBps(marketAcc, protocolAcc)
   const collateralHuman = amountHuman * (1 - feeBps / 10_000)
   const expected = estimateLmsrSharesOut({
@@ -203,8 +223,12 @@ function placeWagerMinSharesOut(
     amountScaled: collateralHuman,
     activeMask: snap.activeMask,
   })
+  if (tol <= 0) return { minSharesOut: new BN(0), expectedSharesHuman: expected }
   const minHuman = applySlippageFloor(expected, tol)
-  return new BN(Math.floor(minHuman * SCALE))
+  return {
+    minSharesOut: new BN(Math.floor(minHuman * SCALE)),
+    expectedSharesHuman: expected,
+  }
 }
 
 /**
@@ -550,13 +574,25 @@ export function usePlaceBatchWager() {
       const insuranceFund = protocolAcc.insuranceFund
       const userTokenAccount = await getAssociatedTokenAddress(quoteMint, user)
 
-      const ixs = await Promise.all(
-        pathIndices.map(async (pathIndex) => {
-          const [pathPda] = derivePathPda(marketId, pathIndex)
-          const [positionPda] = derivePositionPda(marketId, user, pathIndex)
-          const minSharesOut = placeWagerMinSharesOut(marketAcc, protocolAcc, pathIndex, amount)
+      const quoteSnap = readLmsrSnapshot(marketAcc)
+      const ixs: TransactionInstruction[] = []
+      for (const pathIndex of pathIndices) {
+        const [pathPda] = derivePathPda(marketId, pathIndex)
+        const [positionPda] = derivePositionPda(marketId, user, pathIndex)
+        const { minSharesOut, expectedSharesHuman } = placeWagerQuoteFromSnapshot(
+          marketAcc,
+          quoteSnap,
+          protocolAcc,
+          pathIndex,
+          amount,
+        )
+        if (Number.isFinite(expectedSharesHuman) && expectedSharesHuman > 0) {
+          quoteSnap.shareQuantities[pathIndex] =
+            (quoteSnap.shareQuantities[pathIndex] ?? 0) + expectedSharesHuman
+        }
 
-          return program.methods
+        ixs.push(
+          await program.methods
             .placeWager(pathIndex, scaledAmount, minSharesOut)
             .accountsPartial({
               protocolState: protocolPda,
@@ -571,9 +607,9 @@ export function usePlaceBatchWager() {
               tokenProgram: TOKEN_PROGRAM_ID,
               systemProgram: SystemProgram.programId,
             })
-            .instruction()
-        }),
-      )
+            .instruction(),
+        )
+      }
 
       const computeUnitLimit = Math.min(CU_LIMITS.placeWager * pathIndices.length, MAX_CU_PER_TX)
       return sendInstructions(program, ixs, computeUnitLimit)

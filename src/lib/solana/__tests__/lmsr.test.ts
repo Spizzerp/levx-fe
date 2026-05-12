@@ -7,23 +7,21 @@ import {
 } from '../lmsr'
 
 describe('estimateLmsrSharesOut', () => {
-  it('returns ~amount/marginalPrice for small wagers in a balanced market', () => {
-    // 4 paths, all q=0 → uniform p=0.25. Buying $1 should net ~$1/0.25 = 4 shares
-    // (approximately — small deviation from convexity).
+  it('matches the program quote for a fresh alpha-floor market', () => {
+    // Regression for SlippageExceeded on normal first wagers: the program uses
+    // adaptive LS-LMSR liquidity (b = alpha * sum(abs(q)), floored at 0.01),
+    // not b = alpha. Rust levx-math returns 533426 fixed-point shares here.
     const shares = estimateLmsrSharesOut({
-      shareQuantities: [0, 0, 0, 0],
-      numPaths: 4,
-      lmsrAlpha: 100,
+      shareQuantities: [0, 0, 0, 0, 0],
+      numPaths: 5,
+      lmsrAlpha: 1,
       pathIndex: 0,
       amountScaled: 1,
     })
-    expect(shares).toBeGreaterThan(3.9)
-    expect(shares).toBeLessThan(4.1)
+    expect(shares).toBeCloseTo(0.533426, 5)
   })
 
   it('penalizes path that already has heavy long quantity (worse fill)', () => {
-    // q=[10, 0, 0, 0] → p_0 ≈ 0.31, so 10 USDC into path 0 yields ~32 shares
-    // (less than the 40 you'd get if path 0 had q=0 like the others).
     const heavyShares = estimateLmsrSharesOut({
       shareQuantities: [10, 0, 0, 0],
       numPaths: 4,
@@ -127,15 +125,16 @@ describe('estimateLmsrExitPayout', () => {
 })
 
 describe('applySlippageFloor', () => {
-  it('returns floor(expected * (1 - tolerance))', () => {
-    expect(applySlippageFloor(100, 0.005)).toBe(99)
+  it('applies tolerance without dropping fixed-point precision', () => {
+    expect(applySlippageFloor(100, 0.005)).toBe(99.5)
     expect(applySlippageFloor(100, 0.01)).toBe(99)
     expect(applySlippageFloor(100, 0)).toBe(100)
+    expect(applySlippageFloor(0.533426, 0.005)).toBeCloseTo(0.53075887)
   })
 
   it('clamps tolerance to [0, 0.99] and floors at 0', () => {
     expect(applySlippageFloor(100, -1)).toBe(100)
-    expect(applySlippageFloor(100, 5)).toBe(1)
+    expect(applySlippageFloor(100, 5)).toBeCloseTo(1)
     expect(applySlippageFloor(0, 0.5)).toBe(0)
     expect(applySlippageFloor(-5, 0.5)).toBe(0)
   })
