@@ -1,3 +1,5 @@
+import { LMSR_MIN_B, SCALE } from '@/lib/constants'
+
 /**
  * Off-chain estimators for the on-chain LMSR cost-function used by
  * `place_wager` and `exit_position`. These power the slippage UX:
@@ -6,42 +8,52 @@
  * / `min_payout_out` floors that the program enforces.
  *
  * The on-chain implementation has two tiers (cache-fresh quadratic
- * vs. plain LMSR softmax). We mirror only the plain LMSR tier here —
- * the cache-fresh tier is a tighter approximation around the previous
- * checkpoint and the difference falls inside any non-zero slippage
- * tolerance the user picks. If we ever need exact matching we'd port
- * `quantum_cost::shares_for_budget` directly.
+ * vs. plain LMSR softmax). The frontend currently omits EigenCache from
+ * place_wager / exit_position, so the program takes the plain λ=0 tier.
+ * These estimators mirror that tier's adaptive LS-LMSR cost:
+ * b = alpha * Σ|q_active|, floored at MIN_B.
  *
- * Math, with quantities `q` and liquidity `b`:
+ * Math, with quantities `q` and adaptive liquidity `b(q)`:
  *
- *     C(q) = b * ln(Σ exp(q_j / b))
- *     Buy Δq of path k for amount a:
- *         a = C(q + Δq·e_k) − C(q)
- *         exp(q'_k / b) = exp(q_k / b) + (exp(a / b) − 1) · Σ exp(q_j / b)
- *         Δq = b · ln(exp(q'_k / b)) − q_k
- *     Sell s shares of path k:
- *         payout = C(q) − C(q − s·e_k)
+ *     C(q) = b(q) * ln(Σ exp(q_j / b(q)))
+ *     Buy Δq by binary search on C(q + Δq·e_k) − C(q) <= budget
+ *     Sell s shares: payout = C(q) − C(q − s·e_k)
  *
  * Stable via log-sum-exp shift. Inactive (dissolved) paths are dropped
  * because the program restricts cost-fn evaluation to the active mask.
  */
 
 const EPS = 1e-12
+const FIXED_POINT_ATOM = 1 / SCALE
+const MIN_B = LMSR_MIN_B / SCALE
 
 interface EstimateInput {
   /** Net signed share quantities per path, scaled by SCALE (human units). */
   shareQuantities: number[]
   /** Active path count (matches market.numPaths). */
   numPaths: number
-  /** LMSR liquidity parameter `b`, scaled (human units). */
+  /** LS-LMSR alpha parameter, scaled to human units. */
   lmsrAlpha: number
   /** Subset of path indices that are still active (default: all paths < numPaths). */
   activeMask?: boolean[]
 }
 
-function effectiveActive(input: EstimateInput): boolean[] {
-  if (input.activeMask) return input.activeMask
+export function effectiveActive(input: EstimateInput): boolean[] {
+  if (input.activeMask) return input.activeMask.slice(0, input.numPaths)
   return Array.from({ length: input.numPaths }, () => true)
+}
+
+function adaptiveLiquidity(
+  shareQuantities: number[],
+  active: boolean[],
+  numPaths: number,
+  lmsrAlpha: number,
+): number {
+  let sumAbs = 0
+  for (let i = 0; i < numPaths; i += 1) {
+    if (active[i]) sumAbs += Math.abs(shareQuantities[i] ?? 0)
+  }
+  return Math.max(MIN_B, lmsrAlpha * sumAbs)
 }
 
 /**
@@ -75,11 +87,23 @@ function logSumExp(
   return { lse: Math.log(sum) + maxQ / b, scaled, maxQ }
 }
 
+function adaptiveCost(
+  shareQuantities: number[],
+  active: boolean[],
+  numPaths: number,
+  lmsrAlpha: number,
+): number {
+  const b = adaptiveLiquidity(shareQuantities, active, numPaths, lmsrAlpha)
+  const { lse } = logSumExp(shareQuantities, active, numPaths, b)
+  if (!isFinite(lse)) return 0
+  return b * lse
+}
+
 /**
  * Estimate shares-out for a buy-side trade in `amountScaled` USDC of
  * path `pathIndex`. All inputs and outputs are in human (post-SCALE)
- * units. Returns the predicted shares-out the program would emit
- * (modulo the tier-1 EigenCache adjustment, see file header).
+ * units. Returns the predicted shares-out the program would emit on the
+ * plain λ=0 tier used by frontend-built wager instructions.
  *
  * Returns 0 for degenerate inputs (b ≤ 0, no active paths, dissolved
  * target path) — those cases would also be rejected by the program,
@@ -99,19 +123,36 @@ export function estimateLmsrSharesOut(
   const active = effectiveActive(input)
   if (!active[pathIndex]) return 0
 
-  const b = lmsrAlpha
-  const { scaled, maxQ } = logSumExp(shareQuantities, active, numPaths, b)
-  const sumExp = scaled.reduce((acc, v) => acc + v, 0)
-  if (sumExp <= EPS) return 0
+  const baseCost = adaptiveCost(shareQuantities, active, numPaths, lmsrAlpha)
 
-  // exp((q_k − maxQ) / b) is `scaled[pathIndex]`.
-  // After buying Δq of path k:
-  //   exp((q'_k − maxQ) / b) = scaled[pathIndex] + (exp(a/b) − 1) · sumExp
-  const newScaledK = scaled[pathIndex] + (Math.exp(amountScaled / b) - 1) * sumExp
-  if (newScaledK <= EPS) return 0
-  const newQK = b * (Math.log(newScaledK) + maxQ / b)
-  const delta = newQK - shareQuantities[pathIndex]
-  return delta > 0 ? delta : 0
+  const tradeCost = (sharesOut: number) => {
+    const qNext = shareQuantities.slice(0, numPaths)
+    qNext[pathIndex] = (qNext[pathIndex] ?? 0) + sharesOut
+    return adaptiveCost(qNext, active, numPaths, lmsrAlpha) - baseCost
+  }
+
+  const costOne = tradeCost(FIXED_POINT_ATOM)
+  if (costOne > amountScaled) return 0
+
+  const hiCostGrounded = costOne > EPS ? (amountScaled / costOne) * 2 * FIXED_POINT_ATOM : 0
+  const hiFallback = amountScaled * numPaths * 2
+  let lo = 0
+  let hi = Math.max(hiCostGrounded, hiFallback, FIXED_POINT_ATOM)
+
+  // Start with a marginal-cost bound, then expand until `hi` is above budget.
+  for (let i = 0; i < 32 && tradeCost(hi) <= amountScaled; i += 1) {
+    hi *= 2
+  }
+
+  for (let i = 0; i < 80; i += 1) {
+    const mid = lo + (hi - lo) / 2
+    if (hi - lo <= FIXED_POINT_ATOM) break
+
+    if (tradeCost(mid) <= amountScaled) lo = mid
+    else hi = mid
+  }
+
+  return Math.max(0, lo)
 }
 
 /**
@@ -136,25 +177,23 @@ export function estimateLmsrExitPayout(
   const active = effectiveActive(input)
   if (!active[pathIndex]) return 0
 
-  const b = lmsrAlpha
-  const before = logSumExp(shareQuantities, active, numPaths, b)
   const after = shareQuantities.slice()
   after[pathIndex] = shareQuantities[pathIndex] - sharesScaled
-  const afterLse = logSumExp(after, active, numPaths, b)
-  const payout = b * (before.lse - afterLse.lse)
+  const payout =
+    adaptiveCost(shareQuantities, active, numPaths, lmsrAlpha) -
+    adaptiveCost(after, active, numPaths, lmsrAlpha)
   return payout > 0 ? payout : 0
 }
 
 /**
- * Apply slippage tolerance to an expected output and floor at 0.
+ * Apply slippage tolerance to an expected output and return a human-unit float.
  *
  * tolerance is a decimal in [0, 1) — e.g. 0.005 = 0.5%.
- * Returns `floor(expected · (1 − tolerance))`. Floor (not round) is
- * intentional: we never want the FE-side floor to exceed what the
- * on-chain handler actually delivers due to off-by-rounding.
+ * Fixed-point integer conversion is handled by transaction builders; flooring
+ * here would drop sub-unit shares/payouts and silently weaken protection.
  */
-export function applySlippageFloor(expected: number, tolerance: number): number {
+export function applySlippageTolerance(expected: number, tolerance: number): number {
   if (!isFinite(expected) || expected <= 0) return 0
   const t = Math.max(0, Math.min(0.99, tolerance))
-  return Math.floor(expected * (1 - t))
+  return expected * (1 - t)
 }

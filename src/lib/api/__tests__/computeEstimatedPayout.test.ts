@@ -63,22 +63,23 @@ describe('computeEstimatedPayout', () => {
   })
 
   it('falls through to the LMSR mark-to-market estimate for active positions', () => {
-    // Balanced 4-path market, q=0 across the board → marginal price for
-    // path 0 is 1/4 = 0.25/share. Selling 45 shares pulls the price
-    // down as it executes (LMSR convexity), so the realized payout sits
-    // somewhere below the linear 45 × 0.25 = 11.25 estimate. Bound the
-    // estimator without pinning a magic number — the contract is
-    // "non-zero, finite, less than the linear marginal-price estimate."
+    // Model a reachable post-buy state: a 1 USDC fresh-market wager at
+    // lmsr_alpha=1 mints 533426 fixed-point shares on path 0, and the
+    // market's aggregate q includes those shares before exit.
     const result = computeEstimatedPayout({
-      positionRaw: rawPosition({ lmsrShares: new BN(45 * SCALE) }),
+      positionRaw: rawPosition({ collateral: new BN(SCALE), lmsrShares: new BN(533_426) }),
       pathDissolved: false,
       pathIndex: 0,
       marketState: 'active',
       ...baseMarket,
+      marketShareQuantitiesScaled: [0.533426, 0, 0, 0, 0],
+      marketLmsrAlphaScaled: 1,
+      marketAmplitudesScaled: [1, 1, 1, 1, 1],
+      marketNumPaths: 5,
     })
     expect(Number.isFinite(result)).toBe(true)
-    expect(result).toBeGreaterThan(0)
-    expect(result).toBeLessThan(11.25)
+    expect(result).toBeGreaterThan(0.99)
+    expect(result).toBeLessThanOrEqual(1)
   })
 
   it('returns 0 when LMSR shares are zero (e.g. fully exited but not yet swept)', () => {

@@ -29,6 +29,7 @@ import { ERROR_MAP, formatDecoded, lookupError } from './errorMap'
 import { logTransactionError } from './logTransactionError'
 import {
   deriveMarketPda,
+  deriveEigenCachePda,
   derivePathChunkPda,
   derivePathPda,
   derivePathUploadPda,
@@ -37,7 +38,7 @@ import {
 } from './pda'
 import { buildTransaction } from '@/lib/chain/buildTransaction'
 import { getPriorityFee } from '@/lib/chain/priorityFee'
-import { applySlippageFloor, estimateLmsrExitPayout, estimateLmsrSharesOut } from './lmsr'
+import { applySlippageTolerance, estimateLmsrExitPayout, estimateLmsrSharesOut } from './lmsr'
 import { buildPathChunks, computePathRoot, PATH_ORIGIN_USER_DRAWN } from './pathCommitments'
 
 const MAX_BATCH_SIZE = 4
@@ -158,10 +159,37 @@ function readLmsrSnapshot(marketAcc: any): LmsrSnapshot {
   const shareQuantities = (marketAcc.lmsrShareQuantities as BN[])
     .slice(0, numPaths)
     .map((q) => q.toNumber() / SCALE)
-  const amplitudes = (marketAcc.amplitudes as BN[]).slice(0, numPaths).map((a) => a.toNumber())
-  const activeMask = amplitudes.map((a) => a > 0)
+  const pricingActiveMask =
+    marketAcc.pricingActiveMask instanceof BN
+      ? marketAcc.pricingActiveMask.toNumber()
+      : Number(marketAcc.pricingActiveMask ?? 0)
+  const activeMask = Array.from(
+    { length: numPaths },
+    (_, idx) => (pricingActiveMask & (1 << idx)) !== 0,
+  )
   const lmsrAlpha = (marketAcc.lmsrAlpha as BN).toNumber() / SCALE
   return { numPaths, shareQuantities, lmsrAlpha, activeMask }
+}
+
+function cloneLmsrSnapshot(snap: LmsrSnapshot): LmsrSnapshot {
+  return {
+    ...snap,
+    shareQuantities: snap.shareQuantities.slice(),
+    activeMask: snap.activeMask.slice(),
+  }
+}
+
+function fixedPointFloorWithRoundingSlack(valueHuman: number): BN {
+  const safeHuman = Math.max(0, valueHuman - 1 / SCALE)
+  return new BN(Math.floor(safeHuman * SCALE))
+}
+
+function assertNoEigenCacheAccount(ix: TransactionInstruction, marketId: number): void {
+  const [eigenCachePda] = deriveEigenCachePda(marketId)
+  if (!ix.keys.some((meta) => meta.pubkey.equals(eigenCachePda))) return
+  throw new Error(
+    'EigenCache-aware slippage quoting is not implemented; do not pass EigenCache to FE-built wager/exit instructions.',
+  )
 }
 
 function entryFeeBps(marketAcc: any, protocolAcc: any): number {
@@ -190,9 +218,23 @@ function placeWagerMinSharesOut(
   pathIndex: number,
   amountHuman: number,
 ): BN {
+  return placeWagerQuoteFromSnapshot(
+    marketAcc,
+    readLmsrSnapshot(marketAcc),
+    protocolAcc,
+    pathIndex,
+    amountHuman,
+  ).minSharesOut
+}
+
+function placeWagerQuoteFromSnapshot(
+  marketAcc: any,
+  snap: LmsrSnapshot,
+  protocolAcc: any,
+  pathIndex: number,
+  amountHuman: number,
+): { minSharesOut: BN; expectedSharesHuman: number } {
   const tol = getSlippageTolerance()
-  if (tol <= 0) return new BN(0)
-  const snap = readLmsrSnapshot(marketAcc)
   const feeBps = entryFeeBps(marketAcc, protocolAcc)
   const collateralHuman = amountHuman * (1 - feeBps / 10_000)
   const expected = estimateLmsrSharesOut({
@@ -203,8 +245,12 @@ function placeWagerMinSharesOut(
     amountScaled: collateralHuman,
     activeMask: snap.activeMask,
   })
-  const minHuman = applySlippageFloor(expected, tol)
-  return new BN(Math.floor(minHuman * SCALE))
+  if (tol <= 0) return { minSharesOut: new BN(0), expectedSharesHuman: expected }
+  const minHuman = applySlippageTolerance(expected, tol)
+  return {
+    minSharesOut: fixedPointFloorWithRoundingSlack(minHuman),
+    expectedSharesHuman: expected,
+  }
 }
 
 /**
@@ -229,8 +275,8 @@ function exitPositionMinPayoutOut(marketAcc: any, protocolAcc: any, positionAcc:
     activeMask: snap.activeMask,
   })
   const userPayout = grossPayout * (1 - feeBps / 10_000)
-  const minHuman = applySlippageFloor(userPayout, tol)
-  return new BN(Math.floor(minHuman * SCALE))
+  const minHuman = applySlippageTolerance(userPayout, tol)
+  return fixedPointFloorWithRoundingSlack(minHuman)
 }
 
 /**
@@ -504,6 +550,7 @@ export function usePlaceWager() {
           systemProgram: SystemProgram.programId,
         })
         .instruction()
+      assertNoEigenCacheAccount(ix, marketId)
 
       return sendInstructions(program, [ix], CU_LIMITS.placeWager)
     },
@@ -550,30 +597,42 @@ export function usePlaceBatchWager() {
       const insuranceFund = protocolAcc.insuranceFund
       const userTokenAccount = await getAssociatedTokenAddress(quoteMint, user)
 
-      const ixs = await Promise.all(
-        pathIndices.map(async (pathIndex) => {
-          const [pathPda] = derivePathPda(marketId, pathIndex)
-          const [positionPda] = derivePositionPda(marketId, user, pathIndex)
-          const minSharesOut = placeWagerMinSharesOut(marketAcc, protocolAcc, pathIndex, amount)
+      const quoteSnap = cloneLmsrSnapshot(readLmsrSnapshot(marketAcc))
+      const ixs: TransactionInstruction[] = []
+      for (const pathIndex of pathIndices) {
+        const [pathPda] = derivePathPda(marketId, pathIndex)
+        const [positionPda] = derivePositionPda(marketId, user, pathIndex)
+        const { minSharesOut, expectedSharesHuman } = placeWagerQuoteFromSnapshot(
+          marketAcc,
+          quoteSnap,
+          protocolAcc,
+          pathIndex,
+          amount,
+        )
+        if (Number.isFinite(expectedSharesHuman) && expectedSharesHuman > 0) {
+          quoteSnap.shareQuantities[pathIndex] =
+            (quoteSnap.shareQuantities[pathIndex] ?? 0) + expectedSharesHuman
+        }
 
-          return program.methods
-            .placeWager(pathIndex, scaledAmount, minSharesOut)
-            .accountsPartial({
-              protocolState: protocolPda,
-              market: marketPda,
-              pathOutcome: pathPda,
-              position: positionPda,
-              vault,
-              treasury,
-              insuranceFund,
-              userTokenAccount,
-              user,
-              tokenProgram: TOKEN_PROGRAM_ID,
-              systemProgram: SystemProgram.programId,
-            })
-            .instruction()
-        }),
-      )
+        const ix = await program.methods
+          .placeWager(pathIndex, scaledAmount, minSharesOut)
+          .accountsPartial({
+            protocolState: protocolPda,
+            market: marketPda,
+            pathOutcome: pathPda,
+            position: positionPda,
+            vault,
+            treasury,
+            insuranceFund,
+            userTokenAccount,
+            user,
+            tokenProgram: TOKEN_PROGRAM_ID,
+            systemProgram: SystemProgram.programId,
+          })
+          .instruction()
+        assertNoEigenCacheAccount(ix, marketId)
+        ixs.push(ix)
+      }
 
       const computeUnitLimit = Math.min(CU_LIMITS.placeWager * pathIndices.length, MAX_CU_PER_TX)
       return sendInstructions(program, ixs, computeUnitLimit)
@@ -632,6 +691,7 @@ export function useExitPosition() {
           tokenProgram: TOKEN_PROGRAM_ID,
         })
         .instruction()
+      assertNoEigenCacheAccount(ix, marketId)
 
       return sendInstructions(program, [ix], CU_LIMITS.exitPosition)
     },

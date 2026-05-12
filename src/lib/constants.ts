@@ -1,6 +1,9 @@
 /** Fixed-point scale factor used across on-chain arithmetic. All u64 values ÷ SCALE for display. */
 export const SCALE = 1_000_000
 
+/** Mirror of on-chain `levx-math/src/lmsr.rs:20` MIN_B. Keep in sync. */
+export const LMSR_MIN_B = 10_000
+
 /** Per-instruction compute-unit budgets. Static; could be replaced with simulate-derived values later. */
 export const CU_LIMITS = {
   addPath: 100_000,
