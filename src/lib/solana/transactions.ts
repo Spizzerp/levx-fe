@@ -676,6 +676,8 @@ export function usePlaceBatchWager() {
         let lowerBoundHuman = Infinity
         const nextBranches: Array<{ snap: LmsrSnapshot; eigenCache?: EigenCacheQuoteSnapshot }> = []
 
+        // Conservative lower-bound exploration: each prior leg may execute
+        // through either EigenCache or LMSR fallback, mutating q differently.
         for (const branch of quoteBranches) {
           const quote = placeWagerQuoteFromSnapshot(
             marketAcc,

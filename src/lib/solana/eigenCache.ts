@@ -37,6 +37,8 @@ export interface EigenCachePolicy {
 }
 
 function bnToNumber(value: BN | number | undefined | null): number {
+  // EigenCache fields read here are bounded in practice: lambda <= SCALE,
+  // pricing masks are u16, and lipschitz is SCALE^2 / b with b >= MIN_B.
   if (typeof value === 'number') return value
   if (value && typeof value.toNumber === 'function') return value.toNumber()
   return Number(value ?? 0)
@@ -123,7 +125,7 @@ export function evaluateEigenCachePolicy(args: {
   if (
     !pubkeyEquals(cacheAcc.market, marketPda) ||
     cachedPrices.length < numPaths ||
-    checkpointQuantities.length !== numPaths ||
+    checkpointQuantities.length < numPaths ||
     lipschitzRaw <= 0
   ) {
     return { status: 'unusable', quoteTier: 'lmsr_fallback', cachePda }
