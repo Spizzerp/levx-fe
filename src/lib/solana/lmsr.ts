@@ -26,6 +26,9 @@ import { LMSR_MIN_B, SCALE } from '@/lib/constants'
 const EPS = 1e-12
 const FIXED_POINT_ATOM = 1 / SCALE
 const MIN_B = LMSR_MIN_B / SCALE
+const SCALE_BIGINT = BigInt(SCALE)
+const I64_MIN = -(1n << 63n)
+const I64_MAX = (1n << 63n) - 1n
 
 interface EstimateInput {
   /** Net signed share quantities per path, scaled by SCALE (human units). */
@@ -36,6 +39,18 @@ interface EstimateInput {
   lmsrAlpha: number
   /** Subset of path indices that are still active (default: all paths < numPaths). */
   activeMask?: boolean[]
+}
+
+export interface QuadraticEstimateInput {
+  /** Current net signed share quantities per path, in human units. */
+  shareQuantities: number[]
+  /** EigenCache checkpoint quantities, in human units. */
+  checkpointQuantities: number[]
+  /** EigenCache cached prices, in human probability units. */
+  cachedPrices: number[]
+  /** EigenCache Lipschitz constant, in human units (`raw / SCALE`). */
+  lipschitz: number
+  pathIndex: number
 }
 
 export function effectiveActive(input: EstimateInput): boolean[] {
@@ -183,6 +198,131 @@ export function estimateLmsrExitPayout(
     adaptiveCost(shareQuantities, active, numPaths, lmsrAlpha) -
     adaptiveCost(after, active, numPaths, lmsrAlpha)
   return payout > 0 ? payout : 0
+}
+
+function toRawFixedPoint(value: number): bigint {
+  if (!Number.isFinite(value)) return 0n
+  return BigInt(Math.trunc(value * SCALE))
+}
+
+function toRawUnsignedFixedPoint(value: number): bigint {
+  if (!Number.isFinite(value) || value <= 0) return 0n
+  return BigInt(Math.floor(value * SCALE))
+}
+
+function fromRawFixedPoint(value: bigint): number {
+  return Number(value) / SCALE
+}
+
+function sqrtBigInt(n: bigint): bigint {
+  if (n <= 0n) return 0n
+  if (n === 1n) return 1n
+  let x = n
+  let y = (x + 1n) / 2n
+  while (y < x) {
+    x = y
+    y = (x + n / x) / 2n
+  }
+  return x
+}
+
+function saturatingSubI64(a: bigint, b: bigint): bigint {
+  const out = a - b
+  if (out < I64_MIN) return I64_MIN
+  if (out > I64_MAX) return I64_MAX
+  return out
+}
+
+function effectiveQuadraticPriceRaw(input: QuadraticEstimateInput): bigint {
+  const { shareQuantities, checkpointQuantities, cachedPrices, lipschitz, pathIndex } = input
+  const pBase = toRawUnsignedFixedPoint(cachedPrices[pathIndex] ?? 0)
+  const l = toRawUnsignedFixedPoint(lipschitz)
+  if (pBase <= 0n || l <= 0n) return 0n
+
+  const q = toRawFixedPoint(shareQuantities[pathIndex] ?? 0)
+  const qCheckpoint = toRawFixedPoint(checkpointQuantities[pathIndex] ?? 0)
+  const delta = saturatingSubI64(q, qCheckpoint)
+  if (delta >= 0n) {
+    const adjustment = (l * delta) / SCALE_BIGINT
+    const raised = pBase + adjustment
+    return raised > SCALE_BIGINT ? SCALE_BIGINT : raised
+  }
+
+  const decrease = (l * -delta) / SCALE_BIGINT
+  const lowered = pBase > decrease ? pBase - decrease : 0n
+  return lowered < 1n ? 1n : lowered
+}
+
+function sharesForBudgetQuadraticRaw(
+  effectivePriceRaw: bigint,
+  lipschitzRaw: bigint,
+  budgetRaw: bigint,
+): bigint {
+  if (budgetRaw <= 0n || lipschitzRaw <= 0n) return 0n
+  const discriminant = effectivePriceRaw * effectivePriceRaw + 2n * lipschitzRaw * budgetRaw
+  const sqrtDisc = sqrtBigInt(discriminant)
+  const numerator = sqrtDisc > effectivePriceRaw ? sqrtDisc - effectivePriceRaw : 0n
+  if (numerator === 0n) return 0n
+  return (numerator * SCALE_BIGINT) / lipschitzRaw
+}
+
+function quadraticCostRaw(
+  effectivePriceRaw: bigint,
+  lipschitzRaw: bigint,
+  sharesRaw: bigint,
+): bigint {
+  if (sharesRaw === 0n) return 0n
+  const s = sharesRaw < 0n ? -sharesRaw : sharesRaw
+  const linear = (effectivePriceRaw * s) / SCALE_BIGINT
+  const quadratic = (lipschitzRaw * s * s) / (2n * SCALE_BIGINT * SCALE_BIGINT)
+  return linear + quadratic
+}
+
+function quadraticSellValueRaw(
+  effectivePriceRaw: bigint,
+  lipschitzRaw: bigint,
+  sharesRaw: bigint,
+): bigint {
+  if (sharesRaw <= 0n) return 0n
+  const linear = (effectivePriceRaw * sharesRaw) / SCALE_BIGINT
+  const quadratic = (lipschitzRaw * sharesRaw * sharesRaw) / (2n * SCALE_BIGINT * SCALE_BIGINT)
+  return linear > quadratic ? linear - quadratic : 0n
+}
+
+/**
+ * Estimate EigenCache Tier-1 buy shares using the same fixed-point quadratic
+ * rule as `shares_for_budget_quadratic` and the program's effective-price cap.
+ * Returns a human-unit float for UI/transaction lower-bound composition.
+ */
+export function estimateQuadraticSharesOut(
+  input: QuadraticEstimateInput & { amountScaled: number },
+): number {
+  const { pathIndex, cachedPrices, checkpointQuantities, shareQuantities, amountScaled } = input
+  if (pathIndex < 0 || pathIndex >= cachedPrices.length) return 0
+  if (checkpointQuantities.length <= pathIndex || shareQuantities.length <= pathIndex) return 0
+  const l = toRawUnsignedFixedPoint(input.lipschitz)
+  const budget = toRawUnsignedFixedPoint(amountScaled)
+  const pEff = effectiveQuadraticPriceRaw(input)
+  const shares = sharesForBudgetQuadraticRaw(pEff, l, budget)
+  if (quadraticCostRaw(pEff, l, shares) > budget) return 0
+  return fromRawFixedPoint(shares)
+}
+
+/**
+ * Estimate EigenCache Tier-1 exit payout using the on-chain quadratic sell
+ * value formula. The value is gross of settlement rake; callers apply rake
+ * before computing `min_payout_out`, matching `exit_position`.
+ */
+export function estimateQuadraticExitPayout(
+  input: QuadraticEstimateInput & { sharesScaled: number },
+): number {
+  const { pathIndex, cachedPrices, checkpointQuantities, shareQuantities, sharesScaled } = input
+  if (pathIndex < 0 || pathIndex >= cachedPrices.length) return 0
+  if (checkpointQuantities.length <= pathIndex || shareQuantities.length <= pathIndex) return 0
+  const l = toRawUnsignedFixedPoint(input.lipschitz)
+  const shares = toRawUnsignedFixedPoint(sharesScaled)
+  const pEff = effectiveQuadraticPriceRaw(input)
+  return fromRawFixedPoint(quadraticSellValueRaw(pEff, l, shares))
 }
 
 /**

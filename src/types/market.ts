@@ -27,6 +27,14 @@ export type PathTone = 'ultra-bull' | 'bull' | 'neutral' | 'bear' | 'ultra-bear'
 
 /** Maps to on-chain PathOrigin enum: Ai → 'ai', UserDrawn → 'user'. */
 export type PathOrigin = 'ai' | 'user'
+export type EigenCacheStatus =
+  | 'disabled'
+  | 'lambda_zero'
+  | 'missing'
+  | 'stale'
+  | 'fresh'
+  | 'unusable'
+  | 'rpc_error'
 
 /* ── Price data ────────────────────────────────────────────── */
 
@@ -156,10 +164,13 @@ export interface Market {
   amplitudes: number[]
   /** LMSR share quantities per path (up to 16, signed) */
   lmsrShareQuantities: number[]
+  /** Program liveness mask used by LMSR and EigenCache pricing. */
+  pricingActiveMask: number
   /** LMSR liquidity parameter `b` (already divided by SCALE). Drives cost-function curvature. */
   lmsrAlpha: number
   /** Quantum coupling strength (0 = pure LMSR) */
   lambda: number
+  eigenCacheStatus?: EigenCacheStatus
   /** Rate at which deviating paths decohere */
   decoherenceRate: number
   /** Minimum Born probability below which a path decoheres (fixed-point) */

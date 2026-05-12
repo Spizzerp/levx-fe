@@ -31,6 +31,7 @@ const ON_CHAIN_DEFAULTS: Pick<
   | 'targetNumPaths'
   | 'amplitudes'
   | 'lmsrShareQuantities'
+  | 'pricingActiveMask'
   | 'lmsrAlpha'
   | 'lambda'
   | 'decoherenceRate'
@@ -44,6 +45,7 @@ const ON_CHAIN_DEFAULTS: Pick<
   targetNumPaths: 3,
   amplitudes: [],
   lmsrShareQuantities: [],
+  pricingActiveMask: 0,
   lmsrAlpha: 100_000,
   lambda: 0,
   decoherenceRate: 500_000,
@@ -55,7 +57,10 @@ const ON_CHAIN_DEFAULTS: Pick<
 }
 
 /** Factory to keep fixture rows terse — override per-state fields as needed. */
-function makeMarket(overrides: Partial<Market> & Pick<Market, 'id' | 'marketId' | 'pair' | 'base' | 'quote' | 'state'>): Market {
+function makeMarket(
+  overrides: Partial<Market> &
+    Pick<Market, 'id' | 'marketId' | 'pair' | 'base' | 'quote' | 'state'>,
+): Market {
   const now = Date.now()
   return {
     pool: 100_000,

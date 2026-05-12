@@ -103,6 +103,7 @@ const mockMarket = (overrides: Partial<Market> = {}): Market => {
     targetNumPaths: 3,
     amplitudes: [],
     lmsrShareQuantities: [],
+    pricingActiveMask: 0,
     lmsrAlpha: 100_000,
     lambda: 0,
     decoherenceRate: 500_000,

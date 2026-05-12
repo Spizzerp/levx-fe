@@ -51,6 +51,7 @@ function makeMarket(overrides: Partial<Market> = {}): Market {
     targetNumPaths: 3,
     amplitudes: [],
     lmsrShareQuantities: [],
+    pricingActiveMask: 0,
     lmsrAlpha: 0,
     lambda: 0,
     decoherenceRate: 0,
