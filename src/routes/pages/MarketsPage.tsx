@@ -515,7 +515,7 @@ export function MarketsPage() {
                 layout
                 className={cn(
                   'grid gap-6',
-                  'grid-cols-1 sm:grid-cols-2 [@media(min-width:1201px)]:grid-cols-3',
+                  'grid-cols-1 [@media(min-width:700px)_and_(max-width:1200px)]:grid-cols-2 [@media(min-width:1201px)]:grid-cols-3',
                 )}
               >
                 <AnimatePresence mode="popLayout">

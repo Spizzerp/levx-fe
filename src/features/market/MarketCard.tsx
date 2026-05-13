@@ -4,6 +4,7 @@ import { StatusDot } from '@/ui/StatusDot'
 import { TokenPairIcon } from '@/ui/TokenPairIcon'
 import { cn } from '@/lib/cn'
 import { formatCountdown, formatMarketDurationLabel, formatShortDate } from '@/lib/format'
+import { useMarket } from '@/lib/chain'
 import { getMarketDisplayState } from '@/lib/market/status'
 
 import type { Market, MarketState } from '@/types/market'
@@ -77,6 +78,9 @@ export function MarketCard({ market, now, onClick }: MarketCardProps) {
     pair: market.pair,
     interval: '1h',
   })
+  const shouldHydratePathPreview = market.paths.length === 0 && market.numPaths > 0
+  const { data: hydratedMarket } = useMarket(shouldHydratePathPreview ? market.id : undefined)
+  const pathsForChart = market.paths.length > 0 ? market.paths : (hydratedMarket?.paths ?? [])
 
   const historyToUse = realHistory && realHistory.length > 0 ? realHistory : market.history
   const liveHistory = useMemo(
@@ -192,7 +196,7 @@ export function MarketCard({ market, now, onClick }: MarketCardProps) {
         >
           <MarketMiniChart
             history={liveHistory}
-            paths={market.paths.length > 0 ? market.paths : undefined}
+            paths={pathsForChart.length > 0 ? pathsForChart : undefined}
             nowTime={now}
             marketStart={market.startTime}
             marketEnd={market.endTime}

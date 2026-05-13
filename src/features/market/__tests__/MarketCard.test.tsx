@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
 
 import { MarketCard } from '@/features/market/MarketCard'
@@ -23,6 +23,11 @@ vi.mock('@/lib/pyth/useBenchmarksHistory', () => ({
 const useLatestPriceMock = vi.fn()
 vi.mock('@/lib/pyth/hooks', () => ({
   useLatestPrice: (...args: unknown[]) => useLatestPriceMock(...args),
+}))
+
+const useMarketMock = vi.fn()
+vi.mock('@/lib/chain', () => ({
+  useMarket: (...args: unknown[]) => useMarketMock(...args),
 }))
 
 function makeMarket(overrides: Partial<Market> = {}): Market {
@@ -64,6 +69,12 @@ function makeMarket(overrides: Partial<Market> = {}): Market {
 }
 
 describe('MarketCard', () => {
+  beforeEach(() => {
+    useBenchmarksHistoryMock.mockReturnValue({ data: undefined })
+    useLatestPriceMock.mockReturnValue(null)
+    useMarketMock.mockReturnValue({ data: undefined })
+  })
+
   it('calculates percentage from market start price to the live Pyth price', () => {
     const market = makeMarket()
     const history = [
@@ -85,5 +96,66 @@ describe('MarketCard', () => {
     expect(screen.getByText('+10.00%')).toBeInTheDocument()
     expect(screen.getByText('ID: 30')).toBeInTheDocument()
     expect(screen.getByText('Active')).toBeInTheDocument()
+  })
+
+  it('renders hydrated AI path previews when list markets only include path counts', () => {
+    const market = makeMarket({
+      numPaths: 1,
+      paths: [],
+      history: [
+        { time: Date.UTC(2026, 4, 7, 12), value: 100 },
+        { time: Date.UTC(2026, 4, 8, 12), value: 101 },
+      ],
+    })
+    const hydratedPath = {
+      id: 'path-0',
+      label: 'Path A',
+      tone: 'bull' as const,
+      origin: 'ai' as const,
+      multiplier: 1,
+      data: [
+        { time: market.startTime, value: 100 },
+        { time: market.startTime + 24 * 60 * 60 * 1000, value: 105 },
+        { time: market.endTime, value: 115 },
+      ],
+      pathIndex: 0,
+      predictedPrices: [100, 105, 115],
+      numCheckpoints: 3,
+      generationTimestamp: market.startTime,
+      creator: '',
+      cumulativeAction: 0,
+      compositeScore: 0,
+      peakAmplitude: 0,
+      amplitudeAtDecoherence: 0,
+      dissolved: false,
+      dissolvedAtCheckpoint: 0,
+      checkpointsProcessed: 0,
+      createdAtCheckpoint: 0,
+      firstActiveCheckpoint: 0,
+      totalWagered: 0,
+      totalLeveragedExposure: 0,
+      lmsrSharesOutstanding: 0,
+      totalTimeWeightedExposure: 0,
+      currentImpliedProbability: 0,
+      initialAmplitude: 0,
+    } satisfies Market['paths'][number]
+
+    useMarketMock.mockReturnValue({
+      data: {
+        ...market,
+        paths: [hydratedPath],
+      },
+    })
+
+    const { container } = render(
+      <MarketCard
+        market={market}
+        now={market.startTime + 12 * 60 * 60 * 1000}
+        onClick={vi.fn()}
+      />,
+    )
+
+    expect(useMarketMock).toHaveBeenCalledWith(market.id)
+    expect(container.querySelectorAll('path[stroke-dasharray="4 4"]').length).toBeGreaterThan(0)
   })
 })
