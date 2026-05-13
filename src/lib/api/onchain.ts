@@ -158,6 +158,39 @@ async function hydrateChunkedPath(program: any, pathRaw: any): Promise<any> {
   }
 }
 
+async function fetchMarketPaths(
+  program: any,
+  args: { marketId: number; marketPda: PublicKey; raw: any },
+): Promise<Market['paths']> {
+  const { marketId, marketPda, raw } = args
+  const numPaths = raw.numPaths as number
+  const pathPromises = Array.from({ length: numPaths }, async (_, i) => {
+    const [pathPda] = derivePathPda(marketId, i)
+    try {
+      return await fetchPathOutcome(program, pathPda, { market: marketPda, marketId, pathIndex: i })
+    } catch (err) {
+      console.warn(
+        `[onchain] Skipping undecodable path ${i} for market ${marketId}:`,
+        (err as Error).message,
+      )
+      return null
+    }
+  })
+  const pathRaws: any[] = (await Promise.all(pathPromises)).filter(Boolean)
+
+  const startTimeMs = raw.startTime.toNumber() * 1000
+  const checkpointInterval = raw.checkpointInterval as number
+
+  const hydratedPathRaws = await Promise.all(
+    pathRaws.map((pathRaw: any) => hydrateChunkedPath(program, pathRaw)),
+  )
+  return hydratedPathRaws.map((pathRaw: any) => {
+    const path = anchorPathToFE(pathRaw, startTimeMs, checkpointInterval)
+    applyDerivedPathDisplay(path)
+    return path
+  })
+}
+
 export async function getMarkets(): Promise<Market[]> {
   const program = getReadOnlyProgram()
   let allMarkets: any[]
@@ -210,35 +243,25 @@ export async function getMarket(id: string): Promise<Market> {
   market.base = pairInfo.base
   market.quote = pairInfo.quote
 
-  // Fetch all paths for this market
-  const numPaths = raw.numPaths as number
-  const pathPromises = Array.from({ length: numPaths }, async (_, i) => {
-    const [pathPda] = derivePathPda(marketId, i)
-    try {
-      return await fetchPathOutcome(program, pathPda, { market: marketPda, marketId, pathIndex: i })
-    } catch (err) {
-      console.warn(
-        `[onchain] Skipping undecodable path ${i} for market ${marketId}:`,
-        (err as Error).message,
-      )
-      return null
-    }
-  })
-  const pathRaws: any[] = (await Promise.all(pathPromises)).filter(Boolean)
-
-  const startTimeMs = raw.startTime.toNumber() * 1000
-  const checkpointInterval = raw.checkpointInterval as number
-
-  const hydratedPathRaws = await Promise.all(
-    pathRaws.map((pathRaw: any) => hydrateChunkedPath(program, pathRaw)),
-  )
-  market.paths = hydratedPathRaws.map((pathRaw: any) => {
-    const path = anchorPathToFE(pathRaw, startTimeMs, checkpointInterval)
-    applyDerivedPathDisplay(path)
-    return path
-  })
+  market.paths = await fetchMarketPaths(program, { marketId, marketPda, raw })
 
   return market
+}
+
+export async function getMarketPathPreviews(
+  marketIds: readonly string[],
+): Promise<Record<string, Market['paths']>> {
+  const program = getReadOnlyProgram()
+  const entries = await Promise.all(
+    marketIds.map(async (id) => {
+      const marketId = Number(id)
+      const [marketPda] = deriveMarketPda(marketId)
+      const raw: any = await program.account.market.fetch(marketPda)
+      const paths = await fetchMarketPaths(program, { marketId, marketPda, raw })
+      return [id, paths] as const
+    }),
+  )
+  return Object.fromEntries(entries)
 }
 
 /**

@@ -3,4 +3,10 @@
  * Phase 3: replace these re-exports with Anchor account reads. Signature is frozen.
  * Rule: page-level code imports from '@/lib/chain', never from '@/lib/api/hooks' directly.
  */
-export { useMarkets, useMarket, useUserPosition, useUserPositions } from '@/lib/api/hooks'
+export {
+  useMarkets,
+  useMarket,
+  useMarketPathPreviews,
+  useUserPosition,
+  useUserPositions,
+} from '@/lib/api/hooks'

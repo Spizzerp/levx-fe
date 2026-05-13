@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import type { ReactNode } from 'react'
 
 // Mock env config before any other imports (mirrors MarketPage.test.tsx)
 vi.mock('@/env/env.config', () => ({
@@ -16,22 +17,33 @@ vi.mock('@/env/env.config', () => ({
 
 // Mock navigate so the DataTable row click doesn't crash outside the router
 const navigateSpy = vi.fn()
+let searchParams: { view?: 'table' | 'grid' } = {}
 vi.mock('@tanstack/react-router', async () => {
   const actual =
     await vi.importActual<typeof import('@tanstack/react-router')>('@tanstack/react-router')
   return {
     ...actual,
     useNavigate: () => navigateSpy,
-    useSearch: () => ({}),
+    useSearch: () => searchParams,
   }
 })
 
+vi.mock('@visx/responsive', () => ({
+  ParentSize: ({
+    children,
+  }: {
+    children: (args: { width: number; height: number }) => ReactNode
+  }) => children({ width: 640, height: 160 }),
+}))
+
 // Mock useMarkets from the chain seam — this plan flips the import to @/lib/chain
+const useMarketPathPreviewsMock = vi.fn()
 vi.mock('@/lib/chain', async () => {
   const actual = await vi.importActual<typeof import('@/lib/chain')>('@/lib/chain')
   return {
     ...actual,
     useMarkets: vi.fn(),
+    useMarketPathPreviews: (...args: unknown[]) => useMarketPathPreviewsMock(...args),
   }
 })
 
@@ -121,6 +133,41 @@ function makeMarketsAcrossStates(): Market[] {
   ]
 }
 
+function makePathPreview(market: Market): Market['paths'][number] {
+  return {
+    id: `${market.id}-path-0`,
+    label: 'Path A',
+    tone: 'bull',
+    origin: 'ai',
+    multiplier: 1,
+    data: [
+      { time: market.startTime, value: 100 },
+      { time: market.startTime + 24 * 60 * 60 * 1000, value: 105 },
+      { time: market.endTime, value: 115 },
+    ],
+    pathIndex: 0,
+    predictedPrices: [100, 105, 115],
+    numCheckpoints: 3,
+    generationTimestamp: market.startTime,
+    creator: '',
+    cumulativeAction: 0,
+    compositeScore: 0,
+    peakAmplitude: 0,
+    amplitudeAtDecoherence: 0,
+    dissolved: false,
+    dissolvedAtCheckpoint: 0,
+    checkpointsProcessed: 0,
+    createdAtCheckpoint: 0,
+    firstActiveCheckpoint: 0,
+    totalWagered: 0,
+    totalLeveragedExposure: 0,
+    lmsrSharesOutstanding: 0,
+    totalTimeWeightedExposure: 0,
+    currentImpliedProbability: 0,
+    initialAmplitude: 0,
+  }
+}
+
 function renderPage() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
@@ -148,6 +195,9 @@ async function setUseMarkets(result: {
 
 beforeEach(() => {
   navigateSpy.mockClear()
+  searchParams = {}
+  useMarketPathPreviewsMock.mockReset()
+  useMarketPathPreviewsMock.mockReturnValue({ data: {} })
 })
 
 describe('MarketsPage', () => {
@@ -163,6 +213,45 @@ describe('MarketsPage', () => {
     await setUseMarkets({ data: makeMarketsAcrossStates() })
     renderPage()
     expect(navigateSpy).not.toHaveBeenCalled()
+  })
+
+  it('hydrates missing grid path previews with one page-level query', async () => {
+    searchParams = { view: 'grid' }
+    const baseMarket = makeMarket({
+      id: 'act',
+      pair: 'BTC/USDC',
+      state: 'active',
+      numPaths: 1,
+      paths: [],
+      history: [
+        { time: Date.now() - 60 * 60 * 1000, value: 100 },
+        { time: Date.now(), value: 101 },
+      ],
+    })
+    const market = {
+      ...baseMarket,
+      paths: [
+        {
+          ...makePathPreview(baseMarket),
+          data: [],
+          predictedPrices: [],
+          numCheckpoints: 0,
+        },
+      ],
+    }
+    useMarketPathPreviewsMock.mockReturnValue({
+      data: {
+        [market.id]: [makePathPreview(market)],
+      },
+    })
+    await setUseMarkets({ data: [market] })
+
+    const { container } = renderPage()
+
+    expect(useMarketPathPreviewsMock).toHaveBeenCalledWith([market.id])
+    expect(container.querySelectorAll('[data-testid="market-mini-ai-path"]').length).toBeGreaterThan(
+      0,
+    )
   })
 
   it('renders a Paths column in the DataTable header (MARKET-01)', async () => {

@@ -197,6 +197,7 @@ function MiniChartInner({
             <g key={path.id}>
               {segments.elapsed.length > 1 && (
                 <LinePath<PricePoint>
+                  data-testid={path.origin === 'ai' ? 'market-mini-ai-path' : undefined}
                   data={segments.elapsed}
                   x={(d) => timeScale(d.time) ?? 0}
                   y={(d) => priceScale(d.value) ?? 0}
@@ -211,6 +212,7 @@ function MiniChartInner({
               )}
               {segments.future.length > 1 && (
                 <LinePath<PricePoint>
+                  data-testid={path.origin === 'ai' ? 'market-mini-ai-path' : undefined}
                   data={segments.future}
                   x={(d) => timeScale(d.time) ?? 0}
                   y={(d) => priceScale(d.value) ?? 0}

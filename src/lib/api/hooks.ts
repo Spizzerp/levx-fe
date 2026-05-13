@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import type { PublicKey } from '@solana/web3.js'
+import { useMemo } from 'react'
 
 import type { CurrentPrice, Market, UserPosition } from '@/types/market'
 import { useWalletStore } from '@/stores/walletStore'
@@ -22,6 +23,7 @@ const MARKETS_REFETCH_MS = 60_000
 const MARKET_REFETCH_MS = 60_000
 const POSITIONS_REFETCH_MS = 60_000
 const STALE_MS = 5_000
+const PATH_PREVIEWS_STALE_MS = 60_000
 
 async function getApi() {
   if (USE_MOCK) {
@@ -52,6 +54,21 @@ export function useMarket(id: string | undefined) {
     enabled: !!id,
     refetchInterval: MARKET_REFETCH_MS,
     staleTime: STALE_MS,
+  })
+}
+
+export function useMarketPathPreviews(marketIds: readonly string[]) {
+  const normalizedIds = useMemo(() => Array.from(new Set(marketIds)).sort(), [marketIds])
+
+  return useQuery({
+    queryKey: ['marketPathPreviews', normalizedIds],
+    queryFn: async (): Promise<Record<string, Market['paths']>> => {
+      const api = await getApi()
+      return api.getMarketPathPreviews(normalizedIds)
+    },
+    enabled: normalizedIds.length > 0,
+    refetchInterval: false,
+    staleTime: PATH_PREVIEWS_STALE_MS,
   })
 }
 

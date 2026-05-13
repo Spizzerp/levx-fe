@@ -25,11 +25,6 @@ vi.mock('@/lib/pyth/hooks', () => ({
   useLatestPrice: (...args: unknown[]) => useLatestPriceMock(...args),
 }))
 
-const useMarketMock = vi.fn()
-vi.mock('@/lib/chain', () => ({
-  useMarket: (...args: unknown[]) => useMarketMock(...args),
-}))
-
 function makeMarket(overrides: Partial<Market> = {}): Market {
   const startTime = Date.UTC(2026, 4, 7, 12)
   const base: Market = {
@@ -72,7 +67,6 @@ describe('MarketCard', () => {
   beforeEach(() => {
     useBenchmarksHistoryMock.mockReturnValue({ data: undefined })
     useLatestPriceMock.mockReturnValue(null)
-    useMarketMock.mockReturnValue({ data: undefined })
   })
 
   it('calculates percentage from market start price to the live Pyth price', () => {
@@ -98,10 +92,9 @@ describe('MarketCard', () => {
     expect(screen.getByText('Active')).toBeInTheDocument()
   })
 
-  it('renders hydrated AI path previews when list markets only include path counts', () => {
+  it('renders AI path previews supplied by parent hydration', () => {
     const market = makeMarket({
       numPaths: 1,
-      paths: [],
       history: [
         { time: Date.UTC(2026, 4, 7, 12), value: 100 },
         { time: Date.UTC(2026, 4, 8, 12), value: 101 },
@@ -140,22 +133,16 @@ describe('MarketCard', () => {
       initialAmplitude: 0,
     } satisfies Market['paths'][number]
 
-    useMarketMock.mockReturnValue({
-      data: {
-        ...market,
-        paths: [hydratedPath],
-      },
-    })
-
     const { container } = render(
       <MarketCard
-        market={market}
+        market={{ ...market, paths: [hydratedPath] }}
         now={market.startTime + 12 * 60 * 60 * 1000}
         onClick={vi.fn()}
       />,
     )
 
-    expect(useMarketMock).toHaveBeenCalledWith(market.id)
-    expect(container.querySelectorAll('path[stroke-dasharray="4 4"]').length).toBeGreaterThan(0)
+    expect(container.querySelectorAll('[data-testid="market-mini-ai-path"]').length).toBeGreaterThan(
+      0,
+    )
   })
 })
