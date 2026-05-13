@@ -12,7 +12,14 @@ import type { Market, MarketState, PathTone, UserPosition } from '@/types/market
 import { anchorMarketToFE, anchorPathToFE, anchorPositionToFE, parseMarketState } from './adapters'
 import { resolveBaseMintLabel } from './pairLabels'
 import { getReadOnlyProgram } from '../solana/program'
-import { PROGRAM_ID, deriveMarketPda, derivePathChunkPda, derivePathPda, derivePositionPda } from '../solana/pda'
+import {
+  PROGRAM_ID,
+  deriveMarketPda,
+  derivePathChunkPda,
+  derivePathPda,
+  derivePositionPda,
+} from '../solana/pda'
+import { activeMaskFromPricingMask, loadEigenCachePolicy } from '../solana/eigenCache'
 import { estimateLmsrExitPayout } from '../solana/lmsr'
 import { SCALE } from '@/lib/constants'
 import { formatAiPathLabel } from '@/lib/pathLabels'
@@ -28,9 +35,9 @@ function deriveTone(predictedPrices: number[]): DerivedPathTone {
   const first = predictedPrices[0]
   const last = predictedPrices[predictedPrices.length - 1]
   const pctChange = (last - first) / first
-  if (pctChange > 0.10) return 'ultra-bull'
+  if (pctChange > 0.1) return 'ultra-bull'
   if (pctChange > 0.03) return 'bull'
-  if (pctChange < -0.10) return 'ultra-bear'
+  if (pctChange < -0.1) return 'ultra-bear'
   if (pctChange < -0.03) return 'bear'
   return 'neutral'
 }
@@ -65,11 +72,12 @@ const PATH_OUTCOME_FIXED_ACCOUNT_SIZE = 310
 
 function readU32LE(data: Uint8Array, offset: number): number {
   return (
-    data[offset] |
-    (data[offset + 1] << 8) |
-    (data[offset + 2] << 16) |
-    (data[offset + 3] << 24)
-  ) >>> 0
+    (data[offset] |
+      (data[offset + 1] << 8) |
+      (data[offset + 2] << 16) |
+      (data[offset + 3] << 24)) >>>
+    0
+  )
 }
 
 function assertCurrentPathOutcomeLayout(data: Uint8Array, label: string): void {
@@ -237,6 +245,7 @@ export async function getMarket(id: string): Promise<Market> {
 
   const raw: any = await program.account.market.fetch(marketPda)
   const market = anchorMarketToFE(raw, id)
+  market.eigenCacheStatus = (await loadEigenCachePolicy(program, marketId, marketPda, raw)).status
 
   const pairInfo = resolveBaseMintLabel(raw.baseMint)
   market.pair = pairInfo.pair
@@ -300,13 +309,19 @@ export async function getUserPosition(
  * computation.
  */
 export function computeEstimatedPayout(args: {
-  positionRaw: { collateral: { toNumber(): number }; lmsrShares: { toNumber(): number }; finalPayout: { toNumber(): number }; claimed: boolean }
+  positionRaw: {
+    collateral: { toNumber(): number }
+    lmsrShares: { toNumber(): number }
+    finalPayout: { toNumber(): number }
+    claimed: boolean
+  }
   pathDissolved: boolean
   pathIndex: number
   marketState: MarketState
   marketShareQuantitiesScaled: number[]
   marketLmsrAlphaScaled: number
   marketAmplitudesScaled: number[]
+  marketPricingActiveMask?: number
   marketNumPaths: number
 }): number {
   if (args.positionRaw.claimed) {
@@ -318,9 +333,10 @@ export function computeEstimatedPayout(args: {
   }
   const sharesScaled = args.positionRaw.lmsrShares.toNumber() / SCALE
   if (sharesScaled <= 0) return 0
-  const activeMask = args.marketAmplitudesScaled
-    .slice(0, args.marketNumPaths)
-    .map((a) => a > 0)
+  const activeMask =
+    args.marketPricingActiveMask !== undefined
+      ? activeMaskFromPricingMask(args.marketPricingActiveMask, args.marketNumPaths)
+      : args.marketAmplitudesScaled.slice(0, args.marketNumPaths).map((a) => a > 0)
   return estimateLmsrExitPayout({
     shareQuantities: args.marketShareQuantitiesScaled,
     numPaths: args.marketNumPaths,
@@ -372,6 +388,10 @@ export async function getPosition(
       marketShareQuantitiesScaled: shareQuantitiesScaled,
       marketLmsrAlphaScaled: lmsrAlphaScaled,
       marketAmplitudesScaled: amplitudesScaled,
+      marketPricingActiveMask:
+        typeof marketRaw.pricingActiveMask?.toNumber === 'function'
+          ? marketRaw.pricingActiveMask.toNumber()
+          : Number(marketRaw.pricingActiveMask ?? 0),
       marketNumPaths: numPaths,
     })
     return anchorPositionToFE(positionRaw, {
@@ -421,10 +441,14 @@ export async function getUserPositions(wallet: PublicKey | null): Promise<UserPo
     numPaths: number
     shareQuantitiesScaled: number[]
     amplitudesScaled: number[]
+    pricingActiveMask: number
     lmsrAlphaScaled: number
   }
   const marketCache = new Map<string, MarketCacheEntry | null>()
-  const pathCache = new Map<string, { label: string; tone: ReturnType<typeof deriveTone>; dissolved: boolean }>()
+  const pathCache = new Map<
+    string,
+    { label: string; tone: ReturnType<typeof deriveTone>; dissolved: boolean }
+  >()
 
   for (const acc of accounts) {
     const raw = acc.account
@@ -453,6 +477,10 @@ export async function getUserPositions(wallet: PublicKey | null): Promise<UserPo
           amplitudesScaled: (marketRaw.amplitudes as { toNumber(): number }[])
             .slice(0, numPaths)
             .map((a) => a.toNumber() / SCALE),
+          pricingActiveMask:
+            typeof marketRaw.pricingActiveMask?.toNumber === 'function'
+              ? marketRaw.pricingActiveMask.toNumber()
+              : Number(marketRaw.pricingActiveMask ?? 0),
           lmsrAlphaScaled: marketRaw.lmsrAlpha.toNumber() / SCALE,
         }
         marketCache.set(marketKey, mkt)
@@ -504,6 +532,7 @@ export async function getUserPositions(wallet: PublicKey | null): Promise<UserPo
       marketShareQuantitiesScaled: mkt.shareQuantitiesScaled,
       marketLmsrAlphaScaled: mkt.lmsrAlphaScaled,
       marketAmplitudesScaled: mkt.amplitudesScaled,
+      marketPricingActiveMask: mkt.pricingActiveMask,
       marketNumPaths: mkt.numPaths,
     })
 

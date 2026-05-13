@@ -38,7 +38,19 @@ import {
 } from './pda'
 import { buildTransaction } from '@/lib/chain/buildTransaction'
 import { getPriorityFee } from '@/lib/chain/priorityFee'
-import { applySlippageTolerance, estimateLmsrExitPayout, estimateLmsrSharesOut } from './lmsr'
+import {
+  applySlippageTolerance,
+  estimateLmsrExitPayout,
+  estimateLmsrSharesOut,
+  estimateQuadraticExitPayout,
+  estimateQuadraticSharesOut,
+} from './lmsr'
+import {
+  eigenCacheRemainingAccounts,
+  loadEigenCachePolicy,
+  type EigenCachePolicy,
+  type EigenCacheQuoteSnapshot,
+} from './eigenCache'
 import { buildPathChunks, computePathRoot, PATH_ORIGIN_USER_DRAWN } from './pathCommitments'
 
 const MAX_BATCH_SIZE = 4
@@ -70,7 +82,10 @@ export class PathRelayError extends Error {
   readonly expiresAt: number
   readonly intentSig: string
 
-  constructor(message: string, args: { intentPda: string; nonce: number; expiresAt: number; intentSig: string }) {
+  constructor(
+    message: string,
+    args: { intentPda: string; nonce: number; expiresAt: number; intentSig: string },
+  ) {
     super(message)
     this.name = 'PathRelayError'
     this.intentPda = args.intentPda
@@ -184,12 +199,21 @@ function fixedPointFloorWithRoundingSlack(valueHuman: number): BN {
   return new BN(Math.floor(safeHuman * SCALE))
 }
 
-function assertNoEigenCacheAccount(ix: TransactionInstruction, marketId: number): void {
+function assertEigenCachePolicy(
+  ix: TransactionInstruction,
+  marketId: number,
+  policy: EigenCachePolicy,
+): void {
   const [eigenCachePda] = deriveEigenCachePda(marketId)
-  if (!ix.keys.some((meta) => meta.pubkey.equals(eigenCachePda))) return
-  throw new Error(
-    'EigenCache-aware slippage quoting is not implemented; do not pass EigenCache to FE-built wager/exit instructions.',
-  )
+  const present = ix.keys.some((meta) => meta.pubkey.equals(eigenCachePda))
+  if (policy.status === 'fresh') {
+    if (present) return
+    throw new Error(
+      'Fresh EigenCache quote policy did not attach the EigenCache remaining account.',
+    )
+  }
+  if (!present) return
+  throw new Error('EigenCache account attached without a fresh EigenCache quote policy.')
 }
 
 function entryFeeBps(marketAcc: any, protocolAcc: any): number {
@@ -206,25 +230,12 @@ function settleFeeBps(marketAcc: any, protocolAcc: any): number {
     : (protocolAcc.defaultFeeSettleBps as number)
 }
 
-/**
- * Compute `min_shares_out` for `place_wager` honoring the user's
- * configured slippage tolerance. Returns `BN(0)` (no protection) when
- * tolerance is 0 or the LMSR estimate is unavailable — the program
- * still validates and would surface a real on-chain error instead.
- */
-function placeWagerMinSharesOut(
-  marketAcc: any,
-  protocolAcc: any,
-  pathIndex: number,
-  amountHuman: number,
-): BN {
-  return placeWagerQuoteFromSnapshot(
-    marketAcc,
-    readLmsrSnapshot(marketAcc),
-    protocolAcc,
-    pathIndex,
-    amountHuman,
-  ).minSharesOut
+interface PlaceWagerQuoteResult {
+  minSharesOut: BN
+  expectedSharesHuman: number
+  fallbackSharesHuman: number
+  eigenSharesHuman?: number
+  conservativeSharesHuman: number
 }
 
 function placeWagerQuoteFromSnapshot(
@@ -233,11 +244,12 @@ function placeWagerQuoteFromSnapshot(
   protocolAcc: any,
   pathIndex: number,
   amountHuman: number,
-): { minSharesOut: BN; expectedSharesHuman: number } {
+  eigenCache?: EigenCacheQuoteSnapshot,
+): PlaceWagerQuoteResult {
   const tol = getSlippageTolerance()
   const feeBps = entryFeeBps(marketAcc, protocolAcc)
   const collateralHuman = amountHuman * (1 - feeBps / 10_000)
-  const expected = estimateLmsrSharesOut({
+  const fallbackSharesHuman = estimateLmsrSharesOut({
     shareQuantities: snap.shareQuantities,
     numPaths: snap.numPaths,
     lmsrAlpha: snap.lmsrAlpha,
@@ -245,11 +257,39 @@ function placeWagerQuoteFromSnapshot(
     amountScaled: collateralHuman,
     activeMask: snap.activeMask,
   })
-  if (tol <= 0) return { minSharesOut: new BN(0), expectedSharesHuman: expected }
-  const minHuman = applySlippageTolerance(expected, tol)
+  const eigenSharesHuman = eigenCache
+    ? estimateQuadraticSharesOut({
+        shareQuantities: snap.shareQuantities,
+        checkpointQuantities: eigenCache.checkpointQuantities,
+        cachedPrices: eigenCache.cachedPrices,
+        lipschitz: eigenCache.lipschitz,
+        pathIndex,
+        amountScaled: collateralHuman,
+      })
+    : undefined
+  const expectedSharesHuman =
+    eigenSharesHuman && eigenSharesHuman > 0 ? eigenSharesHuman : fallbackSharesHuman
+  const conservativeSharesHuman =
+    eigenSharesHuman !== undefined
+      ? Math.min(eigenSharesHuman, fallbackSharesHuman)
+      : fallbackSharesHuman
+
+  if (tol <= 0) {
+    return {
+      minSharesOut: new BN(0),
+      expectedSharesHuman,
+      fallbackSharesHuman,
+      eigenSharesHuman,
+      conservativeSharesHuman,
+    }
+  }
+  const minHuman = applySlippageTolerance(conservativeSharesHuman, tol)
   return {
     minSharesOut: fixedPointFloorWithRoundingSlack(minHuman),
-    expectedSharesHuman: expected,
+    expectedSharesHuman,
+    fallbackSharesHuman,
+    eigenSharesHuman,
+    conservativeSharesHuman,
   }
 }
 
@@ -259,14 +299,19 @@ function placeWagerQuoteFromSnapshot(
  * on `user_payout` after the settlement rake. Returns `BN(0)` if
  * tolerance is 0 or the position has no shares to sell.
  */
-function exitPositionMinPayoutOut(marketAcc: any, protocolAcc: any, positionAcc: any): BN {
+function exitPositionMinPayoutOut(
+  marketAcc: any,
+  protocolAcc: any,
+  positionAcc: any,
+  eigenCache?: EigenCacheQuoteSnapshot,
+): BN {
   const tol = getSlippageTolerance()
   if (tol <= 0) return new BN(0)
   const sharesHuman = (positionAcc.lmsrShares as BN).toNumber() / SCALE
   if (sharesHuman <= 0) return new BN(0)
   const snap = readLmsrSnapshot(marketAcc)
   const feeBps = settleFeeBps(marketAcc, protocolAcc)
-  const grossPayout = estimateLmsrExitPayout({
+  const fallbackGrossPayout = estimateLmsrExitPayout({
     shareQuantities: snap.shareQuantities,
     numPaths: snap.numPaths,
     lmsrAlpha: snap.lmsrAlpha,
@@ -274,6 +319,20 @@ function exitPositionMinPayoutOut(marketAcc: any, protocolAcc: any, positionAcc:
     sharesScaled: sharesHuman,
     activeMask: snap.activeMask,
   })
+  const eigenGrossPayout = eigenCache
+    ? estimateQuadraticExitPayout({
+        shareQuantities: snap.shareQuantities,
+        checkpointQuantities: eigenCache.checkpointQuantities,
+        cachedPrices: eigenCache.cachedPrices,
+        lipschitz: eigenCache.lipschitz,
+        pathIndex: positionAcc.pathIndex as number,
+        sharesScaled: sharesHuman,
+      })
+    : undefined
+  const grossPayout =
+    eigenGrossPayout !== undefined
+      ? Math.min(eigenGrossPayout, fallbackGrossPayout)
+      : fallbackGrossPayout
   const userPayout = grossPayout * (1 - feeBps / 10_000)
   const minHuman = applySlippageTolerance(userPayout, tol)
   return fixedPointFloorWithRoundingSlack(minHuman)
@@ -327,7 +386,7 @@ async function relayPathUpload(body: {
     const message =
       typeof detail === 'string'
         ? detail
-        : detail?.message ?? payload?.error ?? `Relayer failed with HTTP ${res.status}`
+        : (detail?.message ?? payload?.error ?? `Relayer failed with HTTP ${res.status}`)
     throw new Error(message)
   }
   return payload as RelayPathUploadResponse
@@ -525,6 +584,7 @@ export function usePlaceWager() {
         program.account.market.fetch(marketPda),
         program.account.protocolState.fetch(protocolPda),
       ])
+      const eigenPolicy = await loadEigenCachePolicy(program, marketId, marketPda, marketAcc)
 
       const vault = marketAcc.vault
       const quoteMint = marketAcc.quoteMint
@@ -532,7 +592,14 @@ export function usePlaceWager() {
       const insuranceFund = protocolAcc.insuranceFund
       const userTokenAccount = await getAssociatedTokenAddress(quoteMint, user)
 
-      const minSharesOut = placeWagerMinSharesOut(marketAcc, protocolAcc, pathIndex, amount)
+      const minSharesOut = placeWagerQuoteFromSnapshot(
+        marketAcc,
+        readLmsrSnapshot(marketAcc),
+        protocolAcc,
+        pathIndex,
+        amount,
+        eigenPolicy.snapshot,
+      ).minSharesOut
 
       const ix = await program.methods
         .placeWager(pathIndex, scaledAmount, minSharesOut)
@@ -549,8 +616,9 @@ export function usePlaceWager() {
           tokenProgram: TOKEN_PROGRAM_ID,
           systemProgram: SystemProgram.programId,
         })
+        .remainingAccounts(eigenCacheRemainingAccounts(eigenPolicy))
         .instruction()
-      assertNoEigenCacheAccount(ix, marketId)
+      assertEigenCachePolicy(ix, marketId, eigenPolicy)
 
       return sendInstructions(program, [ix], CU_LIMITS.placeWager)
     },
@@ -590,6 +658,7 @@ export function usePlaceBatchWager() {
         program.account.market.fetch(marketPda),
         program.account.protocolState.fetch(protocolPda),
       ])
+      const eigenPolicy = await loadEigenCachePolicy(program, marketId, marketPda, marketAcc)
 
       const vault = marketAcc.vault
       const quoteMint = marketAcc.quoteMint
@@ -597,22 +666,57 @@ export function usePlaceBatchWager() {
       const insuranceFund = protocolAcc.insuranceFund
       const userTokenAccount = await getAssociatedTokenAddress(quoteMint, user)
 
-      const quoteSnap = cloneLmsrSnapshot(readLmsrSnapshot(marketAcc))
+      let quoteBranches: Array<{ snap: LmsrSnapshot; eigenCache?: EigenCacheQuoteSnapshot }> = [
+        { snap: cloneLmsrSnapshot(readLmsrSnapshot(marketAcc)), eigenCache: eigenPolicy.snapshot },
+      ]
       const ixs: TransactionInstruction[] = []
       for (const pathIndex of pathIndices) {
         const [pathPda] = derivePathPda(marketId, pathIndex)
         const [positionPda] = derivePositionPda(marketId, user, pathIndex)
-        const { minSharesOut, expectedSharesHuman } = placeWagerQuoteFromSnapshot(
-          marketAcc,
-          quoteSnap,
-          protocolAcc,
-          pathIndex,
-          amount,
-        )
-        if (Number.isFinite(expectedSharesHuman) && expectedSharesHuman > 0) {
-          quoteSnap.shareQuantities[pathIndex] =
-            (quoteSnap.shareQuantities[pathIndex] ?? 0) + expectedSharesHuman
+        let lowerBoundHuman = Infinity
+        const nextBranches: Array<{ snap: LmsrSnapshot; eigenCache?: EigenCacheQuoteSnapshot }> = []
+
+        // Conservative lower-bound exploration: each prior leg may execute
+        // through either EigenCache or LMSR fallback, mutating q differently.
+        for (const branch of quoteBranches) {
+          const quote = placeWagerQuoteFromSnapshot(
+            marketAcc,
+            branch.snap,
+            protocolAcc,
+            pathIndex,
+            amount,
+            branch.eigenCache,
+          )
+          lowerBoundHuman = Math.min(lowerBoundHuman, quote.conservativeSharesHuman)
+
+          if (Number.isFinite(quote.fallbackSharesHuman) && quote.fallbackSharesHuman > 0) {
+            const fallbackSnap = cloneLmsrSnapshot(branch.snap)
+            fallbackSnap.shareQuantities[pathIndex] =
+              (fallbackSnap.shareQuantities[pathIndex] ?? 0) + quote.fallbackSharesHuman
+            nextBranches.push({ snap: fallbackSnap })
+          }
+
+          if (
+            branch.eigenCache &&
+            quote.eigenSharesHuman !== undefined &&
+            Number.isFinite(quote.eigenSharesHuman) &&
+            quote.eigenSharesHuman > 0
+          ) {
+            const eigenSnap = cloneLmsrSnapshot(branch.snap)
+            eigenSnap.shareQuantities[pathIndex] =
+              (eigenSnap.shareQuantities[pathIndex] ?? 0) + quote.eigenSharesHuman
+            nextBranches.push({ snap: eigenSnap, eigenCache: branch.eigenCache })
+          }
         }
+
+        const tolerance = getSlippageTolerance()
+        const minSharesOut =
+          tolerance <= 0 || !Number.isFinite(lowerBoundHuman)
+            ? new BN(0)
+            : fixedPointFloorWithRoundingSlack(
+                applySlippageTolerance(Math.max(0, lowerBoundHuman), tolerance),
+              )
+        quoteBranches = nextBranches.length > 0 ? nextBranches : quoteBranches
 
         const ix = await program.methods
           .placeWager(pathIndex, scaledAmount, minSharesOut)
@@ -629,8 +733,9 @@ export function usePlaceBatchWager() {
             tokenProgram: TOKEN_PROGRAM_ID,
             systemProgram: SystemProgram.programId,
           })
+          .remainingAccounts(eigenCacheRemainingAccounts(eigenPolicy))
           .instruction()
-        assertNoEigenCacheAccount(ix, marketId)
+        assertEigenCachePolicy(ix, marketId, eigenPolicy)
         ixs.push(ix)
       }
 
@@ -673,11 +778,17 @@ export function useExitPosition() {
         program.account.protocolState.fetch(protocolPda),
         program.account.position.fetch(positionPda),
       ])
+      const eigenPolicy = await loadEigenCachePolicy(program, marketId, marketPda, marketAcc)
       const vault = marketAcc.vault
       const quoteMint = marketAcc.quoteMint
       const userTokenAccount = await getAssociatedTokenAddress(quoteMint, user)
 
-      const minPayoutOut = exitPositionMinPayoutOut(marketAcc, protocolAcc, positionAcc)
+      const minPayoutOut = exitPositionMinPayoutOut(
+        marketAcc,
+        protocolAcc,
+        positionAcc,
+        eigenPolicy.snapshot,
+      )
 
       const ix = await program.methods
         .exitPosition(minPayoutOut)
@@ -690,8 +801,9 @@ export function useExitPosition() {
           user,
           tokenProgram: TOKEN_PROGRAM_ID,
         })
+        .remainingAccounts(eigenCacheRemainingAccounts(eigenPolicy))
         .instruction()
-      assertNoEigenCacheAccount(ix, marketId)
+      assertEigenCachePolicy(ix, marketId, eigenPolicy)
 
       return sendInstructions(program, [ix], CU_LIMITS.exitPosition)
     },
@@ -780,7 +892,7 @@ export function useCloseMarket() {
       const vaultPda =
         typeof vault === 'string'
           ? new PublicKey(vault)
-          : vault ?? (await program.account.market.fetch(marketPda)).vault
+          : (vault ?? (await program.account.market.fetch(marketPda)).vault)
 
       const ix = await program.methods
         .closeMarket()

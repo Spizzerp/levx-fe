@@ -3,6 +3,7 @@ import { Minus, Plus } from 'lucide-react'
 
 import { cn } from '@/lib/cn'
 import { formatUSD } from '@/lib/format'
+import { summarizeEigenCacheStatus } from '@/lib/solana/eigenCache'
 import type { Market } from '@/types/market'
 
 interface MarketMetaPanelProps {
@@ -47,11 +48,7 @@ export function MarketMetaPanel({ market }: MarketMetaPanelProps) {
       >
         <span>Market details</span>
         <span aria-hidden className="text-ink-dim flex items-center justify-center">
-          {open ? (
-            <Minus size={18} strokeWidth={1.75} />
-          ) : (
-            <Plus size={18} strokeWidth={1.75} />
-          )}
+          {open ? <Minus size={18} strokeWidth={1.75} /> : <Plus size={18} strokeWidth={1.75} />}
         </span>
       </button>
       {open && (
@@ -64,6 +61,12 @@ export function MarketMetaPanel({ market }: MarketMetaPanelProps) {
           <MetaRow label="Entry fee" value={`${feePct}%`} />
           <MetaRow label="Pool" value={`${formatUSD(market.pool)} USDC`} />
           <MetaRow label="LMSR coupling" value={market.lambda.toFixed(3)} />
+          {market.lambda > 0 && (
+            <MetaRow
+              label="EigenCache"
+              value={summarizeEigenCacheStatus(market.eigenCacheStatus ?? 'disabled')}
+            />
+          )}
           <MetaRow label="Decoherence rate" value={market.decoherenceRate.toFixed(4)} />
         </div>
       )}
