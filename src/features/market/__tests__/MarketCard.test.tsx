@@ -93,7 +93,7 @@ describe('MarketCard', () => {
     expect(screen.getByText('Active')).toBeInTheDocument()
   })
 
-  it('renders AI path previews supplied by parent hydration', () => {
+  it('renders only the future AI path preview supplied by parent hydration', () => {
     const market = makeMarket({
       numPaths: 1,
       history: [
@@ -142,8 +142,6 @@ describe('MarketCard', () => {
       />,
     )
 
-    expect(container.querySelectorAll('[data-testid="market-mini-ai-path"]').length).toBeGreaterThan(
-      0,
-    )
+    expect(container.querySelectorAll('[data-testid="market-mini-ai-path"]')).toHaveLength(1)
   })
 })
