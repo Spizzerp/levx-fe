@@ -195,21 +195,6 @@ function MiniChartInner({
 
           return (
             <g key={path.id}>
-              {segments.elapsed.length > 1 && (
-                <LinePath<PricePoint>
-                  data-testid={path.origin === 'ai' ? 'market-mini-ai-path' : undefined}
-                  data={segments.elapsed}
-                  x={(d) => timeScale(d.time) ?? 0}
-                  y={(d) => priceScale(d.value) ?? 0}
-                  stroke={style.stroke}
-                  strokeWidth={1.15}
-                  strokeDasharray={style.dash}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  opacity={style.opacity * 0.3}
-                  curve={CATMULL_ROM_ALPHA_05}
-                />
-              )}
               {segments.future.length > 1 && (
                 <LinePath<PricePoint>
                   data-testid={path.origin === 'ai' ? 'market-mini-ai-path' : undefined}

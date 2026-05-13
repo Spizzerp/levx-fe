@@ -452,20 +452,6 @@ function ChartInner({
               : { elapsed: [], future: path.data }
             return (
               <g key={path.id}>
-                {segments.elapsed.length > 1 && (
-                  <LinePath<PricePoint>
-                    data={segments.elapsed}
-                    x={(d) => timeScale(d.time)}
-                    y={(d) => priceScale(d.value)}
-                    stroke={style.stroke}
-                    strokeWidth={1.25}
-                    strokeDasharray={style.dash}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    opacity={isSelected ? 0 : style.opacity * 0.3}
-                    curve={CATMULL_ROM_ALPHA_05}
-                  />
-                )}
                 {segments.future.length > 1 && (
                   <LinePath<PricePoint>
                     data={segments.future}
@@ -494,19 +480,6 @@ function ChartInner({
                   : { elapsed: [], future: path.data }
                 return (
                   <g key={`wager-${path.id}`}>
-                    {segments.elapsed.length > 1 && (
-                      <LinePath<PricePoint>
-                        data={segments.elapsed}
-                        x={(d) => timeScale(d.time)}
-                        y={(d) => priceScale(d.value)}
-                        stroke={C.line}
-                        strokeWidth={1.5}
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        opacity={0.12}
-                        curve={CATMULL_ROM_ALPHA_05}
-                      />
-                    )}
                     {segments.future.length > 1 && (
                       <LinePath<PricePoint>
                         data={segments.future}
@@ -533,19 +506,6 @@ function ChartInner({
                 : { elapsed: [], future: path.data }
               return (
                 <g key={`sel-${path.id}`}>
-                  {segments.elapsed.length > 1 && (
-                    <LinePath<PricePoint>
-                      data={segments.elapsed}
-                      x={(d) => timeScale(d.time)}
-                      y={(d) => priceScale(d.value)}
-                      stroke={C.line}
-                      strokeWidth={1.75}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      opacity={0.32}
-                      curve={CATMULL_ROM_ALPHA_05}
-                    />
-                  )}
                   {segments.future.length > 1 && (
                     <LinePath<PricePoint>
                       data={segments.future}
@@ -569,20 +529,6 @@ function ChartInner({
               : { elapsed: [], future: selected.data }
             return (
               <>
-                {segments.elapsed.length > 1 && (
-                  <LinePath<PricePoint>
-                    data={segments.elapsed}
-                    x={(d) => timeScale(d.time)}
-                    y={(d) => priceScale(d.value)}
-                    stroke={C.muted}
-                    strokeWidth={1.25}
-                    strokeDasharray="2 4"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    opacity={0.25}
-                    curve={CATMULL_ROM_ALPHA_05}
-                  />
-                )}
                 {segments.future.length > 1 && (
                   <LinePath<PricePoint>
                     data={segments.future}
