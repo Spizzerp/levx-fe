@@ -351,6 +351,15 @@ export async function getMarket(id: string): Promise<Market> {
   return delay(match)
 }
 
+export async function getMarketPathPreviews(
+  marketIds: readonly string[],
+): Promise<Record<string, PredictionPath[]>> {
+  const previews = Object.fromEntries(
+    marketIds.map((id) => [id, MARKETS.find((m) => m.id === id)?.paths ?? []]),
+  )
+  return delay(previews)
+}
+
 export async function getUserPosition(
   marketId: string,
   // wallet pubkey is unused in mock mode; kept for signature parity with onchain.ts

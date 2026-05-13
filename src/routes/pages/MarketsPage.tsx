@@ -19,7 +19,7 @@ import { MarketsTableSkeleton } from '@/features/market/MarketsTableSkeleton'
 import { QueryErrorState } from '@/ui/QueryErrorState'
 import { StatusDot } from '@/ui/StatusDot'
 import { cn } from '@/lib/cn'
-import { useMarkets } from '@/lib/chain'
+import { useMarketPathPreviews, useMarkets } from '@/lib/chain'
 import { getMarketDisplayState } from '@/lib/market/status'
 import { feedIdForPair } from '@/lib/pyth/feedIds'
 import { usePythFeed } from '@/lib/pyth/hooks'
@@ -89,6 +89,10 @@ const FILTERS: { id: StateFilter; label: string }[] = [
 
 function matchesFilter(state: MarketState, filter: StateFilter): boolean {
   return filter === 'all' || state === filter
+}
+
+function hasRenderablePathData(market: Market): boolean {
+  return market.paths.some((path) => path.data.length > 1)
 }
 
 function endsInLabel(m: Market, now: number): string {
@@ -314,8 +318,30 @@ export function MarketsPage() {
   }
 
   const totalPages = Math.ceil(visible.length / PAGE_SIZE)
-  const tableItems = visible.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
-  const gridItems = visible.slice(0, visibleCount)
+  const tableItems = useMemo(
+    () => visible.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE),
+    [page, visible],
+  )
+  const gridItems = useMemo(() => visible.slice(0, visibleCount), [visible, visibleCount])
+  const pathPreviewMarketIds = useMemo(
+    () =>
+      viewMode === 'grid'
+        ? gridItems.filter((m) => !hasRenderablePathData(m) && m.numPaths > 0).map((m) => m.id)
+        : [],
+    [gridItems, viewMode],
+  )
+  const { data: pathPreviews = {} } = useMarketPathPreviews(pathPreviewMarketIds)
+  const gridItemsWithPathPreviews = useMemo(
+    () =>
+      gridItems.map((market) => {
+        if (hasRenderablePathData(market)) return market
+        const previewPaths = pathPreviews[market.id]
+        return previewPaths && previewPaths.length > 0
+          ? { ...market, paths: previewPaths }
+          : market
+      }),
+    [gridItems, pathPreviews],
+  )
 
   // Infinite Scroll Observer
   const loadMoreRef = useRef<HTMLDivElement>(null)
@@ -509,13 +535,13 @@ export function MarketsPage() {
               exit={{ opacity: 0, y: -10, scale: 0.985 }}
               transition={{ duration: 0.24, ease: [0.25, 0.46, 0.45, 0.94] }}
             >
-              <MarketGridPythSubscriptions markets={gridItems} />
+              <MarketGridPythSubscriptions markets={gridItemsWithPathPreviews} />
 
               <motion.div
                 layout
                 className={cn(
                   'grid gap-6',
-                  'grid-cols-1 sm:grid-cols-2 [@media(min-width:1201px)]:grid-cols-3',
+                  'grid-cols-1 [@media(min-width:769px)_and_(max-width:1200px)]:grid-cols-2 [@media(min-width:1201px)]:grid-cols-3',
                 )}
               >
                 <AnimatePresence mode="popLayout">
@@ -537,7 +563,7 @@ export function MarketsPage() {
                       </motion.div>
                     ))
                   ) : gridItems.length > 0 ? (
-                    gridItems.map((m, i) => (
+                    gridItemsWithPathPreviews.map((m, i) => (
                       <motion.div
                         key={m.id}
                         layout
