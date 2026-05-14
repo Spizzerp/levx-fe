@@ -458,11 +458,11 @@ function ChartInner({
                     x={(d) => timeScale(d.time)}
                     y={(d) => priceScale(d.value)}
                     stroke={style.stroke}
-                    strokeWidth={1.25}
+                    strokeWidth={1.5}
                     strokeDasharray={style.dash}
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    opacity={isSelected ? 0 : style.opacity * 0.3}
+                    opacity={isSelected ? 0 : style.opacity}
                     curve={CATMULL_ROM_ALPHA_05}
                   />
                 )}
@@ -500,10 +500,10 @@ function ChartInner({
                         x={(d) => timeScale(d.time)}
                         y={(d) => priceScale(d.value)}
                         stroke={C.line}
-                        strokeWidth={1.5}
+                        strokeWidth={2}
                         strokeLinecap="round"
                         strokeLinejoin="round"
-                        opacity={0.12}
+                        opacity={0.3}
                         curve={CATMULL_ROM_ALPHA_05}
                       />
                     )}
@@ -539,10 +539,9 @@ function ChartInner({
                       x={(d) => timeScale(d.time)}
                       y={(d) => priceScale(d.value)}
                       stroke={C.line}
-                      strokeWidth={1.75}
+                      strokeWidth={2.5}
                       strokeLinecap="round"
                       strokeLinejoin="round"
-                      opacity={0.32}
                       curve={CATMULL_ROM_ALPHA_05}
                     />
                   )}
@@ -575,11 +574,11 @@ function ChartInner({
                     x={(d) => timeScale(d.time)}
                     y={(d) => priceScale(d.value)}
                     stroke={C.muted}
-                    strokeWidth={1.25}
+                    strokeWidth={1.5}
                     strokeDasharray="2 4"
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    opacity={0.25}
+                    opacity={0.65}
                     curve={CATMULL_ROM_ALPHA_05}
                   />
                 )}
