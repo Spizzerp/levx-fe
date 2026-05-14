@@ -37,7 +37,7 @@ export function MarketTimeProgress({
   const value = marketTimeProgressPercent({ startTime, endTime, now })
 
   return (
-    <div className={cn('flex size-24 shrink-0 items-center justify-center', className)}>
+    <div className={cn('flex size-36 shrink-0 items-center justify-center', className)}>
       <AnimatedCircularProgressBar
         value={value}
         gaugePrimaryGradient={{
@@ -46,7 +46,7 @@ export function MarketTimeProgress({
         }}
         gaugeSecondaryColor="var(--color-line-strong)"
         label="Market time elapsed"
-        className="size-20 text-xs"
+        className="size-32 text-lg"
       />
     </div>
   )
