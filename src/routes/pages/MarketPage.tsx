@@ -582,13 +582,14 @@ export function MarketPage() {
           <MarketStateBadge market={market} />
         </div>
 
-        <h1 className="font-display text-ink-strong text-display-lg my-1.5 mb-2.5 leading-none font-medium tracking-tighter [font-variation-settings:'ROND'_100]">
-          {formatPrice(priceDisplay)}
-        </h1>
-
-        <div className="text-ink-muted text-caption flex items-baseline gap-3 font-mono">
-          <span className={cn('font-bold', deltaColor)}>{formatDeltaBps(deltaDisplay)}</span>
-          <span>24H</span>
+        <div className="my-1.5 mb-2.5 flex flex-wrap items-baseline gap-x-5 gap-y-1">
+          <h1 className="font-display text-ink-strong text-display-lg leading-none font-medium tracking-tighter [font-variation-settings:'ROND'_100]">
+            {formatPrice(priceDisplay)}
+          </h1>
+          <div className="text-ink-muted text-caption flex items-baseline gap-3 font-mono">
+            <span className={cn('font-bold', deltaColor)}>{formatDeltaBps(deltaDisplay)}</span>
+            <span>24H</span>
+          </div>
         </div>
 
         <div className="text-ink-dim text-caption mt-8 flex flex-nowrap items-center gap-2 overflow-hidden font-mono tracking-normal whitespace-nowrap uppercase">
