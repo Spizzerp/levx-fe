@@ -30,7 +30,9 @@ export function AnimatedCircularProgressBar({
   className,
   label = 'Progress',
 }: AnimatedCircularProgressBarProps) {
-  const gradientId = `progress-gradient-${useId().replace(/:/g, '')}`
+  const id = useId().replace(/:/g, '')
+  const gradientId = `progress-gradient-${id}`
+  const glowId = `progress-glow-${id}`
   const radius = 42
   const circumference = 2 * Math.PI * radius
   const boundedValue = clamp(value, min, max)
@@ -38,7 +40,6 @@ export function AnimatedCircularProgressBar({
     max > min ? Math.round(((boundedValue - min) / (max - min)) * 100) : 0
   const strokeLength = (currentPercent / 100) * circumference
   const primaryStroke = gaugePrimaryGradient ? `url(#${gradientId})` : gaugePrimaryColor
-  const primaryGlow = gaugePrimaryGradient?.to ?? gaugePrimaryColor
 
   return (
     <div
@@ -54,9 +55,9 @@ export function AnimatedCircularProgressBar({
         className,
       )}
     >
-      <svg fill="none" className="size-full" viewBox="0 0 100 100" aria-hidden>
-        {gaugePrimaryGradient && (
-          <defs>
+      <svg fill="none" className="size-full overflow-visible" viewBox="0 0 100 100" aria-hidden>
+        <defs>
+          {gaugePrimaryGradient && (
             <linearGradient
               id={gradientId}
               x1="18"
@@ -68,8 +69,19 @@ export function AnimatedCircularProgressBar({
               <stop offset="0%" stopColor={gaugePrimaryGradient.from} />
               <stop offset="100%" stopColor={gaugePrimaryGradient.to} />
             </linearGradient>
-          </defs>
-        )}
+          )}
+          <filter
+            id={glowId}
+            x="-35"
+            y="-35"
+            width="170"
+            height="170"
+            filterUnits="userSpaceOnUse"
+            colorInterpolationFilters="sRGB"
+          >
+            <feGaussianBlur stdDeviation="7" />
+          </filter>
+        </defs>
         <circle
           cx="50"
           cy="50"
@@ -84,14 +96,23 @@ export function AnimatedCircularProgressBar({
           cy="50"
           r={radius}
           stroke={primaryStroke}
+          strokeWidth="10"
+          strokeDasharray={`${strokeLength} ${circumference}`}
+          strokeLinecap="round"
+          className="opacity-45 transition-[stroke-dasharray] duration-1000 ease-out"
+          transform="rotate(-90 50 50)"
+          filter={`url(#${glowId})`}
+        />
+        <circle
+          cx="50"
+          cy="50"
+          r={radius}
+          stroke={primaryStroke}
           strokeWidth="8"
           strokeDasharray={`${strokeLength} ${circumference}`}
           strokeLinecap="round"
           className="transition-[stroke-dasharray,stroke] duration-1000 ease-out"
           transform="rotate(-90 50 50)"
-          style={{
-            filter: `drop-shadow(0 0 10px ${primaryGlow})`,
-          }}
         />
       </svg>
       <span className="text-ink-strong absolute inset-0 m-auto grid h-fit w-fit">
