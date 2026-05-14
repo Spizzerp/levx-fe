@@ -93,7 +93,7 @@ describe('MarketCard', () => {
     expect(screen.getByText('Active')).toBeInTheDocument()
   })
 
-  it('renders only the future AI path preview supplied by parent hydration', () => {
+  it('renders AI path previews supplied by parent hydration at full thumbnail opacity', () => {
     const market = makeMarket({
       numPaths: 1,
       history: [
@@ -142,14 +142,10 @@ describe('MarketCard', () => {
       />,
     )
 
-    expect(container.querySelectorAll('[data-testid="market-mini-ai-path"]')).toHaveLength(1)
-    const clipRect = container.querySelector('[data-testid="market-mini-ai-path-clip"]')
-    const [marketStartLine] = Array.from(
-      container.querySelectorAll('line[stroke-dasharray="4 4"]'),
-    )
-    const clipX = Number(clipRect?.getAttribute('x'))
-    const marketStartX = Number(marketStartLine?.getAttribute('x1'))
+    const aiPath = container.querySelector('[data-testid="market-mini-ai-path"]')
 
-    expect(clipX).toBeGreaterThan(marketStartX)
+    expect(container.querySelectorAll('[data-testid="market-mini-ai-path"]')).toHaveLength(1)
+    expect(aiPath).toHaveAttribute('opacity', '0.7')
+    expect(container.querySelector('[data-testid="market-mini-ai-path-clip"]')).toBeNull()
   })
 })
