@@ -1,5 +1,10 @@
+import { useState } from 'react'
+import { motion } from 'motion/react'
+
 import { AnimatedCircularProgressBar } from '@/ui/AnimatedCircularProgressBar'
+import { DiaTextReveal } from '@/ui/DiaTextReveal'
 import { cn } from '@/lib/cn'
+import { marketTimeProgressPercent } from '@/features/market/timeProgressMath'
 
 interface MarketTimeProgressProps {
   startTime: number
@@ -8,36 +13,43 @@ interface MarketTimeProgressProps {
   className?: string
 }
 
-export function marketTimeProgressPercent({
-  startTime,
-  endTime,
-  now,
-}: {
-  startTime: number
-  endTime: number
-  now: number
-}): number {
-  if (!Number.isFinite(startTime) || !Number.isFinite(endTime) || !Number.isFinite(now)) {
-    return 0
-  }
-
-  if (endTime <= startTime) return now >= endTime ? 100 : 0
-
-  const elapsed = now - startTime
-  const duration = endTime - startTime
-  return Math.min(100, Math.max(0, (elapsed / duration) * 100))
-}
-
 export function MarketTimeProgress({
   startTime,
   endTime,
   now,
   className,
 }: MarketTimeProgressProps) {
+  const [showLabel, setShowLabel] = useState(false)
   const value = marketTimeProgressPercent({ startTime, endTime, now })
 
   return (
-    <div className={cn('flex size-36 shrink-0 items-center justify-center', className)}>
+    <div
+      className={cn('relative flex size-32 shrink-0 items-center justify-center', className)}
+      onPointerEnter={() => setShowLabel(true)}
+      onPointerLeave={() => setShowLabel(false)}
+    >
+      {showLabel && (
+        <motion.div
+          aria-hidden="true"
+          className={cn(
+            'pointer-events-none absolute top-1/2 right-full -translate-y-1/2',
+            'mr-5',
+            'text-right font-mono text-caption tracking-widest whitespace-nowrap uppercase',
+          )}
+          initial={{ opacity: 0, x: 10 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.18, ease: [0.4, 0, 0.2, 1] }}
+        >
+          <DiaTextReveal
+            text="Market time elapsed"
+            colors={['var(--color-brand-from)', 'var(--color-brand-to)']}
+            textColor="var(--color-ink-muted)"
+            duration={0.85}
+            startOnView={false}
+            once={false}
+          />
+        </motion.div>
+      )}
       <AnimatedCircularProgressBar
         value={value}
         gaugePrimaryGradient={{
@@ -46,7 +58,7 @@ export function MarketTimeProgress({
         }}
         gaugeSecondaryColor="var(--color-line-strong)"
         label="Market time elapsed"
-        className="size-32 text-lg"
+        className="size-28 text-base"
       />
     </div>
   )

@@ -679,7 +679,7 @@ export function MarketPage() {
 
       {/* ── Right rail (Pending / Active / Sampling) ─────────────── */}
       {showWagerRail && (
-        <aside className="mt-5 flex flex-col">
+        <aside className="mt-7 flex flex-col">
           <MarketTimeProgress
             startTime={chartMarketStart}
             endTime={chartMarketEnd}
