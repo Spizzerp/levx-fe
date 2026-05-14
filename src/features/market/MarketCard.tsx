@@ -203,13 +203,11 @@ export function MarketCard({ market, now, onClick }: MarketCardProps) {
         <div
           className={cn(
             'relative mt-auto flex items-center justify-between px-6 py-4',
+            'border-line border-t',
             'bg-surface/40 backdrop-blur-xl',
             'group-hover:bg-surface/80 transition-all duration-500',
           )}
         >
-          {/* Dashed Top Border (Tech Detail) */}
-          <div className="absolute inset-x-0 top-0 h-px bg-[radial-gradient(circle_at_center,_var(--color-line-strong)_1px,_transparent_1px)] bg-[length:4px_1px] opacity-30" />
-
           {/* Token pair */}
           <div className="flex items-center gap-3">
             <div className="relative">

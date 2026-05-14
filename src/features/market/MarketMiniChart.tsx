@@ -19,7 +19,7 @@ const DAY_MS = 24 * HOUR_MS
 const MAX_HISTORY_LEAD_MS = 3 * DAY_MS
 
 const C = {
-  line: 'var(--chart-line, #FFFFFF)',
+  line: 'var(--chart-line, var(--color-ink-strong, #FFFFFF))',
   muted: 'var(--chart-muted, #999999)',
   grid: 'var(--chart-grid, #222222)',
 }
