@@ -143,5 +143,13 @@ describe('MarketCard', () => {
     )
 
     expect(container.querySelectorAll('[data-testid="market-mini-ai-path"]')).toHaveLength(1)
+    const clipRect = container.querySelector('[data-testid="market-mini-ai-path-clip"]')
+    const [marketStartLine] = Array.from(
+      container.querySelectorAll('line[stroke-dasharray="4 4"]'),
+    )
+    const clipX = Number(clipRect?.getAttribute('x'))
+    const marketStartX = Number(marketStartLine?.getAttribute('x1'))
+
+    expect(clipX).toBeGreaterThan(marketStartX)
   })
 })
