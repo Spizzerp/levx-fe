@@ -3,7 +3,7 @@ import { Group } from '@visx/group'
 import { ParentSize } from '@visx/responsive'
 import { scaleLinear, scaleTime } from '@visx/scale'
 import { LinePath } from '@visx/shape'
-import { useMemo } from 'react'
+import { useId, useMemo } from 'react'
 
 import { segmentPredictionPathAtTime } from '@/lib/chart/segmentPredictionPath'
 
@@ -87,6 +87,11 @@ function filterPointsToDomain(points: PricePoint[], [from, to]: [number, number]
   return points.filter((point) => point.time >= from && point.time <= to)
 }
 
+function clampTime(time: number, from: number, to: number): number {
+  if (!Number.isFinite(time)) return from
+  return Math.min(Math.max(time, from), to)
+}
+
 function pathSegments(path: PredictionPath, nowTime: number, marketEnd: number) {
   if (nowTime >= marketEnd) return { elapsed: path.data, future: [] }
   return segmentPredictionPathAtTime(path.data, nowTime)
@@ -104,6 +109,11 @@ function MiniChartInner({
   const margin = { top: 12, right: 4, bottom: 8, left: 4 }
   const innerWidth = Math.max(0, width - margin.left - margin.right)
   const innerHeight = Math.max(0, height - margin.top - margin.bottom)
+  const rawClipId = useId()
+  const pathClipId = useMemo(
+    () => `market-mini-path-clip-${rawClipId.replace(/:/g, '')}`,
+    [rawClipId],
+  )
 
   const timeDomain = useMemo(
     () => buildTimeDomain({ nowTime, marketStart, marketEnd }),
@@ -126,10 +136,24 @@ function MiniChartInner({
   const gridRows = [0.25, 0.5, 0.75]
   const marketStartX = timeScale(marketStart) ?? 0
   const marketEndX = timeScale(marketEnd) ?? 0
+  const pathRevealTime = clampTime(lastHistory?.time ?? nowTime, marketStart, marketEnd)
+  const pathRevealX = Math.max(0, Math.min(innerWidth, timeScale(pathRevealTime) ?? 0))
 
   return (
     <svg width={width} height={height} className="pointer-events-none overflow-visible">
       <Group left={margin.left} top={margin.top}>
+        <defs>
+          <clipPath id={pathClipId}>
+            <rect
+              data-testid="market-mini-ai-path-clip"
+              x={pathRevealX}
+              y={0}
+              width={Math.max(0, innerWidth - pathRevealX)}
+              height={innerHeight}
+            />
+          </clipPath>
+        </defs>
+
         {gridRows.map((ratio) => (
           <line
             key={ratio}
@@ -189,30 +213,32 @@ function MiniChartInner({
           [ ENDS ]
         </text>
 
-        {paths.map((path) => {
-          const style = pathStyle(path)
-          const segments = pathSegments(path, nowTime, marketEnd)
+        <g clipPath={`url(#${pathClipId})`}>
+          {paths.map((path) => {
+            const style = pathStyle(path)
+            const segments = pathSegments(path, pathRevealTime, marketEnd)
 
-          return (
-            <g key={path.id}>
-              {segments.future.length > 1 && (
-                <LinePath<PricePoint>
-                  data-testid={path.origin === 'ai' ? 'market-mini-ai-path' : undefined}
-                  data={segments.future}
-                  x={(d) => timeScale(d.time) ?? 0}
-                  y={(d) => priceScale(d.value) ?? 0}
-                  stroke={style.stroke}
-                  strokeWidth={1.3}
-                  strokeDasharray={style.dash}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  opacity={style.opacity}
-                  curve={CATMULL_ROM_ALPHA_05}
-                />
-              )}
-            </g>
-          )
-        })}
+            return (
+              <g key={path.id}>
+                {segments.future.length > 1 && (
+                  <LinePath<PricePoint>
+                    data-testid={path.origin === 'ai' ? 'market-mini-ai-path' : undefined}
+                    data={segments.future}
+                    x={(d) => timeScale(d.time) ?? 0}
+                    y={(d) => priceScale(d.value) ?? 0}
+                    stroke={style.stroke}
+                    strokeWidth={1.3}
+                    strokeDasharray={style.dash}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    opacity={style.opacity}
+                    curve={CATMULL_ROM_ALPHA_05}
+                  />
+                )}
+              </g>
+            )
+          })}
+        </g>
 
         <LinePath<PricePoint>
           data={visibleHistory}
