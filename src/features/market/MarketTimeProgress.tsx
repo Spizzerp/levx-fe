@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { motion } from 'motion/react'
 
 import { AnimatedCircularProgressBar } from '@/ui/AnimatedCircularProgressBar'
@@ -13,20 +13,27 @@ interface MarketTimeProgressProps {
   className?: string
 }
 
+type LabelPhase = 'hidden' | 'visible' | 'exiting'
+
 export function MarketTimeProgress({
   startTime,
   endTime,
   now,
   className,
 }: MarketTimeProgressProps) {
-  const [showLabel, setShowLabel] = useState(false)
+  const [labelPhase, setLabelPhase] = useState<LabelPhase>('hidden')
   const value = marketTimeProgressPercent({ startTime, endTime, now })
+  const showLabel = labelPhase !== 'hidden'
+
+  const handleSweepComplete = useCallback(() => {
+    setLabelPhase((phase) => (phase === 'exiting' ? 'hidden' : phase))
+  }, [])
 
   return (
     <div
       className={cn('relative flex size-32 shrink-0 items-center justify-center', className)}
-      onPointerEnter={() => setShowLabel(true)}
-      onPointerLeave={() => setShowLabel(false)}
+      onPointerEnter={() => setLabelPhase('visible')}
+      onPointerLeave={() => setLabelPhase((phase) => (phase === 'hidden' ? phase : 'exiting'))}
     >
       {showLabel && (
         <motion.div
@@ -37,7 +44,10 @@ export function MarketTimeProgress({
             'text-right font-mono text-caption tracking-widest whitespace-nowrap uppercase',
           )}
           initial={{ opacity: 0, x: 10 }}
-          animate={{ opacity: 1, x: 0 }}
+          animate={{
+            opacity: labelPhase === 'exiting' ? 0 : 1,
+            x: labelPhase === 'exiting' ? 10 : 0,
+          }}
           transition={{ duration: 0.18, ease: [0.4, 0, 0.2, 1] }}
         >
           <DiaTextReveal
@@ -47,6 +57,8 @@ export function MarketTimeProgress({
             duration={0.85}
             startOnView={false}
             once={false}
+            direction={labelPhase === 'exiting' ? 'reverse' : 'forward'}
+            onSweepComplete={handleSweepComplete}
           />
         </motion.div>
       )}

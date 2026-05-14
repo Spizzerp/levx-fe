@@ -25,6 +25,10 @@ function buildGradient(pos: number, colors: string[], textColor: string) {
   const bandStart = pos - BAND_HALF
   const bandEnd = pos + BAND_HALF
 
+  if (bandEnd <= 0) {
+    return 'linear-gradient(90deg, transparent, transparent)'
+  }
+
   if (bandStart >= 100) {
     return `linear-gradient(90deg, ${textColor}, ${textColor})`
   }
@@ -86,6 +90,8 @@ export interface DiaTextRevealProps
   once?: boolean
   className?: string
   fixedWidth?: boolean
+  direction?: 'forward' | 'reverse'
+  onSweepComplete?: () => void
 }
 
 export function DiaTextReveal({
@@ -100,6 +106,8 @@ export function DiaTextReveal({
   once = true,
   className,
   fixedWidth = false,
+  direction = 'forward',
+  onSweepComplete,
   ...props
 }: DiaTextRevealProps) {
   const textKey = Array.isArray(text) ? text.join('\0') : text
@@ -156,7 +164,8 @@ export function DiaTextReveal({
 
   useEffect(() => {
     if (prefersReducedMotion) {
-      sweepPos.set(SWEEP_END)
+      sweepPos.set(direction === 'reverse' ? SWEEP_START : SWEEP_END)
+      onSweepComplete?.()
       return
     }
 
@@ -167,14 +176,18 @@ export function DiaTextReveal({
     let active = true
 
     const play = () => {
-      sweepPos.set(SWEEP_START)
+      const sweepFrom = direction === 'reverse' ? SWEEP_END : SWEEP_START
+      const sweepTo = direction === 'reverse' ? SWEEP_START : SWEEP_END
 
-      const controls = animate(sweepPos, SWEEP_END, {
+      sweepPos.set(sweepFrom)
+
+      const controls = animate(sweepPos, sweepTo, {
         duration,
         delay,
         ease: sweepEase,
         onComplete() {
-          if (!repeat || !active) return
+          onSweepComplete?.()
+          if (direction === 'reverse' || !repeat || !active) return
           timerRef.current = setTimeout(() => {
             setActiveIndex((currentIndex) => (currentIndex + 1) % texts.length)
             play()
@@ -194,8 +207,10 @@ export function DiaTextReveal({
     }
   }, [
     delay,
+    direction,
     duration,
     isInView,
+    onSweepComplete,
     once,
     prefersReducedMotion,
     repeat,

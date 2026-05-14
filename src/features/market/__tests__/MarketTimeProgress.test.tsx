@@ -21,5 +21,9 @@ describe('MarketTimeProgress', () => {
     fireEvent.pointerEnter(progress.parentElement as HTMLElement)
 
     expect(screen.getByText('Market time elapsed')).toBeInTheDocument()
+
+    fireEvent.pointerLeave(progress.parentElement as HTMLElement)
+
+    expect(screen.getByText('Market time elapsed')).toBeInTheDocument()
   })
 })
