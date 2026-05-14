@@ -14,6 +14,7 @@ import { Label } from '@/ui/Label'
 import { LevXChart } from '@/features/chart/LevXChart'
 import { MarketMetaPanel } from '@/features/market/MarketMetaPanel'
 import { MarketStateBadge } from '@/features/market/MarketStateBadge'
+import { MarketTimeProgress } from '@/features/market/MarketTimeProgress'
 import { MaturityCountdownCard } from '@/features/market/MaturityCountdownCard'
 import { PendingPathsBanner } from '@/features/market/PendingPathsBanner'
 import { VoidMarketPanel } from '@/features/market/VoidMarketPanel'
@@ -557,11 +558,11 @@ export function MarketPage() {
       className={cn(
         'mx-auto grid max-w-[1680px] grid-cols-1 items-start gap-14 px-10 pt-6 pb-12',
         showRail &&
-          '[@media(min-width:1181px)]:grid-cols-[1fr_400px] [@media(min-width:1181px)]:gap-[72px]',
+          '[@media(min-width:1181px)]:grid-cols-[minmax(0,1fr)_400px] [@media(min-width:1181px)]:gap-[72px]',
       )}
     >
       {/* ── Chart column ─────────────────────────────── */}
-      <section>
+      <section className="min-w-0">
         <Link
           to="/markets"
           className="group text-ink-dim hover:text-ink-strong mb-5 flex items-center gap-1 transition-colors"
@@ -677,7 +678,14 @@ export function MarketPage() {
 
       {/* ── Right rail (Pending / Active / Sampling) ─────────────── */}
       {showWagerRail && (
-        <aside className="mt-[180px] flex flex-col">
+        <aside className="mt-11 flex flex-col">
+          <MarketTimeProgress
+            startTime={chartMarketStart}
+            endTime={chartMarketEnd}
+            now={now}
+            className="mb-6 ml-auto"
+          />
+
           <Label>Select Paths</Label>
 
           {(() => {

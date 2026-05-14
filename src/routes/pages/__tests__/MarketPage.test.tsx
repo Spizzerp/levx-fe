@@ -335,6 +335,30 @@ describe('MarketPage', () => {
     })
   })
 
+  it('renders elapsed market time as a circular progress indicator', async () => {
+    const now = Date.UTC(2026, 4, 14, 12)
+    vi.useFakeTimers()
+    vi.setSystemTime(now)
+
+    try {
+      await setMarketState('active', {
+        startTime: now - 60 * 60 * 1000,
+        endTime: now + 60 * 60 * 1000,
+        checkpointInterval: 3600,
+        totalCheckpoints: 3,
+        completedCheckpoints: 1,
+      })
+
+      renderMarketPage()
+
+      const progress = screen.getByRole('progressbar', { name: /market time elapsed/i })
+      expect(progress).toHaveAttribute('aria-valuenow', '50')
+      expect(progress).toHaveAttribute('aria-valuetext', '50% elapsed')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   // DRAW-09: desktop-only drawing gate.
   it('draw button wrapper has desktop-first "block md:hidden" classes (DRAW-09)', () => {
     renderMarketPage()
