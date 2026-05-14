@@ -44,10 +44,7 @@ export function MarketTimeProgress({
             'text-right font-mono text-caption tracking-widest whitespace-nowrap uppercase',
           )}
           initial={{ opacity: 0, x: 10 }}
-          animate={{
-            opacity: labelPhase === 'exiting' ? 0 : 1,
-            x: labelPhase === 'exiting' ? 10 : 0,
-          }}
+          animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.18, ease: [0.4, 0, 0.2, 1] }}
         >
           <DiaTextReveal
