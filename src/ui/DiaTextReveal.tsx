@@ -21,6 +21,25 @@ const SWEEP_END = 100 + BAND_HALF
 
 const sweepEase = (t: number) => (t < 0.5 ? 4 * t ** 3 : 1 - (-2 * t + 2) ** 3 / 2)
 
+function resolveSweepFrom(
+  current: number,
+  direction: 'forward' | 'reverse',
+  restartFromBoundary = false,
+) {
+  const fallback = direction === 'reverse' ? SWEEP_END : SWEEP_START
+
+  if (
+    restartFromBoundary ||
+    !Number.isFinite(current) ||
+    current <= SWEEP_START ||
+    current >= SWEEP_END
+  ) {
+    return fallback
+  }
+
+  return current
+}
+
 function buildGradient(pos: number, colors: string[], textColor: string) {
   const bandStart = pos - BAND_HALF
   const bandEnd = pos + BAND_HALF
@@ -175,8 +194,8 @@ export function DiaTextReveal({
     hasPlayedRef.current = true
     let active = true
 
-    const play = () => {
-      const sweepFrom = direction === 'reverse' ? SWEEP_END : SWEEP_START
+    const play = (restartFromBoundary = false) => {
+      const sweepFrom = resolveSweepFrom(sweepPos.get(), direction, restartFromBoundary)
       const sweepTo = direction === 'reverse' ? SWEEP_START : SWEEP_END
 
       sweepPos.set(sweepFrom)
@@ -190,7 +209,7 @@ export function DiaTextReveal({
           if (direction === 'reverse' || !repeat || !active) return
           timerRef.current = setTimeout(() => {
             setActiveIndex((currentIndex) => (currentIndex + 1) % texts.length)
-            play()
+            play(true)
           }, repeatDelay * 1000)
         },
       })
