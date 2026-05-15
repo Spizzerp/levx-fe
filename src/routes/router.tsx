@@ -17,6 +17,7 @@ import { DocsContent } from '@/modules/docs/DocsContent'
 import { DocsHome } from '@/modules/docs/DocsHome'
 import { isDocId } from '@/modules/docs/data'
 import type { DocId } from '@/modules/docs/types'
+import { validateProfileSearch } from '@/routes/profileSearch'
 
 const rootRoute = createRootRoute({
   component: RootRouteComponent,
@@ -71,17 +72,10 @@ const portfolioRoute = createRoute({
   component: PortfolioPage,
 })
 
-export type ProfileSearchParams = {
-  wallet?: string
-}
-
 const profileRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/profile',
-  validateSearch: (search: Record<string, unknown>): ProfileSearchParams => {
-    const wallet = typeof search.wallet === 'string' ? search.wallet.trim() : ''
-    return { wallet: wallet || undefined }
-  },
+  validateSearch: validateProfileSearch,
   component: ProfilePage,
 })
 

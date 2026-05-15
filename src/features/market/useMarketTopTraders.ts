@@ -96,6 +96,6 @@ export function useMarketTopTraders(marketId: number | null) {
     enabled: marketId != null,
     queryFn: () => getMarketTopTraders(marketId!),
     staleTime: 60_000,
-    refetchInterval: 60_000,
+    refetchInterval: false,
   })
 }

@@ -49,7 +49,7 @@ export function MarketParticipantAvatars({
   traderCount,
   className,
 }: MarketParticipantAvatarsProps) {
-  const { data: topTraders } = useMarketTopTraders(marketIdNum)
+  const { data: topTraders } = useMarketTopTraders(traderCount > 0 ? marketIdNum : null)
 
   const knownWallets = useMemo(() => {
     return (topTraders ?? []).slice(0, MAX_VISIBLE_AVATARS).map((trader) => trader.wallet)
