@@ -147,5 +147,7 @@ describe('MarketCard', () => {
     expect(container.querySelectorAll('[data-testid="market-mini-ai-path"]')).toHaveLength(1)
     expect(aiPath).toHaveAttribute('opacity', '0.7')
     expect(container.querySelector('[data-testid="market-mini-ai-path-clip"]')).toBeNull()
+    expect(container.querySelector('svg path[stroke*="color-ink-strong"]')).toBeInTheDocument()
+    expect(container.querySelector('.border-line.border-t')).toBeInTheDocument()
   })
 })

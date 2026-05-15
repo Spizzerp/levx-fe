@@ -17,6 +17,7 @@ import { DocsContent } from '@/modules/docs/DocsContent'
 import { DocsHome } from '@/modules/docs/DocsHome'
 import { isDocId } from '@/modules/docs/data'
 import type { DocId } from '@/modules/docs/types'
+import { validateProfileSearch } from '@/routes/profileSearch'
 
 const rootRoute = createRootRoute({
   component: RootRouteComponent,
@@ -74,6 +75,7 @@ const portfolioRoute = createRoute({
 const profileRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/profile',
+  validateSearch: validateProfileSearch,
   component: ProfilePage,
 })
 

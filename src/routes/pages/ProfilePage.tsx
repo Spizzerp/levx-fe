@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useSearch } from '@tanstack/react-router'
 import { useWallet } from '@solana/wallet-adapter-react'
 import { motion } from 'motion/react'
 import { Camera, Check, Copy, Lock, Shuffle, Trash2 } from 'lucide-react'
@@ -54,27 +55,30 @@ type DraftState = {
 }
 
 export function ProfilePage() {
+  const { wallet: profileWalletParam } = useSearch({ from: '/profile' })
   const { status, authenticate } = useSupabaseAuth()
   const connected = useWalletStore((s) => s.connected)
   const publicKey = useWalletStore((s) => s.publicKey)
   const walletAddress = publicKey?.toBase58() ?? null
+  const targetWallet = profileWalletParam ?? walletAddress
+  const canEdit = connected && !!walletAddress && targetWallet === walletAddress
   const { wallet: walletAdapter } = useWallet()
   const walletName = walletAdapter?.adapter.name ?? 'Unknown Wallet'
 
-  const profileQuery = useProfile(walletAddress)
+  const profileQuery = useProfile(targetWallet)
   const saveProfile = useSaveProfile()
 
-  const hydrationKey = walletAddress
+  const hydrationKey = targetWallet
     ? profileQuery.data
-      ? `${walletAddress}:${profileQuery.data.updated_at}`
+      ? `${targetWallet}:${profileQuery.data.updated_at}`
       : profileQuery.isSuccess
-        ? `${walletAddress}:new`
+        ? `${targetWallet}:new`
         : null
     : 'disconnected'
 
   const hydratedData = profileQuery.data
     ? profileToForm(profileQuery.data)
-    : buildDefaultData(walletAddress)
+    : buildDefaultData(targetWallet)
 
   const [draft, setDraft] = useState<DraftState>(() => ({
     hydrationKey,
@@ -94,7 +98,14 @@ export function ProfilePage() {
   }
 
   useEffect(() => {
-    if (!data.username || !USERNAME_RE.test(data.username) || RESERVED.has(data.username)) return
+    if (
+      !canEdit ||
+      !data.username ||
+      !USERNAME_RE.test(data.username) ||
+      RESERVED.has(data.username)
+    ) {
+      return
+    }
 
     let cancelled = false
     const username = data.username
@@ -119,7 +130,7 @@ export function ProfilePage() {
       cancelled = true
       window.clearTimeout(timer)
     }
-  }, [data.username, walletAddress])
+  }, [canEdit, data.username, walletAddress])
 
   const availabilityError = usernameCheck?.name === data.username ? usernameCheck.error : null
   const availability: Availability = !data.username
@@ -140,6 +151,7 @@ export function ProfilePage() {
   const usernameReady =
     availability === 'ok' || (availabilityError !== null && availability !== 'taken')
   const canSave =
+    canEdit &&
     status !== 'pending' &&
     usernameReady &&
     data.displayName.trim().length >= 2 &&
@@ -180,14 +192,14 @@ export function ProfilePage() {
   }
 
   const onCopyAddress = () => {
-    if (!walletAddress) return
-    void navigator.clipboard?.writeText(walletAddress)
+    if (!targetWallet) return
+    void navigator.clipboard?.writeText(targetWallet)
     setCopied(true)
     window.setTimeout(() => setCopied(false), 1500)
   }
 
   const onSave = async () => {
-    if (!walletAddress) return
+    if (!canEdit || !walletAddress) return
 
     try {
       if (!authReady) await authenticate()
@@ -214,7 +226,7 @@ export function ProfilePage() {
     }
   }
 
-  if (!connected) {
+  if (!targetWallet) {
     return (
       <PageLayout title="Profile" subtitle="Your public profile">
         <div className="border-line-strong flex flex-col items-center justify-center gap-4 rounded-2xl border border-dashed py-24">
@@ -233,7 +245,7 @@ export function ProfilePage() {
     <>
       <PageLayout
         title="Profile"
-        subtitle="Your public profile"
+        subtitle={canEdit ? 'Your public profile' : 'Public trader profile'}
         summaryBar={
           <div className="pb-8">
             <div className="flex flex-wrap items-center justify-between gap-x-12 gap-y-6">
@@ -260,13 +272,13 @@ export function ProfilePage() {
               </div>
 
               {/* Wallet address row — right side */}
-              {walletAddress && (
+              {targetWallet && (
                 <div className="flex items-center gap-3">
                   <span className="text-label text-ink-muted font-mono tracking-wider uppercase">
                     Wallet
                   </span>
                   <span className="text-ink tracking-snug font-mono text-sm">
-                    {formatAddress(walletAddress)}
+                    {formatAddress(targetWallet)}
                   </span>
                   <button
                     type="button"
@@ -301,7 +313,7 @@ export function ProfilePage() {
             Public Identity
           </h2>
           <span className="text-ink-dim text-micro font-mono tracking-wider uppercase">
-            // Edit
+            {canEdit ? '// Edit' : '// View'}
           </span>
         </div>
 
@@ -358,147 +370,153 @@ export function ProfilePage() {
                   </div>
                 </div>
 
-                <FieldLabel idx="01" label="Profile Image" />
+                {canEdit && (
+                  <>
+                    <FieldLabel idx="01" label="Profile Image" />
 
-                <div className="mt-4 grid grid-cols-4 gap-2">
-                  {SIGILS.map((Glyph, i) => {
-                    const selected = !data.customImage && data.avatarIdx === i
-                    return (
+                    <div className="mt-4 grid grid-cols-4 gap-2">
+                      {SIGILS.map((Glyph, i) => {
+                        const selected = !data.customImage && data.avatarIdx === i
+                        return (
+                          <motion.button
+                            key={i}
+                            type="button"
+                            onClick={() =>
+                              setDraft((current) => ({
+                                ...current,
+                                data: { ...current.data, avatarIdx: i, customImage: null },
+                              }))
+                            }
+                            whileHover={{ y: -1 }}
+                            whileTap={{ scale: 0.96 }}
+                            className={cn(
+                              'group relative flex aspect-square items-center justify-center',
+                              'rounded-md border',
+                              'duration-short ease-levx transition-[border-color,background-color]',
+                              selected
+                                ? 'border-ink-strong bg-surface-1'
+                                : 'border-line hover:border-ink-muted bg-transparent',
+                            )}
+                          >
+                            <Glyph size={36} tone={selected ? 'accent' : 'strong'} />
+                            {selected && (
+                              <span
+                                className={cn(
+                                  'absolute -top-1 -right-1 h-3 w-3',
+                                  'border-surface bg-brand-to rounded-full border',
+                                )}
+                              />
+                            )}
+                          </motion.button>
+                        )
+                      })}
+
                       <motion.button
-                        key={i}
                         type="button"
+                        whileTap={{ rotate: 180 }}
+                        transition={{ duration: 0.3 }}
                         onClick={() =>
                           setDraft((current) => ({
                             ...current,
-                            data: { ...current.data, avatarIdx: i, customImage: null },
+                            data: {
+                              ...current.data,
+                              avatarIdx:
+                                (current.data.avatarIdx + 1 + Math.floor(Math.random() * 7))
+                                % SIGILS.length,
+                              customImage: null,
+                            },
                           }))
                         }
-                        whileHover={{ y: -1 }}
-                        whileTap={{ scale: 0.96 }}
                         className={cn(
-                          'group relative flex aspect-square items-center justify-center',
-                          'rounded-md border',
-                          'duration-short ease-levx transition-[border-color,background-color]',
-                          selected
-                            ? 'border-ink-strong bg-surface-1'
-                            : 'border-line hover:border-ink-muted bg-transparent',
+                          'flex aspect-square items-center justify-center',
+                          'border-line-strong text-ink-muted rounded-md border border-dashed',
+                          'hover:border-ink hover:text-ink-strong transition-colors',
                         )}
+                        aria-label="Randomize sigil"
                       >
-                        <Glyph size={36} tone={selected ? 'accent' : 'strong'} />
-                        {selected && (
+                        <Shuffle size={16} strokeWidth={1.5} />
+                      </motion.button>
+
+                      {data.customImage ? (
+                        <div
+                          className={cn(
+                            'group relative flex aspect-square items-center justify-center',
+                            'border-ink-strong bg-surface-1 rounded-md border',
+                          )}
+                        >
+                          <div className="relative h-full w-full overflow-hidden rounded-[inherit]">
+                            <img
+                              src={data.customImage}
+                              alt="Uploaded"
+                              className="h-full w-full object-cover"
+                              draggable={false}
+                            />
+                            <div
+                              className={cn(
+                                'absolute inset-0 flex items-center justify-center gap-1.5',
+                                'bg-surface/75 opacity-0 group-hover:opacity-100',
+                                'duration-short ease-levx transition-opacity',
+                              )}
+                            >
+                              <button
+                                type="button"
+                                onClick={openFilePicker}
+                                aria-label="Replace image"
+                                className={cn(
+                                  'border-ink-strong text-ink-strong rounded-md border bg-transparent p-1',
+                                  'hover:bg-surface-1 transition-colors',
+                                )}
+                              >
+                                <Camera size={12} strokeWidth={1.5} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={clearCustomImage}
+                                aria-label="Remove image"
+                                className={cn(
+                                  'border-accent text-accent rounded-md border bg-transparent p-1',
+                                  'hover:bg-accent-subtle transition-colors',
+                                )}
+                              >
+                                <Trash2 size={12} strokeWidth={1.5} />
+                              </button>
+                            </div>
+                          </div>
                           <span
+                            aria-hidden
                             className={cn(
                               'absolute -top-1 -right-1 h-3 w-3',
                               'border-surface bg-brand-to rounded-full border',
                             )}
                           />
-                        )}
-                      </motion.button>
-                    )
-                  })}
-
-                  <motion.button
-                    type="button"
-                    whileTap={{ rotate: 180 }}
-                    transition={{ duration: 0.3 }}
-                    onClick={() =>
-                      setDraft((current) => ({
-                        ...current,
-                        data: {
-                          ...current.data,
-                          avatarIdx:
-                            (current.data.avatarIdx + 1 + Math.floor(Math.random() * 7))
-                            % SIGILS.length,
-                          customImage: null,
-                        },
-                      }))
-                    }
-                    className={cn(
-                      'flex aspect-square items-center justify-center',
-                      'border-line-strong text-ink-muted rounded-md border border-dashed',
-                      'hover:border-ink hover:text-ink-strong transition-colors',
-                    )}
-                    aria-label="Randomize sigil"
-                  >
-                    <Shuffle size={16} strokeWidth={1.5} />
-                  </motion.button>
-
-                  {data.customImage ? (
-                    <div
-                      className={cn(
-                        'group relative flex aspect-square items-center justify-center',
-                        'border-ink-strong bg-surface-1 rounded-md border',
-                      )}
-                    >
-                      <div className="relative h-full w-full overflow-hidden rounded-[inherit]">
-                        <img
-                          src={data.customImage}
-                          alt="Uploaded"
-                          className="h-full w-full object-cover"
-                          draggable={false}
-                        />
-                        <div
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={openFilePicker}
                           className={cn(
-                            'absolute inset-0 flex items-center justify-center gap-1.5',
-                            'bg-surface/75 opacity-0 group-hover:opacity-100',
-                            'duration-short ease-levx transition-opacity',
+                            'flex aspect-square flex-col items-center justify-center gap-1',
+                            'border-line-strong text-ink-muted rounded-md border border-dashed',
+                            'hover:border-ink hover:text-ink-strong transition-colors',
                           )}
                         >
-                          <button
-                            type="button"
-                            onClick={openFilePicker}
-                            aria-label="Replace image"
-                            className={cn(
-                              'border-ink-strong text-ink-strong rounded-md border bg-transparent p-1',
-                              'hover:bg-surface-1 transition-colors',
-                            )}
-                          >
-                            <Camera size={12} strokeWidth={1.5} />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={clearCustomImage}
-                            aria-label="Remove image"
-                            className={cn(
-                              'border-accent text-accent rounded-md border bg-transparent p-1',
-                              'hover:bg-accent-subtle transition-colors',
-                            )}
-                          >
-                            <Trash2 size={12} strokeWidth={1.5} />
-                          </button>
-                        </div>
-                      </div>
-                      <span
-                        aria-hidden
-                        className={cn(
-                          'absolute -top-1 -right-1 h-3 w-3',
-                          'border-surface bg-brand-to rounded-full border',
-                        )}
-                      />
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={openFilePicker}
-                      className={cn(
-                        'flex aspect-square flex-col items-center justify-center gap-1',
-                        'border-line-strong text-ink-muted rounded-md border border-dashed',
-                        'hover:border-ink hover:text-ink-strong transition-colors',
+                          <Camera size={14} strokeWidth={1.5} />
+                          <span className="text-micro font-mono tracking-wider uppercase">
+                            Upload
+                          </span>
+                        </button>
                       )}
-                    >
-                      <Camera size={14} strokeWidth={1.5} />
-                      <span className="text-micro font-mono tracking-wider uppercase">Upload</span>
-                    </button>
-                  )}
-                </div>
+                    </div>
 
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleFileSelected}
-                />
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleFileSelected}
+                    />
+                  </>
+                )}
               </div>
 
               <div className="px-8 py-8">
@@ -509,6 +527,7 @@ export function ProfilePage() {
                       <input
                         value={data.username}
                         onChange={(e) =>
+                          canEdit &&
                           setDraft((current) => ({
                             ...current,
                             data: {
@@ -517,11 +536,12 @@ export function ProfilePage() {
                             },
                           }))
                         }
+                        readOnly={!canEdit}
                         maxLength={20}
                         spellCheck={false}
                         className="text-ink-strong w-0 min-w-0 flex-1 font-mono text-2xl"
                       />
-                      <AvailabilityBadge state={availability} />
+                      {canEdit && <AvailabilityBadge state={availability} />}
                     </div>
                   </FormRow>
 
@@ -529,11 +549,13 @@ export function ProfilePage() {
                     <input
                       value={data.displayName}
                       onChange={(e) =>
+                        canEdit &&
                         setDraft((current) => ({
                           ...current,
                           data: { ...current.data, displayName: e.target.value },
                         }))
                       }
+                      readOnly={!canEdit}
                       maxLength={32}
                       className="text-ink-strong w-full font-sans text-2xl font-medium tracking-tight"
                     />
@@ -548,11 +570,13 @@ export function ProfilePage() {
                     <textarea
                       value={data.bio}
                       onChange={(e) =>
+                        canEdit &&
                         setDraft((current) => ({
                           ...current,
                           data: { ...current.data, bio: e.target.value },
                         }))
                       }
+                      readOnly={!canEdit}
                       rows={2}
                       className="text-ink text-body-sm w-full resize-none font-sans leading-snug"
                     />
@@ -564,11 +588,13 @@ export function ProfilePage() {
                       <input
                         value={data.xId}
                         onChange={(e) =>
+                          canEdit &&
                           setDraft((current) => ({
                             ...current,
                             data: { ...current.data, xId: normalizeXId(e.target.value) },
                           }))
                         }
+                        readOnly={!canEdit}
                         maxLength={32}
                         className="text-ink-strong text-body w-0 min-w-0 flex-1 font-mono"
                       />
@@ -578,26 +604,28 @@ export function ProfilePage() {
               </div>
             </div>
 
-            <footer className="border-line flex justify-end border-t px-8 py-5">
-              <Button
-                variant="primary"
-                disabled={!canSave}
-                onClick={onSave}
-                className="min-w-[200px]"
-              >
-                {saveProfile.isPending
-                  ? 'Saving…'
-                  : status === 'pending'
-                    ? 'Verifying…'
-                    : 'Save Profile'}
-              </Button>
-            </footer>
+            {canEdit && (
+              <footer className="border-line flex justify-end border-t px-8 py-5">
+                <Button
+                  variant="primary"
+                  disabled={!canSave}
+                  onClick={onSave}
+                  className="min-w-[200px]"
+                >
+                  {saveProfile.isPending
+                    ? 'Saving…'
+                    : status === 'pending'
+                      ? 'Verifying…'
+                      : 'Save Profile'}
+                </Button>
+              </footer>
+            )}
           </ChartFrame>
         )}
       </PageLayout>
 
       <ImageCropModal
-        open={pendingUpload !== null}
+        open={canEdit && pendingUpload !== null}
         imageSrc={pendingUpload}
         onClose={() => setPendingUpload(null)}
         onApply={handleCropApply}
