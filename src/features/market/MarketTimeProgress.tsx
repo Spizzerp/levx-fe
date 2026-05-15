@@ -48,7 +48,7 @@ export function MarketTimeProgress({
           transition={{ duration: 0.18, ease: [0.4, 0, 0.2, 1] }}
         >
           <DiaTextReveal
-            text="Market time elapsed"
+            text="Market Progress"
             colors={['var(--color-brand-from)', 'var(--color-brand-to)']}
             textColor="var(--color-ink-muted)"
             duration={0.85}
@@ -66,7 +66,7 @@ export function MarketTimeProgress({
           to: 'var(--color-brand-to)',
         }}
         gaugeSecondaryColor="var(--color-line-strong)"
-        label="Market time elapsed"
+        label="Market Progress"
         className="size-28 text-base"
       />
     </div>

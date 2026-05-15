@@ -14,16 +14,16 @@ describe('MarketTimeProgress', () => {
   it('reveals the Dia text label when the progress indicator is hovered', () => {
     render(<MarketTimeProgress startTime={100} endTime={200} now={136} />)
 
-    const progress = screen.getByRole('progressbar', { name: /market time elapsed/i })
+    const progress = screen.getByRole('progressbar', { name: /market progress/i })
     expect(progress).toHaveAttribute('aria-valuenow', '36')
-    expect(screen.queryByText('Market time elapsed')).not.toBeInTheDocument()
+    expect(screen.queryByText('Market Progress')).not.toBeInTheDocument()
 
     fireEvent.pointerEnter(progress.parentElement as HTMLElement)
 
-    expect(screen.getByText('Market time elapsed')).toBeInTheDocument()
+    expect(screen.getByText('Market Progress')).toBeInTheDocument()
 
     fireEvent.pointerLeave(progress.parentElement as HTMLElement)
 
-    expect(screen.getByText('Market time elapsed')).toBeInTheDocument()
+    expect(screen.getByText('Market Progress')).toBeInTheDocument()
   })
 })
