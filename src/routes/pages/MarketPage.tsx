@@ -13,6 +13,7 @@ import { Input } from '@/ui/Input'
 import { Label } from '@/ui/Label'
 import { LevXChart } from '@/features/chart/LevXChart'
 import { MarketMetaPanel } from '@/features/market/MarketMetaPanel'
+import { MarketParticipantAvatars } from '@/features/market/MarketParticipantAvatars'
 import { MarketStateBadge } from '@/features/market/MarketStateBadge'
 import { MarketTimeProgress } from '@/features/market/MarketTimeProgress'
 import { MaturityCountdownCard } from '@/features/market/MaturityCountdownCard'
@@ -554,14 +555,8 @@ export function MarketPage() {
   const relayFailedPaths = visibleUserPaths.filter((p) => p.onChainStatus === 'relay_failed')
 
   return (
-    <main
-      className={cn(
-        'mx-auto grid max-w-[1680px] grid-cols-1 items-start gap-14 px-10 pt-6 pb-12',
-        showRail &&
-          '[@media(min-width:1181px)]:grid-cols-[minmax(0,1fr)_400px] [@media(min-width:1181px)]:gap-[72px]',
-      )}
-    >
-      {/* ── Chart column ─────────────────────────────── */}
+    <main className="mx-auto max-w-[1680px] px-10 pt-6 pb-12">
+      {/* ── Market header ────────────────────────────── */}
       <section className="min-w-0">
         <Link
           to="/markets"
@@ -582,11 +577,18 @@ export function MarketPage() {
           <MarketStateBadge market={market} />
         </div>
 
-        <div className="my-1.5 mb-2.5 flex flex-wrap items-baseline gap-x-5 gap-y-1">
-          <h1 className="font-display text-ink-strong text-display-lg leading-none font-medium tracking-tighter [font-variation-settings:'ROND'_100]">
-            {formatPrice(priceDisplay)}
-          </h1>
-          <div className="text-ink-muted text-caption flex items-baseline gap-3 font-mono">
+        <div className="my-1.5 mb-2.5">
+          <div className="flex flex-wrap items-center gap-x-8 gap-y-4">
+            <h1 className="font-display text-ink-strong text-display-lg leading-none font-medium tracking-tighter [font-variation-settings:'ROND'_100]">
+              {formatPrice(priceDisplay)}
+            </h1>
+            <MarketTimeProgress
+              startTime={chartMarketStart}
+              endTime={chartMarketEnd}
+              now={now}
+            />
+          </div>
+          <div className="text-ink-muted text-caption mt-2 flex items-baseline gap-3 font-mono">
             <span className={cn('font-bold', deltaColor)}>{formatDeltaBps(deltaDisplay)}</span>
             <span>24H</span>
           </div>
@@ -621,371 +623,385 @@ export function MarketPage() {
           <span>ENTRY FEE</span>
           <span className="text-ink-muted ml-1">{(market.entryFeeBps / 100).toFixed(1)}%</span>
         </div>
-
-        <ChartFrame glow className="mt-8">
-          <LevXChart
-            height={520}
-            history={chartHistory}
-            predictions={allPaths}
-            nowTime={latestTick ? latestTick.time : now}
-            marketStart={chartMarketStart}
-            marketEnd={chartMarketEnd}
-            selectedPathId={hoveredPathId ?? activePathId}
-            selectedPathIds={selectedPathIds}
-            selectionInteractive={showWagerRail}
-            showOtherPositions={showOtherPositions}
-            pair={market.pair}
-            isLoading={isBenchmarksLoading}
-            error={null}
-            onViewportChange={onChartViewportChange}
-            market={{
-              startTime: chartMarketStart,
-              checkpointInterval: chartCheckpointInterval,
-              totalCheckpoints: chartTotalCheckpoints,
-            }}
-            renderDrawingOverlay={({
-              xScale,
-              yScale,
-              innerWidth,
-              innerHeight,
-              checkpointXs,
-              marketStart,
-              margin,
-            }) => (
-              <DrawingLayer
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                xScale={xScale as any}
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                yScale={yScale as any}
-                innerWidth={innerWidth}
-                innerHeight={innerHeight}
-                margin={margin}
-                checkpointXs={checkpointXs}
-                marketStart={Math.max(marketStart, drawingStartTime)}
-                marketId={market.id}
-              />
-            )}
-          />
-        </ChartFrame>
-
-        <div className="mt-4">
-          <TimeRangePicker value={candleInterval} onChange={setCandleInterval} />
-        </div>
-
-        <div className="mt-8">
-          <MarketComments marketId={market.id} />
-        </div>
       </section>
 
-      {/* ── Right rail (Pending / Active / Sampling) ─────────────── */}
-      {showWagerRail && (
-        <aside className="mt-7 flex flex-col">
-          <MarketTimeProgress
-            startTime={chartMarketStart}
-            endTime={chartMarketEnd}
-            now={now}
-            className="mb-6 ml-auto"
-          />
+      <div
+        className={cn(
+          'mt-8 grid grid-cols-1 items-start gap-14',
+          showRail &&
+            '[@media(min-width:1181px)]:grid-cols-[minmax(0,1fr)_400px] [@media(min-width:1181px)]:gap-[72px]',
+        )}
+      >
+        {/* ── Chart column ─────────────────────────────── */}
+        <section className="min-w-0">
+          <ChartFrame glow>
+            <LevXChart
+              height={520}
+              history={chartHistory}
+              predictions={allPaths}
+              nowTime={latestTick ? latestTick.time : now}
+              marketStart={chartMarketStart}
+              marketEnd={chartMarketEnd}
+              selectedPathId={hoveredPathId ?? activePathId}
+              selectedPathIds={selectedPathIds}
+              selectionInteractive={showWagerRail}
+              showOtherPositions={showOtherPositions}
+              pair={market.pair}
+              isLoading={isBenchmarksLoading}
+              error={null}
+              onViewportChange={onChartViewportChange}
+              market={{
+                startTime: chartMarketStart,
+                checkpointInterval: chartCheckpointInterval,
+                totalCheckpoints: chartTotalCheckpoints,
+              }}
+              renderDrawingOverlay={({
+                xScale,
+                yScale,
+                innerWidth,
+                innerHeight,
+                checkpointXs,
+                marketStart,
+                margin,
+              }) => (
+                <DrawingLayer
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  xScale={xScale as any}
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  yScale={yScale as any}
+                  innerWidth={innerWidth}
+                  innerHeight={innerHeight}
+                  margin={margin}
+                  checkpointXs={checkpointXs}
+                  marketStart={Math.max(marketStart, drawingStartTime)}
+                  marketId={market.id}
+                />
+              )}
+            />
+          </ChartFrame>
 
-          <Label>Select Paths</Label>
+          <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
+            <TimeRangePicker value={candleInterval} onChange={setCandleInterval} />
+            <MarketParticipantAvatars
+              marketIdNum={market.marketId}
+              traderCount={market.traders}
+              className="ml-auto"
+            />
+          </div>
 
-          {(() => {
-            // During pending state we want to:
-            //   - Hide mock AI fixtures (`APP_USE_MOCK=true` paints
-            //     fake "CHRONOS-2 PATH" rows that confuse users while
-            //     real AI paths are still in flight).
-            //   - Always show real content the user produced (a path
-            //     they drew this session) or the chain reflects (a
-            //     partial on-chain AI submission below targetNumPaths).
-            //   - Replace the rows with the heart-pulse loader only
-            //     when there is genuinely nothing real to display.
-            // Outside pending, `allPaths` is authoritative.
-            const hasOnChainPaths = (market.paths?.length ?? 0) > 0
-            const visiblePaths = showPendingIndicator && !hasOnChainPaths ? userPaths : allPaths
-            const showLoaderInSlot = showPendingIndicator && visiblePaths.length === 0
+          <div className="mt-8">
+            <MarketComments marketId={market.id} />
+          </div>
+        </section>
 
-            if (showLoaderInSlot) {
+        {/* ── Right rail (Pending / Active / Sampling) ─────────────── */}
+        {showWagerRail && (
+          <aside className="flex flex-col">
+            <Label>Select Paths</Label>
+
+            {(() => {
+              // During pending state we want to:
+              //   - Hide mock AI fixtures (`APP_USE_MOCK=true` paints
+              //     fake "CHRONOS-2 PATH" rows that confuse users while
+              //     real AI paths are still in flight).
+              //   - Always show real content the user produced (a path
+              //     they drew this session) or the chain reflects (a
+              //     partial on-chain AI submission below targetNumPaths).
+              //   - Replace the rows with the heart-pulse loader only
+              //     when there is genuinely nothing real to display.
+              // Outside pending, `allPaths` is authoritative.
+              const hasOnChainPaths = (market.paths?.length ?? 0) > 0
+              const visiblePaths = showPendingIndicator && !hasOnChainPaths ? userPaths : allPaths
+              const showLoaderInSlot = showPendingIndicator && visiblePaths.length === 0
+
+              if (showLoaderInSlot) {
+                return (
+                  <div className="border-line mt-5 flex items-center justify-center border-t py-12">
+                    <PendingPathsBanner market={market} />
+                  </div>
+                )
+              }
+
               return (
-                <div className="border-line mt-5 flex items-center justify-center border-t py-12">
-                  <PendingPathsBanner market={market} />
-                </div>
-              )
-            }
-
-            return (
-              <div className="border-line mt-5 border-0 border-t">
-                {visiblePaths.map((p, idx) => (
-                  <PathRow
-                    key={p.id}
-                    index={idx + 1}
-                    name={p.label}
-                    multiplier={`${p.multiplier.toFixed(2)}×`}
-                    wagered={p.totalWagered}
-                    compositeScore={p.compositeScore}
-                    active={selectedPathIds.has(p.id)}
-                    pending={
-                      p.origin === 'user' &&
-                      (p.onChainStatus === 'pending' || p.onChainStatus === 'relay_failed')
-                    }
-                    onMouseEnter={() => setHoveredPathId(p.id)}
-                    onMouseLeave={() => setHoveredPathId(null)}
-                    onClick={() =>
-                      setSelectedPathIds((prev) => {
-                        const next = new Set(prev)
-                        if (next.has(p.id)) next.delete(p.id)
-                        else next.add(p.id)
-                        return next
-                      })
-                    }
-                  />
-                ))}
-                {relayFailedPaths.map((p) => {
-                  const remainingMs = Math.max(0, (p.uploadExpiresAt ?? 0) * 1000 - now)
-                  const canCancel = remainingMs === 0 && !!p.uploadIntentPda
-                  return (
-                    <div
-                      key={`${p.id}-relay`}
-                      className={cn(
-                        'border-line flex items-center justify-between gap-3',
-                        'border-0 border-b px-4 py-3',
-                      )}
-                    >
-                      <span className="text-ink-dim min-w-0 font-mono text-xs tracking-wide uppercase">
-                        {canCancel
-                          ? 'Relay stalled. Cleanup and cancel are available.'
-                          : `Relay pending. Cleanup unlocks in ${formatCountdown(remainingMs)}`}
-                      </span>
-                      <Button
-                        variant="secondary"
-                        className="min-h-8 shrink-0 px-3 py-2 text-[10px]"
-                        disabled={!canCancel || cancelPathUpload.isPending}
-                        onClick={async () => {
-                          if (!p.uploadIntentPda || !market) return
-                          await cancelPathUpload.mutateAsync({
-                            marketId: market.marketId,
-                            intentPda: p.uploadIntentPda,
-                          })
-                          setUserPaths((prev) => prev.filter((path) => path.id !== p.id))
-                          setSelectedPathIds((prev) => {
-                            const next = new Set(prev)
-                            next.delete(p.id)
-                            return next
-                          })
-                        }}
+                <div className="border-line mt-5 border-0 border-t">
+                  {visiblePaths.map((p, idx) => (
+                    <PathRow
+                      key={p.id}
+                      index={idx + 1}
+                      name={p.label}
+                      multiplier={`${p.multiplier.toFixed(2)}×`}
+                      wagered={p.totalWagered}
+                      compositeScore={p.compositeScore}
+                      active={selectedPathIds.has(p.id)}
+                      pending={
+                        p.origin === 'user' &&
+                        (p.onChainStatus === 'pending' || p.onChainStatus === 'relay_failed')
+                      }
+                      onMouseEnter={() => setHoveredPathId(p.id)}
+                      onMouseLeave={() => setHoveredPathId(null)}
+                      onClick={() =>
+                        setSelectedPathIds((prev) => {
+                          const next = new Set(prev)
+                          if (next.has(p.id)) next.delete(p.id)
+                          else next.add(p.id)
+                          return next
+                        })
+                      }
+                    />
+                  ))}
+                  {relayFailedPaths.map((p) => {
+                    const remainingMs = Math.max(0, (p.uploadExpiresAt ?? 0) * 1000 - now)
+                    const canCancel = remainingMs === 0 && !!p.uploadIntentPda
+                    return (
+                      <div
+                        key={`${p.id}-relay`}
+                        className={cn(
+                          'border-line flex items-center justify-between gap-3',
+                          'border-0 border-b px-4 py-3',
+                        )}
                       >
-                        {canCancel ? 'Cleanup + Cancel' : 'Cancel'}
-                      </Button>
-                    </div>
-                  )
-                })}
-                {selectedPathIds.size > 4 && (
-                  <p className="text-accent text-caption px-4 py-2 font-mono">
-                    Max 4 paths per transaction. Deselect some paths.
-                  </p>
-                )}
-                {/* Inline AI-generating indicator below the existing
+                        <span className="text-ink-dim min-w-0 font-mono text-xs tracking-wide uppercase">
+                          {canCancel
+                            ? 'Relay stalled. Cleanup and cancel are available.'
+                            : `Relay pending. Cleanup unlocks in ${formatCountdown(remainingMs)}`}
+                        </span>
+                        <Button
+                          variant="secondary"
+                          className="min-h-8 shrink-0 px-3 py-2 text-[10px]"
+                          disabled={!canCancel || cancelPathUpload.isPending}
+                          onClick={async () => {
+                            if (!p.uploadIntentPda || !market) return
+                            await cancelPathUpload.mutateAsync({
+                              marketId: market.marketId,
+                              intentPda: p.uploadIntentPda,
+                            })
+                            setUserPaths((prev) => prev.filter((path) => path.id !== p.id))
+                            setSelectedPathIds((prev) => {
+                              const next = new Set(prev)
+                              next.delete(p.id)
+                              return next
+                            })
+                          }}
+                        >
+                          {canCancel ? 'Cleanup + Cancel' : 'Cancel'}
+                        </Button>
+                      </div>
+                    )
+                  })}
+                  {selectedPathIds.size > 4 && (
+                    <p className="text-accent text-caption px-4 py-2 font-mono">
+                      Max 4 paths per transaction. Deselect some paths.
+                    </p>
+                  )}
+                  {/* Inline AI-generating indicator below the existing
                     rows so a user who's drawn a path during pending
                     still sees their work — the loader doesn't
                     swallow it. */}
-                {showPendingIndicator && (
-                  <div className="border-line border-t px-1 py-3">
-                    <PendingPathsBanner market={market} />
-                  </div>
-                )}
-              </div>
-            )
-          })()}
+                  {showPendingIndicator && (
+                    <div className="border-line border-t px-1 py-3">
+                      <PendingPathsBanner market={market} />
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
 
-          {/*
+            {/*
           ── Draw button — desktop only (mobile gate: pure Tailwind CSS) ──
           This project uses DESKTOP-FIRST custom variants in src/style/customVariants.css:
           `md:` = `@media (max-width: 1024px)`. So base classes apply on desktop
           and `md:` variants override on viewports ≤1024px.
         */}
-          <div data-testid="draw-button-wrapper" className="block md:hidden">
-            {isInDrawMode ? (
-              <div className="mt-5 flex gap-3">
-                <Button
-                  variant="secondary"
-                  fullWidth
-                  onClick={() => exitDrawMode()}
-                  disabled={addPath.isPending}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  variant="primary"
-                  fullWidth
-                  onClick={handleConfirmDrawing}
-                  disabled={drawingState.phase !== 'ready' || addPath.isPending}
-                >
-                  {confirmPathLabel}
-                </Button>
-              </div>
-            ) : (
-              <Button
-                variant="dashed"
-                fullWidth
-                className="mt-5 gap-2"
-                disabled={chartTotalCheckpoints <= 0}
-                onClick={() => enterDrawMode(chartTotalCheckpoints, drawingInitialValues)}
-              >
-                <Plus size={14} strokeWidth={1.75} aria-hidden />
-                Draw Custom Path
-              </Button>
-            )}
-          </div>
-          <div
-            data-testid="drawing-desktop-notice"
-            className="mt-5 hidden font-mono text-sm text-[color:var(--color-ink-dim,#666)] md:block"
-          >
-            Drawing requires desktop
-          </div>
-
-          {market.leverageEnabled && (
-            <>
-              <hr className="bg-line my-9 mb-8 h-px border-0" />
-
-              <div className="mb-8">
-                <div className="mb-3.5 flex items-baseline justify-between">
-                  <Label>Leverage</Label>
-                  <span className="text-ink-strong text-body-sm font-mono font-bold">
-                    {Math.min(leverage, leverageCap)}×
-                  </span>
+            <div data-testid="draw-button-wrapper" className="block md:hidden">
+              {isInDrawMode ? (
+                <div className="mt-5 flex gap-3">
+                  <Button
+                    variant="secondary"
+                    fullWidth
+                    onClick={() => exitDrawMode()}
+                    disabled={addPath.isPending}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="primary"
+                    fullWidth
+                    onClick={handleConfirmDrawing}
+                    disabled={drawingState.phase !== 'ready' || addPath.isPending}
+                  >
+                    {confirmPathLabel}
+                  </Button>
                 </div>
-                <SegmentedSlider
-                  value={Math.min(leverage, leverageCap)}
-                  max={leverageCap}
-                  onChange={setLeverage}
-                />
-                <div className="text-ink-dim text-caption mt-2.5 flex justify-between font-mono uppercase">
-                  <span>1×</span>
-                  <span>
-                    {leverageCap}× MAX ·{' '}
-                    {formatMarketDurationLabel(market.startTime, chartMarketEnd)}
-                  </span>
-                </div>
-              </div>
-            </>
-          )}
-
-          {!market.leverageEnabled && <hr className="bg-line my-9 mb-8 h-px border-0" />}
-
-          <div className="mb-6 flex items-center justify-between gap-3">
-            <UsdcBalance />
-            <RequestUsdcButton />
-          </div>
-
-          <Input
-            label="Collateral"
-            value={collateral}
-            onChange={(e) => setCollateral(e.target.value)}
-            unit="USDC"
-            inputMode="decimal"
-            borderless
-            className="mb-8"
-          />
-          {numWagerable > 1 && (
-            <p className="text-ink-muted text-caption -mt-6 mb-6 font-mono">
-              Total: {formatUSD((parseFloat(collateral) || 0) * numWagerable)} USDC across{' '}
-              {numWagerable} paths
-            </p>
-          )}
-
-          <SlippageSelector className="mb-6" />
-
-          <ConnectGate>
-            <Button
-              variant="primary"
-              fullWidth
-              className="mt-2"
-              disabled={
-                !wageringOpen || numWagerable === 0 || numWagerable > 4 || placeBatchWager.isPending
-              }
-              onClick={() => {
-                if (numWagerable === 0) return
-                const wager = parseFloat(collateral) || 0
-                const total = wager * numWagerable
-                // Pre-tx guard only fires when the balance is actually
-                // known. If the query is still loading or hit a
-                // transient RPC error, fall through and let the on-chain
-                // validation surface insufficient-funds — better than
-                // blocking a valid wager because we couldn't read the
-                // ATA.
-                if (usdcBalance && total > usdcBalance.balance) {
-                  toast.error('Insufficient USDC', {
-                    message: `Wager total ${total.toFixed(2)} USDC exceeds your balance of ${usdcBalance.balance.toFixed(2)}. Use "Request test USDC" above.`,
-                  })
-                  return
-                }
-                placeBatchWager.mutate({
-                  marketId: market.marketId,
-                  pathIndices: wagerablePaths.map((p) => p.pathIndex),
-                  amount: wager,
-                })
-              }}
+              ) : (
+                <Button
+                  variant="dashed"
+                  fullWidth
+                  className="mt-5 gap-2"
+                  disabled={chartTotalCheckpoints <= 0}
+                  onClick={() => enterDrawMode(chartTotalCheckpoints, drawingInitialValues)}
+                >
+                  <Plus size={14} strokeWidth={1.75} aria-hidden />
+                  Draw Custom Path
+                </Button>
+              )}
+            </div>
+            <div
+              data-testid="drawing-desktop-notice"
+              className="mt-5 hidden font-mono text-sm text-[color:var(--color-ink-dim,#666)] md:block"
             >
-              {placeBatchWager.isPending
-                ? 'Confirming…'
-                : numWagerable <= 1
-                  ? `Open ${isPathLong(wagerablePaths[0]) ? 'Long' : 'Short'} Position`
-                  : `Open ${numWagerable} Positions`}
-            </Button>
-          </ConnectGate>
-          {placeBatchWager.isError && (
-            <p className="text-accent text-caption mt-2 font-mono">
-              {(placeBatchWager.error as Error).message}
-            </p>
-          )}
-        </aside>
-      )}
+              Drawing requires desktop
+            </div>
 
-      {/* ── Right rail (Maturing) — countdown card in wager-slot position ── */}
-      {showMaturityCard && (
-        <aside className="flex flex-col gap-6">
-          <MaturityCountdownCard market={market} />
-          {userPosition && <UserPositionCard position={userPosition} marketState={market.state} />}
-        </aside>
-      )}
+            {market.leverageEnabled && (
+              <>
+                <hr className="bg-line my-9 mb-8 h-px border-0" />
 
-      {/* ── Right rail (Settled) — claim button (ConnectGate-wrapped) ── */}
-      {showClaimCard && (
-        <aside className="flex flex-col gap-6">
-          <ClaimButton
-            market={market}
-            pathIndex={
-              userPosition ? parseInt(userPosition.pathId.replace('path-', ''), 10) : undefined
-            }
-          />
-          {/* hideAction: ClaimButton above already drives the claim flow;
+                <div className="mb-8">
+                  <div className="mb-3.5 flex items-baseline justify-between">
+                    <Label>Leverage</Label>
+                    <span className="text-ink-strong text-body-sm font-mono font-bold">
+                      {Math.min(leverage, leverageCap)}×
+                    </span>
+                  </div>
+                  <SegmentedSlider
+                    value={Math.min(leverage, leverageCap)}
+                    max={leverageCap}
+                    onChange={setLeverage}
+                  />
+                  <div className="text-ink-dim text-caption mt-2.5 flex justify-between font-mono uppercase">
+                    <span>1×</span>
+                    <span>
+                      {leverageCap}× MAX ·{' '}
+                      {formatMarketDurationLabel(market.startTime, chartMarketEnd)}
+                    </span>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {!market.leverageEnabled && <hr className="bg-line my-9 mb-8 h-px border-0" />}
+
+            <div className="mb-6 flex items-center justify-between gap-3">
+              <UsdcBalance />
+              <RequestUsdcButton />
+            </div>
+
+            <Input
+              label="Collateral"
+              value={collateral}
+              onChange={(e) => setCollateral(e.target.value)}
+              unit="USDC"
+              inputMode="decimal"
+              borderless
+              className="mb-8"
+            />
+            {numWagerable > 1 && (
+              <p className="text-ink-muted text-caption -mt-6 mb-6 font-mono">
+                Total: {formatUSD((parseFloat(collateral) || 0) * numWagerable)} USDC across{' '}
+                {numWagerable} paths
+              </p>
+            )}
+
+            <SlippageSelector className="mb-6" />
+
+            <ConnectGate>
+              <Button
+                variant="primary"
+                fullWidth
+                className="mt-2"
+                disabled={
+                  !wageringOpen ||
+                  numWagerable === 0 ||
+                  numWagerable > 4 ||
+                  placeBatchWager.isPending
+                }
+                onClick={() => {
+                  if (numWagerable === 0) return
+                  const wager = parseFloat(collateral) || 0
+                  const total = wager * numWagerable
+                  // Pre-tx guard only fires when the balance is actually
+                  // known. If the query is still loading or hit a
+                  // transient RPC error, fall through and let the on-chain
+                  // validation surface insufficient-funds — better than
+                  // blocking a valid wager because we couldn't read the
+                  // ATA.
+                  if (usdcBalance && total > usdcBalance.balance) {
+                    toast.error('Insufficient USDC', {
+                      message: `Wager total ${total.toFixed(2)} USDC exceeds your balance of ${usdcBalance.balance.toFixed(2)}. Use "Request test USDC" above.`,
+                    })
+                    return
+                  }
+                  placeBatchWager.mutate({
+                    marketId: market.marketId,
+                    pathIndices: wagerablePaths.map((p) => p.pathIndex),
+                    amount: wager,
+                  })
+                }}
+              >
+                {placeBatchWager.isPending
+                  ? 'Confirming…'
+                  : numWagerable <= 1
+                    ? `Open ${isPathLong(wagerablePaths[0]) ? 'Long' : 'Short'} Position`
+                    : `Open ${numWagerable} Positions`}
+              </Button>
+            </ConnectGate>
+            {placeBatchWager.isError && (
+              <p className="text-accent text-caption mt-2 font-mono">
+                {(placeBatchWager.error as Error).message}
+              </p>
+            )}
+          </aside>
+        )}
+
+        {/* ── Right rail (Maturing) — countdown card in wager-slot position ── */}
+        {showMaturityCard && (
+          <aside className="flex flex-col gap-6">
+            <MaturityCountdownCard market={market} />
+            {userPosition && (
+              <UserPositionCard position={userPosition} marketState={market.state} />
+            )}
+          </aside>
+        )}
+
+        {/* ── Right rail (Settled) — claim button (ConnectGate-wrapped) ── */}
+        {showClaimCard && (
+          <aside className="flex flex-col gap-6">
+            <ClaimButton
+              market={market}
+              pathIndex={
+                userPosition ? parseInt(userPosition.pathId.replace('path-', ''), 10) : undefined
+              }
+            />
+            {/* hideAction: ClaimButton above already drives the claim flow;
               the card's in-built "Claim Payout" button is dead (no onClick). */}
-          {userPosition && (
-            <UserPositionCard position={userPosition} marketState={market.state} hideAction />
-          )}
-        </aside>
-      )}
+            {userPosition && (
+              <UserPositionCard position={userPosition} marketState={market.state} hideAction />
+            )}
+          </aside>
+        )}
 
-      {/* ── Right rail (Void) — refund / reclaim panel ── */}
-      {showVoidPanel && (
-        <aside className="flex flex-col gap-6">
-          <VoidMarketPanel market={market} />
-          {/* hideAction: VoidMarketPanel drives the reclaim flow; the
+        {/* ── Right rail (Void) — refund / reclaim panel ── */}
+        {showVoidPanel && (
+          <aside className="flex flex-col gap-6">
+            <VoidMarketPanel market={market} />
+            {/* hideAction: VoidMarketPanel drives the reclaim flow; the
               card's in-built "Claim Refund" button is dead (no onClick). */}
-          {userPosition && (
-            <UserPositionCard position={userPosition} marketState={market.state} hideAction />
-          )}
-        </aside>
-      )}
+            {userPosition && (
+              <UserPositionCard position={userPosition} marketState={market.state} hideAction />
+            )}
+          </aside>
+        )}
 
-      {/* ── Right rail (non-Active markets with a user position) ── */}
-      {showPositionRail && userPosition && (
-        <aside className="flex flex-col">
-          <UserPositionCard position={userPosition} marketState={market.state} />
-        </aside>
-      )}
+        {/* ── Right rail (non-Active markets with a user position) ── */}
+        {showPositionRail && userPosition && (
+          <aside className="flex flex-col">
+            <UserPositionCard position={userPosition} marketState={market.state} />
+          </aside>
+        )}
+      </div>
 
       {/* ── Market details (collapsible) — spans full width below chart/rail ── */}
-      <div className="[@media(min-width:1181px)]:col-span-full">
+      <div className="mt-14">
         <MarketMetaPanel market={market} />
       </div>
     </main>

@@ -31,7 +31,7 @@ export function MarketTimeProgress({
 
   return (
     <div
-      className={cn('relative flex size-32 shrink-0 items-center justify-center', className)}
+      className={cn('relative flex size-20 shrink-0 items-center justify-center', className)}
       onPointerEnter={() => setLabelPhase('visible')}
       onPointerLeave={() => setLabelPhase((phase) => (phase === 'hidden' ? phase : 'exiting'))}
     >
@@ -39,11 +39,11 @@ export function MarketTimeProgress({
         <motion.div
           aria-hidden="true"
           className={cn(
-            'pointer-events-none absolute top-1/2 right-full -translate-y-1/2',
-            'mr-5',
-            'text-right font-mono text-caption tracking-widest whitespace-nowrap uppercase',
+            'pointer-events-none absolute top-1/2 left-full -translate-y-1/2',
+            'ml-5',
+            'text-left font-mono text-caption tracking-widest whitespace-nowrap uppercase',
           )}
-          initial={{ opacity: 0, x: 10 }}
+          initial={{ opacity: 0, x: -10 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.18, ease: [0.4, 0, 0.2, 1] }}
         >
@@ -67,7 +67,7 @@ export function MarketTimeProgress({
         }}
         gaugeSecondaryColor="var(--color-line-strong)"
         label="Market Progress"
-        className="size-28 text-base"
+        className="size-16 text-sm"
       />
     </div>
   )

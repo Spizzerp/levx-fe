@@ -71,9 +71,17 @@ const portfolioRoute = createRoute({
   component: PortfolioPage,
 })
 
+export type ProfileSearchParams = {
+  wallet?: string
+}
+
 const profileRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/profile',
+  validateSearch: (search: Record<string, unknown>): ProfileSearchParams => {
+    const wallet = typeof search.wallet === 'string' ? search.wallet.trim() : ''
+    return { wallet: wallet || undefined }
+  },
   component: ProfilePage,
 })
 

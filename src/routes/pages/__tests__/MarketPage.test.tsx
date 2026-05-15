@@ -41,12 +41,19 @@ vi.mock('@tanstack/react-router', async () => {
       children,
       to,
       className,
+      search,
+      ...rest
     }: {
       children: React.ReactNode
       to: string
       className?: string
+      search?: Record<string, unknown>
     }) => (
-      <a href={to} className={className}>
+      <a
+        href={`${to}${search?.wallet ? `?wallet=${String(search.wallet)}` : ''}`}
+        className={className}
+        {...rest}
+      >
         {children}
       </a>
     ),
@@ -92,6 +99,11 @@ vi.mock('@/lib/pyth/useBenchmarksHistory', () => ({
 const setVisible = vi.fn()
 vi.mock('@solana/wallet-adapter-react-ui', () => ({
   useWalletModal: () => ({ setVisible, visible: false }),
+}))
+
+const useMarketTopTradersMock = vi.hoisted(() => vi.fn())
+vi.mock('@/features/market/useMarketTopTraders', () => ({
+  useMarketTopTraders: useMarketTopTradersMock,
 }))
 
 // MarketPage now renders <MarketComments> which calls useSupabaseAuth + useComments.
@@ -210,6 +222,7 @@ beforeEach(async () => {
   usePythStore.setState({ ticks: {}, status: 'idle' })
   usePythFeedSpy.mockClear()
   setVisible.mockClear()
+  useMarketTopTradersMock.mockReturnValue({ data: [], isLoading: false, error: null })
   useWalletStore.setState({
     publicKey: null,
     connected: false,
@@ -351,12 +364,62 @@ describe('MarketPage', () => {
 
       renderMarketPage()
 
-      const progress = screen.getByRole('progressbar', { name: /market time elapsed/i })
+      const progress = screen.getByRole('progressbar', { name: /market progress/i })
       expect(progress).toHaveAttribute('aria-valuenow', '50')
       expect(progress).toHaveAttribute('aria-valuetext', '50% elapsed')
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  it('renders the top five market traders with overflow after the fifth', async () => {
+    useMarketTopTradersMock.mockReturnValue({
+      data: [
+        { wallet: 'wallet-a', exposure: 100, collateral: 50, pnl: 12.5, positions: 1 },
+        { wallet: 'wallet-b', exposure: 90, collateral: 45, pnl: 8, positions: 1 },
+        { wallet: 'wallet-c', exposure: 80, collateral: 40, pnl: 4, positions: 1 },
+        { wallet: 'wallet-d', exposure: 70, collateral: 35, pnl: 2, positions: 1 },
+        { wallet: 'wallet-e', exposure: 60, collateral: 30, pnl: -1.25, positions: 1 },
+        { wallet: 'wallet-f', exposure: 50, collateral: 25, pnl: -2, positions: 1 },
+      ],
+      isLoading: false,
+      error: null,
+    })
+    await setMarketState('active', { traders: 7 })
+
+    renderMarketPage()
+
+    expect(screen.getByLabelText('wallet-a')).toHaveAttribute('href', '/profile?wallet=wallet-a')
+    expect(screen.getByLabelText('wallet-b')).toBeInTheDocument()
+    expect(screen.getByLabelText('wallet-c')).toBeInTheDocument()
+    expect(screen.getByLabelText('wallet-d')).toBeInTheDocument()
+    expect(screen.getByLabelText('wallet-e')).toBeInTheDocument()
+    expect(screen.queryByLabelText('wallet-f')).not.toBeInTheDocument()
+    await userEvent.click(screen.getByLabelText('1 more participant'))
+    expect(screen.getByText('PNL +$12.50')).toBeInTheDocument()
+  })
+
+  it('hides trader avatars when the market has no traders', async () => {
+    useMarketTopTradersMock.mockReturnValue({ data: [], isLoading: false, error: null })
+    await setMarketState('active', { traders: 0 })
+
+    renderMarketPage()
+
+    expect(screen.queryByLabelText(/more participants?/i)).not.toBeInTheDocument()
+  })
+
+  it('shows one trader avatar without an overflow badge', async () => {
+    useMarketTopTradersMock.mockReturnValue({
+      data: [{ wallet: 'wallet-solo', exposure: 100, collateral: 50, pnl: 6, positions: 1 }],
+      isLoading: false,
+      error: null,
+    })
+    await setMarketState('active', { traders: 1 })
+
+    renderMarketPage()
+
+    expect(screen.getByLabelText('wallet-solo')).toBeInTheDocument()
+    expect(screen.queryByLabelText(/more participants?/i)).not.toBeInTheDocument()
   })
 
   // DRAW-09: desktop-only drawing gate.
