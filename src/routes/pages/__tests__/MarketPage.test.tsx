@@ -374,7 +374,6 @@ describe('MarketPage', () => {
       vi.useRealTimers()
     }
   })
-
   // DRAW-09: desktop-only drawing gate.
   it('draw button wrapper has desktop-first "block md:hidden" classes (DRAW-09)', () => {
     renderMarketPage()
