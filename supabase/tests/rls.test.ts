@@ -229,6 +229,53 @@ describe('RLS — comment rate limiting', () => {
   })
 })
 
+describe('RLS — market_participants', () => {
+  beforeEach(async () => {
+    await resetTables()
+  })
+
+  it('anon can read service-maintained participant aggregates', async () => {
+    await serviceClient().from('market_participants').insert({
+      market_id: 49,
+      wallet: WALLET_A,
+      collateral: 10,
+      exposure: 25,
+      pnl: 3,
+      positions: 2,
+    })
+
+    const { data, error } = await anonClient()
+      .from('market_participants')
+      .select('market_id, wallet, exposure, positions')
+      .eq('market_id', 49)
+
+    expect(error).toBeNull()
+    expect(data).toEqual([
+      {
+        market_id: 49,
+        wallet: WALLET_A,
+        exposure: 25,
+        positions: 2,
+      },
+    ])
+  })
+
+  it('anon and wallet clients cannot write participant aggregates', async () => {
+    const anonInsert = await anonClient().from('market_participants').insert({
+      market_id: 49,
+      wallet: WALLET_A,
+    })
+    expect(anonInsert.error).not.toBeNull()
+
+    const wallet = await walletClient(WALLET_A)
+    const walletInsert = await wallet.from('market_participants').insert({
+      market_id: 49,
+      wallet: WALLET_A,
+    })
+    expect(walletInsert.error).not.toBeNull()
+  })
+})
+
 describe('RLS — realtime.messages (path-draw policies)', () => {
   beforeEach(async () => { await resetTables() })
 

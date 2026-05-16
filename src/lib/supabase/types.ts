@@ -38,3 +38,13 @@ export type Profile = {
   created_at: string
   updated_at: string
 }
+
+export type MarketParticipant = {
+  market_id: number
+  wallet: string
+  collateral: number
+  exposure: number
+  pnl: number
+  positions: number
+  updated_at: string
+}

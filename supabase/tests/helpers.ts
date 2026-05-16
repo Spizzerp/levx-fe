@@ -42,6 +42,7 @@ export async function resetTables() {
   await svc.from('users').delete().neq('wallet_address', '__never__')
   await svc.from('comments').delete().neq('id', '00000000-0000-0000-0000-000000000000')
   await svc.from('comment_rate_limit').delete().neq('wallet', '__never__')
+  await svc.from('market_participants').delete().neq('wallet', '__never__')
   await svc.from('auth_nonces').delete().neq('nonce', '__never__')
 }
 

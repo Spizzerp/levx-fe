@@ -110,6 +110,11 @@ vi.mock('@solana/wallet-adapter-react-ui', () => ({
   useWalletModal: () => ({ setVisible, visible: false }),
 }))
 
+const useMarketParticipantsMock = vi.hoisted(() => vi.fn())
+vi.mock('@/features/market/useMarketParticipants', () => ({
+  useMarketParticipants: useMarketParticipantsMock,
+}))
+
 // MarketPage now renders <MarketComments> which calls useSupabaseAuth + useComments.
 // Stub them at the module boundary so the test harness does not need to mount
 // a real SupabaseAuthProvider tree (which itself depends on the wallet adapter).
@@ -226,6 +231,11 @@ beforeEach(async () => {
   usePythStore.setState({ ticks: {}, status: 'idle' })
   usePythFeedSpy.mockClear()
   setVisible.mockClear()
+  useMarketParticipantsMock.mockReturnValue({
+    data: { participants: [], totalParticipants: 0 },
+    isLoading: false,
+    error: null,
+  })
   useWalletStore.setState({
     publicKey: null,
     connected: false,
