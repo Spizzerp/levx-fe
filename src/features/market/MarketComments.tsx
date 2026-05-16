@@ -55,7 +55,7 @@ export function MarketComments({ marketId }: Props) {
   const connected = useWalletStore((s) => s.connected)
   const walletPubkey = useWalletStore((s) => s.publicKey)
   const wallet = walletPubkey?.toBase58() ?? null
-  const { status } = useSupabaseAuth()
+  const { status, authenticate } = useSupabaseAuth()
   const { setVisible } = useWalletModal()
 
   const { data: comments, isLoading, error } = useComments(marketId)
@@ -94,11 +94,21 @@ export function MarketComments({ marketId }: Props) {
   const walletAddresses = useMemo(() => (comments ?? []).map((c) => c.wallet), [comments])
   const { data: profileMap } = useProfiles(walletAddresses)
 
-  const canPost = connected && status === 'authenticated' && body.trim().length > 0
+  const canPost =
+    connected && body.trim().length > 0 && status !== 'pending' && !post.isPending
 
-  const onSubmit = (e: FormEvent) => {
+  const onSubmit = async (e: FormEvent) => {
     e.preventDefault()
     if (!canPost) return
+
+    if (status !== 'authenticated') {
+      try {
+        await authenticate()
+      } catch {
+        return
+      }
+    }
+
     post.mutate(
       { body: body.trim() },
       {
@@ -306,6 +316,11 @@ export function MarketComments({ marketId }: Props) {
                   {post.isPending && (
                     <span className="text-label text-ink-muted animate-pulse font-mono">
                       Posting…
+                    </span>
+                  )}
+                  {!post.isPending && status === 'pending' && (
+                    <span className="text-label text-ink-muted animate-pulse font-mono">
+                      Signing…
                     </span>
                   )}
                   <button

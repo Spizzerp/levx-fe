@@ -98,8 +98,9 @@ export function SupabaseAuthProvider({ children, signMessage: signOverride }: Pr
       setStatus('authenticated')
       return
     }
-    void authenticate().catch(() => {})
-  }, [connected, wallet, authenticate])
+    setRecord(null)
+    setStatus('idle')
+  }, [connected, wallet])
 
   const value = useMemo<AuthContextValue>(
     () => ({

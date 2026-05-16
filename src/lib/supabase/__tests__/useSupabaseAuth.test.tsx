@@ -19,6 +19,7 @@ vi.mock('@solana/wallet-adapter-react', () => ({
 }))
 
 const PUBKEY_A = 'AliceWalletPubkey1111111111111111111111111111'
+const PUBKEY_B = 'BobWalletPubkey1111111111111111111111111111111'
 
 function makeWrapper(signMessage?: (m: Uint8Array) => Promise<Uint8Array>) {
   return function Wrapper({ children }: PropsWithChildren) {
@@ -61,7 +62,7 @@ describe('useSupabaseAuth', () => {
     expect(fetch).not.toHaveBeenCalled()
   })
 
-  it('cold path: no cache → calls Edge Function, signs, stores JWT', async () => {
+  it('cold path: no cache stays idle until authenticate() is called manually', async () => {
     ;(fetch as unknown as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce({
         ok: true,
@@ -74,8 +75,19 @@ describe('useSupabaseAuth', () => {
         json: async () => ({ jwt: 'fresh.jwt', expiresAt: new Date(Date.now() + 86400_000).toISOString() }),
       })
 
-    const { result } = renderHook(() => useSupabaseAuth(), { wrapper: makeWrapper(okSign) })
+    const sign = vi.fn(okSign)
+    const { result } = renderHook(() => useSupabaseAuth(), { wrapper: makeWrapper(sign) })
     act(() => setConnectedWallet(PUBKEY_A))
+    await waitFor(() => expect(result.current.wallet).toBe(PUBKEY_A))
+
+    expect(result.current.status).toBe('idle')
+    expect(sign).not.toHaveBeenCalled()
+    expect(fetch).not.toHaveBeenCalled()
+
+    await act(async () => {
+      await result.current.authenticate()
+    })
+
     await waitFor(() => expect(result.current.status).toBe('authenticated'))
     expect(result.current.jwt).toBe('fresh.jwt')
   })
@@ -88,6 +100,10 @@ describe('useSupabaseAuth', () => {
     const reject = vi.fn().mockRejectedValueOnce(new Error('User rejected'))
     const { result } = renderHook(() => useSupabaseAuth(), { wrapper: makeWrapper(reject) })
     act(() => setConnectedWallet(PUBKEY_A))
+    await waitFor(() => expect(result.current.wallet).toBe(PUBKEY_A))
+    await act(async () => {
+      await expect(result.current.authenticate()).rejects.toThrow('User rejected')
+    })
     await waitFor(() => expect(result.current.status).toBe('error'))
   })
 
@@ -100,6 +116,23 @@ describe('useSupabaseAuth', () => {
     act(() => setConnectedWallet(null))
     await waitFor(() => expect(result.current.status).toBe('idle'))
     expect(localStorage.getItem('levx_jwt:' + PUBKEY_A)).toBeNull()
+  })
+
+  it('switching wallets clears the prior JWT and leaves the new wallet signed out', async () => {
+    cacheJWT({ jwt: 'old-a', expiresAt: Date.now() + 3600_000, wallet: PUBKEY_A })
+    const { result } = renderHook(() => useSupabaseAuth(), { wrapper: makeWrapper() })
+
+    act(() => setConnectedWallet(PUBKEY_A))
+    await waitFor(() => expect(result.current.status).toBe('authenticated'))
+    expect(result.current.jwt).toBe('old-a')
+
+    act(() => setConnectedWallet(PUBKEY_B))
+    await waitFor(() => expect(result.current.wallet).toBe(PUBKEY_B))
+
+    expect(result.current.status).toBe('idle')
+    expect(result.current.jwt).toBeNull()
+    expect(localStorage.getItem('levx_jwt:' + PUBKEY_A)).toBeNull()
+    expect(fetch).not.toHaveBeenCalled()
   })
 
   it('in-flight guard: parallel authenticate() calls only fire one nonce request', async () => {
@@ -125,9 +158,10 @@ describe('useSupabaseAuth', () => {
     const sign = vi.fn(okSign)
     const { result } = renderHook(() => useSupabaseAuth(), { wrapper: makeWrapper(sign) })
     act(() => setConnectedWallet(PUBKEY_A))
-    // First authenticate() (auto-fired by the connect effect) is now waiting on `firstNonce`.
-    // A second call must be a no-op (in-flight guard).
+    await waitFor(() => expect(result.current.wallet).toBe(PUBKEY_A))
+
     await act(async () => {
+      void result.current.authenticate()
       void result.current.authenticate()
       void result.current.authenticate()
       void result.current.authenticate()
