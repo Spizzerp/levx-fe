@@ -48,15 +48,24 @@ vi.mock('@tanstack/react-router', async () => {
       to: string
       className?: string
       search?: Record<string, unknown>
-    }) => (
-      <a
-        href={`${to}${search?.wallet ? `?wallet=${String(search.wallet)}` : ''}`}
-        className={className}
-        {...rest}
-      >
-        {children}
-      </a>
-    ),
+    }) => {
+      const searchString = search
+        ? new URLSearchParams(
+            Object.entries(search).flatMap(([key, value]) =>
+              value == null ? [] : [[key, String(value)]],
+            ),
+          ).toString()
+        : ''
+      return (
+        <a
+          href={`${to}${searchString ? `?${searchString}` : ''}`}
+          className={className}
+          {...rest}
+        >
+          {children}
+        </a>
+      )
+    },
   }
 })
 

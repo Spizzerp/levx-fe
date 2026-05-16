@@ -15,6 +15,7 @@ import { useWalletStore } from '@/stores/walletStore'
 import { cn } from '@/lib/cn'
 import { Modal } from '@/ui/Modal'
 import { Button } from '@/ui/Button'
+import { toast } from '@/stores/toastStore'
 import type { Profile } from '@/lib/supabase/types'
 
 type Props = { marketId: string }
@@ -105,6 +106,9 @@ export function MarketComments({ marketId }: Props) {
       try {
         await authenticate()
       } catch {
+        toast.error('Comment not posted', {
+          message: 'Finish wallet sign-in to post a comment.',
+        })
         return
       }
     }

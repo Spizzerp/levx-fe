@@ -9,6 +9,7 @@ const setVisible = vi.hoisted(() => vi.fn())
 const authenticateMock = vi.hoisted(() => vi.fn())
 const postMutateMock = vi.hoisted(() => vi.fn())
 const deleteMutateMock = vi.hoisted(() => vi.fn())
+const toastErrorMock = vi.hoisted(() => vi.fn())
 
 vi.mock('@solana/wallet-adapter-react-ui', () => ({
   useWalletModal: () => ({ setVisible, visible: false }),
@@ -54,6 +55,12 @@ vi.mock('@/ui/Button', () => ({
   ),
 }))
 
+vi.mock('@/stores/toastStore', () => ({
+  toast: {
+    error: toastErrorMock,
+  },
+}))
+
 import { MarketComments } from '@/features/market/MarketComments'
 
 describe('MarketComments', () => {
@@ -84,5 +91,21 @@ describe('MarketComments', () => {
       { body: 'First comment' },
       expect.any(Object),
     )
+  })
+
+  it('shows a toast and does not post when explicit auth is rejected', async () => {
+    const user = userEvent.setup()
+    authenticateMock.mockRejectedValueOnce(new Error('User rejected'))
+
+    render(<MarketComments marketId="market-1" />)
+
+    await user.type(screen.getByPlaceholderText('Share your take…'), 'First comment')
+    await user.click(screen.getByRole('button', { name: 'Post comment' }))
+
+    expect(authenticateMock).toHaveBeenCalledTimes(1)
+    expect(postMutateMock).not.toHaveBeenCalled()
+    expect(toastErrorMock).toHaveBeenCalledWith('Comment not posted', {
+      message: 'Finish wallet sign-in to post a comment.',
+    })
   })
 })

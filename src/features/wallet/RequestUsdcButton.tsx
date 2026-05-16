@@ -6,6 +6,7 @@ import { cn } from '@/lib/cn'
 import { toast } from '@/stores/toastStore'
 import { useUsdcBalance } from '@/lib/api/useUsdcBalance'
 import { FaucetRateLimitError, requestTestUsdc } from '@/lib/supabase/faucet'
+import { useSupabaseAuth } from '@/lib/supabase/hooks'
 import { useWalletStore } from '@/stores/walletStore'
 
 interface RequestUsdcButtonProps {
@@ -23,6 +24,7 @@ function formatRetryAfter(secs: number): string {
 export function RequestUsdcButton({ className, hideAboveBalance = 100 }: RequestUsdcButtonProps) {
   const connected = useWalletStore((s) => s.connected)
   const { data: balance } = useUsdcBalance()
+  const { status, authenticate } = useSupabaseAuth()
   const queryClient = useQueryClient()
   const [pending, setPending] = useState(false)
 
@@ -32,6 +34,17 @@ export function RequestUsdcButton({ className, hideAboveBalance = 100 }: Request
   const handleClick = async () => {
     setPending(true)
     try {
+      if (status !== 'authenticated') {
+        try {
+          await authenticate()
+        } catch {
+          toast.error('Could not request test USDC', {
+            message: 'Finish wallet sign-in to use the test faucet.',
+          })
+          return
+        }
+      }
+
       const result = await requestTestUsdc()
       toast.success(`Sent ${(Number(result.amount) / 1_000_000).toFixed(0)} test USDC`, {
         txSig: result.sig,
@@ -54,7 +67,7 @@ export function RequestUsdcButton({ className, hideAboveBalance = 100 }: Request
     <Button
       variant="secondary"
       onClick={handleClick}
-      disabled={pending}
+      disabled={pending || status === 'pending'}
       className={cn('text-micro min-h-0 h-8 px-3 py-1', className)}
     >
       {pending ? 'Requesting…' : 'Request test USDC'}
