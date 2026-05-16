@@ -72,6 +72,7 @@ supabase secrets set APP_ORIGIN=https://levx.app
 - `users` — wallet-bound public user records with username, display name, bio, X ID, and avatar metadata. Public read; RLS-gated writes keyed on `auth.jwt() ->> 'wallet'`.
 - `comments` — per-market comments. Public read; RLS-gated insert/update/delete keyed on `auth.jwt() ->> 'wallet'`. Immutable columns enforced by trigger; `edited_at` server-stamped.
 - `comment_rate_limit` — last-comment-at per wallet for the cooldown trigger (10s cooldown + 30/hr cap; service_role bypasses).
+- `market_participants` — service-maintained per-market wallet aggregates for top-participant UI. Public read; service_role writes only.
 - `realtime.messages` — Realtime Authorization policies for the private `path-draw:*` channels (subscribe + publish require `authenticated`).
 
 ## Files
