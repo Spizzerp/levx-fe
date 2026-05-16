@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
+import { formatUSD } from '@/lib/format'
 
 const useMarketParticipantsMock = vi.hoisted(() => vi.fn())
 const useProfilesMock = vi.hoisted(() => vi.fn())
@@ -98,7 +99,9 @@ describe('MarketParticipantAvatars', () => {
     expect(screen.getByLabelText('wallet-b')).toBeInTheDocument()
     expect(screen.queryByLabelText('wallet-f')).not.toBeInTheDocument()
     await user.click(screen.getByLabelText('3 more participants'))
-    expect(screen.getByText('100 exposure')).toBeInTheDocument()
+    const exposureLabel = screen.getAllByText(/exposure/i)[0]
+    expect(exposureLabel).toHaveTextContent(formatUSD(100))
+    expect(exposureLabel).toHaveTextContent('exposure')
   })
 })
 
