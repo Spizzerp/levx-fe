@@ -98,10 +98,22 @@ describe('MarketParticipantAvatars', () => {
     expect(screen.getByLabelText('Alice')).toHaveAttribute('href', '/profile?wallet=wallet-a')
     expect(screen.getByLabelText('wallet-b')).toBeInTheDocument()
     expect(screen.queryByLabelText('wallet-f')).not.toBeInTheDocument()
-    await user.click(screen.getByLabelText('3 more participants'))
+    const overflowButton = screen.getByLabelText('3 more participants')
+    expect(overflowButton).toHaveAttribute('aria-haspopup', 'dialog')
+
+    await user.click(overflowButton)
+    expect(screen.getByRole('dialog', { name: 'Top market participants' })).toBeInTheDocument()
     const exposureLabel = screen.getAllByText(/exposure/i)[0]
     expect(exposureLabel).toHaveTextContent(formatUSD(100))
     expect(exposureLabel).toHaveTextContent('exposure')
+
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog', { name: 'Top market participants' })).not.toBeInTheDocument()
+
+    await user.click(overflowButton)
+    expect(screen.getByRole('dialog', { name: 'Top market participants' })).toBeInTheDocument()
+    await user.click(document.body)
+    expect(screen.queryByRole('dialog', { name: 'Top market participants' })).not.toBeInTheDocument()
   })
 })
 

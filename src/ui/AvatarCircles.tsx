@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import { useState, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 
 import { cn } from '@/lib/cn'
 import { formatUSD } from '@/lib/format'
@@ -32,10 +32,33 @@ function pnlLabel(pnl: number): string {
 
 export function AvatarCircles({ avatars, numPeople = 0, className }: AvatarCirclesProps) {
   const [expanded, setExpanded] = useState(false)
+  const popoverId = useId()
+  const rootRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    if (!expanded) return
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target instanceof Node ? event.target : null
+      if (target && rootRef.current?.contains(target)) return
+      setExpanded(false)
+    }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setExpanded(false)
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown, true)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown, true)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [expanded])
+
   if (avatars.length === 0) return null
 
   return (
-    <div className={cn('relative flex items-center justify-end gap-2', className)}>
+    <div ref={rootRef} className={cn('flex items-center justify-end relative gap-2', className)}>
       <div className="flex -space-x-2">
         {avatars.map((avatar) => (
           <Link
@@ -45,8 +68,8 @@ export function AvatarCircles({ avatars, numPeople = 0, className }: AvatarCircl
             aria-label={avatar.label}
             title={avatar.label}
             className={cn(
-              'border-surface-1 bg-surface-2 text-ink-strong relative inline-flex',
-              'h-9 w-9 items-center justify-center overflow-hidden rounded-full border-2',
+              'inline-flex items-center justify-center relative overflow-hidden h-9 w-9',
+              'rounded-full border-2 border-surface-1 bg-surface-2 text-ink-strong',
               'shadow-[0_8px_18px_rgba(0,0,0,0.28)] transition-transform hover:-translate-y-0.5',
               'focus-visible:ring-focus focus-visible:outline-none focus-visible:ring-2',
             )}
@@ -69,12 +92,14 @@ export function AvatarCircles({ avatars, numPeople = 0, className }: AvatarCircl
         <button
           type="button"
           onClick={() => setExpanded((value) => !value)}
+          aria-controls={expanded ? popoverId : undefined}
           aria-expanded={expanded}
+          aria-haspopup="dialog"
           aria-label={overflowLabel(numPeople)}
           title={overflowLabel(numPeople)}
           className={cn(
-            'border-line bg-surface-2 text-ink-muted inline-flex h-8 min-w-8 items-center',
-            'justify-center rounded-full border px-2 font-mono text-[11px] leading-none',
+            'inline-flex items-center justify-center h-8 min-w-8 px-2 rounded-full border',
+            'border-line bg-surface-2 font-mono text-[11px] text-ink-muted leading-none',
             'transition-colors hover:text-ink-strong focus-visible:ring-focus',
             'focus-visible:outline-none focus-visible:ring-2',
           )}
@@ -85,9 +110,12 @@ export function AvatarCircles({ avatars, numPeople = 0, className }: AvatarCircl
 
       {expanded && (
         <div
+          id={popoverId}
+          role="dialog"
+          aria-label="Top market participants"
           className={cn(
-            'border-line bg-surface-1 absolute right-0 top-11 z-20 w-72 rounded-lg border',
-            'p-2 shadow-[0_24px_60px_rgba(0,0,0,0.38)]',
+            'absolute right-0 top-11 z-20 w-72 p-2 rounded-lg border border-line',
+            'bg-surface-1 shadow-[0_24px_60px_rgba(0,0,0,0.38)]',
           )}
         >
           {avatars.map((avatar) => (
@@ -96,14 +124,14 @@ export function AvatarCircles({ avatars, numPeople = 0, className }: AvatarCircl
               to="/profile"
               search={{ wallet: avatar.wallet }}
               className={cn(
-                'hover:bg-surface-2 flex items-center gap-3 rounded-md px-2 py-2',
+                'flex items-center gap-3 px-2 py-2 rounded-md hover:bg-surface-2',
                 'focus-visible:ring-focus focus-visible:outline-none focus-visible:ring-2',
               )}
             >
               <span
                 className={cn(
-                  'bg-surface-2 text-ink-strong flex h-8 w-8 shrink-0',
-                  'items-center justify-center overflow-hidden rounded-full',
+                  'flex items-center justify-center overflow-hidden h-8 w-8 shrink-0',
+                  'rounded-full bg-surface-2 text-ink-strong',
                 )}
               >
                 {avatar.imageUrl ? (
@@ -118,8 +146,8 @@ export function AvatarCircles({ avatars, numPeople = 0, className }: AvatarCircl
                 )}
               </span>
               <span className="min-w-0 flex-1">
-                <span className="text-ink-strong block truncate text-sm">{avatar.label}</span>
-                <span className="text-ink-dim block truncate font-mono text-[11px]">
+                <span className="block truncate text-sm text-ink-strong">{avatar.label}</span>
+                <span className="block truncate font-mono text-[11px] text-ink-dim">
                   {formatUSD(avatar.exposure)} exposure
                 </span>
               </span>
