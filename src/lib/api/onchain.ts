@@ -20,7 +20,7 @@ import {
   derivePositionPda,
 } from '../solana/pda'
 import { activeMaskFromPricingMask, loadEigenCachePolicy } from '../solana/eigenCache'
-import { estimateLmsrExitPayout } from '../solana/lmsr'
+import { estimateLmsrExitPayout, estimateLmsrPrices, probabilityToMultiplier } from '../solana/lmsr'
 import { SCALE } from '@/lib/constants'
 import { formatAiPathLabel } from '@/lib/pathLabels'
 
@@ -188,6 +188,22 @@ async function fetchMarketPaths(
 
   const startTimeMs = raw.startTime.toNumber() * 1000
   const checkpointInterval = raw.checkpointInterval as number
+  const lambda = raw.lambda.toNumber() / SCALE
+  const pricingActiveMask =
+    typeof raw.pricingActiveMask?.toNumber === 'function'
+      ? raw.pricingActiveMask.toNumber()
+      : Number(raw.pricingActiveMask ?? 0)
+  const currentPrices =
+    lambda === 0
+      ? estimateLmsrPrices({
+          shareQuantities: (raw.lmsrShareQuantities as { toNumber(): number }[])
+            .slice(0, numPaths)
+            .map((q) => q.toNumber() / SCALE),
+          numPaths,
+          lmsrAlpha: raw.lmsrAlpha.toNumber() / SCALE,
+          activeMask: activeMaskFromPricingMask(pricingActiveMask, numPaths),
+        })
+      : []
 
   const hydratedPathRaws = await Promise.all(
     pathRaws.map((pathRaw: any) => hydrateChunkedPath(program, pathRaw)),
@@ -195,6 +211,10 @@ async function fetchMarketPaths(
   return hydratedPathRaws.map((pathRaw: any) => {
     const path = anchorPathToFE(pathRaw, startTimeMs, checkpointInterval)
     applyDerivedPathDisplay(path)
+    const currentMultiplier = probabilityToMultiplier(currentPrices[path.pathIndex] ?? 0)
+    if (currentMultiplier > 0) {
+      path.multiplier = currentMultiplier
+    }
     return path
   })
 }

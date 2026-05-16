@@ -3,9 +3,11 @@ import { describe, it, expect } from 'vitest'
 import {
   applySlippageTolerance,
   estimateLmsrExitPayout,
+  estimateLmsrPrices,
   estimateLmsrSharesOut,
   estimateQuadraticExitPayout,
   estimateQuadraticSharesOut,
+  probabilityToMultiplier,
 } from '../lmsr'
 
 describe('estimateLmsrSharesOut', () => {
@@ -123,6 +125,34 @@ describe('estimateLmsrExitPayout', () => {
         sharesScaled: 0,
       }),
     ).toBe(0)
+  })
+})
+
+describe('estimateLmsrPrices', () => {
+  it('returns uniform current prices for a fresh active market', () => {
+    expect(
+      estimateLmsrPrices({
+        shareQuantities: [0, 0, 0, 0, 0],
+        numPaths: 5,
+        lmsrAlpha: 1,
+      }),
+    ).toEqual([0.2, 0.2, 0.2, 0.2, 0.2])
+  })
+
+  it('moves probability toward paths with positive quantity', () => {
+    const prices = estimateLmsrPrices({
+      shareQuantities: [10, 0, 0],
+      numPaths: 3,
+      lmsrAlpha: 10,
+    })
+
+    expect(prices[0]).toBeGreaterThan(prices[1])
+    expect(prices[1]).toBeCloseTo(prices[2], 12)
+  })
+
+  it('converts probabilities to payout multipliers', () => {
+    expect(probabilityToMultiplier(0.2)).toBe(5)
+    expect(probabilityToMultiplier(0)).toBe(0)
   })
 })
 

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { BN } from '@coral-xyz/anchor'
 
-import { anchorPositionToFE } from '@/lib/api/adapters'
+import { anchorPathToFE, anchorPositionToFE } from '@/lib/api/adapters'
 import { SCALE } from '@/lib/constants'
 
 function rawPosition(overrides: Record<string, unknown> = {}) {
@@ -17,6 +17,41 @@ function rawPosition(overrides: Record<string, unknown> = {}) {
     ...overrides,
   }
 }
+
+function rawPath(overrides: Record<string, unknown> = {}) {
+  return {
+    pathIndex: 1,
+    predictedPrices: [100 * SCALE, 101 * SCALE].map((v) => new BN(v)),
+    numCheckpoints: 2,
+    generationTimestamp: new BN(1_700_000_000),
+    creator: { toBase58: () => '11111111111111111111111111111111' },
+    generationMethod: { ai: {} },
+    cumulativeAction: new BN(0),
+    compositeScore: new BN(0),
+    peakAmplitude: new BN(SCALE),
+    amplitudeAtDecoherence: new BN(0),
+    dissolved: false,
+    dissolvedAtCheckpoint: 0,
+    checkpointsProcessed: 0,
+    createdAtCheckpoint: 0,
+    firstActiveCheckpoint: 0,
+    totalWagered: new BN(0),
+    totalLeveragedExposure: new BN(0),
+    lmsrSharesOutstanding: new BN(0),
+    totalTimeWeightedExposure: new BN(0),
+    currentImpliedProbability: 2500,
+    initialAmplitude: new BN(SCALE),
+    ...overrides,
+  }
+}
+
+describe('anchorPathToFE', () => {
+  it('derives the display multiplier from implied probability bps', () => {
+    const path = anchorPathToFE(rawPath(), 1_700_000_000_000, 60)
+
+    expect(path.multiplier).toBe(4)
+  })
+})
 
 describe('anchorPositionToFE', () => {
   it('produces a stable id of `${marketIdNum}-${pathIndex}` for use as a React key', () => {
@@ -69,20 +104,17 @@ describe('anchorPositionToFE', () => {
     })
     expect(live.entryMultiplier).toBeCloseTo(1.8, 3)
 
-    const empty = anchorPositionToFE(
-      rawPosition({ costBasis: new BN(0), lmsrShares: new BN(0) }),
-      {
-        marketIdNum: 0,
-        marketState: 'active',
-        pair: 'SOL/USDC',
-        base: 'SOL',
-        quote: 'USDC',
-        pathLabel: 'Path A',
-        pathTone: 'bull',
-        pathDissolved: false,
-        estimatedPayout: 0,
-      },
-    )
+    const empty = anchorPositionToFE(rawPosition({ costBasis: new BN(0), lmsrShares: new BN(0) }), {
+      marketIdNum: 0,
+      marketState: 'active',
+      pair: 'SOL/USDC',
+      base: 'SOL',
+      quote: 'USDC',
+      pathLabel: 'Path A',
+      pathTone: 'bull',
+      pathDissolved: false,
+      estimatedPayout: 0,
+    })
     expect(empty.entryMultiplier).toBe(0)
   })
 

@@ -200,6 +200,30 @@ export function estimateLmsrExitPayout(
   return payout > 0 ? payout : 0
 }
 
+/**
+ * Estimate current LMSR probabilities for each path from the market's
+ * quantity vector. Returned values are human probabilities in [0, 1].
+ */
+export function estimateLmsrPrices(input: EstimateInput): number[] {
+  const { shareQuantities, numPaths, lmsrAlpha } = input
+  if (lmsrAlpha <= 0 || numPaths <= 0) return []
+  const active = effectiveActive(input)
+  const b = adaptiveLiquidity(shareQuantities, active, numPaths, lmsrAlpha)
+  const { lse } = logSumExp(shareQuantities, active, numPaths, b)
+  if (!isFinite(lse)) return new Array(numPaths).fill(0)
+
+  return Array.from({ length: numPaths }, (_, i) => {
+    if (!active[i]) return 0
+    const q = shareQuantities[i] ?? 0
+    return Math.exp(q / b - lse)
+  })
+}
+
+export function probabilityToMultiplier(probability: number): number {
+  if (!Number.isFinite(probability) || probability <= 0) return 0
+  return 1 / probability
+}
+
 function toRawFixedPoint(value: number): bigint {
   if (!Number.isFinite(value)) return 0n
   return BigInt(Math.trunc(value * SCALE))
