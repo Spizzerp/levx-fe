@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useSearch } from '@tanstack/react-router'
+import { useLocation, useSearch } from '@tanstack/react-router'
 import { useWallet } from '@solana/wallet-adapter-react'
 import { motion } from 'motion/react'
 import { Camera, Check, Copy, Lock, Shuffle, Trash2 } from 'lucide-react'
@@ -13,6 +13,7 @@ import { cn } from '@/lib/cn'
 import { readFileAsDataUrl } from '@/lib/cropImage'
 import { formatAddress } from '@/lib/format'
 import { PageLayout } from '@/layouts/PageLayout'
+import { resolveProfileTargetWallet } from '@/routes/profileSearch'
 import {
   checkUsernameAvailability,
   getProfileImageUrl,
@@ -56,11 +57,16 @@ type DraftState = {
 
 export function ProfilePage() {
   const { wallet: profileWalletParam } = useSearch({ from: '/profile' })
+  const searchStr = useLocation({ select: (location) => location.searchStr })
   const { status, authenticate } = useSupabaseAuth()
   const connected = useWalletStore((s) => s.connected)
   const publicKey = useWalletStore((s) => s.publicKey)
   const walletAddress = publicKey?.toBase58() ?? null
-  const targetWallet = profileWalletParam ?? walletAddress
+  const targetWallet = resolveProfileTargetWallet({
+    searchStr,
+    validatedWallet: profileWalletParam,
+    connectedWallet: walletAddress,
+  })
   const canEdit = connected && !!walletAddress && targetWallet === walletAddress
   const { wallet: walletAdapter } = useWallet()
   const walletName = walletAdapter?.adapter.name ?? 'Unknown Wallet'
