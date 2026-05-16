@@ -13,7 +13,6 @@ import { Input } from '@/ui/Input'
 import { Label } from '@/ui/Label'
 import { LevXChart } from '@/features/chart/LevXChart'
 import { MarketMetaPanel } from '@/features/market/MarketMetaPanel'
-import { MarketParticipantAvatars } from '@/features/market/MarketParticipantAvatars'
 import { MarketStateBadge } from '@/features/market/MarketStateBadge'
 import { MarketTimeProgress } from '@/features/market/MarketTimeProgress'
 import { MaturityCountdownCard } from '@/features/market/MaturityCountdownCard'
@@ -680,13 +679,8 @@ export function MarketPage() {
             />
           </ChartFrame>
 
-          <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
+          <div className="mt-4">
             <TimeRangePicker value={candleInterval} onChange={setCandleInterval} />
-            <MarketParticipantAvatars
-              marketIdNum={market.marketId}
-              traderCount={market.traders}
-              className="ml-auto"
-            />
           </div>
 
           <div className="mt-8">

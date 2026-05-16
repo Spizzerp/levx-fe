@@ -40,6 +40,22 @@ vi.mock('@/ui/TokenPairIcon', () => ({
   TokenPairIcon: () => null,
 }))
 
+vi.mock('@/lib/supabase/hooks', async () => {
+  const actual =
+    await vi.importActual<typeof import('@/lib/supabase/hooks')>('@/lib/supabase/hooks')
+  return {
+    ...actual,
+    useSupabaseAuth: () => ({
+      status: 'idle',
+      jwt: null,
+      wallet: null,
+      expiresAt: null,
+      authenticate: vi.fn(),
+      signOut: vi.fn(),
+    }),
+  }
+})
+
 const positionsRef: { current: UserPosition[] } = { current: [] }
 vi.mock('@/lib/chain', async () => {
   const actual = await vi.importActual<typeof import('@/lib/chain')>('@/lib/chain')
