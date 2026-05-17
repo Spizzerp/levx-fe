@@ -18,6 +18,7 @@ import type {
   UserPosition,
 } from '@/types/market'
 import { SCALE } from '@/lib/constants'
+import { probabilityToMultiplier } from '@/lib/solana/lmsr'
 
 /** Convert Anchor BN to number, optionally dividing by SCALE for fixed-point fields. */
 function bn(v: BN, scaled = false): number {
@@ -115,6 +116,7 @@ export function anchorPathToFE(
 ): PredictionPath {
   const predictedPrices: number[] = ((raw.predictedPrices ?? []) as BN[]).map((p) => bn(p, true))
   const intervalMs = checkpointInterval * 1000
+  const currentImpliedProbability = raw.currentImpliedProbability as number
 
   const data: PricePoint[] = predictedPrices.map((price, i) => ({
     time: marketStartTime + i * intervalMs,
@@ -126,7 +128,7 @@ export function anchorPathToFE(
     label: `Path ${String.fromCharCode(65 + raw.pathIndex)}`,
     tone: 'neutral', // derived later from price trajectory
     origin: parsePathOrigin(raw.generationMethod),
-    multiplier: 0, // computed from LMSR pricing
+    multiplier: probabilityToMultiplier(currentImpliedProbability / 10_000),
     data,
     pathIndex: raw.pathIndex,
     predictedPrices,
@@ -146,7 +148,7 @@ export function anchorPathToFE(
     totalLeveragedExposure: bn(raw.totalLeveragedExposure, true),
     lmsrSharesOutstanding: bn(raw.lmsrSharesOutstanding, true),
     totalTimeWeightedExposure: bn(raw.totalTimeWeightedExposure, true),
-    currentImpliedProbability: raw.currentImpliedProbability,
+    currentImpliedProbability,
     initialAmplitude: bn(raw.initialAmplitude, true),
   }
 }

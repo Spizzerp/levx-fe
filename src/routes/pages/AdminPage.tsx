@@ -149,7 +149,8 @@ function buildPreviewPaths(
       label: formatAiPathLabel(tone),
       tone,
       origin: 'ai' as const,
-      multiplier: 0,
+      // Fresh markets start at uniform probability, so 1 / (1 / count) = count.
+      multiplier: count > 0 ? count : 0,
       data,
       pathIndex: idx,
       predictedPrices: data.map((d) => d.value),

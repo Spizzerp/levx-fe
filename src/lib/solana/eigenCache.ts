@@ -174,18 +174,7 @@ export async function loadEigenCachePolicy(
   }
 
   try {
-    const info = await program.provider.connection.getAccountInfo(cachePda)
-    if (!info) {
-      return evaluateEigenCachePolicy({
-        enabled: true,
-        marketPda,
-        marketAcc,
-        cachePda,
-        cacheAcc: null,
-      })
-    }
-
-    const cacheAcc = await program.account.eigenCache.fetch(cachePda)
+    const cacheAcc = await program.account.eigenCache.fetchNullable(cachePda)
     return evaluateEigenCachePolicy({
       enabled: true,
       marketPda,
