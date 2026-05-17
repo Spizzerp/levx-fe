@@ -56,7 +56,7 @@ import {
   formatUSD,
   maxLeverageByDuration,
 } from '@/lib/format'
-import type { Market, PredictionPath, PricePoint } from '@/types/market'
+import type { Market, PredictionPath, PricePoint, UserPosition } from '@/types/market'
 
 const META_SEP = <span className="text-line-strong mx-0.5">·</span>
 
@@ -112,14 +112,9 @@ function buildDrawingInitialValues({
   return values
 }
 
-/**
- * Placeholder claim action surfaced during Settled state. The real claim
- * transaction lands in Phase 5 (CLAIM-01); Phase 2 just ensures the button is
- * present, state-gated, and wallet-gated via ConnectGate.
- */
-function ClaimButton({ market, pathIndex }: { market: Market; pathIndex?: number }) {
+function ClaimButton({ market, position }: { market: Market; position?: UserPosition | null }) {
   const claim = useClaim()
-  const idx = pathIndex ?? 0
+  const pathIndex = position?.pathIndex
 
   return (
     <div className="border-line flex flex-col gap-3 border p-6">
@@ -130,14 +125,20 @@ function ClaimButton({ market, pathIndex }: { market: Market; pathIndex?: number
         Market has settled. Claim your payout below.
       </p>
       <ConnectGate>
-        <Button
-          variant="primary"
-          fullWidth
-          disabled={claim.isPending}
-          onClick={() => claim.mutate({ marketId: market.marketId, pathIndex: idx })}
-        >
-          {claim.isPending ? 'Confirming…' : 'Claim'}
-        </Button>
+        {pathIndex === undefined ? (
+          <Button variant="primary" fullWidth disabled>
+            No position to claim
+          </Button>
+        ) : (
+          <Button
+            variant="primary"
+            fullWidth
+            disabled={claim.isPending}
+            onClick={() => claim.mutate({ marketId: market.marketId, pathIndex })}
+          >
+            {claim.isPending ? 'Confirming…' : 'Claim'}
+          </Button>
+        )}
       </ConnectGate>
       {claim.isError && (
         <p className="text-accent text-caption mt-1 font-mono">{(claim.error as Error).message}</p>
@@ -966,12 +967,7 @@ export function MarketPage() {
         {/* ── Right rail (Settled) — claim button (ConnectGate-wrapped) ── */}
         {showClaimCard && (
           <aside className="flex flex-col gap-6">
-            <ClaimButton
-              market={market}
-              pathIndex={
-                userPosition ? parseInt(userPosition.pathId.replace('path-', ''), 10) : undefined
-              }
-            />
+            <ClaimButton market={market} position={userPosition} />
             {/* hideAction: ClaimButton above already drives the claim flow;
               the card's in-built "Claim Payout" button is dead (no onClick). */}
             {userPosition && (
