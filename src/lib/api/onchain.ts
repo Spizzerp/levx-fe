@@ -79,17 +79,29 @@ const PATH_OUTCOME_GENERATION_METHOD_OFFSET = 139
 const PATH_OUTCOME_PRICES_LEN_OFFSET = 148
 const PATH_OUTCOME_FIXED_ACCOUNT_SIZE = 310
 
-function numericValue(value: unknown): number {
+const warnedNumericCoercions = new Set<string>()
+
+function numericValue(value: unknown, label = 'account field'): number {
   if (typeof value === 'number') return value
   if (value && typeof (value as { toNumber?: unknown }).toNumber === 'function') {
     return (value as { toNumber(): number }).toNumber()
   }
+  if (value !== null && value !== undefined) {
+    const warningKey = `${label}:${typeof value}`
+    if (!warnedNumericCoercions.has(warningKey)) {
+      warnedNumericCoercions.add(warningKey)
+      console.warn(`[onchain] Unexpected numeric value for ${label}; coercing with Number().`, {
+        type: typeof value,
+        value,
+      })
+    }
+  }
   return Number(value ?? 0)
 }
 
-function scaledArray(value: unknown, length: number): number[] {
+function scaledArray(value: unknown, length: number, label: string): number[] {
   const items = Array.isArray(value) ? value : []
-  return Array.from({ length }, (_, idx) => numericValue(items[idx]) / SCALE)
+  return Array.from({ length }, (_, idx) => numericValue(items[idx], `${label}[${idx}]`) / SCALE)
 }
 
 function readU32LE(data: Uint8Array, offset: number): number {
@@ -220,7 +232,7 @@ async function fetchMarketPaths(
   args: { marketId: number; marketPda: PublicKey; raw: any; eigenCache?: EigenCacheQuoteSnapshot },
 ): Promise<Market['paths']> {
   const { marketId, marketPda, raw, eigenCache } = args
-  const numPaths = numericValue(raw.numPaths)
+  const numPaths = numericValue(raw.numPaths, 'market.numPaths')
   const pathPromises = Array.from({ length: numPaths }, async (_, i) => {
     const [pathPda] = derivePathPda(marketId, i)
     try {
@@ -235,14 +247,18 @@ async function fetchMarketPaths(
   })
   const pathRaws: any[] = (await Promise.all(pathPromises)).filter(Boolean)
 
-  const startTimeMs = numericValue(raw.startTime) * 1000
-  const checkpointInterval = numericValue(raw.checkpointInterval)
-  const pricingActiveMask = numericValue(raw.pricingActiveMask)
-  const shareQuantities = scaledArray(raw.lmsrShareQuantities, numPaths)
+  const startTimeMs = numericValue(raw.startTime, 'market.startTime') * 1000
+  const checkpointInterval = numericValue(raw.checkpointInterval, 'market.checkpointInterval')
+  const pricingActiveMask = numericValue(raw.pricingActiveMask, 'market.pricingActiveMask')
+  const shareQuantities = scaledArray(
+    raw.lmsrShareQuantities,
+    numPaths,
+    'market.lmsrShareQuantities',
+  )
   const currentPrices = estimateCurrentPathPrices({
     shareQuantities,
     numPaths,
-    lmsrAlpha: numericValue(raw.lmsrAlpha) / SCALE,
+    lmsrAlpha: numericValue(raw.lmsrAlpha, 'market.lmsrAlpha') / SCALE,
     pricingActiveMask,
     eigenCache,
   })
@@ -283,7 +299,7 @@ export async function getMarkets(): Promise<Market[]> {
 
       try {
         raw = acc.account
-        marketId = numericValue(raw.marketId)
+        marketId = numericValue(raw.marketId, 'market.marketId')
         market = anchorMarketToFE(raw, String(marketId))
       } catch {
         // Skip accounts that can't be deserialized (layout mismatch)
@@ -442,16 +458,23 @@ export async function getPosition(
       program,
       await fetchPathOutcome(program, pathPda, { market: marketPda, marketId, pathIndex }),
     )
-    const startTimeMs = numericValue(marketRaw.startTime) * 1000
-    const checkpointInterval = numericValue(marketRaw.checkpointInterval)
+    const startTimeMs = numericValue(marketRaw.startTime, 'market.startTime') * 1000
+    const checkpointInterval = numericValue(
+      marketRaw.checkpointInterval,
+      'market.checkpointInterval',
+    )
     const path = anchorPathToFE(pathRaw, startTimeMs, checkpointInterval)
     applyDerivedPathDisplay(path)
     const pairInfo = resolveBaseMintLabel(marketRaw.baseMint)
     const marketState = parseMarketState(marketRaw.state) as MarketState
-    const numPaths = numericValue(marketRaw.numPaths)
-    const shareQuantitiesScaled = scaledArray(marketRaw.lmsrShareQuantities, numPaths)
-    const amplitudesScaled = scaledArray(marketRaw.amplitudes, numPaths)
-    const lmsrAlphaScaled = numericValue(marketRaw.lmsrAlpha) / SCALE
+    const numPaths = numericValue(marketRaw.numPaths, 'market.numPaths')
+    const shareQuantitiesScaled = scaledArray(
+      marketRaw.lmsrShareQuantities,
+      numPaths,
+      'market.lmsrShareQuantities',
+    )
+    const amplitudesScaled = scaledArray(marketRaw.amplitudes, numPaths, 'market.amplitudes')
+    const lmsrAlphaScaled = numericValue(marketRaw.lmsrAlpha, 'market.lmsrAlpha') / SCALE
     const estimatedPayout = computeEstimatedPayout({
       positionRaw,
       pathDissolved: path.dissolved,
@@ -460,7 +483,10 @@ export async function getPosition(
       marketShareQuantitiesScaled: shareQuantitiesScaled,
       marketLmsrAlphaScaled: lmsrAlphaScaled,
       marketAmplitudesScaled: amplitudesScaled,
-      marketPricingActiveMask: numericValue(marketRaw.pricingActiveMask),
+      marketPricingActiveMask: numericValue(
+        marketRaw.pricingActiveMask,
+        'market.pricingActiveMask',
+      ),
       marketNumPaths: numPaths,
     })
     return anchorPositionToFE(positionRaw, {
@@ -530,20 +556,27 @@ export async function getUserPositions(wallet: PublicKey | null): Promise<UserPo
       try {
         const marketRaw: any = await program.account.market.fetch(marketPubkey)
         const pairInfo = resolveBaseMintLabel(marketRaw.baseMint)
-        const numPaths = numericValue(marketRaw.numPaths)
+        const numPaths = numericValue(marketRaw.numPaths, 'market.numPaths')
         mkt = {
-          marketIdNum: numericValue(marketRaw.marketId),
+          marketIdNum: numericValue(marketRaw.marketId, 'market.marketId'),
           marketState: parseMarketState(marketRaw.state) as MarketState,
           pair: pairInfo.pair,
           base: pairInfo.base,
           quote: pairInfo.quote,
-          startTimeMs: numericValue(marketRaw.startTime) * 1000,
-          checkpointInterval: numericValue(marketRaw.checkpointInterval),
+          startTimeMs: numericValue(marketRaw.startTime, 'market.startTime') * 1000,
+          checkpointInterval: numericValue(
+            marketRaw.checkpointInterval,
+            'market.checkpointInterval',
+          ),
           numPaths,
-          shareQuantitiesScaled: scaledArray(marketRaw.lmsrShareQuantities, numPaths),
-          amplitudesScaled: scaledArray(marketRaw.amplitudes, numPaths),
-          pricingActiveMask: numericValue(marketRaw.pricingActiveMask),
-          lmsrAlphaScaled: numericValue(marketRaw.lmsrAlpha) / SCALE,
+          shareQuantitiesScaled: scaledArray(
+            marketRaw.lmsrShareQuantities,
+            numPaths,
+            'market.lmsrShareQuantities',
+          ),
+          amplitudesScaled: scaledArray(marketRaw.amplitudes, numPaths, 'market.amplitudes'),
+          pricingActiveMask: numericValue(marketRaw.pricingActiveMask, 'market.pricingActiveMask'),
+          lmsrAlphaScaled: numericValue(marketRaw.lmsrAlpha, 'market.lmsrAlpha') / SCALE,
         }
         marketCache.set(marketKey, mkt)
       } catch {
