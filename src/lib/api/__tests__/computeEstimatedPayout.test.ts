@@ -42,6 +42,17 @@ describe('estimateCurrentPathPrices', () => {
     expect(prices[1]).toBeCloseTo(prices[2], 12)
   })
 
+  it('zeroes inactive fallback paths from pricingActiveMask', () => {
+    const prices = estimateCurrentPathPrices({
+      shareQuantities: [10, 0, 0],
+      numPaths: 3,
+      lmsrAlpha: 10,
+      pricingActiveMask: 0b011,
+    })
+
+    expect(prices[2]).toBe(0)
+  })
+
   it('uses fresh EigenCache snapshot prices when supplied', () => {
     const prices = estimateCurrentPathPrices({
       shareQuantities: [10, 5, 0],
