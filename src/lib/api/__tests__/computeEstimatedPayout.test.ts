@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { BN } from '@coral-xyz/anchor'
+import { PublicKey } from '@solana/web3.js'
 
-import { computeEstimatedPayout } from '@/lib/api/onchain'
+import { computeEstimatedPayout, estimateCurrentPathPrices } from '@/lib/api/onchain'
 import { SCALE } from '@/lib/constants'
 
 function rawPosition(
@@ -27,6 +28,41 @@ const baseMarket = {
   marketPricingActiveMask: 0b1111,
   marketNumPaths: 4,
 }
+
+describe('estimateCurrentPathPrices', () => {
+  it('uses LMSR fallback when no fresh EigenCache snapshot is supplied', () => {
+    const prices = estimateCurrentPathPrices({
+      shareQuantities: [10, 0, 0],
+      numPaths: 3,
+      lmsrAlpha: 10,
+      pricingActiveMask: 0b111,
+    })
+
+    expect(prices[0]).toBeGreaterThan(prices[1])
+    expect(prices[1]).toBeCloseTo(prices[2], 12)
+  })
+
+  it('uses fresh EigenCache snapshot prices when supplied', () => {
+    const prices = estimateCurrentPathPrices({
+      shareQuantities: [10, 5, 0],
+      numPaths: 3,
+      lmsrAlpha: 10,
+      pricingActiveMask: 0b011,
+      eigenCache: {
+        cachePda: new PublicKey('11111111111111111111111111111111'),
+        status: 'fresh',
+        quoteTier: 'eigencache',
+        cachedPrices: [0.2, 0.5, 0.3],
+        checkpointQuantities: [0, 0, 0],
+        lipschitz: 0.01,
+        cacheVersion: 1,
+        marketVersion: 1,
+      },
+    })
+
+    expect(prices).toEqual([0.3, 0.55, 0])
+  })
+})
 
 describe('computeEstimatedPayout', () => {
   it('returns realized final_payout when the position is claimed', () => {

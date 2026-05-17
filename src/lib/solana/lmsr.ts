@@ -219,6 +219,25 @@ export function estimateLmsrPrices(input: EstimateInput): number[] {
   })
 }
 
+/**
+ * Estimate EigenCache Tier-1 effective prices for each path using the same
+ * per-path linearization as `place_wager` / `exit_position`.
+ */
+export function estimateQuadraticPrices(
+  input: Omit<QuadraticEstimateInput, 'pathIndex'> & { numPaths: number; activeMask?: boolean[] },
+): number[] {
+  const { numPaths } = input
+  if (numPaths <= 0) return []
+  const active = input.activeMask
+    ? input.activeMask.slice(0, numPaths)
+    : Array.from({ length: numPaths }, () => true)
+
+  return Array.from({ length: numPaths }, (_, pathIndex) => {
+    if (!active[pathIndex]) return 0
+    return fromRawFixedPoint(effectiveQuadraticPriceRaw({ ...input, pathIndex }))
+  })
+}
+
 export function probabilityToMultiplier(probability: number): number {
   if (!Number.isFinite(probability) || probability <= 0) return 0
   return 1 / probability

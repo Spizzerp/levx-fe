@@ -4,6 +4,7 @@ import {
   applySlippageTolerance,
   estimateLmsrExitPayout,
   estimateLmsrPrices,
+  estimateQuadraticPrices,
   estimateLmsrSharesOut,
   estimateQuadraticExitPayout,
   estimateQuadraticSharesOut,
@@ -157,6 +158,19 @@ describe('estimateLmsrPrices', () => {
 })
 
 describe('EigenCache quadratic estimators', () => {
+  it('derives current quadratic prices per active path', () => {
+    const prices = estimateQuadraticPrices({
+      shareQuantities: [10, 5, 0],
+      checkpointQuantities: [0, 0, 0],
+      cachedPrices: [0.2, 0.5, 0.3],
+      lipschitz: 0.01,
+      numPaths: 3,
+      activeMask: [true, true, false],
+    })
+
+    expect(prices).toEqual([0.3, 0.55, 0])
+  })
+
   it('matches the on-chain quadratic buy formula in fixed-point units', () => {
     const shares = estimateQuadraticSharesOut({
       shareQuantities: [0, 0, 0],

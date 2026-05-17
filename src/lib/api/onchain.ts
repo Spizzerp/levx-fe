@@ -19,8 +19,17 @@ import {
   derivePathPda,
   derivePositionPda,
 } from '../solana/pda'
-import { activeMaskFromPricingMask, loadEigenCachePolicy } from '../solana/eigenCache'
-import { estimateLmsrExitPayout, estimateLmsrPrices, probabilityToMultiplier } from '../solana/lmsr'
+import {
+  activeMaskFromPricingMask,
+  loadEigenCachePolicy,
+  type EigenCacheQuoteSnapshot,
+} from '../solana/eigenCache'
+import {
+  estimateLmsrExitPayout,
+  estimateLmsrPrices,
+  estimateQuadraticPrices,
+  probabilityToMultiplier,
+} from '../solana/lmsr'
 import { SCALE } from '@/lib/constants'
 import { formatAiPathLabel } from '@/lib/pathLabels'
 
@@ -166,11 +175,38 @@ async function hydrateChunkedPath(program: any, pathRaw: any): Promise<any> {
   }
 }
 
+export function estimateCurrentPathPrices(args: {
+  shareQuantities: number[]
+  numPaths: number
+  lmsrAlpha: number
+  pricingActiveMask: number
+  eigenCache?: EigenCacheQuoteSnapshot
+}): number[] {
+  const activeMask = activeMaskFromPricingMask(args.pricingActiveMask, args.numPaths)
+  if (args.eigenCache) {
+    return estimateQuadraticPrices({
+      shareQuantities: args.shareQuantities,
+      checkpointQuantities: args.eigenCache.checkpointQuantities,
+      cachedPrices: args.eigenCache.cachedPrices,
+      lipschitz: args.eigenCache.lipschitz,
+      numPaths: args.numPaths,
+      activeMask,
+    })
+  }
+
+  return estimateLmsrPrices({
+    shareQuantities: args.shareQuantities,
+    numPaths: args.numPaths,
+    lmsrAlpha: args.lmsrAlpha,
+    activeMask,
+  })
+}
+
 async function fetchMarketPaths(
   program: any,
-  args: { marketId: number; marketPda: PublicKey; raw: any },
+  args: { marketId: number; marketPda: PublicKey; raw: any; eigenCache?: EigenCacheQuoteSnapshot },
 ): Promise<Market['paths']> {
-  const { marketId, marketPda, raw } = args
+  const { marketId, marketPda, raw, eigenCache } = args
   const numPaths = raw.numPaths as number
   const pathPromises = Array.from({ length: numPaths }, async (_, i) => {
     const [pathPda] = derivePathPda(marketId, i)
@@ -188,22 +224,20 @@ async function fetchMarketPaths(
 
   const startTimeMs = raw.startTime.toNumber() * 1000
   const checkpointInterval = raw.checkpointInterval as number
-  const lambda = raw.lambda.toNumber() / SCALE
   const pricingActiveMask =
     typeof raw.pricingActiveMask?.toNumber === 'function'
       ? raw.pricingActiveMask.toNumber()
       : Number(raw.pricingActiveMask ?? 0)
-  const currentPrices =
-    lambda === 0
-      ? estimateLmsrPrices({
-          shareQuantities: (raw.lmsrShareQuantities as { toNumber(): number }[])
-            .slice(0, numPaths)
-            .map((q) => q.toNumber() / SCALE),
-          numPaths,
-          lmsrAlpha: raw.lmsrAlpha.toNumber() / SCALE,
-          activeMask: activeMaskFromPricingMask(pricingActiveMask, numPaths),
-        })
-      : []
+  const shareQuantities = (raw.lmsrShareQuantities as { toNumber(): number }[])
+    .slice(0, numPaths)
+    .map((q) => q.toNumber() / SCALE)
+  const currentPrices = estimateCurrentPathPrices({
+    shareQuantities,
+    numPaths,
+    lmsrAlpha: raw.lmsrAlpha.toNumber() / SCALE,
+    pricingActiveMask,
+    eigenCache,
+  })
 
   const hydratedPathRaws = await Promise.all(
     pathRaws.map((pathRaw: any) => hydrateChunkedPath(program, pathRaw)),
@@ -211,9 +245,9 @@ async function fetchMarketPaths(
   return hydratedPathRaws.map((pathRaw: any) => {
     const path = anchorPathToFE(pathRaw, startTimeMs, checkpointInterval)
     applyDerivedPathDisplay(path)
-    const currentMultiplier = probabilityToMultiplier(currentPrices[path.pathIndex] ?? 0)
-    if (currentMultiplier > 0) {
-      path.multiplier = currentMultiplier
+    const currentProbability = currentPrices[path.pathIndex]
+    if (currentProbability !== undefined) {
+      path.multiplier = probabilityToMultiplier(currentProbability)
     }
     return path
   })
@@ -265,14 +299,20 @@ export async function getMarket(id: string): Promise<Market> {
 
   const raw: any = await program.account.market.fetch(marketPda)
   const market = anchorMarketToFE(raw, id)
-  market.eigenCacheStatus = (await loadEigenCachePolicy(program, marketId, marketPda, raw)).status
+  const eigenPolicy = await loadEigenCachePolicy(program, marketId, marketPda, raw)
+  market.eigenCacheStatus = eigenPolicy.status
 
   const pairInfo = resolveBaseMintLabel(raw.baseMint)
   market.pair = pairInfo.pair
   market.base = pairInfo.base
   market.quote = pairInfo.quote
 
-  market.paths = await fetchMarketPaths(program, { marketId, marketPda, raw })
+  market.paths = await fetchMarketPaths(program, {
+    marketId,
+    marketPda,
+    raw,
+    eigenCache: eigenPolicy.snapshot,
+  })
 
   return market
 }
@@ -286,7 +326,13 @@ export async function getMarketPathPreviews(
       const marketId = Number(id)
       const [marketPda] = deriveMarketPda(marketId)
       const raw: any = await program.account.market.fetch(marketPda)
-      const paths = await fetchMarketPaths(program, { marketId, marketPda, raw })
+      const eigenPolicy = await loadEigenCachePolicy(program, marketId, marketPda, raw)
+      const paths = await fetchMarketPaths(program, {
+        marketId,
+        marketPda,
+        raw,
+        eigenCache: eigenPolicy.snapshot,
+      })
       return [id, paths] as const
     }),
   )
