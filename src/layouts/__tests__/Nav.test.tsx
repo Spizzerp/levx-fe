@@ -11,8 +11,20 @@ vi.mock('@solana/wallet-adapter-react', () => ({
   useWallet: () => ({ disconnect: vi.fn() }),
 }))
 
-vi.mock('@/env', () => ({
-  env: { APP_NETWORK: 'devnet' },
+vi.mock('@/env/env.config', () => ({
+  env: {
+    APP_ENV: 'test',
+    APP_API_BASE_URL: '',
+    APP_HERMES_URL: 'https://hermes.pyth.network',
+    APP_RPC_URL: 'https://api.devnet.solana.com',
+    APP_NETWORK: 'devnet',
+    APP_PROGRAM_ID: 'LEVXqi1Z2XujBw2jAEP15Dv8LyrDetDR95KZGGQNobV',
+    APP_ADMIN_WALLETS: [],
+    APP_PATH_UPLOAD_RELAY_FEE_LAMPORTS: 50_000,
+    APP_EIGENCACHE_QUOTES_ENABLED: false,
+    APP_SUPABASE_URL: 'https://example.supabase.co',
+    APP_SUPABASE_ANON_KEY: 'anon',
+  },
 }))
 
 // @tanstack/react-router's <Link> and useNavigate requires a router context.
@@ -67,5 +79,6 @@ describe('Nav', () => {
     expect(screen.getAllByText(/vault/i)[0]).toBeInTheDocument()
     expect(screen.getAllByText(/portfolio/i)[0]).toBeInTheDocument()
     expect(screen.getAllByText(/leaderboard/i)[0]).toBeInTheDocument()
+    expect(screen.getAllByText(/providers/i)[0]).toBeInTheDocument()
   })
 })
