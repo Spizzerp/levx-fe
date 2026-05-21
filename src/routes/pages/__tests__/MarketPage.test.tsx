@@ -75,8 +75,49 @@ vi.mock('@/lib/api/hooks', async () => {
   return {
     ...actual,
     useMarket: vi.fn(),
+    useUserPosition: vi.fn(),
   }
 })
+
+const claimMutateMock = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/solana/transactions', () => ({
+  PathRelayError: class PathRelayError extends Error {
+    intentPda: string
+    nonce: number
+    expiresAt: number
+
+    constructor(message: string) {
+      super(message)
+      this.intentPda = ''
+      this.nonce = 0
+      this.expiresAt = 0
+    }
+  },
+  useAddPath: () => ({
+    mutateAsync: vi.fn(async ({ pathIndex }: { pathIndex: number }) => ({
+      sig: 'test-sig',
+      pathIndex,
+    })),
+    isPending: false,
+  }),
+  useCancelPathUpload: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  usePlaceBatchWager: () => ({
+    mutate: vi.fn(),
+    isPending: false,
+    isError: false,
+    error: null,
+  }),
+  useClaim: () => ({
+    mutate: claimMutateMock,
+    isPending: false,
+    isError: false,
+    error: null,
+  }),
+}))
+
+vi.mock('@/lib/solana/program', () => ({
+  useProgram: () => null,
+}))
 
 // Mock usePythFeed so no real SSE is opened
 const usePythFeedSpy = vi.fn()
@@ -147,13 +188,15 @@ vi.mock('@/lib/supabase/hooks', () => ({
 import { MarketPage } from '@/routes/pages/MarketPage'
 import { useDrawingStore } from '@/stores/drawingStore'
 import { usePythStore } from '@/stores/pythStore'
-import type { PredictionPath } from '@/types/market'
+import type { PredictionPath, UserPosition } from '@/types/market'
 
 const TEST_MARKET = {
   id: 'btc',
+  marketId: 7,
   pair: 'BTC/USDC',
   base: 'BTC',
   quote: 'USDC',
+  vault: '11111111111111111111111111111111',
   state: 'active' as const,
   pool: 248_901,
   traders: 1204,
@@ -230,6 +273,7 @@ beforeEach(async () => {
   useDrawingStore.setState({ state: { phase: 'idle' }, totalCheckpoints: 0 })
   usePythStore.setState({ ticks: {}, status: 'idle' })
   usePythFeedSpy.mockClear()
+  claimMutateMock.mockClear()
   setVisible.mockClear()
   useMarketParticipantsMock.mockReturnValue({
     data: { participants: [], totalParticipants: 0 },
@@ -250,6 +294,12 @@ beforeEach(async () => {
     isError: false,
     error: null,
     refetch: vi.fn(),
+  })
+  const { useUserPosition } = await import('@/lib/api/hooks')
+  ;(useUserPosition as ReturnType<typeof vi.fn>).mockReturnValue({
+    data: null,
+    isLoading: false,
+    isError: false,
   })
 })
 
@@ -478,6 +528,52 @@ describe('MarketPage state-gated controls', () => {
     expect(
       screen.queryByText(/market has settled\. claim your payout below/i),
     ).not.toBeInTheDocument()
+  })
+
+  it('does not expose a claim transaction when a connected wallet has no settled position', async () => {
+    await setMarketState('settled')
+    act(() => connectWallet())
+
+    renderMarketPage()
+
+    expect(screen.queryByRole('button', { name: /^claim$/i })).not.toBeInTheDocument()
+  })
+
+  it('claims with the loaded position path index instead of deriving a fallback path', async () => {
+    await setMarketState('settled')
+    act(() => connectWallet())
+    const { useUserPosition } = await import('@/lib/api/hooks')
+    const position: UserPosition = {
+      id: '7-3',
+      marketId: '7',
+      marketIdNum: 7,
+      marketState: 'settled',
+      pair: 'BTC/USDC',
+      base: 'BTC',
+      quote: 'USDC',
+      pathId: 'path-3',
+      pathIndex: 3,
+      pathLabel: 'Path D',
+      pathTone: 'bear',
+      collateral: 25,
+      leverage: 1,
+      exposure: 25,
+      entryMultiplier: 1,
+      entryTime: 0,
+      estimatedPayout: 31,
+      dissolved: false,
+      claimed: false,
+    }
+    ;(useUserPosition as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: position,
+      isLoading: false,
+      isError: false,
+    })
+
+    renderMarketPage()
+    await userEvent.setup().click(screen.getByRole('button', { name: /^claim$/i }))
+
+    expect(claimMutateMock).toHaveBeenCalledWith({ marketId: 7, pathIndex: 3 })
   })
 
   it('mounts the maturity countdown card only when market.state is Maturing (MARKET-04)', async () => {
