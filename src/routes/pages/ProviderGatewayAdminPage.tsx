@@ -17,6 +17,7 @@ import {
   useProviderLeaderboard,
   useProviderResults,
 } from '@/features/providerGateway/api'
+import { providerGatewayErrorMessage } from '@/features/providerGateway/errors'
 import { useIsAdmin } from '@/lib/hooks/useIsAdmin'
 import { PageLayout } from '@/layouts/PageLayout'
 
@@ -73,6 +74,12 @@ function ProviderGatewayAdminContent() {
         <ProviderGatewayLoading />
       ) : isError ? (
         <ProviderGatewayError
+          message={providerGatewayErrorMessage(
+            statusQuery.error ??
+              providersQuery.error ??
+              leaderboardQuery.error ??
+              marketsQuery.error,
+          )}
           onRetry={() => {
             void statusQuery.refetch()
             void providersQuery.refetch()
@@ -95,7 +102,7 @@ function ProviderGatewayAdminContent() {
           </div>
           {resultsQuery.isError ? (
             <ProviderGatewayError
-              message="Provider details are unavailable."
+              message={providerGatewayErrorMessage(resultsQuery.error)}
               onRetry={() => void resultsQuery.refetch()}
             />
           ) : resultsQuery.isLoading ? (

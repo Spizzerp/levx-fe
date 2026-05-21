@@ -18,6 +18,7 @@ import {
   shortId,
 } from '@/features/providerGateway/format'
 import { useProviderGatewayProviders, useProviderLeaderboard } from '@/features/providerGateway/api'
+import { providerGatewayErrorMessage } from '@/features/providerGateway/errors'
 import type { ProviderRecord } from '@/features/providerGateway/types'
 import { PageLayout } from '@/layouts/PageLayout'
 import { ChartFrame } from '@/features/chart/ChartFrame'
@@ -58,7 +59,7 @@ export function ProviderGatewayLeaderboardPage() {
           onSelectedOnlyChange={setSelectedOnly}
         />
       }
-      summaryBar={
+      summaryBar={!isLoading && !isError ? (
         <div className="grid gap-3 md:grid-cols-4">
           <MetricPanel label="Providers" value={entries.length} />
           <MetricPanel label="Selected paths" value={totalSelected} />
@@ -68,12 +69,13 @@ export function ProviderGatewayLeaderboardPage() {
             value={topProvider ? providerLabel(topProvider.provider_id, providerById) : '-'}
           />
         </div>
-      }
+      ) : undefined}
     >
       {isLoading ? (
         <ProviderGatewayLoading />
       ) : isError ? (
         <ProviderGatewayError
+          message={providerGatewayErrorMessage(providersQuery.error ?? leaderboardQuery.error)}
           onRetry={() => {
             void providersQuery.refetch()
             void leaderboardQuery.refetch()
