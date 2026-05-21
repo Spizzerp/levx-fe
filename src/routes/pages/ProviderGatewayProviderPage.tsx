@@ -9,6 +9,7 @@ import {
   ProviderResultsPanel,
 } from '@/features/providerGateway/ProviderGatewayPanels'
 import { useProviderGatewayProviders, useProviderResults } from '@/features/providerGateway/api'
+import { providerGatewayErrorMessage } from '@/features/providerGateway/errors'
 import { PageLayout } from '@/layouts/PageLayout'
 
 export function ProviderGatewayProviderPage() {
@@ -41,6 +42,7 @@ export function ProviderGatewayProviderPage() {
         <ProviderGatewayLoading />
       ) : isError ? (
         <ProviderGatewayError
+          message={providerGatewayErrorMessage(providersQuery.error ?? resultsQuery.error)}
           onRetry={() => {
             void providersQuery.refetch()
             void resultsQuery.refetch()

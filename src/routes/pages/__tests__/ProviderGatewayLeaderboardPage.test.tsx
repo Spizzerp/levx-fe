@@ -121,4 +121,17 @@ describe('ProviderGatewayLeaderboardPage', () => {
     expect(screen.getAllByText('0.820')).toHaveLength(2)
     expect(screen.getByText(/2 \/ 40.0%/i)).toBeInTheDocument()
   })
+
+  it('surfaces missing pipeline API configuration when gateway calls fail', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(new Response('not found', { status: 404 }))),
+    )
+
+    render(<ProviderGatewayLeaderboardPage />, { wrapper })
+
+    await waitFor(() => {
+      expect(screen.getByText(/pipeline api base url is not configured/i)).toBeInTheDocument()
+    })
+  })
 })
