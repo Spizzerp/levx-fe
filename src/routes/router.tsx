@@ -11,6 +11,9 @@ import { MarketsPage } from '@/routes/pages/MarketsPage'
 import { NotFoundPage } from '@/routes/pages/NotFoundPage'
 import { PortfolioPage } from '@/routes/pages/PortfolioPage'
 import { ProfilePage } from '@/routes/pages/ProfilePage'
+import { ProviderGatewayAdminPage } from '@/routes/pages/ProviderGatewayAdminPage'
+import { ProviderGatewayLeaderboardPage } from '@/routes/pages/ProviderGatewayLeaderboardPage'
+import { ProviderGatewayProviderPage } from '@/routes/pages/ProviderGatewayProviderPage'
 import { VaultPage } from '@/routes/pages/VaultPage'
 import { RootRouteComponent } from '@/routes/RootRoute'
 import { DocsContent } from '@/modules/docs/DocsContent'
@@ -40,7 +43,10 @@ export const marketsRoute = createRoute({
   validateSearch: (search: Record<string, unknown>): MarketsSearchParams => {
     const view = search.view as string
     return {
-      view: (view === 'grid' || view === 'table' ? view : undefined) as 'table' | 'grid' | undefined,
+      view: (view === 'grid' || view === 'table' ? view : undefined) as
+        | 'table'
+        | 'grid'
+        | undefined,
     }
   },
   component: MarketsPage,
@@ -85,10 +91,28 @@ const leaderboardRoute = createRoute({
   component: LeaderboardPage,
 })
 
+const providersRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/providers',
+  component: ProviderGatewayLeaderboardPage,
+})
+
+const providerRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/providers/$providerId',
+  component: ProviderGatewayProviderPage,
+})
+
 const adminRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/admin',
   component: AdminMarketsPage,
+})
+
+const adminProvidersRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/admin/providers',
+  component: ProviderGatewayAdminPage,
 })
 
 const adminCreateRoute = createRoute({
@@ -143,7 +167,10 @@ const routeTree = rootRoute.addChildren([
   portfolioRoute,
   profileRoute,
   leaderboardRoute,
+  providersRoute,
+  providerRoute,
   adminRoute,
+  adminProvidersRoute,
   adminCreateRoute,
   labsChartRoute,
   docsRoute.addChildren([docsIndexRoute, docsDocRoute]),

@@ -14,6 +14,7 @@ const KEEPER_HEALTH_ROUTES = [
   '/portfolio',
   '/positions',
   '/leaderboard',
+  '/providers',
   '/vault',
   '/admin',
 ] as const
@@ -48,9 +49,9 @@ export function CommonLayout({ children }: PropsWithChildren) {
         {children}
       </div>
       {showMainLayout && (
-        <footer className="mt-auto border-t border-ink-dim/25">
+        <footer className="border-ink-dim/25 mt-auto border-t">
           <div className="mx-auto grid max-w-[1680px] grid-cols-3 items-center px-10 py-4">
-            <span className="text-ink-dim font-mono text-xs justify-self-start">
+            <span className="text-ink-dim justify-self-start font-mono text-xs">
               Not Your Business LLC ©
             </span>
             <div className="flex items-center gap-4 justify-self-center">

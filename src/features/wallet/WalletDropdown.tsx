@@ -56,7 +56,7 @@ export function WalletDropdown({
       ref={panelRef}
       role="menu"
       className={cn(
-        'border-line-strong bg-surface-1 absolute right-0 top-[calc(100%+8px)] z-overlay',
+        'border-line-strong bg-surface-1 z-overlay absolute top-[calc(100%+8px)] right-0',
         'min-w-[200px] overflow-hidden rounded-md border',
       )}
     >
@@ -84,6 +84,17 @@ export function WalletDropdown({
             }}
           >
             Manage markets
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            className={MENU_ITEM}
+            onClick={() => {
+              onClose()
+              void navigate({ to: '/admin/providers' })
+            }}
+          >
+            Provider ops
           </button>
           <hr className="border-line mx-2 my-1" />
         </>

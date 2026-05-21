@@ -16,6 +16,7 @@ const links = [
   { to: '/vault', label: 'Vault' },
   { to: '/portfolio', label: 'Portfolio' },
   { to: '/leaderboard', label: 'Leaderboard' },
+  { to: '/providers', label: 'Providers' },
 ] as const
 
 const LINK_BASE = cn(
@@ -61,8 +62,8 @@ function MobileWalletSection({ onAction }: { onAction: () => void }) {
             onAction()
           }}
           className={cn(
-            'w-full rounded-full border border-line-strong py-2.5',
-            'font-mono text-xs uppercase tracking-wide text-ink',
+            'border-line-strong w-full rounded-full border py-2.5',
+            'text-ink font-mono text-xs tracking-wide uppercase',
             'duration-short ease-levx transition-[border-color]',
             'hover:border-ink',
           )}
@@ -79,30 +80,51 @@ function MobileWalletSection({ onAction }: { onAction: () => void }) {
   return (
     <div className="border-line border-t">
       <div className="px-4 py-2.5">
-        <span className="font-mono text-[10px] uppercase tracking-wide text-ink-dim">{label}</span>
+        <span className="text-ink-dim font-mono text-[10px] tracking-wide uppercase">{label}</span>
       </div>
       <hr className="border-line mx-4" />
       <button
         type="button"
         className={MENU_ITEM}
-        onClick={() => { onAction(); void navigate({ to: '/profile' }) }}
+        onClick={() => {
+          onAction()
+          void navigate({ to: '/profile' })
+        }}
       >
         Profile
       </button>
       {isAdmin && (
-        <button
-          type="button"
-          className={MENU_ITEM}
-          onClick={() => { onAction(); void navigate({ to: '/admin' }) }}
-        >
-          Manage markets
-        </button>
+        <>
+          <button
+            type="button"
+            className={MENU_ITEM}
+            onClick={() => {
+              onAction()
+              void navigate({ to: '/admin' })
+            }}
+          >
+            Manage markets
+          </button>
+          <button
+            type="button"
+            className={MENU_ITEM}
+            onClick={() => {
+              onAction()
+              void navigate({ to: '/admin/providers' })
+            }}
+          >
+            Provider ops
+          </button>
+        </>
       )}
       <hr className="border-line mx-4" />
       <button
         type="button"
         className={MENU_ITEM}
-        onClick={() => { void navigator.clipboard?.writeText(base58); onAction() }}
+        onClick={() => {
+          void navigator.clipboard?.writeText(base58)
+          onAction()
+        }}
       >
         Copy address
       </button>
@@ -111,7 +133,11 @@ function MobileWalletSection({ onAction }: { onAction: () => void }) {
         type="button"
         className={MENU_ITEM}
         onClick={() => {
-          window.open(explorerAddressUrl(base58, cluster ?? 'devnet'), '_blank', 'noopener,noreferrer')
+          window.open(
+            explorerAddressUrl(base58, cluster ?? 'devnet'),
+            '_blank',
+            'noopener,noreferrer',
+          )
           onAction()
         }}
       >
@@ -121,7 +147,10 @@ function MobileWalletSection({ onAction }: { onAction: () => void }) {
       <button
         type="button"
         className={cn(MENU_ITEM, 'mb-1 text-red-400 hover:text-red-400')}
-        onClick={() => { void disconnect(); onAction() }}
+        onClick={() => {
+          void disconnect()
+          onAction()
+        }}
       >
         Disconnect
       </button>
@@ -130,13 +159,7 @@ function MobileWalletSection({ onAction }: { onAction: () => void }) {
 }
 
 /* ─── Animated hamburger / X button ───────────────────────── */
-function HamburgerButton({
-  isOpen,
-  onClick,
-}: {
-  isOpen: boolean
-  onClick: () => void
-}) {
+function HamburgerButton({ isOpen, onClick }: { isOpen: boolean; onClick: () => void }) {
   const barBase: React.CSSProperties = {
     position: 'absolute',
     left: '50%',
@@ -153,7 +176,7 @@ function HamburgerButton({
       onClick={onClick}
       className={cn(
         'relative flex size-10 items-center justify-center rounded-full',
-        'text-ink-muted transition-colors duration-short ease-levx',
+        'text-ink-muted duration-short ease-levx transition-colors',
         'hover:text-ink-strong',
         isOpen && 'text-ink-strong',
       )}
@@ -199,9 +222,9 @@ export function Nav() {
   return (
     <>
       {/* ── Desktop nav ─────────────────────────────────── */}
-      <div className="sticky top-0 z-nav w-full bg-gradient-to-b from-surface from-60% to-transparent px-6 pt-3 pb-3 sm:hidden">
-        <nav className="pill-glow relative mx-auto flex w-full max-w-[1400px] items-center justify-between rounded-full border border-line-strong bg-surface px-6 py-3">
-          <img src="/logo_color.png" alt="LevX" className="relative z-10 h-12 -my-1 w-auto" />
+      <div className="z-nav from-surface sticky top-0 w-full bg-gradient-to-b from-60% to-transparent px-6 pt-3 pb-3 sm:hidden">
+        <nav className="pill-glow border-line-strong bg-surface relative mx-auto flex w-full max-w-[1400px] items-center justify-between rounded-full border px-6 py-3">
+          <img src="/logo_color.png" alt="LevX" className="relative z-10 -my-1 h-12 w-auto" />
           <ul className="absolute inset-0 flex items-center justify-center gap-9">
             {links.map((l) => (
               <li key={l.to}>
@@ -229,16 +252,16 @@ export function Nav() {
         overflow:visible lets the absolutely-positioned panel appear below.
       */}
       <div
-        className="sticky top-0 z-nav hidden sm:block"
+        className="z-nav sticky top-0 hidden sm:block"
         style={{ height: 52, overflow: 'visible' }}
       >
         {/* Gradient bg */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-[60px] bg-gradient-to-b from-surface from-60% to-transparent" />
+        <div className="from-surface pointer-events-none absolute inset-x-0 top-0 h-[60px] bg-gradient-to-b from-60% to-transparent" />
 
         <div className="relative px-2 pt-2">
           {/* Pill bar — always fully rounded */}
-          <div className="pill-glow relative mx-auto flex w-full items-center justify-between rounded-full border border-line-strong bg-surface px-3 py-1.5">
-            <img src="/logo_color.png" alt="LevX" className="relative z-10 h-9 -my-0.5 w-auto" />
+          <div className="pill-glow border-line-strong bg-surface relative mx-auto flex w-full items-center justify-between rounded-full border px-3 py-1.5">
+            <img src="/logo_color.png" alt="LevX" className="relative z-10 -my-0.5 h-9 w-auto" />
             <HamburgerButton
               isOpen={isMobileMenuOpen}
               onClick={() => setIsMobileMenuOpen((prev) => !prev)}
@@ -247,7 +270,7 @@ export function Nav() {
 
           {/* Dropdown panel — absolutely below the pill, no clipping */}
           <div
-            className="absolute inset-x-2 top-full mt-1 overflow-hidden rounded-2xl border border-line-strong bg-surface"
+            className="border-line-strong bg-surface absolute inset-x-2 top-full mt-1 overflow-hidden rounded-2xl border"
             style={{
               opacity: isMobileMenuOpen ? 1 : 0,
               transform: isMobileMenuOpen ? 'translateY(0)' : 'translateY(-8px)',
@@ -278,7 +301,9 @@ export function Nav() {
 
             {/* Theme toggle */}
             <div className="border-line flex items-center justify-between border-t px-4 py-3">
-              <span className="font-mono text-[10px] uppercase tracking-wide text-ink-dim">Theme</span>
+              <span className="text-ink-dim font-mono text-[10px] tracking-wide uppercase">
+                Theme
+              </span>
               <ThemeToggle />
             </div>
           </div>
