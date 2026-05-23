@@ -24,6 +24,18 @@ describe('searchDocs', () => {
     )
   })
 
+  it('finds the external provider gateway docs section', () => {
+    const results = searchDocs('provider gateway')
+
+    expect(results).toContainEqual(
+      expect.objectContaining({
+        doc: 'ai-pipeline',
+        anchor: 'external-provider-gateway',
+        kind: 'Section',
+      }),
+    )
+  })
+
   it('does not expose internal stability status as a searchable public term', () => {
     expect(searchDocs('stable')).toEqual([])
   })
