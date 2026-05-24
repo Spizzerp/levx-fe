@@ -1,7 +1,43 @@
 /* eslint-disable react-refresh/only-export-components */
 import type { ReactNode } from 'react'
+import { Mail } from 'lucide-react'
+import { cn } from '@/lib/cn'
 import { Code, CodeBlock, Li, Note, P, Section, Ul } from './primitives'
 import type { DocId } from './types'
+
+const PROVIDER_ACCESS_EMAIL = 'admin@notyourbusiness.xyz'
+const PROVIDER_ACCESS_MAILTO = `mailto:${PROVIDER_ACCESS_EMAIL}?subject=${encodeURIComponent(
+  'LevX Provider Gateway Access Request',
+)}&body=${encodeURIComponent(`Hi LevX team,
+
+I would like to request access to the external Provider Gateway beta.
+
+Provider / organization:
+Contact:
+Forecasting system overview:
+
+Thanks,
+`)}`
+
+function RequestProviderAccessButton() {
+  return (
+    <a
+      href={PROVIDER_ACCESS_MAILTO}
+      className={cn(
+        'inline-flex min-h-11 items-center gap-2',
+        'mt-6 px-5 py-2.5',
+        'border-line-strong rounded-full border',
+        'text-ink-strong font-mono text-xs uppercase',
+        'duration-short ease-levx transition-colors',
+        'hover:border-ink-strong hover:bg-surface-1',
+        'focus-visible:ring-ink-strong focus-visible:ring-2 focus-visible:outline-none',
+      )}
+    >
+      <Mail size={14} strokeWidth={1.75} aria-hidden />
+      Request Access
+    </a>
+  )
+}
 
 function IntroductionContent() {
   return (
@@ -562,10 +598,10 @@ function AiPipelineContent() {
           into forecast priors for LevX path generation.
         </P>
         <P>
-          GPU inference is hosted through RunPod Serverless. The pipeline calls the RunPod worker
-          first, and can fall back to local model loading or a statistical baseline if foundation
-          inference is unavailable. This keeps market generation operational while allowing the
-          foundation-model layer to improve independently.
+          GPU inference is hosted through RunPod Serverless. The pipeline retries the RunPod worker
+          and treats foundation-model forecasts as mandatory. If it still cannot obtain a usable
+          forecast, generation raises an error and retries on the next scheduler cycle instead of
+          silently falling back to a different model path.
         </P>
       </Section>
 
@@ -632,6 +668,7 @@ function AiPipelineContent() {
           External providers are path candidates only; Pyth checkpoints and on-chain scoring remain
           the settlement authority.
         </Note>
+        <RequestProviderAccessButton />
       </Section>
 
       <Section id="feedback-loop" num="06" heading="Feedback loop">
