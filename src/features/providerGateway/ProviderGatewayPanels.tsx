@@ -192,6 +192,7 @@ export function ProviderTable({
         <tbody>
           {providers.map((provider) => {
             const snapshot = snapshotByProvider.get(provider.provider_id)
+            const submissionStats = provider.submission_stats
             const selected = selectedProviderId === provider.provider_id
             return (
               <tr
@@ -229,10 +230,10 @@ export function ProviderTable({
                   </StatusPill>
                 </td>
                 <td className="text-ink px-4 py-4 text-right font-mono text-sm">
-                  {snapshot?.paths_valid ?? 0}
+                  {snapshot?.paths_valid ?? submissionStats?.paths_valid ?? 0}
                 </td>
                 <td className="text-ink px-4 py-4 text-right font-mono text-sm">
-                  {snapshot?.paths_selected ?? 0}
+                  {snapshot?.paths_selected ?? submissionStats?.paths_selected ?? 0}
                 </td>
                 <td className="text-ink px-4 py-4 text-right font-mono text-sm">
                   {formatScore(snapshot?.avg_composite_score)}
@@ -267,6 +268,7 @@ export function ProviderResultsPanel({
   }
 
   const latest = results.reputation_snapshots.at(-1)
+  const submissionStats = results.submission_stats
   const recentScores = results.results
     .toSorted((a, b) => b.created_at.localeCompare(a.created_at))
     .slice(0, 6)
@@ -290,10 +292,17 @@ export function ProviderResultsPanel({
           <StatusPill tone={providerStatusTone(provider.status)}>{provider.status}</StatusPill>
         </div>
         <div className="mt-6 grid grid-cols-2 gap-3">
-          <MetricPanel label="Valid paths" value={latest?.paths_valid ?? 0} />
+          <MetricPanel
+            label="Valid paths"
+            value={latest?.paths_valid ?? submissionStats?.paths_valid ?? 0}
+          />
           <MetricPanel
             label="Selected"
-            value={latest?.paths_selected ?? results.selected_paths.length}
+            value={
+              latest?.paths_selected ??
+              submissionStats?.paths_selected ??
+              results.selected_paths.length
+            }
           />
           <MetricPanel label="Avg score" value={formatScore(latest?.avg_composite_score)} />
           <MetricPanel label="Selection" value={formatPercent(latest?.selection_rate)} />

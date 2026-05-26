@@ -27,6 +27,7 @@ export interface ProviderRecord {
   status: ProviderStatus
   created_at: string
   updated_at: string
+  submission_stats?: ProviderSubmissionStats
   status_history?: Array<{
     status: ProviderStatus
     actor: string
@@ -88,6 +89,14 @@ export interface ProviderAttribution {
   created_at?: string
 }
 
+export interface ProviderSubmissionStats {
+  submissions_submitted: number
+  submissions_valid: number
+  paths_submitted: number
+  paths_valid: number
+  paths_selected: number
+}
+
 export interface OrthogonalPrecisionResult {
   score_id: string
   score_run_id: string
@@ -133,6 +142,7 @@ export interface ReputationSnapshot {
 export interface ProviderResultsResponse {
   provider_id: string
   status: ProviderStatus
+  submission_stats?: ProviderSubmissionStats
   selected_paths: ProviderAttribution[]
   results: OrthogonalPrecisionResult[]
   reputation_snapshots: ReputationSnapshot[]
