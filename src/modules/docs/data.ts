@@ -189,18 +189,18 @@ export const DOC_META: Record<DocId, DocMeta> = {
     category: '02 - Protocol',
     title: 'AI Pipeline',
     tagline:
-      'How LevX uses internal foundation-model path generation today, and how external AI providers can compete in future markets.',
+      'How LevX combines internal foundation-model paths with the external Provider Gateway beta.',
     meta: [
       { label: 'MODELS', value: 'TimesFM 2.5 + Chronos-2' },
-      { label: 'HOSTING', value: 'RunPod Serverless' },
-      { label: 'STATUS', value: 'Alpha' },
+      { label: 'HOSTING', value: 'RunPod + Provider Gateway' },
+      { label: 'STATUS', value: 'Beta' },
     ],
     sections: [
       { id: 'role', num: '01', heading: 'Role of AI' },
       { id: 'internal-providers', num: '02', heading: 'Internal providers' },
       { id: 'market-flow', num: '03', heading: 'Market generation flow' },
       { id: 'onchain-boundary', num: '04', heading: 'On-chain boundary' },
-      { id: 'provider-roadmap', num: '05', heading: 'Provider roadmap' },
+      { id: 'external-provider-gateway', num: '05', heading: 'External Provider Gateway' },
       { id: 'feedback-loop', num: '06', heading: 'Feedback loop' },
     ],
   },
@@ -251,11 +251,11 @@ export const DOC_META: Record<DocId, DocMeta> = {
     category: '03 - Resources',
     title: 'Roadmap',
     tagline:
-      'A staged path from Mode 1 path markets toward validated AI competition, deeper liquidity, and production readiness.',
+      'A staged path from Mode 1 path markets toward validated provider competition, deeper liquidity, and production readiness.',
     meta: [
       { label: 'CURRENT', value: 'Mode 1 beta' },
-      { label: 'NEXT', value: 'Hardening + AI validation' },
-      { label: 'FUTURE', value: 'Provider marketplace + Mode 2' },
+      { label: 'NEXT', value: 'Provider smoke tests + hardening' },
+      { label: 'FUTURE', value: 'Self-serve providers + Mode 2' },
       { label: 'STATUS', value: 'Draft' },
     ],
     sections: [

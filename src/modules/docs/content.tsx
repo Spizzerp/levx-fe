@@ -1,7 +1,43 @@
 /* eslint-disable react-refresh/only-export-components */
 import type { ReactNode } from 'react'
+import { Mail } from 'lucide-react'
+import { cn } from '@/lib/cn'
 import { Code, CodeBlock, Li, Note, P, Section, Ul } from './primitives'
 import type { DocId } from './types'
+
+const PROVIDER_ACCESS_EMAIL = 'admin@notyourbusiness.xyz'
+const PROVIDER_ACCESS_MAILTO = `mailto:${PROVIDER_ACCESS_EMAIL}?subject=${encodeURIComponent(
+  'LevX Provider Gateway Access Request',
+)}&body=${encodeURIComponent(`Hi LevX team,
+
+I would like to request access to the external Provider Gateway beta.
+
+Provider / organization:
+Contact:
+Forecasting system overview:
+
+Thanks,
+`)}`
+
+function RequestProviderAccessButton() {
+  return (
+    <a
+      href={PROVIDER_ACCESS_MAILTO}
+      className={cn(
+        'inline-flex min-h-11 items-center gap-2',
+        'mt-6 px-5 py-2.5',
+        'border-line-strong rounded-full border',
+        'text-ink-strong font-mono text-xs uppercase',
+        'duration-short ease-levx transition-colors',
+        'hover:border-ink-strong hover:bg-surface-1',
+        'focus-visible:ring-ink-strong focus-visible:ring-2 focus-visible:outline-none',
+      )}
+    >
+      <Mail size={14} strokeWidth={1.75} aria-hidden />
+      Request Access
+    </a>
+  )
+}
 
 function IntroductionContent() {
   return (
@@ -562,10 +598,10 @@ function AiPipelineContent() {
           into forecast priors for LevX path generation.
         </P>
         <P>
-          GPU inference is hosted through RunPod Serverless. The pipeline calls the RunPod worker
-          first, and can fall back to local model loading or a statistical baseline if foundation
-          inference is unavailable. This keeps market generation operational while allowing the
-          foundation-model layer to improve independently.
+          GPU inference is hosted through RunPod Serverless. The pipeline retries the RunPod worker
+          and treats foundation-model forecasts as mandatory. If it still cannot obtain a usable
+          forecast, generation raises an error and retries on the next scheduler cycle instead of
+          silently falling back to a different model path.
         </P>
       </Section>
 
@@ -599,21 +635,40 @@ function AiPipelineContent() {
         </P>
       </Section>
 
-      <Section id="provider-roadmap" num="05" heading="Provider roadmap">
+      <Section id="external-provider-gateway" num="05" heading="External Provider Gateway">
         <P>
-          The initial phase focuses on validating LevX's internal AI providers before opening the
-          market to outside providers. After that validation phase, the roadmap is to let external
-          AI providers compete for path positions in markets.
+          LevX now has an API-driven Provider Gateway beta for external forecast providers. The
+          gateway is off-chain infrastructure: admins register providers and issue one-time API
+          keys, the scheduler publishes market context before activation, and authenticated
+          providers submit forecast paths before the market's submission deadline.
         </P>
         <P>
-          Those providers could range from retail AI agents to institutional forecasting systems.
-          The goal is a marketplace where models earn distribution by producing paths that survive
-          checkpoints, score well against realized prices, and prove useful to traders over time.
+          The pipeline validates each submission against the published market context, stores raw
+          and normalized artifacts, deduplicates retries with idempotency keys, and selects at most a
+          configured number of curated provider paths. Selected provider packages are stitched
+          together with LevX protocol-generated packages into the final AI menu submitted on-chain.
+        </P>
+        <CodeBlock language="gateway">{`admin registration
+  -> one-time provider API key
+  -> market context published by scheduler
+  -> provider forecast intake
+  -> validation + immutable artifacts
+  -> curated selection run
+  -> protocol paths + provider paths submitted as the AI menu
+  -> attribution + public provider metrics`}</CodeBlock>
+        <P>
+          Provider results and leaderboards are visible in the app, including selected-path
+          attribution and Orthogonal Precision reputation snapshots. This analytics layer is
+          reputation-only today; it does not change settlement, claims, rewards, or the deterministic
+          on-chain scoring rules.
         </P>
         <Note>
-          External provider registration, provider profiles, and provider leaderboards are planned
-          features. They are not part of the current public beta settlement authority.
+          The current provider surface is not a self-serve onboarding portal. Registration, API-key
+          issuance, status changes, selection runs, and analytics scoring are still admin/API-driven.
+          External providers are path candidates only; Pyth checkpoints and on-chain scoring remain
+          the settlement authority.
         </Note>
+        <RequestProviderAccessButton />
       </Section>
 
       <Section id="feedback-loop" num="06" heading="Feedback loop">
@@ -759,8 +814,8 @@ DisputeBond:   ["dispute_bond", market]`}</CodeBlock>
         </P>
         <Note>
           The current on-chain path origin model records protocol AI and user-drawn paths. External
-          AI provider competition is planned as a future marketplace layer after the internal
-          providers are validated.
+          provider forecasts enter through the off-chain Provider Gateway and are submitted on-chain
+          only when selected into the official AI menu before market activation.
         </Note>
       </Section>
     </>
@@ -951,9 +1006,10 @@ action_score = SCALE * exp(-cumulative_action / reference_action)`}</CodeBlock>
           validation of the internal AI path providers.
         </P>
         <P>
-          After internal validation, LevX plans to open path competition to external AI providers.
-          These may range from retail AI agents to institutional forecasting systems. Provider
-          registration, provider profiles, and leaderboards are planned marketplace features.
+          LevX has added the first external Provider Gateway beta: admin-gated provider
+          registration, API-key forecast intake, durable off-chain storage, curated provider-path
+          selection, attribution, and public provider metrics. The next step is proving that flow
+          end-to-end on devnet before treating external providers as a production partner surface.
         </P>
         <P>
           Mode 2 liquidity is a later roadmap phase. The program already contains dormant vault and
@@ -1013,19 +1069,19 @@ function RoadmapContent() {
 
       <Section id="provider-marketplace" num="04" heading="Provider marketplace">
         <P>
-          After the internal providers are validated, LevX plans to open path competition to
-          external AI providers. These providers may include retail AI agents, independent quant
-          systems, institutional forecasting models, and specialized market-specific predictors.
+          LevX has started opening path competition to external AI providers through the Provider
+          Gateway beta. These providers may include retail AI agents, independent quant systems,
+          institutional forecasting models, and specialized market-specific predictors.
         </P>
         <P>
-          The planned marketplace layer includes provider registration, provider identity, path-slot
-          competition, performance history, and leaderboards. The protocol direction is simple:
-          models should earn distribution by producing paths that survive checkpoints, score well,
-          and create useful markets for traders.
+          The current gateway supports admin-gated registration, API-key-authenticated forecast
+          intake, market-context validation, curated path selection, on-chain attribution, provider
+          profiles, and leaderboards. It remains an operator-controlled beta rather than a
+          self-serve marketplace.
         </P>
         <Note>
-          External provider registration and leaderboards are roadmap features. They are not current
-          settlement authorities and should not be presented as live beta functionality.
+          Provider metrics are informational. External provider paths can become part of the AI menu
+          only after selection and on-chain submission; they do not control settlement or claims.
         </Note>
       </Section>
 
