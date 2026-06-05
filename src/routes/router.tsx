@@ -35,6 +35,11 @@ const indexRoute = createRoute({
 
 export type MarketsSearchParams = {
   view?: 'table' | 'grid'
+  group?: string
+}
+
+export type AdminCreateSearchParams = {
+  group?: string
 }
 
 export const marketsRoute = createRoute({
@@ -42,11 +47,13 @@ export const marketsRoute = createRoute({
   path: '/markets',
   validateSearch: (search: Record<string, unknown>): MarketsSearchParams => {
     const view = search.view as string
+    const group = typeof search.group === 'string' ? search.group : undefined
     return {
       view: (view === 'grid' || view === 'table' ? view : undefined) as
         | 'table'
         | 'grid'
         | undefined,
+      group,
     }
   },
   component: MarketsPage,
@@ -118,6 +125,9 @@ const adminProvidersRoute = createRoute({
 const adminCreateRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/admin/create',
+  validateSearch: (search: Record<string, unknown>): AdminCreateSearchParams => ({
+    group: typeof search.group === 'string' ? search.group : undefined,
+  }),
   component: AdminPage,
 })
 

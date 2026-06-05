@@ -2,7 +2,7 @@ import { useEffect, useRef, useMemo, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnchorProvider, BN, parseIdlErrors, translateError } from '@coral-xyz/anchor'
-import { PublicKey, Keypair, SystemProgram, Transaction } from '@solana/web3.js'
+import { PublicKey, Keypair, SYSVAR_RENT_PUBKEY, SystemProgram, Transaction } from '@solana/web3.js'
 import {
   TOKEN_PROGRAM_ID,
   getAssociatedTokenAddress,
@@ -26,13 +26,19 @@ import { formatAiPathLabel } from '@/lib/pathLabels'
 import type { PathTone, PredictionPath, PricePoint } from '@/types/market'
 import { useIsAdmin } from '@/lib/hooks/useIsAdmin'
 import { useProgram, getReadOnlyProgram } from '@/lib/solana/program'
-import { deriveMarketPda, deriveProtocolPda } from '@/lib/solana/pda'
+import {
+  deriveMarketGroupLinkPda,
+  deriveMarketGroupPda,
+  deriveMarketPda,
+  deriveProtocolPda,
+} from '@/lib/solana/pda'
 import { logTransactionError } from '@/lib/solana/logTransactionError'
 import { resolveBaseMintLabel } from '@/lib/api/pairLabels'
 import { toast } from '@/stores/toastStore'
 import { useWalletStore } from '@/stores/walletStore'
 import { usePythFeed, useLatestPrice } from '@/lib/pyth/hooks'
 import { useBenchmarksHistory, useLazyHistoryTrigger } from '@/lib/pyth/useBenchmarksHistory'
+import { isBytes32Hex, normalizeBytes32Hex } from '@/lib/marketGroups'
 
 /* ── Pair config ─────────────────────────────────────────── */
 
@@ -388,6 +394,10 @@ export function AdminPage() {
   const [nudgeRate, setNudgeRate] = useState('0.05')
   const [pathMaxAge, setPathMaxAge] = useState('1800')
   const [numPaths, setNumPaths] = useState(5)
+  const [groupKeyHashInput, setGroupKeyHashInput] = useState(() => {
+    if (typeof window === 'undefined') return ''
+    return new URLSearchParams(window.location.search).get('group') ?? ''
+  })
 
   // Tx state
   const [isPending, setIsPending] = useState(false)
@@ -531,6 +541,9 @@ export function AdminPage() {
       const vaultKeypair = Keypair.generate()
       const quoteMint = new PublicKey(pair.quoteMint)
       const creatorTokenAccount = await getAssociatedTokenAddress(quoteMint, publicKey)
+      const normalizedGroupKeyHash = groupKeyHashInput.trim()
+        ? normalizeBytes32Hex(groupKeyHashInput)
+        : null
 
       const params = {
         baseMint: new PublicKey(pair.baseMint),
@@ -555,20 +568,45 @@ export function AdminPage() {
         lmsrAlpha: new BN(1_000_000),
       }
 
-      const ix = await program.methods
-        .createMarket(params)
-        .accountsPartial({
-          protocolState: protocolPda,
-          market: marketPda,
-          vault: vaultKeypair.publicKey,
-          collateralMint: quoteMint,
-          insuranceFund: protocolAcc.insuranceFund,
-          creatorTokenAccount,
-          creator: publicKey,
-          systemProgram: SystemProgram.programId,
-          tokenProgram: TOKEN_PROGRAM_ID,
-        })
-        .instruction()
+      const marketGroupPda = normalizedGroupKeyHash
+        ? deriveMarketGroupPda(normalizedGroupKeyHash)[0]
+        : null
+      const marketGroupLinkPda = normalizedGroupKeyHash
+        ? deriveMarketGroupLinkPda(nextMarketId)[0]
+        : null
+
+      const ix = normalizedGroupKeyHash
+        ? await program.methods
+            .createMarketUnderGroup(params)
+            .accountsPartial({
+              protocolState: protocolPda,
+              marketGroup: marketGroupPda!,
+              market: marketPda,
+              marketGroupLink: marketGroupLinkPda!,
+              vault: vaultKeypair.publicKey,
+              collateralMint: quoteMint,
+              insuranceFund: protocolAcc.insuranceFund,
+              creatorTokenAccount,
+              creator: publicKey,
+              systemProgram: SystemProgram.programId,
+              tokenProgram: TOKEN_PROGRAM_ID,
+              rent: SYSVAR_RENT_PUBKEY,
+            })
+            .instruction()
+        : await program.methods
+            .createMarket(params)
+            .accountsPartial({
+              protocolState: protocolPda,
+              market: marketPda,
+              vault: vaultKeypair.publicKey,
+              collateralMint: quoteMint,
+              insuranceFund: protocolAcc.insuranceFund,
+              creatorTokenAccount,
+              creator: publicKey,
+              systemProgram: SystemProgram.programId,
+              tokenProgram: TOKEN_PROGRAM_ID,
+            })
+            .instruction()
 
       const provider = program.provider as AnchorProvider
       const priorityFeeMicroLamports = await getPriorityFee(provider.connection)
@@ -602,13 +640,15 @@ export function AdminPage() {
             quoteMint: pair.quoteMint,
             protocolPda: protocolPda.toBase58(),
             marketPda: marketPda.toBase58(),
+            marketGroupPda: marketGroupPda?.toBase58(),
+            marketGroupLinkPda: marketGroupLinkPda?.toBase58(),
             vault: vaultKeypair.publicKey.toBase58(),
             creatorTokenAccount: creatorTokenAccount.toBase58(),
             instructionLabels: [
               '0: setComputeUnitLimit',
               '1: setComputeUnitPrice',
               '2: createAssociatedTokenAccountIdempotent',
-              '3: createMarket',
+              normalizedGroupKeyHash ? '3: createMarketUnderGroup' : '3: createMarket',
             ],
           },
         })
@@ -856,14 +896,38 @@ export function AdminPage() {
             </div>
           </div>
 
+          <Label className="mb-3 block">Hierarchy</Label>
+          <div className="mb-12">
+            <Input
+              label="Market group hash"
+              value={groupKeyHashInput}
+              onChange={(e) => setGroupKeyHashInput(e.target.value)}
+              placeholder="Optional 32-byte hex group key"
+            />
+            {groupKeyHashInput && !isBytes32Hex(groupKeyHashInput) && (
+              <p className="text-accent text-caption mt-3 font-mono">
+                Group hash must be 64 hex chars, optionally 0x-prefixed.
+              </p>
+            )}
+          </div>
+
           {/* Submit */}
           <Button
             variant="primary"
             fullWidth
-            disabled={isPending || !program || !checkpointsValid}
+            disabled={
+              isPending ||
+              !program ||
+              !checkpointsValid ||
+              (groupKeyHashInput.trim().length > 0 && !isBytes32Hex(groupKeyHashInput))
+            }
             onClick={handleCreateMarket}
           >
-            {isPending ? 'Creating…' : 'Create Market'}
+            {isPending
+              ? 'Creating…'
+              : groupKeyHashInput.trim()
+                ? 'Create Market Under Group'
+                : 'Create Market'}
           </Button>
         </div>
       </div>

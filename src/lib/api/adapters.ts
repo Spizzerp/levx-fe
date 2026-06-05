@@ -11,6 +11,10 @@ import type { BN } from '@coral-xyz/anchor'
 
 import type {
   Market,
+  MarketGroup,
+  MarketGroupKind,
+  MarketGroupLink,
+  MarketGroupStatus,
   MarketState,
   PathOrigin,
   PredictionPath,
@@ -40,12 +44,24 @@ export function parseMarketState(raw: Record<string, unknown>): MarketState {
   return key.toLowerCase() as MarketState
 }
 
+function parseMarketGroupKind(raw: Record<string, unknown>): MarketGroupKind {
+  return Object.keys(raw)[0] as MarketGroupKind
+}
+
+function parseMarketGroupStatus(raw: Record<string, unknown>): MarketGroupStatus {
+  return Object.keys(raw)[0] as MarketGroupStatus
+}
+
 function parsePathOrigin(raw: Record<string, unknown>): PathOrigin {
   const key = Object.keys(raw)[0]
   return key === 'userDrawn' ? 'user' : 'ai'
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
+
+function bytesToHex(value: ArrayLike<number>): string {
+  return Array.from(value, (byte) => byte.toString(16).padStart(2, '0')).join('')
+}
 
 const warnedLegacyTargetNumPaths = new Set<number>()
 
@@ -94,6 +110,38 @@ export function anchorMarketToFE(raw: any, id: string): Market {
     pathMaxAge: i64(raw.pathMaxAge),
     pathsScored: raw.pathsScored,
     pathsDissolved: raw.pathsDissolved,
+  }
+}
+
+export function anchorMarketGroupToFE(raw: any, address: string): MarketGroup {
+  return {
+    address,
+    authority: raw.authority.toBase58(),
+    groupKeyHash: bytesToHex(raw.groupKeyHash),
+    parentGroup: raw.hasParent ? raw.parentGroup.toBase58() : null,
+    kind: parseMarketGroupKind(raw.kind),
+    status: parseMarketGroupStatus(raw.status),
+    baseMint: raw.baseMint.toBase58(),
+    quoteMint: raw.quoteMint.toBase58(),
+    pythFeedId: bytesToHex(raw.pythFeedId),
+    constraintFlags: raw.constraintFlags,
+    startTime: i64(raw.startTime) * 1000,
+    endTime: i64(raw.endTime) * 1000,
+    allowedTimeframesMask: raw.allowedTimeframesMask,
+    childMarketCount: raw.childMarketCount,
+    metadataHash: bytesToHex(raw.metadataHash),
+  }
+}
+
+export function anchorMarketGroupLinkToFE(raw: any, address: string): MarketGroupLink {
+  return {
+    address,
+    group: raw.group.toBase58(),
+    market: raw.market.toBase58(),
+    marketId: bn(raw.marketId),
+    timeframeSeconds: raw.timeframeSeconds,
+    linkedAt: i64(raw.linkedAt) * 1000,
+    groupKind: parseMarketGroupKind(raw.groupKind),
   }
 }
 

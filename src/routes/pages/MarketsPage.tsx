@@ -1,5 +1,5 @@
 import { useNavigate, useSearch } from '@tanstack/react-router'
-import { ArrowRight, Filter, LayoutGrid, List, Loader2 } from 'lucide-react'
+import { ArrowRight, Filter, Layers, LayoutGrid, List, Loader2 } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
@@ -8,12 +8,7 @@ import { MarketCard } from '@/features/market/MarketCard'
 import { MarketCardSkeleton } from '@/features/market/MarketCardSkeleton'
 import { MarketPairFilter, type PairOption } from '@/features/market/MarketPairFilter'
 import { TokenPairIcon } from '@/ui/TokenPairIcon'
-import {
-  DataTable,
-  NUM_CELL,
-  type DataTableColumn,
-  type DataTableSort,
-} from '@/ui/DataTable'
+import { DataTable, NUM_CELL, type DataTableColumn, type DataTableSort } from '@/ui/DataTable'
 import { ExpandPill } from '@/ui/ExpandPill'
 import { MarketsTableSkeleton } from '@/features/market/MarketsTableSkeleton'
 import { QueryErrorState } from '@/ui/QueryErrorState'
@@ -103,6 +98,17 @@ function endsInLabel(m: Market, now: number): string {
   if (m.state === 'settled') return 'SETTLED'
   const diff = m.endTime - now
   return diff > 0 ? formatCountdown(diff) : 'ENDED'
+}
+
+function groupKindLabel(kind: Market['groupKind']): string {
+  if (!kind) return 'Group'
+  if (kind === 'assetSeason') return 'Asset season'
+  return kind.charAt(0).toUpperCase() + kind.slice(1)
+}
+
+function groupLabel(market: Market): string {
+  if (!market.groupKeyHash) return 'Ungrouped'
+  return `${groupKindLabel(market.groupKind)} ${market.groupKeyHash.slice(0, 8)}`
 }
 
 // Hidden below 1200px (matches old @media rule that hid columns 6 & 7)
@@ -240,7 +246,7 @@ function buildColumns(now: number, marketHeader: ReactNode): DataTableColumn<Mar
 
 export function MarketsPage() {
   const navigate = useNavigate({ from: '/markets' })
-  const { view: viewParam } = useSearch({ from: '/markets' })
+  const { view: viewParam, group: groupParam } = useSearch({ from: '/markets' })
   const viewMode = viewParam ?? 'table'
 
   const { data: markets, isLoading, isError, refetch } = useMarkets()
@@ -292,7 +298,8 @@ export function MarketsPage() {
     const filtered = (markets ?? []).filter(
       (m) =>
         matchesFilter(getMarketDisplayState(m), filter) &&
-        (selectedPairs.size === 0 || selectedPairs.has(m.pair)),
+        (selectedPairs.size === 0 || selectedPairs.has(m.pair)) &&
+        (!groupParam || m.groupKeyHash === groupParam),
     )
 
     if (!sort) {
@@ -306,7 +313,31 @@ export function MarketsPage() {
 
     const mult = sort.dir === 'asc' ? 1 : -1
     return [...filtered].sort((a, b) => (accessor(a) - accessor(b)) * mult)
-  }, [markets, filter, selectedPairs, sort])
+  }, [markets, filter, selectedPairs, groupParam, sort])
+
+  const groupedMarkets = useMemo(() => {
+    const byHash = new Map<string, { hash: string; label: string; count: number }>()
+    for (const market of markets ?? []) {
+      if (!market.groupKeyHash) continue
+      const existing = byHash.get(market.groupKeyHash)
+      if (existing) {
+        existing.count += 1
+      } else {
+        byHash.set(market.groupKeyHash, {
+          hash: market.groupKeyHash,
+          label: groupLabel(market),
+          count: 1,
+        })
+      }
+    }
+    return Array.from(byHash.values()).sort((a, b) => a.label.localeCompare(b.label))
+  }, [markets])
+
+  const setGroup = (group: string | undefined) => {
+    navigate({ search: (prev) => ({ ...prev, group }) })
+    setPage(0)
+    setVisibleCount(20)
+  }
 
   const handleSortToggle = (key: string) => {
     setSort((prev) => {
@@ -336,9 +367,7 @@ export function MarketsPage() {
       gridItems.map((market) => {
         if (hasRenderablePathData(market)) return market
         const previewPaths = pathPreviews[market.id]
-        return previewPaths && previewPaths.length > 0
-          ? { ...market, paths: previewPaths }
-          : market
+        return previewPaths && previewPaths.length > 0 ? { ...market, paths: previewPaths } : market
       }),
     [gridItems, pathPreviews],
   )
@@ -468,6 +497,44 @@ export function MarketsPage() {
         </div>
       )}
 
+      {hasAnyMarkets && groupedMarkets.length > 0 && (
+        <div className="mb-5 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setGroup(undefined)}
+            className={cn(
+              'inline-flex h-9 items-center gap-2 rounded-full border px-3',
+              'text-label font-mono tracking-wider uppercase',
+              'duration-short ease-levx transition-[border-color,color]',
+              !groupParam
+                ? 'border-ink-strong text-ink-strong'
+                : 'border-line-strong text-ink-muted hover:border-ink hover:text-ink',
+            )}
+          >
+            <Layers size={14} strokeWidth={1.5} />
+            All groups
+          </button>
+          {groupedMarkets.map((group) => (
+            <button
+              key={group.hash}
+              type="button"
+              onClick={() => setGroup(group.hash)}
+              className={cn(
+                'inline-flex h-9 items-center gap-2 rounded-full border px-3',
+                'text-label font-mono tracking-wider uppercase',
+                'duration-short ease-levx transition-[border-color,color]',
+                groupParam === group.hash
+                  ? 'border-ink-strong text-ink-strong'
+                  : 'border-line-strong text-ink-muted hover:border-ink hover:text-ink',
+              )}
+            >
+              {group.label}
+              <span className="text-ink-dim">{group.count}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       {hasAnyMarkets && (
         <AnimatePresence mode="wait" initial={false}>
           {viewMode === 'table' ? (
@@ -541,7 +608,7 @@ export function MarketsPage() {
                 layout
                 className={cn(
                   'grid gap-6',
-                  'grid-cols-1 [@media(min-width:769px)_and_(max-width:1200px)]:grid-cols-2 [@media(min-width:1201px)]:grid-cols-3',
+                  'grid-cols-1 [@media(min-width:1201px)]:grid-cols-3 [@media(min-width:769px)_and_(max-width:1200px)]:grid-cols-2',
                 )}
               >
                 <AnimatePresence mode="popLayout">

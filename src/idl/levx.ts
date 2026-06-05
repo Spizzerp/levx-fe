@@ -1162,6 +1162,270 @@ export type Levx = {
       ]
     },
     {
+      "name": "createMarketGroup",
+      "discriminator": [
+        233,
+        144,
+        194,
+        255,
+        240,
+        250,
+        129,
+        96
+      ],
+      "accounts": [
+        {
+          "name": "protocolState",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "marketGroup",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  103,
+                  114,
+                  111,
+                  117,
+                  112
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "params.group_key_hash"
+              }
+            ]
+          }
+        },
+        {
+          "name": "parentGroupAccount",
+          "docs": [
+            "Required only when `params.has_parent = true`."
+          ],
+          "optional": true
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "params",
+          "type": {
+            "defined": {
+              "name": "createMarketGroupParams"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "createMarketUnderGroup",
+      "discriminator": [
+        4,
+        164,
+        242,
+        92,
+        18,
+        19,
+        182,
+        38
+      ],
+      "accounts": [
+        {
+          "name": "protocolState",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "marketGroup",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  103,
+                  114,
+                  111,
+                  117,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market_group.group_key_hash",
+                "account": "marketGroup"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "protocol_state.total_markets_created",
+                "account": "protocolState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "marketGroupLink",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  103,
+                  114,
+                  111,
+                  117,
+                  112,
+                  95,
+                  108,
+                  105,
+                  110,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "protocol_state.total_markets_created",
+                "account": "protocolState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "collateralMint",
+          "relations": [
+            "protocolState"
+          ]
+        },
+        {
+          "name": "insuranceFund",
+          "writable": true,
+          "relations": [
+            "protocolState"
+          ]
+        },
+        {
+          "name": "creatorTokenAccount",
+          "writable": true
+        },
+        {
+          "name": "creator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "tokenProgram",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "rent",
+          "address": "SysvarRent111111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "params",
+          "type": {
+            "defined": {
+              "name": "createMarketParams"
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "createPathUploadIntent",
       "discriminator": [
         134,
@@ -2099,6 +2363,139 @@ export type Levx = {
                   108,
                   116
                 ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "linkExistingMarketToGroup",
+      "discriminator": [
+        158,
+        137,
+        146,
+        18,
+        6,
+        74,
+        170,
+        229
+      ],
+      "accounts": [
+        {
+          "name": "protocolState",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "marketGroup",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  103,
+                  114,
+                  111,
+                  117,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market_group.group_key_hash",
+                "account": "marketGroup"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "marketGroupLink",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  103,
+                  114,
+                  111,
+                  117,
+                  112,
+                  95,
+                  108,
+                  105,
+                  110,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "market"
               }
             ]
           }
@@ -3170,6 +3567,85 @@ export type Levx = {
       ]
     },
     {
+      "name": "updateMarketGroupStatus",
+      "discriminator": [
+        39,
+        39,
+        13,
+        146,
+        44,
+        179,
+        222,
+        162
+      ],
+      "accounts": [
+        {
+          "name": "protocolState",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "marketGroup",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  103,
+                  114,
+                  111,
+                  117,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market_group.group_key_hash",
+                "account": "marketGroup"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "status",
+          "type": {
+            "defined": {
+              "name": "marketGroupStatus"
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "voidMarket",
       "discriminator": [
         243,
@@ -3345,6 +3821,32 @@ export type Levx = {
         227,
         198,
         154
+      ]
+    },
+    {
+      "name": "marketGroup",
+      "discriminator": [
+        131,
+        205,
+        141,
+        87,
+        148,
+        210,
+        33,
+        36
+      ]
+    },
+    {
+      "name": "marketGroupLink",
+      "discriminator": [
+        10,
+        255,
+        47,
+        3,
+        133,
+        34,
+        79,
+        96
       ]
     },
     {
@@ -3620,6 +4122,45 @@ export type Levx = {
         76,
         234,
         179
+      ]
+    },
+    {
+      "name": "marketGroupCreated",
+      "discriminator": [
+        245,
+        171,
+        234,
+        186,
+        92,
+        62,
+        15,
+        221
+      ]
+    },
+    {
+      "name": "marketGroupStatusUpdated",
+      "discriminator": [
+        187,
+        189,
+        125,
+        61,
+        144,
+        95,
+        242,
+        137
+      ]
+    },
+    {
+      "name": "marketLinkedToGroup",
+      "discriminator": [
+        75,
+        251,
+        245,
+        71,
+        24,
+        189,
+        117,
+        153
       ]
     },
     {
@@ -3942,286 +4483,296 @@ export type Levx = {
     },
     {
       "code": 6006,
+      "name": "invalidMarketGroupConstraint",
+      "msg": "Market group constraints reject this child market"
+    },
+    {
+      "code": 6007,
+      "name": "invalidMarketGroupStatus",
+      "msg": "Market group is not active for new child markets"
+    },
+    {
+      "code": 6008,
       "name": "alreadyClaimed",
       "msg": "Position has already been claimed"
     },
     {
-      "code": 6007,
+      "code": 6009,
       "name": "pathDissolved",
       "msg": "Cannot wager on dissolved path"
     },
     {
-      "code": 6008,
+      "code": 6010,
       "name": "unauthorized",
       "msg": "Unauthorized signer for this operation"
     },
     {
-      "code": 6009,
+      "code": 6011,
       "name": "checkpointMismatch",
       "msg": "Checkpoint count mismatch"
     },
     {
-      "code": 6010,
+      "code": 6012,
       "name": "wagersNotAccepted",
       "msg": "Market is not accepting wagers in current state"
     },
     {
-      "code": 6011,
+      "code": 6013,
       "name": "wagerTooSmall",
       "msg": "Wager amount too small or yields zero shares"
     },
     {
-      "code": 6012,
+      "code": 6014,
       "name": "checkpointNotDue",
       "msg": "Checkpoint not yet due"
     },
     {
-      "code": 6013,
+      "code": 6015,
       "name": "checkpointAlreadySampled",
       "msg": "Checkpoint already sampled"
     },
     {
-      "code": 6014,
+      "code": 6016,
       "name": "oracleConfidenceTooLow",
       "msg": "Oracle confidence too low or price invalid"
     },
     {
-      "code": 6015,
+      "code": 6017,
       "name": "tradingCutoffReached",
       "msg": "Trading window closed; market has passed 80% of checkpoints"
     },
     {
-      "code": 6016,
+      "code": 6018,
       "name": "pathAlreadyDissolved",
       "msg": "Path has already been dissolved"
     },
     {
-      "code": 6017,
+      "code": 6019,
       "name": "quantumStateCollapsed",
       "msg": "All path amplitudes collapsed to zero"
     },
     {
-      "code": 6018,
+      "code": 6020,
       "name": "eigenNonConvergence",
       "msg": "Eigendecomposition did not converge within iteration limit"
     },
     {
-      "code": 6019,
+      "code": 6021,
       "name": "eigenVerificationFailed",
       "msg": "Eigendecomposition verification failed: reconstruction error exceeds tolerance"
     },
     {
-      "code": 6020,
+      "code": 6022,
       "name": "lambdaExceedsMax",
       "msg": "Lambda exceeds maximum allowed coupling strength"
     },
     {
-      "code": 6021,
+      "code": 6023,
       "name": "nudgeRateExceedsMax",
       "msg": "Nudge rate exceeds maximum (500_000 = 50%)"
     },
     {
-      "code": 6022,
+      "code": 6024,
       "name": "settlementIncomplete",
       "msg": "Settlement not complete; not all paths scored"
     },
     {
-      "code": 6023,
+      "code": 6025,
       "name": "marketNotSettled",
       "msg": "Market not in Settled or Void state; cannot claim"
     },
     {
-      "code": 6024,
+      "code": 6026,
       "name": "marketHasOpenPositions",
       "msg": "Market still has open positions; cannot close"
     },
     {
-      "code": 6025,
+      "code": 6027,
       "name": "marketHasOpenPaths",
       "msg": "Market still has path outcomes; close paths and chunks first"
     },
     {
-      "code": 6026,
+      "code": 6028,
       "name": "marketVaultNotEmpty",
       "msg": "Market vault is not empty; cannot close"
     },
     {
-      "code": 6027,
+      "code": 6029,
       "name": "noSurvivingPaths",
       "msg": "No surviving paths to settle"
     },
     {
-      "code": 6028,
+      "code": 6030,
       "name": "invalidScoringWeights",
       "msg": "Invalid scoring weights; must sum to 10000"
     },
     {
-      "code": 6029,
+      "code": 6031,
       "name": "invalidPathIndex",
       "msg": "Invalid path index"
     },
     {
-      "code": 6030,
+      "code": 6032,
       "name": "invalidProbability",
       "msg": "Initial probability must be in basis-point range [0, 10_000]"
     },
     {
-      "code": 6031,
+      "code": 6033,
       "name": "pathNotYetActive",
       "msg": "Path is not active for wagering or scoring yet"
     },
     {
-      "code": 6032,
+      "code": 6034,
       "name": "activePathWindowTooShort",
       "msg": "Not enough checkpoints remain for a live path"
     },
     {
-      "code": 6033,
+      "code": 6035,
       "name": "invalidPathUpload",
       "msg": "Invalid path upload intent or chunk state"
     },
     {
-      "code": 6034,
+      "code": 6036,
       "name": "pathUploadExpired",
       "msg": "Path upload intent has expired"
     },
     {
-      "code": 6035,
+      "code": 6037,
       "name": "pathChunkMissing",
       "msg": "Path upload is missing one or more chunks"
     },
     {
-      "code": 6036,
+      "code": 6038,
       "name": "pathRootMismatch",
       "msg": "Uploaded path chunks do not match the committed path root"
     },
     {
-      "code": 6037,
+      "code": 6039,
       "name": "pathChunksNotClosed",
       "msg": "Path chunks must be closed before closing the path outcome"
     },
     {
-      "code": 6038,
+      "code": 6040,
       "name": "relayFeeTooLow",
       "msg": "Relay fee is below the configured minimum"
     },
     {
-      "code": 6039,
+      "code": 6041,
       "name": "unauthorizedRelayer",
       "msg": "Relay fee can only be claimed by the first chunk payer"
     },
     {
-      "code": 6040,
+      "code": 6042,
       "name": "pathUploadExpiryTooLong",
       "msg": "Path upload expiry exceeds the maximum allowed age"
     },
     {
-      "code": 6041,
+      "code": 6043,
       "name": "duplicateConfigAccount",
       "msg": "Treasury and insurance_fund must be distinct accounts"
     },
     {
-      "code": 6042,
+      "code": 6044,
       "name": "alreadyMigrated",
       "msg": "ProtocolState has already been migrated to v2"
     },
     {
-      "code": 6043,
+      "code": 6045,
       "name": "invalidCollateralMint",
       "msg": "Collateral mint does not match the protocol allowlist"
     },
     {
-      "code": 6044,
+      "code": 6046,
       "name": "slippageExceeded",
       "msg": "Slippage exceeded: received fewer shares/less payout than min_out"
     },
     {
-      "code": 6045,
+      "code": 6047,
       "name": "maturityNotElapsed",
       "msg": "Maturity window has not elapsed; cannot finalize"
     },
     {
-      "code": 6046,
+      "code": 6048,
       "name": "marketDisputed",
       "msg": "Market is disputed; paused for governance review"
     },
     {
-      "code": 6047,
+      "code": 6049,
       "name": "invalidDisputeConfig",
       "msg": "Invalid dispute bond policy or account"
     },
     {
-      "code": 6048,
+      "code": 6050,
       "name": "invalidDisputeBond",
       "msg": "Invalid dispute bond account"
     },
     {
-      "code": 6049,
+      "code": 6051,
       "name": "mathOverflow",
       "msg": "Arithmetic overflow"
     },
     {
-      "code": 6050,
+      "code": 6052,
       "name": "feeExceedsCap",
       "msg": "Fee exceeds maximum cap (5%)"
     },
     {
-      "code": 6051,
+      "code": 6053,
       "name": "leverageNotEnabled",
       "msg": "Leverage is not enabled for this market"
     },
     {
-      "code": 6052,
+      "code": 6054,
       "name": "leverageExceedsMaximum",
       "msg": "Leverage exceeds maximum for this market's timeframe"
     },
     {
-      "code": 6053,
+      "code": 6055,
       "name": "vaultInsufficientCapacity",
       "msg": "Insufficient vault capacity for this leveraged position"
     },
     {
-      "code": 6054,
+      "code": 6056,
       "name": "vaultUtilizationExceeded",
       "msg": "Vault utilization would exceed maximum after this borrow"
     },
     {
-      "code": 6055,
+      "code": 6057,
       "name": "leveragedOiCapExceeded",
       "msg": "Market leveraged open interest cap would be exceeded"
     },
     {
-      "code": 6056,
+      "code": 6058,
       "name": "positionUnderwater",
       "msg": "Position health factor below liquidation threshold"
     },
     {
-      "code": 6057,
+      "code": 6059,
       "name": "positionHealthy",
       "msg": "Position health factor is above liquidation threshold; cannot liquidate"
     },
     {
-      "code": 6058,
+      "code": 6060,
       "name": "unauthorizedBackstopLiquidator",
       "msg": "Caller is not the configured backstop liquidator"
     },
     {
-      "code": 6059,
+      "code": 6061,
       "name": "backstopLiquidatorDisabled",
       "msg": "Backstop liquidator is disabled"
     },
     {
-      "code": 6060,
+      "code": 6062,
       "name": "backstopGracePeriodActive",
       "msg": "Backstop grace period has not elapsed; regular keepers have priority"
     },
     {
-      "code": 6061,
+      "code": 6063,
       "name": "bucketGuardCooldown",
       "msg": "Operation rate-limited; cooldown period has not elapsed"
     },
     {
-      "code": 6062,
+      "code": 6064,
       "name": "invalidLmsrAlpha",
       "msg": "LMSR alpha is below the minimum supported value"
     }
@@ -4427,6 +4978,89 @@ export type Levx = {
           {
             "name": "authority",
             "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "createMarketGroupParams",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "groupKeyHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "parentGroup",
+            "type": "pubkey"
+          },
+          {
+            "name": "hasParent",
+            "type": "bool"
+          },
+          {
+            "name": "kind",
+            "type": {
+              "defined": {
+                "name": "marketGroupKind"
+              }
+            }
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "marketGroupStatus"
+              }
+            }
+          },
+          {
+            "name": "baseMint",
+            "type": "pubkey"
+          },
+          {
+            "name": "quoteMint",
+            "type": "pubkey"
+          },
+          {
+            "name": "pythFeedId",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "constraintFlags",
+            "type": "u8"
+          },
+          {
+            "name": "startTime",
+            "type": "i64"
+          },
+          {
+            "name": "endTime",
+            "type": "i64"
+          },
+          {
+            "name": "allowedTimeframesMask",
+            "type": "u32"
+          },
+          {
+            "name": "metadataHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
           }
         ]
       }
@@ -5478,6 +6112,307 @@ export type Levx = {
           {
             "name": "finalizedAt",
             "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "marketGroup",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "groupKeyHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "parentGroup",
+            "type": "pubkey"
+          },
+          {
+            "name": "hasParent",
+            "type": "bool"
+          },
+          {
+            "name": "kind",
+            "type": {
+              "defined": {
+                "name": "marketGroupKind"
+              }
+            }
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "marketGroupStatus"
+              }
+            }
+          },
+          {
+            "name": "baseMint",
+            "type": "pubkey"
+          },
+          {
+            "name": "quoteMint",
+            "type": "pubkey"
+          },
+          {
+            "name": "pythFeedId",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "constraintFlags",
+            "type": "u8"
+          },
+          {
+            "name": "startTime",
+            "type": "i64"
+          },
+          {
+            "name": "endTime",
+            "type": "i64"
+          },
+          {
+            "name": "allowedTimeframesMask",
+            "type": "u32"
+          },
+          {
+            "name": "metadataHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "childMarketCount",
+            "type": "u32"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "marketGroupCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "group",
+            "type": "pubkey"
+          },
+          {
+            "name": "groupKeyHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "kind",
+            "type": "u8"
+          },
+          {
+            "name": "status",
+            "type": "u8"
+          },
+          {
+            "name": "parentGroup",
+            "type": "pubkey"
+          },
+          {
+            "name": "hasParent",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "marketGroupKind",
+      "repr": {
+        "kind": "rust"
+      },
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "root"
+          },
+          {
+            "name": "league"
+          },
+          {
+            "name": "season"
+          },
+          {
+            "name": "game"
+          },
+          {
+            "name": "event"
+          },
+          {
+            "name": "assetSeason"
+          },
+          {
+            "name": "horizon"
+          },
+          {
+            "name": "custom"
+          }
+        ]
+      }
+    },
+    {
+      "name": "marketGroupLink",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "group",
+            "type": "pubkey"
+          },
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "marketId",
+            "type": "u64"
+          },
+          {
+            "name": "timeframeSeconds",
+            "type": "u32"
+          },
+          {
+            "name": "linkedAt",
+            "type": "i64"
+          },
+          {
+            "name": "groupKind",
+            "type": {
+              "defined": {
+                "name": "marketGroupKind"
+              }
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "marketGroupStatus",
+      "repr": {
+        "kind": "rust"
+      },
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "active"
+          },
+          {
+            "name": "paused"
+          },
+          {
+            "name": "retired"
+          }
+        ]
+      }
+    },
+    {
+      "name": "marketGroupStatusUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "group",
+            "type": "pubkey"
+          },
+          {
+            "name": "oldStatus",
+            "type": "u8"
+          },
+          {
+            "name": "newStatus",
+            "type": "u8"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "marketLinkedToGroup",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "group",
+            "type": "pubkey"
+          },
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "marketId",
+            "type": "u64"
+          },
+          {
+            "name": "groupKind",
+            "type": "u8"
+          },
+          {
+            "name": "timeframeSeconds",
+            "type": "u32"
           }
         ]
       }

@@ -2,6 +2,8 @@ export { useProgram, getReadOnlyProgram, getReadOnlyProvider } from './program'
 export { PROGRAM_ID } from './pda'
 export {
   deriveMarketPda,
+  deriveMarketGroupPda,
+  deriveMarketGroupLinkPda,
   derivePathPda,
   derivePositionPda,
   deriveSamplePda,
