@@ -2,6 +2,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { AnchorProvider, BN, parseIdlErrors, translateError } from '@coral-xyz/anchor'
 import { FolderPlus, Link2, Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { SystemProgram, Transaction } from '@solana/web3.js'
 
 import { Button } from '@/ui/Button'
@@ -49,6 +50,7 @@ function closeMarketDisabledReason(market: Market): string {
 
 function MarketGroupAdminPanel() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const program = useProgram()
   const publicKey = useWalletStore((s) => s.publicKey)
   const [groupKeyHash, setGroupKeyHash] = useState('')
@@ -203,6 +205,8 @@ function MarketGroupAdminPanel() {
         )
         throw translateError(sendErr, parseIdlErrors(program.idl))
       }
+      await queryClient.invalidateQueries({ queryKey: ['markets'] })
+      await queryClient.invalidateQueries({ queryKey: ['market', String(marketId)] })
       toast.success('Market linked to group', { txSig: sig })
     } catch (err) {
       toast.error('Failed to link market', { message: (err as Error).message })
