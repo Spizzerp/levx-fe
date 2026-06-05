@@ -92,6 +92,8 @@ function MarketGroupAdminPanel() {
         hasParent: parentGroupPda !== null,
         kind: anchorEnum(groupKind),
         status: anchorEnum(groupStatus),
+        // TODO(admin): expose group constraints in this form; current admin UI
+        // intentionally creates unconstrained metadata groups only.
         baseMint: DEFAULT_PUBKEY,
         quoteMint: DEFAULT_PUBKEY,
         pythFeedId: Array(32).fill(0),
@@ -101,7 +103,7 @@ function MarketGroupAdminPanel() {
         allowedTimeframesMask: 0,
         metadataHash: bytes32HexToArray(metadataHash || '00'.repeat(32)),
       }
-      const ix = await (program.methods as any)
+      const ix = await program.methods
         .createMarketGroup(params)
         .accountsPartial({
           protocolState: protocolPda,
@@ -159,7 +161,7 @@ function MarketGroupAdminPanel() {
       const [marketPda] = deriveMarketPda(marketId)
       const [marketGroupPda] = deriveMarketGroupPda(normalizedGroupHash)
       const [marketGroupLinkPda] = deriveMarketGroupLinkPda(marketId)
-      const ix = await (program.methods as any)
+      const ix = await program.methods
         .linkExistingMarketToGroup()
         .accountsPartial({
           protocolState: protocolPda,

@@ -310,6 +310,8 @@ async function fetchMarketGroupJoins(program: any): Promise<Map<number, MarketGr
   }
 
   try {
+    // TODO(indexer): replace bulk sidecar scans with indexed group metadata once
+    // market group counts grow beyond devnet scale.
     const [linkAccounts, groupAccounts] = await Promise.all([
       accounts.marketGroupLink.all(),
       accounts.marketGroup.all(),
@@ -367,6 +369,7 @@ function applyMarketGroupJoin(market: Market, join: MarketGroupJoin | undefined)
     groupKind: join.group?.kind ?? join.link.groupKind,
     parentGroup: join.group?.parentGroup ?? undefined,
     timeframeSeconds: join.link.timeframeSeconds,
+    // UI-only grouping key; provider gateway season_key remains pair/season/horizon.
     seasonKey: join.group
       ? `${join.group.kind}:${join.group.groupKeyHash}:${join.link.timeframeSeconds}`
       : undefined,
