@@ -1,5 +1,5 @@
 import { useEffect, useRef, useMemo, useState } from 'react'
-import { useNavigate } from '@tanstack/react-router'
+import { useNavigate, useSearch } from '@tanstack/react-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnchorProvider, BN, parseIdlErrors, translateError } from '@coral-xyz/anchor'
 import { PublicKey, Keypair, SYSVAR_RENT_PUBKEY, SystemProgram, Transaction } from '@solana/web3.js'
@@ -370,6 +370,7 @@ import { CHIP, CHIP_ACTIVE, CHIP_INACTIVE } from '@/ui/styles'
 
 export function AdminPage() {
   const navigate = useNavigate()
+  const { group: groupSearchParam } = useSearch({ from: '/admin/create' })
   const program = useProgram()
   const publicKey = useWalletStore((s) => s.publicKey)
   const isAdmin = useIsAdmin()
@@ -394,10 +395,7 @@ export function AdminPage() {
   const [nudgeRate, setNudgeRate] = useState('0.05')
   const [pathMaxAge, setPathMaxAge] = useState('1800')
   const [numPaths, setNumPaths] = useState(5)
-  const [groupKeyHashInput, setGroupKeyHashInput] = useState(() => {
-    if (typeof window === 'undefined') return ''
-    return new URLSearchParams(window.location.search).get('group') ?? ''
-  })
+  const [groupKeyHashInput, setGroupKeyHashInput] = useState(() => groupSearchParam ?? '')
 
   // Tx state
   const [isPending, setIsPending] = useState(false)
@@ -409,6 +407,10 @@ export function AdminPage() {
       return wasStillAuto ? autoCheckpointTarget : clampCheckpointCount(current)
     })
   }, [autoCheckpointTarget])
+
+  useEffect(() => {
+    setGroupKeyHashInput(groupSearchParam ?? '')
+  }, [groupSearchParam])
 
   // Drive the pair dropdown solely from on-chain protocol_state.supportedPairs.
   // Hardcoded pairs were a bootstrap convenience but their (baseMint, quoteMint)

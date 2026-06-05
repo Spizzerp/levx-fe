@@ -1,8 +1,10 @@
+// @vitest-environment node
+
 import { BN } from '@coral-xyz/anchor'
 import { PublicKey } from '@solana/web3.js'
 import { describe, expect, it, vi } from 'vitest'
 
-import { attachMarketGroups } from '@/lib/api/onchain'
+import { attachMarketGroup, attachMarketGroups } from '@/lib/api/onchain'
 import { bytes32HexToArray, isBytes32Hex } from '@/lib/marketGroups'
 import type { Market } from '@/types/market'
 
@@ -89,5 +91,54 @@ describe('market group helpers', () => {
     expect(joined.group?.childMarketCount).toBe(1)
     expect(joined.groupLink?.timeframeSeconds).toBe(86_400)
     expect(joined.seasonKey).toBe(`season:${'ab'.repeat(32)}:86400`)
+  })
+
+  it('fetches a single market group join without scanning all sidecars', async () => {
+    const market = { id: '7', marketId: 7 } as Market
+    const groupAddress = new PublicKey('So11111111111111111111111111111111111111112')
+    const program = {
+      account: {
+        marketGroup: {
+          all: vi.fn(),
+          fetchNullable: vi.fn().mockResolvedValue({
+            authority: KEY,
+            groupKeyHash: Array(32).fill(0xab),
+            parentGroup: KEY,
+            hasParent: false,
+            kind: { season: {} },
+            status: { active: {} },
+            baseMint: KEY,
+            quoteMint: KEY,
+            pythFeedId: Array(32).fill(0),
+            constraintFlags: 0,
+            startTime: new BN(1),
+            endTime: new BN(2),
+            allowedTimeframesMask: 0,
+            metadataHash: Array(32).fill(0xcd),
+            childMarketCount: 1,
+          }),
+        },
+        marketGroupLink: {
+          all: vi.fn(),
+          fetchNullable: vi.fn().mockResolvedValue({
+            group: groupAddress,
+            market: KEY,
+            marketId: new BN(7),
+            timeframeSeconds: 86_400,
+            linkedAt: new BN(3),
+            groupKind: { season: {} },
+          }),
+        },
+      },
+    }
+
+    const joined = await attachMarketGroup(program, market)
+
+    expect(program.account.marketGroupLink.all).not.toHaveBeenCalled()
+    expect(program.account.marketGroup.all).not.toHaveBeenCalled()
+    expect(program.account.marketGroupLink.fetchNullable).toHaveBeenCalledOnce()
+    expect(program.account.marketGroup.fetchNullable).toHaveBeenCalledWith(groupAddress)
+    expect(joined.groupKeyHash).toBe('ab'.repeat(32))
+    expect(joined.groupLink?.timeframeSeconds).toBe(86_400)
   })
 })

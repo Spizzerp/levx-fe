@@ -1287,6 +1287,10 @@ export type Levx = {
         },
         {
           "name": "marketGroup",
+          "docs": [
+            "New child market creation is intentionally permissionless once a group is active.",
+            "The group authority curates constraints and status; creators still pay normal fees."
+          ],
           "writable": true,
           "pda": {
             "seeds": [
@@ -1341,6 +1345,9 @@ export type Levx = {
         },
         {
           "name": "marketGroupLink",
+          "docs": [
+            "The market_id-only link PDA makes group membership unique for each market."
+          ],
           "writable": true,
           "pda": {
             "seeds": [
@@ -4483,298 +4490,298 @@ export type Levx = {
     },
     {
       "code": 6006,
-      "name": "invalidMarketGroupConstraint",
-      "msg": "Market group constraints reject this child market"
-    },
-    {
-      "code": 6007,
-      "name": "invalidMarketGroupStatus",
-      "msg": "Market group is not active for new child markets"
-    },
-    {
-      "code": 6008,
       "name": "alreadyClaimed",
       "msg": "Position has already been claimed"
     },
     {
-      "code": 6009,
+      "code": 6007,
       "name": "pathDissolved",
       "msg": "Cannot wager on dissolved path"
     },
     {
-      "code": 6010,
+      "code": 6008,
       "name": "unauthorized",
       "msg": "Unauthorized signer for this operation"
     },
     {
-      "code": 6011,
+      "code": 6009,
       "name": "checkpointMismatch",
       "msg": "Checkpoint count mismatch"
     },
     {
-      "code": 6012,
+      "code": 6010,
       "name": "wagersNotAccepted",
       "msg": "Market is not accepting wagers in current state"
     },
     {
-      "code": 6013,
+      "code": 6011,
       "name": "wagerTooSmall",
       "msg": "Wager amount too small or yields zero shares"
     },
     {
-      "code": 6014,
+      "code": 6012,
       "name": "checkpointNotDue",
       "msg": "Checkpoint not yet due"
     },
     {
-      "code": 6015,
+      "code": 6013,
       "name": "checkpointAlreadySampled",
       "msg": "Checkpoint already sampled"
     },
     {
-      "code": 6016,
+      "code": 6014,
       "name": "oracleConfidenceTooLow",
       "msg": "Oracle confidence too low or price invalid"
     },
     {
-      "code": 6017,
+      "code": 6015,
       "name": "tradingCutoffReached",
       "msg": "Trading window closed; market has passed 80% of checkpoints"
     },
     {
-      "code": 6018,
+      "code": 6016,
       "name": "pathAlreadyDissolved",
       "msg": "Path has already been dissolved"
     },
     {
-      "code": 6019,
+      "code": 6017,
       "name": "quantumStateCollapsed",
       "msg": "All path amplitudes collapsed to zero"
     },
     {
-      "code": 6020,
+      "code": 6018,
       "name": "eigenNonConvergence",
       "msg": "Eigendecomposition did not converge within iteration limit"
     },
     {
-      "code": 6021,
+      "code": 6019,
       "name": "eigenVerificationFailed",
       "msg": "Eigendecomposition verification failed: reconstruction error exceeds tolerance"
     },
     {
-      "code": 6022,
+      "code": 6020,
       "name": "lambdaExceedsMax",
       "msg": "Lambda exceeds maximum allowed coupling strength"
     },
     {
-      "code": 6023,
+      "code": 6021,
       "name": "nudgeRateExceedsMax",
       "msg": "Nudge rate exceeds maximum (500_000 = 50%)"
     },
     {
-      "code": 6024,
+      "code": 6022,
       "name": "settlementIncomplete",
       "msg": "Settlement not complete; not all paths scored"
     },
     {
-      "code": 6025,
+      "code": 6023,
       "name": "marketNotSettled",
       "msg": "Market not in Settled or Void state; cannot claim"
     },
     {
-      "code": 6026,
+      "code": 6024,
       "name": "marketHasOpenPositions",
       "msg": "Market still has open positions; cannot close"
     },
     {
-      "code": 6027,
+      "code": 6025,
       "name": "marketHasOpenPaths",
       "msg": "Market still has path outcomes; close paths and chunks first"
     },
     {
-      "code": 6028,
+      "code": 6026,
       "name": "marketVaultNotEmpty",
       "msg": "Market vault is not empty; cannot close"
     },
     {
-      "code": 6029,
+      "code": 6027,
       "name": "noSurvivingPaths",
       "msg": "No surviving paths to settle"
     },
     {
-      "code": 6030,
+      "code": 6028,
       "name": "invalidScoringWeights",
       "msg": "Invalid scoring weights; must sum to 10000"
     },
     {
-      "code": 6031,
+      "code": 6029,
       "name": "invalidPathIndex",
       "msg": "Invalid path index"
     },
     {
-      "code": 6032,
+      "code": 6030,
       "name": "invalidProbability",
       "msg": "Initial probability must be in basis-point range [0, 10_000]"
     },
     {
-      "code": 6033,
+      "code": 6031,
       "name": "pathNotYetActive",
       "msg": "Path is not active for wagering or scoring yet"
     },
     {
-      "code": 6034,
+      "code": 6032,
       "name": "activePathWindowTooShort",
       "msg": "Not enough checkpoints remain for a live path"
     },
     {
-      "code": 6035,
+      "code": 6033,
       "name": "invalidPathUpload",
       "msg": "Invalid path upload intent or chunk state"
     },
     {
-      "code": 6036,
+      "code": 6034,
       "name": "pathUploadExpired",
       "msg": "Path upload intent has expired"
     },
     {
-      "code": 6037,
+      "code": 6035,
       "name": "pathChunkMissing",
       "msg": "Path upload is missing one or more chunks"
     },
     {
-      "code": 6038,
+      "code": 6036,
       "name": "pathRootMismatch",
       "msg": "Uploaded path chunks do not match the committed path root"
     },
     {
-      "code": 6039,
+      "code": 6037,
       "name": "pathChunksNotClosed",
       "msg": "Path chunks must be closed before closing the path outcome"
     },
     {
-      "code": 6040,
+      "code": 6038,
       "name": "relayFeeTooLow",
       "msg": "Relay fee is below the configured minimum"
     },
     {
-      "code": 6041,
+      "code": 6039,
       "name": "unauthorizedRelayer",
       "msg": "Relay fee can only be claimed by the first chunk payer"
     },
     {
-      "code": 6042,
+      "code": 6040,
       "name": "pathUploadExpiryTooLong",
       "msg": "Path upload expiry exceeds the maximum allowed age"
     },
     {
-      "code": 6043,
+      "code": 6041,
       "name": "duplicateConfigAccount",
       "msg": "Treasury and insurance_fund must be distinct accounts"
     },
     {
-      "code": 6044,
+      "code": 6042,
       "name": "alreadyMigrated",
       "msg": "ProtocolState has already been migrated to v2"
     },
     {
-      "code": 6045,
+      "code": 6043,
       "name": "invalidCollateralMint",
       "msg": "Collateral mint does not match the protocol allowlist"
     },
     {
-      "code": 6046,
+      "code": 6044,
       "name": "slippageExceeded",
       "msg": "Slippage exceeded: received fewer shares/less payout than min_out"
     },
     {
-      "code": 6047,
+      "code": 6045,
       "name": "maturityNotElapsed",
       "msg": "Maturity window has not elapsed; cannot finalize"
     },
     {
-      "code": 6048,
+      "code": 6046,
       "name": "marketDisputed",
       "msg": "Market is disputed; paused for governance review"
     },
     {
-      "code": 6049,
+      "code": 6047,
       "name": "invalidDisputeConfig",
       "msg": "Invalid dispute bond policy or account"
     },
     {
-      "code": 6050,
+      "code": 6048,
       "name": "invalidDisputeBond",
       "msg": "Invalid dispute bond account"
     },
     {
-      "code": 6051,
+      "code": 6049,
       "name": "mathOverflow",
       "msg": "Arithmetic overflow"
     },
     {
-      "code": 6052,
+      "code": 6050,
       "name": "feeExceedsCap",
       "msg": "Fee exceeds maximum cap (5%)"
     },
     {
-      "code": 6053,
+      "code": 6051,
       "name": "leverageNotEnabled",
       "msg": "Leverage is not enabled for this market"
     },
     {
-      "code": 6054,
+      "code": 6052,
       "name": "leverageExceedsMaximum",
       "msg": "Leverage exceeds maximum for this market's timeframe"
     },
     {
-      "code": 6055,
+      "code": 6053,
       "name": "vaultInsufficientCapacity",
       "msg": "Insufficient vault capacity for this leveraged position"
     },
     {
-      "code": 6056,
+      "code": 6054,
       "name": "vaultUtilizationExceeded",
       "msg": "Vault utilization would exceed maximum after this borrow"
     },
     {
-      "code": 6057,
+      "code": 6055,
       "name": "leveragedOiCapExceeded",
       "msg": "Market leveraged open interest cap would be exceeded"
     },
     {
-      "code": 6058,
+      "code": 6056,
       "name": "positionUnderwater",
       "msg": "Position health factor below liquidation threshold"
     },
     {
-      "code": 6059,
+      "code": 6057,
       "name": "positionHealthy",
       "msg": "Position health factor is above liquidation threshold; cannot liquidate"
     },
     {
-      "code": 6060,
+      "code": 6058,
       "name": "unauthorizedBackstopLiquidator",
       "msg": "Caller is not the configured backstop liquidator"
     },
     {
-      "code": 6061,
+      "code": 6059,
       "name": "backstopLiquidatorDisabled",
       "msg": "Backstop liquidator is disabled"
     },
     {
-      "code": 6062,
+      "code": 6060,
       "name": "backstopGracePeriodActive",
       "msg": "Backstop grace period has not elapsed; regular keepers have priority"
     },
     {
-      "code": 6063,
+      "code": 6061,
       "name": "bucketGuardCooldown",
       "msg": "Operation rate-limited; cooldown period has not elapsed"
     },
     {
-      "code": 6064,
+      "code": 6062,
       "name": "invalidLmsrAlpha",
       "msg": "LMSR alpha is below the minimum supported value"
+    },
+    {
+      "code": 6063,
+      "name": "invalidMarketGroupConstraint",
+      "msg": "Market group constraints reject this child market"
+    },
+    {
+      "code": 6064,
+      "name": "invalidMarketGroupStatus",
+      "msg": "Market group is not active for new child markets"
     }
   ],
   "types": [
@@ -6303,6 +6310,9 @@ export type Levx = {
         "fields": [
           {
             "name": "group",
+            "docs": [
+              "One group per market: this account's PDA is keyed by market_id only."
+            ],
             "type": "pubkey"
           },
           {
