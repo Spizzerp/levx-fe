@@ -36,6 +36,18 @@ export type EigenCacheStatus =
   | 'unusable'
   | 'rpc_error'
 
+export type MarketGroupKind =
+  | 'root'
+  | 'league'
+  | 'season'
+  | 'game'
+  | 'event'
+  | 'assetSeason'
+  | 'horizon'
+  | 'custom'
+
+export type MarketGroupStatus = 'active' | 'paused' | 'retired'
+
 /* ── Price data ────────────────────────────────────────────── */
 
 export interface PricePoint {
@@ -186,6 +198,44 @@ export interface Market {
   pathsScored: number
   /** Number of dissolved paths */
   pathsDissolved: number
+
+  /* ── Optional hierarchy sidecars ────────────────────────── */
+
+  group?: MarketGroup
+  groupLink?: MarketGroupLink
+  groupKeyHash?: string
+  groupKind?: MarketGroupKind
+  parentGroup?: string
+  timeframeSeconds?: number
+  seasonKey?: string
+}
+
+export interface MarketGroup {
+  address: string
+  authority: string
+  groupKeyHash: string
+  parentGroup: string | null
+  kind: MarketGroupKind
+  status: MarketGroupStatus
+  baseMint: string
+  quoteMint: string
+  pythFeedId: string
+  constraintFlags: number
+  startTime: number
+  endTime: number
+  allowedTimeframesMask: number
+  metadataHash: string
+  childMarketCount: number
+}
+
+export interface MarketGroupLink {
+  address: string
+  group: string
+  market: string
+  marketId: number
+  timeframeSeconds: number
+  linkedAt: number
+  groupKind: MarketGroupKind
 }
 
 /* ── User position ─────────────────────────────────────────── */

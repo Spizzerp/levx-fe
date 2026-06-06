@@ -7,13 +7,28 @@
 
 import { PublicKey } from '@solana/web3.js'
 
-import type { Market, MarketState, PathTone, UserPosition } from '@/types/market'
+import type {
+  Market,
+  MarketGroup,
+  MarketGroupLink,
+  MarketState,
+  PathTone,
+  UserPosition,
+} from '@/types/market'
 
-import { anchorMarketToFE, anchorPathToFE, anchorPositionToFE, parseMarketState } from './adapters'
+import {
+  anchorMarketGroupLinkToFE,
+  anchorMarketGroupToFE,
+  anchorMarketToFE,
+  anchorPathToFE,
+  anchorPositionToFE,
+  parseMarketState,
+} from './adapters'
 import { resolveBaseMintLabel } from './pairLabels'
 import { getReadOnlyProgram } from '../solana/program'
 import {
   PROGRAM_ID,
+  deriveMarketGroupLinkPda,
   deriveMarketPda,
   derivePathChunkPda,
   derivePathPda,
@@ -279,6 +294,100 @@ async function fetchMarketPaths(
   })
 }
 
+type MarketGroupAccountClient = {
+  all?: () => Promise<any[]>
+  fetchNullable?: (address: PublicKey) => Promise<any | null>
+}
+
+type MarketGroupAccountClients = Record<string, MarketGroupAccountClient | undefined>
+
+type MarketGroupJoin = { group?: MarketGroup; link: MarketGroupLink }
+
+async function fetchMarketGroupJoins(program: any): Promise<Map<number, MarketGroupJoin>> {
+  const accounts = program.account as MarketGroupAccountClients
+  if (!accounts.marketGroupLink?.all || !accounts.marketGroup?.all) {
+    return new Map()
+  }
+
+  try {
+    // TODO(indexer): replace bulk sidecar scans with indexed group metadata once
+    // market group counts grow beyond devnet scale.
+    const [linkAccounts, groupAccounts] = await Promise.all([
+      accounts.marketGroupLink.all(),
+      accounts.marketGroup.all(),
+    ])
+    const groupsByAddress = new Map<string, MarketGroup>()
+    for (const acc of groupAccounts) {
+      const group = anchorMarketGroupToFE(acc.account, acc.publicKey.toBase58())
+      groupsByAddress.set(group.address, group)
+    }
+    const joins = new Map<number, MarketGroupJoin>()
+    for (const acc of linkAccounts) {
+      const link = anchorMarketGroupLinkToFE(acc.account, acc.publicKey.toBase58())
+      joins.set(link.marketId, { group: groupsByAddress.get(link.group), link })
+    }
+    return joins
+  } catch (err) {
+    console.warn('[onchain] Failed to fetch market group sidecars:', (err as Error).message)
+    return new Map()
+  }
+}
+
+async function fetchMarketGroupJoin(
+  program: any,
+  marketId: number,
+): Promise<MarketGroupJoin | undefined> {
+  const accounts = program.account as MarketGroupAccountClients
+  if (!accounts.marketGroupLink?.fetchNullable || !accounts.marketGroup?.fetchNullable) {
+    return undefined
+  }
+
+  try {
+    const [linkPda] = deriveMarketGroupLinkPda(marketId)
+    const linkRaw = await accounts.marketGroupLink.fetchNullable(linkPda)
+    if (!linkRaw) return undefined
+
+    const link = anchorMarketGroupLinkToFE(linkRaw, linkPda.toBase58())
+    const groupPda = new PublicKey(link.group)
+    const groupRaw = await accounts.marketGroup.fetchNullable(groupPda)
+    const group = groupRaw ? anchorMarketGroupToFE(groupRaw, groupPda.toBase58()) : undefined
+
+    return { group, link }
+  } catch (err) {
+    console.warn('[onchain] Failed to fetch market group sidecar:', (err as Error).message)
+    return undefined
+  }
+}
+
+function applyMarketGroupJoin(market: Market, join: MarketGroupJoin | undefined): Market {
+  if (!join) return market
+  return {
+    ...market,
+    group: join.group,
+    groupLink: join.link,
+    groupKeyHash: join.group?.groupKeyHash,
+    groupKind: join.group?.kind ?? join.link.groupKind,
+    parentGroup: join.group?.parentGroup ?? undefined,
+    timeframeSeconds: join.link.timeframeSeconds,
+    // UI-only grouping key; provider gateway season_key remains pair/season/horizon.
+    seasonKey: join.group
+      ? `${join.group.kind}:${join.group.groupKeyHash}:${join.link.timeframeSeconds}`
+      : undefined,
+  }
+}
+
+export async function attachMarketGroups(program: any, markets: Market[]): Promise<Market[]> {
+  if (markets.length === 0) return markets
+  const joins = await fetchMarketGroupJoins(program)
+  if (joins.size === 0) return markets
+
+  return markets.map((market) => applyMarketGroupJoin(market, joins.get(market.marketId)))
+}
+
+export async function attachMarketGroup(program: any, market: Market): Promise<Market> {
+  return applyMarketGroupJoin(market, await fetchMarketGroupJoin(program, market.marketId))
+}
+
 export async function getMarkets(): Promise<Market[]> {
   const program = getReadOnlyProgram()
   let allMarkets: any[]
@@ -315,7 +424,10 @@ export async function getMarkets(): Promise<Market[]> {
     }),
   )
 
-  return marketResults.filter((market): market is Market => market !== null)
+  return attachMarketGroups(
+    program,
+    marketResults.filter((market): market is Market => market !== null),
+  )
 }
 
 export async function getMarket(id: string): Promise<Market> {
@@ -340,7 +452,7 @@ export async function getMarket(id: string): Promise<Market> {
     eigenCache: eigenPolicy.snapshot,
   })
 
-  return market
+  return attachMarketGroup(program, market)
 }
 
 export async function getMarketPathPreviews(

@@ -1156,6 +1156,277 @@
       ]
     },
     {
+      "name": "create_market_group",
+      "discriminator": [
+        233,
+        144,
+        194,
+        255,
+        240,
+        250,
+        129,
+        96
+      ],
+      "accounts": [
+        {
+          "name": "protocol_state",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "market_group",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  103,
+                  114,
+                  111,
+                  117,
+                  112
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "params.group_key_hash"
+              }
+            ]
+          }
+        },
+        {
+          "name": "parent_group_account",
+          "docs": [
+            "Required only when `params.has_parent = true`."
+          ],
+          "optional": true
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "params",
+          "type": {
+            "defined": {
+              "name": "CreateMarketGroupParams"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "create_market_under_group",
+      "discriminator": [
+        4,
+        164,
+        242,
+        92,
+        18,
+        19,
+        182,
+        38
+      ],
+      "accounts": [
+        {
+          "name": "protocol_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "market_group",
+          "docs": [
+            "New child market creation is intentionally permissionless once a group is active.",
+            "The group authority curates constraints and status; creators still pay normal fees."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  103,
+                  114,
+                  111,
+                  117,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market_group.group_key_hash",
+                "account": "MarketGroup"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "protocol_state.total_markets_created",
+                "account": "ProtocolState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market_group_link",
+          "docs": [
+            "The market_id-only link PDA makes group membership unique for each market."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  103,
+                  114,
+                  111,
+                  117,
+                  112,
+                  95,
+                  108,
+                  105,
+                  110,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "protocol_state.total_markets_created",
+                "account": "ProtocolState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "collateral_mint",
+          "relations": [
+            "protocol_state"
+          ]
+        },
+        {
+          "name": "insurance_fund",
+          "writable": true,
+          "relations": [
+            "protocol_state"
+          ]
+        },
+        {
+          "name": "creator_token_account",
+          "writable": true
+        },
+        {
+          "name": "creator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "rent",
+          "address": "SysvarRent111111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "params",
+          "type": {
+            "defined": {
+              "name": "CreateMarketParams"
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "create_path_upload_intent",
       "discriminator": [
         134,
@@ -2093,6 +2364,139 @@
                   108,
                   116
                 ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "link_existing_market_to_group",
+      "discriminator": [
+        158,
+        137,
+        146,
+        18,
+        6,
+        74,
+        170,
+        229
+      ],
+      "accounts": [
+        {
+          "name": "protocol_state",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "market_group",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  103,
+                  114,
+                  111,
+                  117,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market_group.group_key_hash",
+                "account": "MarketGroup"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "Market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market_group_link",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  103,
+                  114,
+                  111,
+                  117,
+                  112,
+                  95,
+                  108,
+                  105,
+                  110,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "Market"
               }
             ]
           }
@@ -3164,6 +3568,85 @@
       ]
     },
     {
+      "name": "update_market_group_status",
+      "discriminator": [
+        39,
+        39,
+        13,
+        146,
+        44,
+        179,
+        222,
+        162
+      ],
+      "accounts": [
+        {
+          "name": "protocol_state",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "market_group",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  103,
+                  114,
+                  111,
+                  117,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market_group.group_key_hash",
+                "account": "MarketGroup"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "status",
+          "type": {
+            "defined": {
+              "name": "MarketGroupStatus"
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "void_market",
       "discriminator": [
         243,
@@ -3339,6 +3822,32 @@
         227,
         198,
         154
+      ]
+    },
+    {
+      "name": "MarketGroup",
+      "discriminator": [
+        131,
+        205,
+        141,
+        87,
+        148,
+        210,
+        33,
+        36
+      ]
+    },
+    {
+      "name": "MarketGroupLink",
+      "discriminator": [
+        10,
+        255,
+        47,
+        3,
+        133,
+        34,
+        79,
+        96
       ]
     },
     {
@@ -3614,6 +4123,45 @@
         76,
         234,
         179
+      ]
+    },
+    {
+      "name": "MarketGroupCreated",
+      "discriminator": [
+        245,
+        171,
+        234,
+        186,
+        92,
+        62,
+        15,
+        221
+      ]
+    },
+    {
+      "name": "MarketGroupStatusUpdated",
+      "discriminator": [
+        187,
+        189,
+        125,
+        61,
+        144,
+        95,
+        242,
+        137
+      ]
+    },
+    {
+      "name": "MarketLinkedToGroup",
+      "discriminator": [
+        75,
+        251,
+        245,
+        71,
+        24,
+        189,
+        117,
+        153
       ]
     },
     {
@@ -4218,6 +4766,16 @@
       "code": 6062,
       "name": "InvalidLmsrAlpha",
       "msg": "LMSR alpha is below the minimum supported value"
+    },
+    {
+      "code": 6063,
+      "name": "InvalidMarketGroupConstraint",
+      "msg": "Market group constraints reject this child market"
+    },
+    {
+      "code": 6064,
+      "name": "InvalidMarketGroupStatus",
+      "msg": "Market group is not active for new child markets"
     }
   ],
   "types": [
@@ -4421,6 +4979,89 @@
           {
             "name": "authority",
             "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CreateMarketGroupParams",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "group_key_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "parent_group",
+            "type": "pubkey"
+          },
+          {
+            "name": "has_parent",
+            "type": "bool"
+          },
+          {
+            "name": "kind",
+            "type": {
+              "defined": {
+                "name": "MarketGroupKind"
+              }
+            }
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "MarketGroupStatus"
+              }
+            }
+          },
+          {
+            "name": "base_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "quote_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "pyth_feed_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "constraint_flags",
+            "type": "u8"
+          },
+          {
+            "name": "start_time",
+            "type": "i64"
+          },
+          {
+            "name": "end_time",
+            "type": "i64"
+          },
+          {
+            "name": "allowed_timeframes_mask",
+            "type": "u32"
+          },
+          {
+            "name": "metadata_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
           }
         ]
       }
@@ -5472,6 +6113,310 @@
           {
             "name": "finalized_at",
             "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MarketGroup",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "group_key_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "parent_group",
+            "type": "pubkey"
+          },
+          {
+            "name": "has_parent",
+            "type": "bool"
+          },
+          {
+            "name": "kind",
+            "type": {
+              "defined": {
+                "name": "MarketGroupKind"
+              }
+            }
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "MarketGroupStatus"
+              }
+            }
+          },
+          {
+            "name": "base_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "quote_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "pyth_feed_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "constraint_flags",
+            "type": "u8"
+          },
+          {
+            "name": "start_time",
+            "type": "i64"
+          },
+          {
+            "name": "end_time",
+            "type": "i64"
+          },
+          {
+            "name": "allowed_timeframes_mask",
+            "type": "u32"
+          },
+          {
+            "name": "metadata_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "child_market_count",
+            "type": "u32"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "MarketGroupCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "group",
+            "type": "pubkey"
+          },
+          {
+            "name": "group_key_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "kind",
+            "type": "u8"
+          },
+          {
+            "name": "status",
+            "type": "u8"
+          },
+          {
+            "name": "parent_group",
+            "type": "pubkey"
+          },
+          {
+            "name": "has_parent",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MarketGroupKind",
+      "repr": {
+        "kind": "rust"
+      },
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Root"
+          },
+          {
+            "name": "League"
+          },
+          {
+            "name": "Season"
+          },
+          {
+            "name": "Game"
+          },
+          {
+            "name": "Event"
+          },
+          {
+            "name": "AssetSeason"
+          },
+          {
+            "name": "Horizon"
+          },
+          {
+            "name": "Custom"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MarketGroupLink",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "group",
+            "docs": [
+              "One group per market: this account's PDA is keyed by market_id only."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "market_id",
+            "type": "u64"
+          },
+          {
+            "name": "timeframe_seconds",
+            "type": "u32"
+          },
+          {
+            "name": "linked_at",
+            "type": "i64"
+          },
+          {
+            "name": "group_kind",
+            "type": {
+              "defined": {
+                "name": "MarketGroupKind"
+              }
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "MarketGroupStatus",
+      "repr": {
+        "kind": "rust"
+      },
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Active"
+          },
+          {
+            "name": "Paused"
+          },
+          {
+            "name": "Retired"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MarketGroupStatusUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "group",
+            "type": "pubkey"
+          },
+          {
+            "name": "old_status",
+            "type": "u8"
+          },
+          {
+            "name": "new_status",
+            "type": "u8"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MarketLinkedToGroup",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "group",
+            "type": "pubkey"
+          },
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "market_id",
+            "type": "u64"
+          },
+          {
+            "name": "group_kind",
+            "type": "u8"
+          },
+          {
+            "name": "timeframe_seconds",
+            "type": "u32"
           }
         ]
       }

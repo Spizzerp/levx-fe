@@ -12,6 +12,37 @@ export function deriveMarketPda(marketId: number): [PublicKey, number] {
   )
 }
 
+function groupKeyHashBytes(groupKeyHash: Uint8Array | number[] | Buffer | string): Buffer {
+  if (typeof groupKeyHash === 'string') {
+    const hex = groupKeyHash.startsWith('0x') ? groupKeyHash.slice(2) : groupKeyHash
+    if (!/^[0-9a-fA-F]{64}$/.test(hex)) {
+      throw new Error('groupKeyHash must be a 32-byte hex string')
+    }
+    return Buffer.from(hex, 'hex')
+  }
+  const bytes = Buffer.from(groupKeyHash)
+  if (bytes.length !== 32) {
+    throw new Error('groupKeyHash must be 32 bytes')
+  }
+  return bytes
+}
+
+export function deriveMarketGroupPda(
+  groupKeyHash: Uint8Array | number[] | Buffer | string,
+): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from('market_group'), groupKeyHashBytes(groupKeyHash)],
+    PROGRAM_ID,
+  )
+}
+
+export function deriveMarketGroupLinkPda(marketId: number): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from('market_group_link'), new BN(marketId).toArrayLike(Buffer, 'le', 8)],
+    PROGRAM_ID,
+  )
+}
+
 export function derivePathPda(marketId: number, pathIndex: number): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [Buffer.from('path'), new BN(marketId).toArrayLike(Buffer, 'le', 8), Buffer.from([pathIndex])],
