@@ -1,7 +1,7 @@
 import { useNavigate } from '@tanstack/react-router'
-import { AnchorProvider, BN, parseIdlErrors, translateError } from '@coral-xyz/anchor'
+import { AnchorProvider, parseIdlErrors, translateError } from '@coral-xyz/anchor'
 import { FolderPlus, Link2, Plus, Trash2 } from 'lucide-react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { SystemProgram, Transaction } from '@solana/web3.js'
 
@@ -25,7 +25,9 @@ import {
   DEFAULT_PUBKEY,
   MARKET_GROUP_KIND_OPTIONS,
   MARKET_GROUP_STATUS_OPTIONS,
+  MARKET_GROUP_TIMEFRAME_OPTIONS,
   anchorEnum,
+  buildMarketGroupConstraintParams,
   bytes32HexToArray,
   isBytes32Hex,
   normalizeBytes32Hex,
@@ -58,16 +60,61 @@ function MarketGroupAdminPanel() {
   const [metadataHash, setMetadataHash] = useState('')
   const [groupKind, setGroupKind] = useState<MarketGroupKind>('season')
   const [groupStatus, setGroupStatus] = useState<MarketGroupStatus>('active')
+  const [pairConstraintEnabled, setPairConstraintEnabled] = useState(false)
+  const [feedConstraintEnabled, setFeedConstraintEnabled] = useState(false)
+  const [timeWindowConstraintEnabled, setTimeWindowConstraintEnabled] = useState(false)
+  const [timeframeConstraintEnabled, setTimeframeConstraintEnabled] = useState(false)
+  const [constraintBaseMint, setConstraintBaseMint] = useState('')
+  const [constraintQuoteMint, setConstraintQuoteMint] = useState('')
+  const [constraintPythFeedId, setConstraintPythFeedId] = useState('')
+  const [constraintStartTime, setConstraintStartTime] = useState('')
+  const [constraintEndTime, setConstraintEndTime] = useState('')
+  const [constraintTimeframes, setConstraintTimeframes] = useState<number[]>([])
   const [linkMarketId, setLinkMarketId] = useState('')
   const [linkGroupKeyHash, setLinkGroupKeyHash] = useState('')
   const [pendingAction, setPendingAction] = useState<'create' | 'link' | null>(null)
+  const constraintValues = useMemo(
+    () => ({
+      pairEnabled: pairConstraintEnabled,
+      feedEnabled: feedConstraintEnabled,
+      timeWindowEnabled: timeWindowConstraintEnabled,
+      timeframeMaskEnabled: timeframeConstraintEnabled,
+      baseMint: constraintBaseMint,
+      quoteMint: constraintQuoteMint,
+      pythFeedId: constraintPythFeedId,
+      startTime: constraintStartTime,
+      endTime: constraintEndTime,
+      timeframeSeconds: constraintTimeframes,
+    }),
+    [
+      pairConstraintEnabled,
+      feedConstraintEnabled,
+      timeWindowConstraintEnabled,
+      timeframeConstraintEnabled,
+      constraintBaseMint,
+      constraintQuoteMint,
+      constraintPythFeedId,
+      constraintStartTime,
+      constraintEndTime,
+      constraintTimeframes,
+    ],
+  )
+  const constraintError = useMemo(() => {
+    try {
+      buildMarketGroupConstraintParams(constraintValues)
+      return ''
+    } catch (err) {
+      return (err as Error).message
+    }
+  }, [constraintValues])
 
   const canCreateGroup =
     !!program &&
     !!publicKey &&
     isBytes32Hex(groupKeyHash) &&
     (!parentGroupKeyHash || isBytes32Hex(parentGroupKeyHash)) &&
-    (!metadataHash || isBytes32Hex(metadataHash))
+    (!metadataHash || isBytes32Hex(metadataHash)) &&
+    !constraintError
   const canLinkMarket =
     !!program &&
     !!publicKey &&
@@ -92,15 +139,7 @@ function MarketGroupAdminPanel() {
         hasParent: parentGroupPda !== null,
         kind: anchorEnum(groupKind),
         status: anchorEnum(groupStatus),
-        // TODO(admin): expose group constraints in this form; current admin UI
-        // intentionally creates unconstrained metadata groups only.
-        baseMint: DEFAULT_PUBKEY,
-        quoteMint: DEFAULT_PUBKEY,
-        pythFeedId: Array(32).fill(0),
-        constraintFlags: 0,
-        startTime: new BN(0),
-        endTime: new BN(0),
-        allowedTimeframesMask: 0,
+        ...buildMarketGroupConstraintParams(constraintValues),
         metadataHash: bytes32HexToArray(metadataHash || '00'.repeat(32)),
       }
       const ix = await program.methods
@@ -217,6 +256,14 @@ function MarketGroupAdminPanel() {
     }
   }
 
+  function toggleConstraintTimeframe(timeframeSeconds: number) {
+    setConstraintTimeframes((current) =>
+      current.includes(timeframeSeconds)
+        ? current.filter((value) => value !== timeframeSeconds)
+        : [...current, timeframeSeconds],
+    )
+  }
+
   return (
     <section className="border-line mb-10 border-b pb-8">
       <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
@@ -291,6 +338,110 @@ function MarketGroupAdminPanel() {
                   </option>
                 ))}
               </select>
+            </div>
+            <div className="border-line rounded-lg border p-4">
+              <div className="grid grid-cols-2 gap-3">
+                <label className="text-ink-muted flex items-center gap-2 font-mono text-xs uppercase">
+                  <input
+                    type="checkbox"
+                    checked={pairConstraintEnabled}
+                    onChange={(e) => setPairConstraintEnabled(e.target.checked)}
+                  />
+                  Pair
+                </label>
+                <label className="text-ink-muted flex items-center gap-2 font-mono text-xs uppercase">
+                  <input
+                    type="checkbox"
+                    checked={feedConstraintEnabled}
+                    onChange={(e) => setFeedConstraintEnabled(e.target.checked)}
+                  />
+                  Feed
+                </label>
+                <label className="text-ink-muted flex items-center gap-2 font-mono text-xs uppercase">
+                  <input
+                    type="checkbox"
+                    checked={timeWindowConstraintEnabled}
+                    onChange={(e) => setTimeWindowConstraintEnabled(e.target.checked)}
+                  />
+                  Time window
+                </label>
+                <label className="text-ink-muted flex items-center gap-2 font-mono text-xs uppercase">
+                  <input
+                    type="checkbox"
+                    checked={timeframeConstraintEnabled}
+                    onChange={(e) => setTimeframeConstraintEnabled(e.target.checked)}
+                  />
+                  Timeframes
+                </label>
+              </div>
+
+              {pairConstraintEnabled && (
+                <div className="mt-4 grid grid-cols-1 gap-4">
+                  <Input
+                    label="Base mint"
+                    value={constraintBaseMint}
+                    onChange={(e) => setConstraintBaseMint(e.target.value)}
+                    placeholder="Base mint pubkey"
+                  />
+                  <Input
+                    label="Quote mint"
+                    value={constraintQuoteMint}
+                    onChange={(e) => setConstraintQuoteMint(e.target.value)}
+                    placeholder="Quote mint pubkey"
+                  />
+                </div>
+              )}
+
+              {feedConstraintEnabled && (
+                <Input
+                  label="Pyth feed id"
+                  value={constraintPythFeedId}
+                  onChange={(e) => setConstraintPythFeedId(e.target.value)}
+                  placeholder="32-byte hex"
+                  className="mt-4"
+                />
+              )}
+
+              {timeWindowConstraintEnabled && (
+                <div className="mt-4 grid grid-cols-2 gap-4">
+                  <Input
+                    label="Start"
+                    type="datetime-local"
+                    value={constraintStartTime}
+                    onChange={(e) => setConstraintStartTime(e.target.value)}
+                  />
+                  <Input
+                    label="End"
+                    type="datetime-local"
+                    value={constraintEndTime}
+                    onChange={(e) => setConstraintEndTime(e.target.value)}
+                  />
+                </div>
+              )}
+
+              {timeframeConstraintEnabled && (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {MARKET_GROUP_TIMEFRAME_OPTIONS.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      className={cn(
+                        'border-line rounded px-3 py-2 font-mono text-xs uppercase',
+                        constraintTimeframes.includes(option.value)
+                          ? 'bg-ink-strong text-surface'
+                          : 'text-ink-muted',
+                      )}
+                      onClick={() => toggleConstraintTimeframe(option.value)}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {constraintError && (
+                <p className="text-bear mt-4 font-mono text-xs uppercase">{constraintError}</p>
+              )}
             </div>
             <Button
               variant="secondary"

@@ -5,7 +5,13 @@ import { PublicKey } from '@solana/web3.js'
 import { describe, expect, it, vi } from 'vitest'
 
 import { attachMarketGroup, attachMarketGroups } from '@/lib/api/onchain'
-import { bytes32HexToArray, isBytes32Hex } from '@/lib/marketGroups'
+import {
+  MARKET_GROUP_CONSTRAINT_FLAGS,
+  MARKET_GROUP_TIMEFRAME_BITS,
+  buildMarketGroupConstraintParams,
+  bytes32HexToArray,
+  isBytes32Hex,
+} from '@/lib/marketGroups'
 import type { Market } from '@/types/market'
 
 vi.mock('@/env/env.config', () => ({
@@ -29,6 +35,109 @@ describe('market group helpers', () => {
     expect(isBytes32Hex(`0x${'ab'.repeat(32)}`)).toBe(true)
     expect(isBytes32Hex('ab')).toBe(false)
     expect(bytes32HexToArray('ab'.repeat(32))).toHaveLength(32)
+  })
+
+  it('builds unconstrained group params with default sidecar values', () => {
+    const params = buildMarketGroupConstraintParams({
+      pairEnabled: false,
+      feedEnabled: false,
+      timeWindowEnabled: false,
+      timeframeMaskEnabled: false,
+      baseMint: '',
+      quoteMint: '',
+      pythFeedId: '',
+      startTime: '',
+      endTime: '',
+      timeframeSeconds: [],
+    })
+
+    expect(params.constraintFlags).toBe(0)
+    expect(params.baseMint.toBase58()).toBe(KEY.toBase58())
+    expect(params.quoteMint.toBase58()).toBe(KEY.toBase58())
+    expect(params.pythFeedId).toEqual(Array(32).fill(0))
+    expect(params.startTime.toNumber()).toBe(0)
+    expect(params.endTime.toNumber()).toBe(0)
+    expect(params.allowedTimeframesMask).toBe(0)
+  })
+
+  it('builds constrained group params from admin form values', () => {
+    const baseMint = 'So11111111111111111111111111111111111111112'
+    const quoteMint = 'BPFLoader1111111111111111111111111111111111'
+    const pythFeedId = 'ab'.repeat(32)
+    const params = buildMarketGroupConstraintParams({
+      pairEnabled: true,
+      feedEnabled: true,
+      timeWindowEnabled: true,
+      timeframeMaskEnabled: true,
+      baseMint,
+      quoteMint,
+      pythFeedId,
+      startTime: '2026-06-01T00:00',
+      endTime: '2026-06-02T00:00',
+      timeframeSeconds: [3_600, 86_400],
+    })
+
+    expect(params.constraintFlags).toBe(
+      MARKET_GROUP_CONSTRAINT_FLAGS.pair |
+        MARKET_GROUP_CONSTRAINT_FLAGS.feed |
+        MARKET_GROUP_CONSTRAINT_FLAGS.timeWindow |
+        MARKET_GROUP_CONSTRAINT_FLAGS.timeframeMask,
+    )
+    expect(params.baseMint.toBase58()).toBe(baseMint)
+    expect(params.quoteMint.toBase58()).toBe(quoteMint)
+    expect(params.pythFeedId).toEqual(bytes32HexToArray(pythFeedId))
+    expect(params.startTime.toNumber()).toBe(Date.parse('2026-06-01T00:00') / 1000)
+    expect(params.endTime.toNumber()).toBe(Date.parse('2026-06-02T00:00') / 1000)
+    expect(params.allowedTimeframesMask).toBe(
+      MARKET_GROUP_TIMEFRAME_BITS[3_600] | MARKET_GROUP_TIMEFRAME_BITS[86_400],
+    )
+  })
+
+  it('rejects incomplete constrained group form values before transaction build', () => {
+    expect(() =>
+      buildMarketGroupConstraintParams({
+        pairEnabled: true,
+        feedEnabled: false,
+        timeWindowEnabled: false,
+        timeframeMaskEnabled: false,
+        baseMint: '',
+        quoteMint: '',
+        pythFeedId: '',
+        startTime: '',
+        endTime: '',
+        timeframeSeconds: [],
+      }),
+    ).toThrow('Base and quote mints are required')
+
+    expect(() =>
+      buildMarketGroupConstraintParams({
+        pairEnabled: false,
+        feedEnabled: false,
+        timeWindowEnabled: true,
+        timeframeMaskEnabled: false,
+        baseMint: '',
+        quoteMint: '',
+        pythFeedId: '',
+        startTime: '2026-06-02T00:00',
+        endTime: '2026-06-01T00:00',
+        timeframeSeconds: [],
+      }),
+    ).toThrow('End time must be after start time')
+
+    expect(() =>
+      buildMarketGroupConstraintParams({
+        pairEnabled: false,
+        feedEnabled: false,
+        timeWindowEnabled: false,
+        timeframeMaskEnabled: true,
+        baseMint: '',
+        quoteMint: '',
+        pythFeedId: '',
+        startTime: '',
+        endTime: '',
+        timeframeSeconds: [],
+      }),
+    ).toThrow('Select at least one timeframe')
   })
 
   it('keeps flat markets unchanged when group sidecars are unavailable', async () => {
