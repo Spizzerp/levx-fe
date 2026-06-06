@@ -1,6 +1,6 @@
 import { useNavigate } from '@tanstack/react-router'
 import { AnchorProvider, parseIdlErrors, translateError } from '@coral-xyz/anchor'
-import { FolderPlus, Link2, Plus, Trash2 } from 'lucide-react'
+import { FolderPlus, Link2, Plus, Trash2, Unlink2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { SystemProgram, Transaction } from '@solana/web3.js'
@@ -72,7 +72,11 @@ function MarketGroupAdminPanel() {
   const [constraintTimeframes, setConstraintTimeframes] = useState<number[]>([])
   const [linkMarketId, setLinkMarketId] = useState('')
   const [linkGroupKeyHash, setLinkGroupKeyHash] = useState('')
-  const [pendingAction, setPendingAction] = useState<'create' | 'link' | null>(null)
+  const [recoveryMarketId, setRecoveryMarketId] = useState('')
+  const [recoveryGroupKeyHash, setRecoveryGroupKeyHash] = useState('')
+  const [pendingAction, setPendingAction] = useState<
+    'create' | 'link' | 'unlink' | 'close-group' | null
+  >(null)
   const constraintValues = useMemo(
     () => ({
       pairEnabled: pairConstraintEnabled,
@@ -121,6 +125,13 @@ function MarketGroupAdminPanel() {
     isBytes32Hex(linkGroupKeyHash) &&
     Number.isInteger(Number(linkMarketId)) &&
     Number(linkMarketId) >= 0
+  const canUnlinkMarket =
+    !!program &&
+    !!publicKey &&
+    isBytes32Hex(recoveryGroupKeyHash) &&
+    Number.isInteger(Number(recoveryMarketId)) &&
+    Number(recoveryMarketId) >= 0
+  const canCloseGroup = !!program && !!publicKey && isBytes32Hex(recoveryGroupKeyHash)
 
   async function handleCreateGroup() {
     if (!program || !publicKey || !canCreateGroup) return
@@ -183,6 +194,7 @@ function MarketGroupAdminPanel() {
       }
       toast.success('Market group created', { txSig: sig })
       setLinkGroupKeyHash(normalizedGroupHash)
+      setRecoveryGroupKeyHash(normalizedGroupHash)
     } catch (err) {
       toast.error('Failed to create market group', { message: (err as Error).message })
     } finally {
@@ -256,6 +268,125 @@ function MarketGroupAdminPanel() {
     }
   }
 
+  async function handleUnlinkMarket() {
+    if (!program || !publicKey || !canUnlinkMarket) return
+    const marketId = Number(recoveryMarketId)
+    const normalizedGroupHash = normalizeBytes32Hex(recoveryGroupKeyHash)
+    if (
+      !window.confirm(`Unlink market ${marketId} from group ${normalizedGroupHash.slice(0, 8)}…?`)
+    ) {
+      return
+    }
+    setPendingAction('unlink')
+    try {
+      const [protocolPda] = deriveProtocolPda()
+      const [marketPda] = deriveMarketPda(marketId)
+      const [marketGroupPda] = deriveMarketGroupPda(normalizedGroupHash)
+      const [marketGroupLinkPda] = deriveMarketGroupLinkPda(marketId)
+      const ix = await program.methods
+        .unlinkMarketFromGroup()
+        .accountsPartial({
+          protocolState: protocolPda,
+          marketGroup: marketGroupPda,
+          market: marketPda,
+          marketGroupLink: marketGroupLinkPda,
+          authority: publicKey,
+        })
+        .instruction()
+      const provider = program.provider as AnchorProvider
+      const priorityFeeMicroLamports = await getPriorityFee(provider.connection)
+      const tx = new Transaction().add(
+        ...(await buildTransaction({
+          instructions: [ix],
+          computeUnitLimit: 100_000,
+          priorityFeeMicroLamports,
+        })),
+      )
+      let sig: string
+      try {
+        sig = await provider.sendAndConfirm(tx)
+      } catch (sendErr) {
+        await logTransactionError('admin.unlinkMarketFromGroup sendAndConfirm failed', sendErr, {
+          connection: provider.connection,
+          details: {
+            adminWallet: publicKey.toBase58(),
+            marketId,
+            groupKeyHash: normalizedGroupHash,
+            marketPda: marketPda.toBase58(),
+            marketGroupPda: marketGroupPda.toBase58(),
+            marketGroupLinkPda: marketGroupLinkPda.toBase58(),
+            instructionLabels: [
+              '0: setComputeUnitLimit',
+              '1: setComputeUnitPrice',
+              '2: unlinkMarketFromGroup',
+            ],
+          },
+        })
+        throw translateError(sendErr, parseIdlErrors(program.idl))
+      }
+      await queryClient.invalidateQueries({ queryKey: ['markets'] })
+      await queryClient.invalidateQueries({ queryKey: ['market', String(marketId)] })
+      toast.success('Market unlinked from group', { txSig: sig })
+    } catch (err) {
+      toast.error('Failed to unlink market', { message: (err as Error).message })
+    } finally {
+      setPendingAction(null)
+    }
+  }
+
+  async function handleCloseGroup() {
+    if (!program || !publicKey || !canCloseGroup) return
+    const normalizedGroupHash = normalizeBytes32Hex(recoveryGroupKeyHash)
+    if (!window.confirm(`Close empty group ${normalizedGroupHash.slice(0, 8)}…?`)) return
+    setPendingAction('close-group')
+    try {
+      const [protocolPda] = deriveProtocolPda()
+      const [marketGroupPda] = deriveMarketGroupPda(normalizedGroupHash)
+      const ix = await program.methods
+        .closeMarketGroup()
+        .accountsPartial({
+          protocolState: protocolPda,
+          marketGroup: marketGroupPda,
+          authority: publicKey,
+        })
+        .instruction()
+      const provider = program.provider as AnchorProvider
+      const priorityFeeMicroLamports = await getPriorityFee(provider.connection)
+      const tx = new Transaction().add(
+        ...(await buildTransaction({
+          instructions: [ix],
+          computeUnitLimit: 80_000,
+          priorityFeeMicroLamports,
+        })),
+      )
+      let sig: string
+      try {
+        sig = await provider.sendAndConfirm(tx)
+      } catch (sendErr) {
+        await logTransactionError('admin.closeMarketGroup sendAndConfirm failed', sendErr, {
+          connection: provider.connection,
+          details: {
+            adminWallet: publicKey.toBase58(),
+            groupKeyHash: normalizedGroupHash,
+            marketGroupPda: marketGroupPda.toBase58(),
+            instructionLabels: [
+              '0: setComputeUnitLimit',
+              '1: setComputeUnitPrice',
+              '2: closeMarketGroup',
+            ],
+          },
+        })
+        throw translateError(sendErr, parseIdlErrors(program.idl))
+      }
+      await queryClient.invalidateQueries({ queryKey: ['markets'] })
+      toast.success('Market group closed', { txSig: sig })
+    } catch (err) {
+      toast.error('Failed to close market group', { message: (err as Error).message })
+    } finally {
+      setPendingAction(null)
+    }
+  }
+
   function toggleConstraintTimeframe(timeframeSeconds: number) {
     setConstraintTimeframes((current) =>
       current.includes(timeframeSeconds)
@@ -290,7 +421,7 @@ function MarketGroupAdminPanel() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 gap-8 [@media(min-width:1100px)]:grid-cols-2">
+      <div className="grid grid-cols-1 gap-8 [@media(min-width:1100px)]:grid-cols-3">
         <div className="border-line rounded-lg border p-5">
           <div className="mb-4 flex items-center gap-2">
             <FolderPlus size={15} strokeWidth={1.75} className="text-ink-muted" />
@@ -480,6 +611,45 @@ function MarketGroupAdminPanel() {
             >
               {pendingAction === 'link' ? 'Linking' : 'Link market'}
             </Button>
+          </div>
+        </div>
+
+        <div className="border-line rounded-lg border p-5">
+          <div className="mb-4 flex items-center gap-2">
+            <Unlink2 size={15} strokeWidth={1.75} className="text-ink-muted" />
+            <span className="text-ink-strong text-label font-mono uppercase">Recovery</span>
+          </div>
+          <div className="grid grid-cols-1 gap-4">
+            <Input
+              label="Market id"
+              type="number"
+              min={0}
+              value={recoveryMarketId}
+              onChange={(e) => setRecoveryMarketId(e.target.value)}
+              placeholder="0"
+            />
+            <Input
+              label="Group key hash"
+              value={recoveryGroupKeyHash}
+              onChange={(e) => setRecoveryGroupKeyHash(e.target.value)}
+              placeholder="32-byte hex"
+            />
+            <div className="grid grid-cols-1 gap-3 [@media(min-width:1181px)]:grid-cols-2">
+              <Button
+                variant="secondary"
+                disabled={!canUnlinkMarket || pendingAction === 'unlink'}
+                onClick={handleUnlinkMarket}
+              >
+                {pendingAction === 'unlink' ? 'Unlinking' : 'Unlink'}
+              </Button>
+              <Button
+                variant="destructive"
+                disabled={!canCloseGroup || pendingAction === 'close-group'}
+                onClick={handleCloseGroup}
+              >
+                {pendingAction === 'close-group' ? 'Closing' : 'Close group'}
+              </Button>
+            </div>
           </div>
         </div>
       </div>

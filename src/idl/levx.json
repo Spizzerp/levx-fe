@@ -773,6 +773,77 @@
       "args": []
     },
     {
+      "name": "close_market_group",
+      "discriminator": [
+        253,
+        176,
+        123,
+        222,
+        137,
+        166,
+        72,
+        231
+      ],
+      "accounts": [
+        {
+          "name": "protocol_state",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "market_group",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  103,
+                  114,
+                  111,
+                  117,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market_group.group_key_hash",
+                "account": "MarketGroup"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "close_path_chunk",
       "docs": [
         "F7: anyone closes a chunk backing a terminal-market PathOutcome.",
@@ -2468,6 +2539,9 @@
         },
         {
           "name": "market_group_link",
+          "docs": [
+            "The market_id-only link PDA makes group membership unique while linked."
+          ],
           "writable": true,
           "pda": {
             "seeds": [
@@ -3431,6 +3505,135 @@
       ]
     },
     {
+      "name": "unlink_market_from_group",
+      "discriminator": [
+        142,
+        155,
+        250,
+        102,
+        229,
+        75,
+        247,
+        66
+      ],
+      "accounts": [
+        {
+          "name": "protocol_state",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "market_group",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  103,
+                  114,
+                  111,
+                  117,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market_group.group_key_hash",
+                "account": "MarketGroup"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "Market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market_group_link",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  103,
+                  114,
+                  111,
+                  117,
+                  112,
+                  95,
+                  108,
+                  105,
+                  110,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "Market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "update_collateral_mint",
       "docs": [
         "F11 governance escape hatch: rotate the allowlisted collateral mint.",
@@ -4126,6 +4329,19 @@
       ]
     },
     {
+      "name": "MarketGroupClosed",
+      "discriminator": [
+        61,
+        90,
+        183,
+        33,
+        146,
+        166,
+        150,
+        65
+      ]
+    },
+    {
       "name": "MarketGroupCreated",
       "discriminator": [
         245,
@@ -4201,6 +4417,19 @@
         117,
         215,
         99
+      ]
+    },
+    {
+      "name": "MarketUnlinkedFromGroup",
+      "discriminator": [
+        29,
+        200,
+        21,
+        69,
+        9,
+        154,
+        14,
+        179
       ]
     },
     {
@@ -4776,6 +5005,11 @@
       "code": 6064,
       "name": "InvalidMarketGroupStatus",
       "msg": "Market group is not active for new child markets"
+    },
+    {
+      "code": 6065,
+      "name": "MarketGroupNotEmpty",
+      "msg": "Market group still has linked markets"
     }
   ],
   "types": [
@@ -6222,6 +6456,31 @@
       }
     },
     {
+      "name": "MarketGroupClosed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "group",
+            "type": "pubkey"
+          },
+          {
+            "name": "group_key_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
       "name": "MarketGroupCreated",
       "type": {
         "kind": "struct",
@@ -6510,6 +6769,26 @@
           },
           {
             "name": "Void"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MarketUnlinkedFromGroup",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "group",
+            "type": "pubkey"
+          },
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "market_id",
+            "type": "u64"
           }
         ]
       }

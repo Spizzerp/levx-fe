@@ -24,7 +24,11 @@ interface BNLike {
 }
 
 function isBNLike(v: unknown): v is BNLike {
-  return typeof v === 'object' && v !== null && typeof (v as { toNumber?: unknown }).toNumber === 'function'
+  return (
+    typeof v === 'object' &&
+    v !== null &&
+    typeof (v as { toNumber?: unknown }).toNumber === 'function'
+  )
 }
 
 /**
@@ -93,11 +97,14 @@ export const EVENT_INVALIDATION_MAP: Readonly<Record<string, InvalidationFactory
   MarketFinalized: withMarket((mk) => [['market', mk], ['markets'], ['userPositions']]),
   MarketVoided: withMarket((mk) => [['market', mk], ['markets'], ['userPositions']]),
   MarketClosed: withMarket((mk) => [['market', mk], ['markets'], ['userPositions']]),
-  DisputedMarketFinalized: withMarket((mk) => [
-    ['market', mk],
-    ['markets'],
-    ['userPositions'],
-  ]),
+  DisputedMarketFinalized: withMarket((mk) => [['market', mk], ['markets'], ['userPositions']]),
+
+  // ── Market group sidecars ────────────────────────────────────────
+  MarketGroupCreated: () => [['markets']],
+  MarketGroupStatusUpdated: () => [['markets']],
+  MarketGroupClosed: () => [['markets']],
+  MarketLinkedToGroup: withMarket((mk) => [['market', mk], ['markets']]),
+  MarketUnlinkedFromGroup: withMarket((mk) => [['market', mk], ['markets']]),
 
   // ── User-driven (wager / exit / claim) ────────────────────────────
   WagerPlaced: withMarket((mk) => [
@@ -112,11 +119,7 @@ export const EVENT_INVALIDATION_MAP: Readonly<Record<string, InvalidationFactory
     ['userPositions'],
     ['markets'],
   ]),
-  ClaimPaid: withMarket((mk) => [
-    ['market', mk],
-    ['userPosition', mk],
-    ['userPositions'],
-  ]),
+  ClaimPaid: withMarket((mk) => [['market', mk], ['userPosition', mk], ['userPositions']]),
 
   // ── Path lifecycle ────────────────────────────────────────────────
   PathAdded: withMarket((mk) => [['market', mk], ['markets']]),
