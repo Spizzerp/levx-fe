@@ -779,6 +779,77 @@ export type Levx = {
       "args": []
     },
     {
+      "name": "closeMarketGroup",
+      "discriminator": [
+        253,
+        176,
+        123,
+        222,
+        137,
+        166,
+        72,
+        231
+      ],
+      "accounts": [
+        {
+          "name": "protocolState",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "marketGroup",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  103,
+                  114,
+                  111,
+                  117,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market_group.group_key_hash",
+                "account": "marketGroup"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "closePathChunk",
       "docs": [
         "F7: anyone closes a chunk backing a terminal-market PathOutcome.",
@@ -2474,6 +2545,9 @@ export type Levx = {
         },
         {
           "name": "marketGroupLink",
+          "docs": [
+            "The market_id-only link PDA makes group membership unique while linked."
+          ],
           "writable": true,
           "pda": {
             "seeds": [
@@ -3437,6 +3511,135 @@ export type Levx = {
       ]
     },
     {
+      "name": "unlinkMarketFromGroup",
+      "discriminator": [
+        142,
+        155,
+        250,
+        102,
+        229,
+        75,
+        247,
+        66
+      ],
+      "accounts": [
+        {
+          "name": "protocolState",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "marketGroup",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  103,
+                  114,
+                  111,
+                  117,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market_group.group_key_hash",
+                "account": "marketGroup"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "marketGroupLink",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  103,
+                  114,
+                  111,
+                  117,
+                  112,
+                  95,
+                  108,
+                  105,
+                  110,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "updateCollateralMint",
       "docs": [
         "F11 governance escape hatch: rotate the allowlisted collateral mint.",
@@ -4132,6 +4335,19 @@ export type Levx = {
       ]
     },
     {
+      "name": "marketGroupClosed",
+      "discriminator": [
+        61,
+        90,
+        183,
+        33,
+        146,
+        166,
+        150,
+        65
+      ]
+    },
+    {
       "name": "marketGroupCreated",
       "discriminator": [
         245,
@@ -4207,6 +4423,19 @@ export type Levx = {
         117,
         215,
         99
+      ]
+    },
+    {
+      "name": "marketUnlinkedFromGroup",
+      "discriminator": [
+        29,
+        200,
+        21,
+        69,
+        9,
+        154,
+        14,
+        179
       ]
     },
     {
@@ -4782,6 +5011,11 @@ export type Levx = {
       "code": 6064,
       "name": "invalidMarketGroupStatus",
       "msg": "Market group is not active for new child markets"
+    },
+    {
+      "code": 6065,
+      "name": "marketGroupNotEmpty",
+      "msg": "Market group still has linked markets"
     }
   ],
   "types": [
@@ -6228,6 +6462,31 @@ export type Levx = {
       }
     },
     {
+      "name": "marketGroupClosed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "group",
+            "type": "pubkey"
+          },
+          {
+            "name": "groupKeyHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
       "name": "marketGroupCreated",
       "type": {
         "kind": "struct",
@@ -6516,6 +6775,26 @@ export type Levx = {
           },
           {
             "name": "void"
+          }
+        ]
+      }
+    },
+    {
+      "name": "marketUnlinkedFromGroup",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "group",
+            "type": "pubkey"
+          },
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "marketId",
+            "type": "u64"
           }
         ]
       }

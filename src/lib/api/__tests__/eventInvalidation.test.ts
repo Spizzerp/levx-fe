@@ -46,11 +46,16 @@ describe('EVENT_INVALIDATION_MAP — payload shape from BorshEventCoder', () => 
     const evDef = idlJson.events!.find((e: { name: string }) => e.name === 'WagerPlaced')!
     const buf = Buffer.alloc(8 + 8 + 32 + 1 + 8 + 8)
     let o = 0
-    Buffer.from(evDef.discriminator).copy(buf, o); o += 8
-    buf.writeBigUInt64LE(7n, o); o += 8
-    Buffer.alloc(32).copy(buf, o); o += 32
-    buf.writeUInt8(2, o); o += 1
-    buf.writeBigUInt64LE(25_000_000n, o); o += 8
+    Buffer.from(evDef.discriminator).copy(buf, o)
+    o += 8
+    buf.writeBigUInt64LE(7n, o)
+    o += 8
+    Buffer.alloc(32).copy(buf, o)
+    o += 32
+    buf.writeUInt8(2, o)
+    o += 1
+    buf.writeBigUInt64LE(25_000_000n, o)
+    o += 8
     buf.writeBigUInt64LE(45_000_000n, o)
 
     const coder = new BorshEventCoder(idlJson as never)
@@ -83,6 +88,11 @@ describe('EVENT_INVALIDATION_MAP', () => {
       'CheckpointSampled',
       'DisputeRaised',
       'DisputeResolved',
+      'MarketGroupCreated',
+      'MarketGroupStatusUpdated',
+      'MarketGroupClosed',
+      'MarketLinkedToGroup',
+      'MarketUnlinkedFromGroup',
     ]
     for (const name of expected) {
       expect(EVENT_INVALIDATION_MAP[name]).toBeDefined()
@@ -110,8 +120,30 @@ describe('EVENT_INVALIDATION_MAP', () => {
     expect(keys[0]).toEqual(['market', '3'])
   })
 
+  it('market group link changes invalidate the affected market and market list', () => {
+    for (const ev of ['MarketLinkedToGroup', 'MarketUnlinkedFromGroup']) {
+      const keys = EVENT_INVALIDATION_MAP[ev]({ market_id: new BN(4) })
+      const flat = keys.map((k) => JSON.stringify(k))
+      expect(flat, `${ev} should invalidate ['market', '4']`).toContain(
+        JSON.stringify(['market', '4']),
+      )
+      expect(flat, `${ev} should invalidate ['markets']`).toContain(JSON.stringify(['markets']))
+    }
+  })
+
+  it('market group lifecycle changes invalidate the market list', () => {
+    for (const ev of ['MarketGroupCreated', 'MarketGroupStatusUpdated', 'MarketGroupClosed']) {
+      expect(EVENT_INVALIDATION_MAP[ev]({})).toEqual([['markets']])
+    }
+  })
+
   it('terminal-state transitions invalidate userPositions so PortfolioPage refreshes', () => {
-    for (const ev of ['MarketSettled', 'MarketVoided', 'MarketFinalized', 'DisputedMarketFinalized']) {
+    for (const ev of [
+      'MarketSettled',
+      'MarketVoided',
+      'MarketFinalized',
+      'DisputedMarketFinalized',
+    ]) {
       const keys = EVENT_INVALIDATION_MAP[ev]({ market_id: new BN(1) })
       const flat = keys.map((k) => JSON.stringify(k))
       expect(flat, `${ev} should invalidate ['userPositions']`).toContain(
