@@ -26,7 +26,11 @@ function Metric({ icon, label, value }: { icon: ReactNode; label: string; value:
 
 export function MarketGroupSummary({ summary, now }: MarketGroupSummaryProps) {
   const endsIn =
-    summary.endTime && summary.endTime > now ? formatCountdown(summary.endTime - now) : 'Open-ended'
+    summary.endTime == null
+      ? 'Open-ended'
+      : summary.endTime > now
+        ? formatCountdown(summary.endTime - now)
+        : 'Ended'
 
   return (
     <ChartFrame glow className="p-5">
