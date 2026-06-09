@@ -39,16 +39,22 @@ vi.mock('@tanstack/react-router', async () => {
     useParams: vi.fn(() => ({ id: 'btc' })),
     Link: ({
       children,
+      params,
       to,
       className,
       search,
       ...rest
     }: {
       children: React.ReactNode
+      params?: Record<string, string>
       to: string
       className?: string
       search?: Record<string, unknown>
     }) => {
+      const href =
+        params?.groupKeyHash && to === '/markets/group/$groupKeyHash'
+          ? `/markets/group/${params.groupKeyHash}`
+          : to
       const searchString = search
         ? new URLSearchParams(
             Object.entries(search).flatMap(([key, value]) =>
@@ -58,7 +64,7 @@ vi.mock('@tanstack/react-router', async () => {
         : ''
       return (
         <a
-          href={`${to}${searchString ? `?${searchString}` : ''}`}
+          href={`${href}${searchString ? `?${searchString}` : ''}`}
           className={className}
           {...rest}
         >
@@ -188,7 +194,7 @@ vi.mock('@/lib/supabase/hooks', () => ({
 import { MarketPage } from '@/routes/pages/MarketPage'
 import { useDrawingStore } from '@/stores/drawingStore'
 import { usePythStore } from '@/stores/pythStore'
-import type { PredictionPath, UserPosition } from '@/types/market'
+import type { Market, PredictionPath, UserPosition } from '@/types/market'
 
 const TEST_MARKET = {
   id: 'btc',
@@ -223,7 +229,7 @@ const TEST_MARKET = {
   pathsDissolved: 0,
 }
 
-type TestMarketOverride = Partial<Omit<typeof TEST_MARKET, 'paths'> & { paths: PredictionPath[] }>
+type TestMarketOverride = Partial<Market & { paths: PredictionPath[] }>
 
 function makePath(overrides: Partial<PredictionPath> = {}): PredictionPath {
   return {
@@ -335,6 +341,32 @@ function connectWallet() {
 }
 
 describe('MarketPage', () => {
+  it('links grouped markets back to their market group', async () => {
+    const groupKeyHash = 'ab'.repeat(32)
+    await setMarketState('active', {
+      groupKeyHash,
+      groupKind: 'season',
+    })
+
+    renderMarketPage()
+
+    expect(screen.getByRole('link', { name: /season abababab/i })).toHaveAttribute(
+      'href',
+      `/markets/group/${groupKeyHash}`,
+    )
+  })
+
+  it('does not render a group context link for flat markets', async () => {
+    await setMarketState('active', {
+      groupKeyHash: undefined,
+      groupKind: undefined,
+    })
+
+    renderMarketPage()
+
+    expect(screen.queryByRole('link', { name: /season/i })).not.toBeInTheDocument()
+  })
+
   it('opens a Pyth SSE feed on mount for the current market pair', () => {
     renderMarketPage()
     expect(usePythFeedSpy).toHaveBeenCalled()

@@ -23,6 +23,11 @@ vi.mock('@tanstack/react-router', async () => {
     await vi.importActual<typeof import('@tanstack/react-router')>('@tanstack/react-router')
   return {
     ...actual,
+    Link: ({ children, params, to, ...props }: any) => (
+      <a href={params?.groupKeyHash ? `/markets/group/${params.groupKeyHash}` : to} {...props}>
+        {children}
+      </a>
+    ),
     useNavigate: () => navigateSpy,
     useSearch: () => searchParams,
   }
@@ -328,6 +333,37 @@ describe('MarketsPage', () => {
     expect(screen.getByText(/^expires$/i)).toBeInTheDocument()
     expect(screen.getByText(/^pool$/i)).toBeInTheDocument()
     expect(screen.getByText(/^paths$/i)).toBeInTheDocument()
+  })
+
+  it('renders grouped market discovery links when grouped markets exist', async () => {
+    const groupKeyHash = 'ab'.repeat(32)
+    await setUseMarkets({
+      data: [
+        makeMarket({
+          id: 'grouped',
+          pair: 'BTC/USDC',
+          state: 'active',
+          groupKeyHash,
+          groupKind: 'season',
+        }),
+      ],
+    })
+
+    renderPage()
+
+    expect(screen.getByRole('link', { name: /all groups/i })).toHaveAttribute('href', '/markets')
+    const link = screen.getByRole('link', { name: /season abababab/i })
+    expect(link).toHaveAttribute('href', `/markets/group/${groupKeyHash}`)
+  })
+
+  it('keeps flat market lists free of group discovery controls', async () => {
+    await setUseMarkets({
+      data: [makeMarket({ id: 'flat', pair: 'ETH/USDC', state: 'active' })],
+    })
+
+    renderPage()
+
+    expect(screen.queryByRole('link', { name: /season/i })).not.toBeInTheDocument()
   })
 
   it('renders a skeleton component when useMarkets is loading (MARKET-08)', async () => {

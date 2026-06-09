@@ -1,0 +1,93 @@
+import { describe, expect, it } from 'vitest'
+
+import {
+  buildMarketGroupSummaries,
+  formatMarketGroupLabel,
+  getMarketsForGroup,
+} from '@/features/marketGroups/groupPresentation'
+import type { Market } from '@/types/market'
+
+function market(overrides: Partial<Market>): Market {
+  return {
+    id: overrides.id ?? '1',
+    marketId: overrides.marketId ?? 1,
+    pair: overrides.pair ?? 'BTC/USDC',
+    base: overrides.base ?? 'BTC',
+    quote: overrides.quote ?? 'USDC',
+    vault: '',
+    state: overrides.state ?? 'active',
+    pool: overrides.pool ?? 100,
+    traders: overrides.traders ?? 10,
+    startTime: overrides.startTime ?? Date.UTC(2026, 0, 1),
+    endTime: overrides.endTime ?? Date.UTC(2026, 0, 2),
+    checkpointInterval: 3600,
+    completedCheckpoints: 0,
+    totalCheckpoints: 24,
+    leverageEnabled: false,
+    maxLeverage: 1,
+    entryFeeBps: 150,
+    history: [],
+    paths: [],
+    numPaths: 0,
+    targetNumPaths: 3,
+    amplitudes: [],
+    lmsrShareQuantities: [],
+    pricingActiveMask: 0,
+    lmsrAlpha: 100_000,
+    lambda: 0,
+    decoherenceRate: 500_000,
+    minimumProbability: 10_000,
+    nudgeRate: 50_000,
+    pathMaxAge: 3600,
+    pathsScored: 0,
+    pathsDissolved: 0,
+    ...overrides,
+  }
+}
+
+describe('market group presentation', () => {
+  it('formats readable labels from group kind and hash prefix', () => {
+    expect(formatMarketGroupLabel({ groupKind: 'assetSeason', groupKeyHash: 'ab'.repeat(32) })).toBe(
+      'Asset season abababab',
+    )
+    expect(formatMarketGroupLabel({ groupKind: 'season', groupKeyHash: 'cd'.repeat(32) })).toBe(
+      'Season cdcdcdcd',
+    )
+    expect(formatMarketGroupLabel({ groupKeyHash: undefined })).toBe('Ungrouped')
+  })
+
+  it('builds summaries with lifecycle counts and totals', () => {
+    const groupKeyHash = 'ab'.repeat(32)
+    const summaries = buildMarketGroupSummaries([
+      market({ id: 'a', marketId: 1, state: 'active', groupKeyHash, groupKind: 'season' }),
+      market({ id: 'b', marketId: 2, state: 'pending', groupKeyHash, groupKind: 'season' }),
+      market({ id: 'c', marketId: 3, state: 'settled', groupKeyHash, groupKind: 'season' }),
+      market({ id: 'flat', marketId: 4, state: 'active' }),
+    ])
+
+    expect(summaries).toHaveLength(1)
+    expect(summaries[0]).toMatchObject({
+      groupKeyHash,
+      label: 'Season abababab',
+      totalMarkets: 3,
+      activeMarkets: 1,
+      pendingMarkets: 1,
+      settledMarkets: 1,
+    })
+  })
+
+  it('returns only child markets for a selected group hash', () => {
+    const target = 'ab'.repeat(32)
+    const other = 'cd'.repeat(32)
+    expect(
+      getMarketsForGroup(
+        [
+          market({ id: 'target', groupKeyHash: target }),
+          market({ id: 'other', groupKeyHash: other }),
+          market({ id: 'flat' }),
+        ],
+        target,
+      ).map((m) => m.id),
+    ).toEqual(['target'])
+  })
+})

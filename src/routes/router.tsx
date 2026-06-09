@@ -6,6 +6,7 @@ import { DocsLayout } from '@/routes/pages/DocsPage'
 import { LabsChartPage } from '@/routes/pages/LabsChartPage'
 import { LandingPage } from '@/routes/pages/LandingPage'
 import { LeaderboardPage } from '@/routes/pages/LeaderboardPage'
+import { MarketGroupPage } from '@/routes/pages/MarketGroupPage'
 import { MarketPage } from '@/routes/pages/MarketPage'
 import { MarketsPage } from '@/routes/pages/MarketsPage'
 import { NotFoundPage } from '@/routes/pages/NotFoundPage'
@@ -35,7 +36,6 @@ const indexRoute = createRoute({
 
 export type MarketsSearchParams = {
   view?: 'table' | 'grid'
-  group?: string
 }
 
 export type AdminCreateSearchParams = {
@@ -47,13 +47,11 @@ export const marketsRoute = createRoute({
   path: '/markets',
   validateSearch: (search: Record<string, unknown>): MarketsSearchParams => {
     const view = search.view as string
-    const group = typeof search.group === 'string' ? search.group : undefined
     return {
       view: (view === 'grid' || view === 'table' ? view : undefined) as
         | 'table'
         | 'grid'
         | undefined,
-      group,
     }
   },
   component: MarketsPage,
@@ -63,6 +61,12 @@ const marketRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/market/$id',
   component: MarketPage,
+})
+
+const marketGroupRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/markets/group/$groupKeyHash',
+  component: MarketGroupPage,
 })
 
 const positionsRoute = createRoute({
@@ -171,6 +175,7 @@ const docsDocRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   indexRoute,
   marketsRoute,
+  marketGroupRoute,
   marketRoute,
   positionsRoute,
   vaultRoute,
