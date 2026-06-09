@@ -1,6 +1,6 @@
 import { Link, useParams } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, Plus } from 'lucide-react'
+import { ArrowLeft, Layers, Plus } from 'lucide-react'
 
 import { Button } from '@/ui/Button'
 import { ChartFrame } from '@/features/chart/ChartFrame'
@@ -29,6 +29,7 @@ import { UserPositionCard } from '@/features/market/UserPositionCard'
 import { cn } from '@/lib/cn'
 import { useMarket, useUserPosition } from '@/lib/chain'
 import { parseMarketState } from '@/lib/api/adapters'
+import { formatMarketGroupLabel } from '@/features/marketGroups/groupPresentation'
 import { isMarketWageringOpen } from '@/lib/market/status'
 import { useProgram } from '@/lib/solana/program'
 import { deriveMarketPda } from '@/lib/solana/pda'
@@ -624,6 +625,28 @@ export function MarketPage() {
           <span>ENTRY FEE</span>
           <span className="text-ink-muted ml-1">{(market.entryFeeBps / 100).toFixed(1)}%</span>
         </div>
+
+        {market.groupKeyHash && (
+          <div className="mt-4">
+            <Link
+              to="/markets/group/$groupKeyHash"
+              params={{ groupKeyHash: market.groupKeyHash }}
+              className={cn(
+                'inline-flex h-10 items-center gap-2 rounded-full border px-3',
+                'border-line-strong text-ink-muted hover:border-ink hover:text-ink',
+                'text-label font-mono tracking-wider uppercase',
+                'duration-short ease-levx transition-[border-color,color]',
+                'focus-visible:ring-ink-strong focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-surface',
+              )}
+            >
+              <Layers size={14} strokeWidth={1.5} aria-hidden />
+              {formatMarketGroupLabel({
+                groupKind: market.groupKind,
+                groupKeyHash: market.groupKeyHash,
+              })}
+            </Link>
+          </div>
+        )}
       </section>
 
       <div
