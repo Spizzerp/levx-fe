@@ -18,6 +18,7 @@ import { cn } from '@/lib/cn'
 import { useMarketPathPreviews, useMarkets } from '@/lib/chain'
 import { buildMarketGroupSummaries } from '@/features/marketGroups/groupPresentation'
 import { getMarketDisplayState } from '@/lib/market/status'
+import { useNowTick } from '@/lib/hooks/useNowTick'
 import { feedIdForPair } from '@/lib/pyth/feedIds'
 import { usePythFeed } from '@/lib/pyth/hooks'
 import { formatCountdown, formatUSD } from '@/lib/format'
@@ -104,15 +105,6 @@ function endsInLabel(m: Market, now: number): string {
 
 // Hidden below 1200px (matches old @media rule that hid columns 6 & 7)
 const NARROW_HIDE = '[@media(max-width:1200px)]:hidden'
-
-function useNowTick(intervalMs = 1000): number {
-  const [now, setNow] = useState(() => Date.now())
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), intervalMs)
-    return () => clearInterval(id)
-  }, [intervalMs])
-  return now
-}
 
 function PythFeedSubscription({ feedId }: { feedId: string }) {
   usePythFeed(feedId)
@@ -237,7 +229,7 @@ function buildColumns(now: number, marketHeader: ReactNode): DataTableColumn<Mar
 
 export function MarketsPage() {
   const navigate = useNavigate({ from: '/markets' })
-  const { view: viewParam, group: groupParam } = useSearch({ from: '/markets' })
+  const { view: viewParam } = useSearch({ from: '/markets' })
   const viewMode = viewParam ?? 'table'
 
   const { data: markets, isLoading, isError, refetch } = useMarkets()
@@ -289,8 +281,7 @@ export function MarketsPage() {
     const filtered = (markets ?? []).filter(
       (m) =>
         matchesFilter(getMarketDisplayState(m), filter) &&
-        (selectedPairs.size === 0 || selectedPairs.has(m.pair)) &&
-        (!groupParam || m.groupKeyHash === groupParam),
+        (selectedPairs.size === 0 || selectedPairs.has(m.pair)),
     )
 
     if (!sort) {
@@ -304,15 +295,9 @@ export function MarketsPage() {
 
     const mult = sort.dir === 'asc' ? 1 : -1
     return [...filtered].sort((a, b) => (accessor(a) - accessor(b)) * mult)
-  }, [markets, filter, selectedPairs, groupParam, sort])
+  }, [markets, filter, selectedPairs, sort])
 
   const groupedMarkets = useMemo(() => buildMarketGroupSummaries(markets), [markets])
-
-  const setGroup = (group: string | undefined) => {
-    navigate({ search: (prev) => ({ ...prev, group }) })
-    setPage(0)
-    setVisibleCount(20)
-  }
 
   const handleSortToggle = (key: string) => {
     setSort((prev) => {
@@ -472,13 +457,7 @@ export function MarketsPage() {
         </div>
       )}
 
-      {hasAnyMarkets && (
-        <MarketGroupStrip
-          groups={groupedMarkets}
-          selectedGroup={groupParam}
-          onClear={() => setGroup(undefined)}
-        />
-      )}
+      {hasAnyMarkets && <MarketGroupStrip groups={groupedMarkets} />}
 
       {hasAnyMarkets && (
         <AnimatePresence mode="wait" initial={false}>

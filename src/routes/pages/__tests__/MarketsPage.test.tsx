@@ -17,7 +17,7 @@ vi.mock('@/env/env.config', () => ({
 
 // Mock navigate so the DataTable row click doesn't crash outside the router
 const navigateSpy = vi.fn()
-let searchParams: { view?: 'table' | 'grid'; group?: string } = {}
+let searchParams: { view?: 'table' | 'grid' } = {}
 vi.mock('@tanstack/react-router', async () => {
   const actual =
     await vi.importActual<typeof import('@tanstack/react-router')>('@tanstack/react-router')
@@ -351,6 +351,7 @@ describe('MarketsPage', () => {
 
     renderPage()
 
+    expect(screen.getByRole('link', { name: /all groups/i })).toHaveAttribute('href', '/markets')
     const link = screen.getByRole('link', { name: /season abababab/i })
     expect(link).toHaveAttribute('href', `/markets/group/${groupKeyHash}`)
   })

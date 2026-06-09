@@ -36,7 +36,6 @@ const indexRoute = createRoute({
 
 export type MarketsSearchParams = {
   view?: 'table' | 'grid'
-  group?: string
 }
 
 export type AdminCreateSearchParams = {
@@ -48,13 +47,11 @@ export const marketsRoute = createRoute({
   path: '/markets',
   validateSearch: (search: Record<string, unknown>): MarketsSearchParams => {
     const view = search.view as string
-    const group = typeof search.group === 'string' ? search.group : undefined
     return {
       view: (view === 'grid' || view === 'table' ? view : undefined) as
         | 'table'
         | 'grid'
         | undefined,
-      group,
     }
   },
   component: MarketsPage,

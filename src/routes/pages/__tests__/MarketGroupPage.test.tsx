@@ -1,5 +1,5 @@
-import { render, screen, within } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { act, render, screen, within } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { Market } from '@/types/market'
 
@@ -30,9 +30,10 @@ vi.mock('@tanstack/react-router', async () => {
 })
 
 vi.mock('@/features/market/MarketCard', () => ({
-  MarketCard: ({ market, onClick }: { market: Market; onClick: () => void }) => (
+  MarketCard: ({ market, now, onClick }: { market: Market; now: number; onClick: () => void }) => (
     <button type="button" onClick={onClick}>
       {market.pair}
+      <span>now:{now}</span>
     </button>
   ),
 }))
@@ -106,6 +107,10 @@ describe('MarketGroupPage', () => {
     setUseMarkets({ data: [] })
   })
 
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it('renders a stable loading state', () => {
     setUseMarkets({ data: undefined, isLoading: true })
 
@@ -130,6 +135,24 @@ describe('MarketGroupPage', () => {
     expect(screen.getByRole('button', { name: /BTC\/USDC/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /ETH\/USDC/i })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /SOL\/USDC/i })).not.toBeInTheDocument()
+  })
+
+  it('ticks child market cards as time passes', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(1_000)
+    setUseMarkets({
+      data: [makeMarket({ id: 'btc', pair: 'BTC/USDC', state: 'active' })],
+    })
+
+    renderPage()
+
+    expect(screen.getByText('now:1000')).toBeInTheDocument()
+
+    act(() => {
+      vi.advanceTimersByTime(1_000)
+    })
+
+    expect(screen.getByText('now:2000')).toBeInTheDocument()
   })
 
   it('renders an empty state when the group hash has no children', () => {

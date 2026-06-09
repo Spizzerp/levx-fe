@@ -11,23 +11,20 @@ import {
 import { PageLayout } from '@/layouts/PageLayout'
 import { useMarkets } from '@/lib/chain'
 import { cn } from '@/lib/cn'
-import { Button } from '@/ui/Button'
+import { useNowTick } from '@/lib/hooks/useNowTick'
 import { QueryErrorState } from '@/ui/QueryErrorState'
 
 export function MarketGroupPage() {
   const { groupKeyHash } = useParams({ from: '/markets/group/$groupKeyHash' })
   const navigate = useNavigate()
   const { data: markets, isLoading, isError, refetch } = useMarkets()
-  const now = Date.now()
+  const now = useNowTick(1000)
 
   const childMarkets = useMemo(
     () => getMarketsForGroup(markets, groupKeyHash),
     [markets, groupKeyHash],
   )
-  const summary = useMemo(
-    () => buildMarketGroupSummaries(childMarkets).find((item) => item.groupKeyHash === groupKeyHash),
-    [childMarkets, groupKeyHash],
-  )
+  const summary = useMemo(() => buildMarketGroupSummaries(childMarkets)[0], [childMarkets])
 
   return (
     <PageLayout title="Market Group" subtitle="Child markets settle independently.">
@@ -62,13 +59,10 @@ export function MarketGroupPage() {
       )}
 
       {!isLoading && !isError && !summary && (
-        <div className="border-line-strong flex flex-col items-center justify-center gap-4 border border-dashed py-24 text-center">
+        <div className="border-line-strong flex flex-col items-center justify-center border border-dashed py-24 text-center">
           <p className="text-ink-muted text-label font-mono uppercase">
             [ No child markets found ]
           </p>
-          <Button variant="secondary" onClick={() => void navigate({ to: '/markets' })}>
-            Back to markets
-          </Button>
         </div>
       )}
 

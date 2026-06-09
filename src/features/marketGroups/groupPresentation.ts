@@ -1,19 +1,13 @@
 import { getMarketDisplayState } from '@/lib/market/status'
-import type { Market, MarketGroupKind, MarketGroupStatus, MarketState } from '@/types/market'
+import type { Market, MarketGroupKind, MarketState } from '@/types/market'
 
 export type MarketGroupSummary = {
   groupKeyHash: string
   label: string
-  kind?: MarketGroupKind
-  status?: MarketGroupStatus
-  parentGroup?: string
   totalMarkets: number
   activeMarkets: number
   pendingMarkets: number
   settledMarkets: number
-  childMarketCount?: number
-  timeframeSeconds?: number
-  startTime?: number
   endTime?: number
   totalPool: number
   totalTraders: number
@@ -72,16 +66,10 @@ export function buildMarketGroupSummaries(
           groupKind: market.groupKind,
           groupKeyHash: market.groupKeyHash,
         }),
-        kind: market.groupKind,
-        status: market.group?.status,
-        parentGroup: market.parentGroup,
         totalMarkets: 0,
         activeMarkets: 0,
         pendingMarkets: 0,
         settledMarkets: 0,
-        childMarketCount: market.group?.childMarketCount,
-        timeframeSeconds: market.timeframeSeconds,
-        startTime: market.group?.startTime,
         endTime: market.group?.endTime,
         totalPool: 0,
         totalTraders: 0,
