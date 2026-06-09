@@ -1,11 +1,12 @@
 import { useNavigate, useSearch } from '@tanstack/react-router'
-import { ArrowRight, Filter, Layers, LayoutGrid, List, Loader2 } from 'lucide-react'
+import { ArrowRight, Filter, LayoutGrid, List, Loader2 } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { ChartFrame } from '@/features/chart/ChartFrame'
 import { MarketCard } from '@/features/market/MarketCard'
 import { MarketCardSkeleton } from '@/features/market/MarketCardSkeleton'
+import { MarketGroupStrip } from '@/features/marketGroups/MarketGroupStrip'
 import { MarketPairFilter, type PairOption } from '@/features/market/MarketPairFilter'
 import { TokenPairIcon } from '@/ui/TokenPairIcon'
 import { DataTable, NUM_CELL, type DataTableColumn, type DataTableSort } from '@/ui/DataTable'
@@ -15,6 +16,7 @@ import { QueryErrorState } from '@/ui/QueryErrorState'
 import { StatusDot } from '@/ui/StatusDot'
 import { cn } from '@/lib/cn'
 import { useMarketPathPreviews, useMarkets } from '@/lib/chain'
+import { buildMarketGroupSummaries } from '@/features/marketGroups/groupPresentation'
 import { getMarketDisplayState } from '@/lib/market/status'
 import { feedIdForPair } from '@/lib/pyth/feedIds'
 import { usePythFeed } from '@/lib/pyth/hooks'
@@ -98,17 +100,6 @@ function endsInLabel(m: Market, now: number): string {
   if (m.state === 'settled') return 'SETTLED'
   const diff = m.endTime - now
   return diff > 0 ? formatCountdown(diff) : 'ENDED'
-}
-
-function groupKindLabel(kind: Market['groupKind']): string {
-  if (!kind) return 'Group'
-  if (kind === 'assetSeason') return 'Asset season'
-  return kind.charAt(0).toUpperCase() + kind.slice(1)
-}
-
-function groupLabel(market: Market): string {
-  if (!market.groupKeyHash) return 'Ungrouped'
-  return `${groupKindLabel(market.groupKind)} ${market.groupKeyHash.slice(0, 8)}`
 }
 
 // Hidden below 1200px (matches old @media rule that hid columns 6 & 7)
@@ -315,23 +306,7 @@ export function MarketsPage() {
     return [...filtered].sort((a, b) => (accessor(a) - accessor(b)) * mult)
   }, [markets, filter, selectedPairs, groupParam, sort])
 
-  const groupedMarkets = useMemo(() => {
-    const byHash = new Map<string, { hash: string; label: string; count: number }>()
-    for (const market of markets ?? []) {
-      if (!market.groupKeyHash) continue
-      const existing = byHash.get(market.groupKeyHash)
-      if (existing) {
-        existing.count += 1
-      } else {
-        byHash.set(market.groupKeyHash, {
-          hash: market.groupKeyHash,
-          label: groupLabel(market),
-          count: 1,
-        })
-      }
-    }
-    return Array.from(byHash.values()).sort((a, b) => a.label.localeCompare(b.label))
-  }, [markets])
+  const groupedMarkets = useMemo(() => buildMarketGroupSummaries(markets), [markets])
 
   const setGroup = (group: string | undefined) => {
     navigate({ search: (prev) => ({ ...prev, group }) })
@@ -497,42 +472,12 @@ export function MarketsPage() {
         </div>
       )}
 
-      {hasAnyMarkets && groupedMarkets.length > 0 && (
-        <div className="mb-5 flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setGroup(undefined)}
-            className={cn(
-              'inline-flex h-9 items-center gap-2 rounded-full border px-3',
-              'text-label font-mono tracking-wider uppercase',
-              'duration-short ease-levx transition-[border-color,color]',
-              !groupParam
-                ? 'border-ink-strong text-ink-strong'
-                : 'border-line-strong text-ink-muted hover:border-ink hover:text-ink',
-            )}
-          >
-            <Layers size={14} strokeWidth={1.5} />
-            All groups
-          </button>
-          {groupedMarkets.map((group) => (
-            <button
-              key={group.hash}
-              type="button"
-              onClick={() => setGroup(group.hash)}
-              className={cn(
-                'inline-flex h-9 items-center gap-2 rounded-full border px-3',
-                'text-label font-mono tracking-wider uppercase',
-                'duration-short ease-levx transition-[border-color,color]',
-                groupParam === group.hash
-                  ? 'border-ink-strong text-ink-strong'
-                  : 'border-line-strong text-ink-muted hover:border-ink hover:text-ink',
-              )}
-            >
-              {group.label}
-              <span className="text-ink-dim">{group.count}</span>
-            </button>
-          ))}
-        </div>
+      {hasAnyMarkets && (
+        <MarketGroupStrip
+          groups={groupedMarkets}
+          selectedGroup={groupParam}
+          onClear={() => setGroup(undefined)}
+        />
       )}
 
       {hasAnyMarkets && (
