@@ -5,6 +5,7 @@ import {
   formatMarketGroupLabel,
   getMarketsForGroup,
 } from '@/features/marketGroups/groupPresentation'
+import { MARKET_GROUP_CONSTRAINT_FLAGS } from '@/lib/marketGroups'
 import type { Market } from '@/types/market'
 
 function market(overrides: Partial<Market>): Market {
@@ -59,7 +60,30 @@ describe('market group presentation', () => {
   it('builds summaries with lifecycle counts and totals', () => {
     const groupKeyHash = 'ab'.repeat(32)
     const summaries = buildMarketGroupSummaries([
-      market({ id: 'a', marketId: 1, state: 'active', groupKeyHash, groupKind: 'season' }),
+      market({
+        id: 'a',
+        marketId: 1,
+        state: 'active',
+        groupKeyHash,
+        groupKind: 'season',
+        group: {
+          address: 'season-group',
+          authority: 'group-authority',
+          groupKeyHash,
+          parentGroup: null,
+          kind: 'season',
+          status: 'active',
+          baseMint: 'base-mint',
+          quoteMint: 'quote-mint',
+          pythFeedId: '00'.repeat(32),
+          constraintFlags: MARKET_GROUP_CONSTRAINT_FLAGS.timeWindow,
+          startTime: Date.UTC(2026, 0, 1),
+          endTime: Date.UTC(2026, 0, 7),
+          allowedTimeframesMask: 0,
+          metadataHash: '11'.repeat(32),
+          childMarketCount: 3,
+        },
+      }),
       market({ id: 'b', marketId: 2, state: 'pending', groupKeyHash, groupKind: 'season' }),
       market({ id: 'c', marketId: 3, state: 'settled', groupKeyHash, groupKind: 'season' }),
       market({ id: 'flat', marketId: 4, state: 'active' }),
@@ -73,7 +97,41 @@ describe('market group presentation', () => {
       activeMarkets: 1,
       pendingMarkets: 1,
       settledMarkets: 1,
+      endTime: Date.UTC(2026, 0, 7),
     })
+  })
+
+  it('treats groups without a time-window constraint as open-ended even when stored endTime is zero', () => {
+    const groupKeyHash = 'ef'.repeat(32)
+    const summaries = buildMarketGroupSummaries([
+      market({
+        id: 'open-ended',
+        marketId: 5,
+        state: 'active',
+        groupKeyHash,
+        groupKind: 'season',
+        group: {
+          address: 'open-season-group',
+          authority: 'group-authority',
+          groupKeyHash,
+          parentGroup: null,
+          kind: 'season',
+          status: 'active',
+          baseMint: 'base-mint',
+          quoteMint: 'quote-mint',
+          pythFeedId: '00'.repeat(32),
+          constraintFlags: 0,
+          startTime: 0,
+          endTime: 0,
+          allowedTimeframesMask: 0,
+          metadataHash: '22'.repeat(32),
+          childMarketCount: 1,
+        },
+      }),
+    ])
+
+    expect(summaries).toHaveLength(1)
+    expect(summaries[0]?.endTime).toBeUndefined()
   })
 
   it('returns only child markets for a selected group hash', () => {
