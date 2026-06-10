@@ -1,4 +1,5 @@
 import { getMarketDisplayState } from '@/lib/market/status'
+import { MARKET_GROUP_CONSTRAINT_FLAGS } from '@/lib/marketGroups'
 import type { Market, MarketGroupKind, MarketState } from '@/types/market'
 
 export type MarketGroupSummary = {
@@ -70,7 +71,11 @@ export function buildMarketGroupSummaries(
         activeMarkets: 0,
         pendingMarkets: 0,
         settledMarkets: 0,
-        endTime: market.group?.endTime,
+        endTime:
+          market.group &&
+          (market.group.constraintFlags & MARKET_GROUP_CONSTRAINT_FLAGS.timeWindow) !== 0
+            ? market.group.endTime
+            : undefined,
         totalPool: 0,
         totalTraders: 0,
       } satisfies MarketGroupSummary)
