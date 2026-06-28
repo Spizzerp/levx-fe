@@ -34,6 +34,13 @@ function countState(
   return null
 }
 
+function getGroupWindowEndTime(market: Market): number | undefined {
+  return market.group &&
+    (market.group.constraintFlags & MARKET_GROUP_CONSTRAINT_FLAGS.timeWindow) !== 0
+    ? market.group.endTime
+    : undefined
+}
+
 export function formatMarketGroupLabel(args: {
   groupKind?: MarketGroupKind
   groupKeyHash?: string
@@ -71,16 +78,13 @@ export function buildMarketGroupSummaries(
         activeMarkets: 0,
         pendingMarkets: 0,
         settledMarkets: 0,
-        endTime:
-          market.group &&
-          (market.group.constraintFlags & MARKET_GROUP_CONSTRAINT_FLAGS.timeWindow) !== 0
-            ? market.group.endTime
-            : undefined,
+        endTime: getGroupWindowEndTime(market),
         totalPool: 0,
         totalTraders: 0,
       } satisfies MarketGroupSummary)
 
     const stateBucket = countState(getMarketDisplayState(market))
+    summary.endTime ??= getGroupWindowEndTime(market)
     summary.totalMarkets += 1
     summary.totalPool += market.pool
     summary.totalTraders += market.traders

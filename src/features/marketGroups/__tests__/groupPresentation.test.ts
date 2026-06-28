@@ -134,6 +134,47 @@ describe('market group presentation', () => {
     expect(summaries[0]?.endTime).toBeUndefined()
   })
 
+  it('uses later group metadata when the first grouped market lacks a sidecar', () => {
+    const groupKeyHash = '12'.repeat(32)
+    const summaries = buildMarketGroupSummaries([
+      market({
+        id: 'missing-sidecar',
+        marketId: 6,
+        state: 'active',
+        groupKeyHash,
+        groupKind: 'season',
+        group: undefined,
+      }),
+      market({
+        id: 'with-sidecar',
+        marketId: 7,
+        state: 'pending',
+        groupKeyHash,
+        groupKind: 'season',
+        group: {
+          address: 'late-season-group',
+          authority: 'group-authority',
+          groupKeyHash,
+          parentGroup: null,
+          kind: 'season',
+          status: 'active',
+          baseMint: 'base-mint',
+          quoteMint: 'quote-mint',
+          pythFeedId: '00'.repeat(32),
+          constraintFlags: MARKET_GROUP_CONSTRAINT_FLAGS.timeWindow,
+          startTime: Date.UTC(2026, 0, 1),
+          endTime: Date.UTC(2026, 0, 9),
+          allowedTimeframesMask: 0,
+          metadataHash: '33'.repeat(32),
+          childMarketCount: 2,
+        },
+      }),
+    ])
+
+    expect(summaries).toHaveLength(1)
+    expect(summaries[0]?.endTime).toBe(Date.UTC(2026, 0, 9))
+  })
+
   it('returns only child markets for a selected group hash', () => {
     const target = 'ab'.repeat(32)
     const other = 'cd'.repeat(32)
