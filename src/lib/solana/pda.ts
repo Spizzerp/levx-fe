@@ -43,6 +43,20 @@ export function deriveMarketGroupLinkPda(marketId: number): [PublicKey, number] 
   )
 }
 
+export function deriveLeverageConfigPda(): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync([Buffer.from('leverage_config')], PROGRAM_ID)
+}
+
+export function derivePairRiskStatePda(
+  baseMint: PublicKey,
+  quoteMint: PublicKey,
+): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from('pair_risk_state'), baseMint.toBuffer(), quoteMint.toBuffer()],
+    PROGRAM_ID,
+  )
+}
+
 export function derivePathPda(marketId: number, pathIndex: number): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [Buffer.from('path'), new BN(marketId).toArrayLike(Buffer, 'le', 8), Buffer.from([pathIndex])],

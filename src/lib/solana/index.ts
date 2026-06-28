@@ -4,6 +4,8 @@ export {
   deriveMarketPda,
   deriveMarketGroupPda,
   deriveMarketGroupLinkPda,
+  deriveLeverageConfigPda,
+  derivePairRiskStatePda,
   derivePathPda,
   derivePositionPda,
   deriveSamplePda,

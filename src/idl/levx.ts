@@ -62,6 +62,74 @@ export type Levx = {
       "args": []
     },
     {
+      "name": "acceptLeverageConfigAfterDelay",
+      "discriminator": [
+        5,
+        17,
+        203,
+        208,
+        199,
+        106,
+        34,
+        41
+      ],
+      "accounts": [
+        {
+          "name": "protocolState",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "leverageConfig",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  101,
+                  118,
+                  101,
+                  114,
+                  97,
+                  103,
+                  101,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "activateMarket",
       "discriminator": [
         10,
@@ -2339,6 +2407,205 @@ export type Levx = {
       ]
     },
     {
+      "name": "initializeLeverageConfig",
+      "discriminator": [
+        59,
+        159,
+        112,
+        190,
+        6,
+        192,
+        68,
+        26
+      ],
+      "accounts": [
+        {
+          "name": "protocolState",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "leverageConfig",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  101,
+                  118,
+                  101,
+                  114,
+                  97,
+                  103,
+                  101,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "params",
+          "type": {
+            "defined": {
+              "name": "initializeLeverageConfigParams"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "initializePairRiskState",
+      "discriminator": [
+        106,
+        196,
+        82,
+        72,
+        203,
+        169,
+        207,
+        139
+      ],
+      "accounts": [
+        {
+          "name": "protocolState",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "leverageConfig",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  101,
+                  118,
+                  101,
+                  114,
+                  97,
+                  103,
+                  101,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "pairRiskState",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  105,
+                  114,
+                  95,
+                  114,
+                  105,
+                  115,
+                  107,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "params.base_mint"
+              },
+              {
+                "kind": "arg",
+                "path": "params.quote_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "params",
+          "type": {
+            "defined": {
+              "name": "pairRiskStateParams"
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "initializeProtocol",
       "discriminator": [
         188,
@@ -3432,6 +3699,83 @@ export type Levx = {
       "args": []
     },
     {
+      "name": "stageLeverageConfig",
+      "discriminator": [
+        251,
+        51,
+        55,
+        53,
+        163,
+        149,
+        68,
+        207
+      ],
+      "accounts": [
+        {
+          "name": "protocolState",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "leverageConfig",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  101,
+                  118,
+                  101,
+                  114,
+                  97,
+                  103,
+                  101,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "params",
+          "type": {
+            "defined": {
+              "name": "stageLeverageConfigParams"
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "submitEigendecomp",
       "discriminator": [
         159,
@@ -3856,6 +4200,93 @@ export type Levx = {
       ]
     },
     {
+      "name": "updatePairRiskStatus",
+      "discriminator": [
+        219,
+        111,
+        8,
+        162,
+        230,
+        128,
+        136,
+        127
+      ],
+      "accounts": [
+        {
+          "name": "protocolState",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "pairRiskState",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  105,
+                  114,
+                  95,
+                  114,
+                  105,
+                  115,
+                  107,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pair_risk_state.base_mint",
+                "account": "pairRiskState"
+              },
+              {
+                "kind": "account",
+                "path": "pair_risk_state.quote_mint",
+                "account": "pairRiskState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "status",
+          "type": {
+            "defined": {
+              "name": "pairRiskStatus"
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "voidMarket",
       "discriminator": [
         243,
@@ -4021,6 +4452,19 @@ export type Levx = {
       ]
     },
     {
+      "name": "leverageConfig",
+      "discriminator": [
+        75,
+        136,
+        85,
+        193,
+        13,
+        219,
+        3,
+        171
+      ]
+    },
+    {
       "name": "market",
       "discriminator": [
         219,
@@ -4057,6 +4501,19 @@ export type Levx = {
         34,
         79,
         96
+      ]
+    },
+    {
+      "name": "pairRiskState",
+      "discriminator": [
+        14,
+        34,
+        77,
+        152,
+        189,
+        248,
+        70,
+        64
       ]
     },
     {
@@ -4283,6 +4740,45 @@ export type Levx = {
       ]
     },
     {
+      "name": "leverageConfigAccepted",
+      "discriminator": [
+        155,
+        190,
+        24,
+        98,
+        244,
+        143,
+        132,
+        11
+      ]
+    },
+    {
+      "name": "leverageConfigInitialized",
+      "discriminator": [
+        96,
+        212,
+        228,
+        0,
+        237,
+        226,
+        6,
+        185
+      ]
+    },
+    {
+      "name": "leverageConfigStaged",
+      "discriminator": [
+        10,
+        239,
+        163,
+        91,
+        195,
+        191,
+        210,
+        255
+      ]
+    },
+    {
       "name": "marketActivated",
       "discriminator": [
         196,
@@ -4449,6 +4945,32 @@ export type Levx = {
         75,
         89,
         26
+      ]
+    },
+    {
+      "name": "pairRiskStateInitialized",
+      "discriminator": [
+        165,
+        208,
+        218,
+        245,
+        254,
+        98,
+        119,
+        80
+      ]
+    },
+    {
+      "name": "pairRiskStatusUpdated",
+      "discriminator": [
+        115,
+        38,
+        173,
+        111,
+        205,
+        67,
+        113,
+        123
       ]
     },
     {
@@ -5016,6 +5538,26 @@ export type Levx = {
       "code": 6065,
       "name": "marketGroupNotEmpty",
       "msg": "Market group still has linked markets"
+    },
+    {
+      "code": 6066,
+      "name": "invalidLeverageConfig",
+      "msg": "Invalid leverage configuration"
+    },
+    {
+      "code": 6067,
+      "name": "leverageConfigNotStaged",
+      "msg": "Leverage configuration is not staged"
+    },
+    {
+      "code": 6068,
+      "name": "leverageConfigDelayActive",
+      "msg": "Leverage configuration delay has not elapsed"
+    },
+    {
+      "code": 6069,
+      "name": "invalidPairRiskState",
+      "msg": "Invalid pair risk state"
     }
   ],
   "types": [
@@ -5795,6 +6337,35 @@ export type Levx = {
       }
     },
     {
+      "name": "initializeLeverageConfigParams",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "currentParams",
+            "type": {
+              "defined": {
+                "name": "leverageRiskParams"
+              }
+            }
+          },
+          {
+            "name": "simulatorOutputHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "activationDelaySeconds",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "levVault",
       "type": {
         "kind": "struct",
@@ -5935,6 +6506,265 @@ export type Levx = {
           {
             "name": "bump",
             "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "leverageConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "leverageConfigStatus"
+              }
+            }
+          },
+          {
+            "name": "currentParams",
+            "type": {
+              "defined": {
+                "name": "leverageRiskParams"
+              }
+            }
+          },
+          {
+            "name": "pendingParams",
+            "type": {
+              "defined": {
+                "name": "leverageRiskParams"
+              }
+            }
+          },
+          {
+            "name": "simulatorOutputHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "pendingSimulatorOutputHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "activationDelaySeconds",
+            "type": "i64"
+          },
+          {
+            "name": "stagedAt",
+            "type": "i64"
+          },
+          {
+            "name": "acceptedAt",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "leverageConfigAccepted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "config",
+            "type": "pubkey"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "acceptedAt",
+            "type": "i64"
+          },
+          {
+            "name": "simulatorOutputHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "maxLeverage",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "leverageConfigInitialized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "config",
+            "type": "pubkey"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "simulatorOutputHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "activationDelaySeconds",
+            "type": "i64"
+          },
+          {
+            "name": "maxLeverage",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "leverageConfigStaged",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "config",
+            "type": "pubkey"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "stagedAt",
+            "type": "i64"
+          },
+          {
+            "name": "earliestAcceptAt",
+            "type": "i64"
+          },
+          {
+            "name": "pendingSimulatorOutputHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "leverageConfigStatus",
+      "repr": {
+        "kind": "rust"
+      },
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "accepted"
+          },
+          {
+            "name": "staged"
+          }
+        ]
+      }
+    },
+    {
+      "name": "leverageRiskParams",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "maxLeverage",
+            "type": "u8"
+          },
+          {
+            "name": "maxMarketLeveragedOi",
+            "type": "u64"
+          },
+          {
+            "name": "maxPairLeveragedOi",
+            "type": "u64"
+          },
+          {
+            "name": "maxPathLeveragedOi",
+            "type": "u64"
+          },
+          {
+            "name": "maxPathClusterLeveragedOi",
+            "type": "u64"
+          },
+          {
+            "name": "vaultUtilizationCeilingBps",
+            "type": "u16"
+          },
+          {
+            "name": "borrowBaseRateBps",
+            "type": "u16"
+          },
+          {
+            "name": "borrowKinkUtilizationBps",
+            "type": "u16"
+          },
+          {
+            "name": "borrowKinkRateBps",
+            "type": "u16"
+          },
+          {
+            "name": "borrowMaxRateBps",
+            "type": "u16"
+          },
+          {
+            "name": "liquidationThreshold",
+            "type": "u64"
+          },
+          {
+            "name": "keeperRewardBps",
+            "type": "u16"
+          },
+          {
+            "name": "profitWarmupCheckpoints",
+            "type": "u16"
+          },
+          {
+            "name": "minPairBufferBps",
+            "type": "u16"
           }
         ]
       }
@@ -6815,6 +7645,220 @@ export type Levx = {
           {
             "name": "reason",
             "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "pairRiskState",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "baseMint",
+            "type": "pubkey"
+          },
+          {
+            "name": "quoteMint",
+            "type": "pubkey"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "pairRiskStatus"
+              }
+            }
+          },
+          {
+            "name": "maxPairLeveragedOi",
+            "type": "u64"
+          },
+          {
+            "name": "maxLeverage",
+            "type": "u8"
+          },
+          {
+            "name": "bufferTargetBps",
+            "type": "u16"
+          },
+          {
+            "name": "bufferDrainThresholdBps",
+            "type": "u16"
+          },
+          {
+            "name": "bufferReopenThresholdBps",
+            "type": "u16"
+          },
+          {
+            "name": "lastStatusChange",
+            "type": "i64"
+          },
+          {
+            "name": "configHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "pairRiskStateInitialized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pairRiskState",
+            "type": "pubkey"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "baseMint",
+            "type": "pubkey"
+          },
+          {
+            "name": "quoteMint",
+            "type": "pubkey"
+          },
+          {
+            "name": "status",
+            "type": "u8"
+          },
+          {
+            "name": "maxPairLeveragedOi",
+            "type": "u64"
+          },
+          {
+            "name": "maxLeverage",
+            "type": "u8"
+          },
+          {
+            "name": "configHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "pairRiskStateParams",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "baseMint",
+            "type": "pubkey"
+          },
+          {
+            "name": "quoteMint",
+            "type": "pubkey"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "pairRiskStatus"
+              }
+            }
+          },
+          {
+            "name": "maxPairLeveragedOi",
+            "type": "u64"
+          },
+          {
+            "name": "maxLeverage",
+            "type": "u8"
+          },
+          {
+            "name": "bufferTargetBps",
+            "type": "u16"
+          },
+          {
+            "name": "bufferDrainThresholdBps",
+            "type": "u16"
+          },
+          {
+            "name": "bufferReopenThresholdBps",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "pairRiskStatus",
+      "repr": {
+        "kind": "rust"
+      },
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "active"
+          },
+          {
+            "name": "drainOnly"
+          },
+          {
+            "name": "resetPending"
+          },
+          {
+            "name": "paused"
+          }
+        ]
+      }
+    },
+    {
+      "name": "pairRiskStatusUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pairRiskState",
+            "type": "pubkey"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "oldStatus",
+            "type": "u8"
+          },
+          {
+            "name": "newStatus",
+            "type": "u8"
+          },
+          {
+            "name": "lastStatusChange",
+            "type": "i64"
           }
         ]
       }
@@ -7858,6 +8902,31 @@ export type Levx = {
               "lands."
             ],
             "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "stageLeverageConfigParams",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pendingParams",
+            "type": {
+              "defined": {
+                "name": "leverageRiskParams"
+              }
+            }
+          },
+          {
+            "name": "simulatorOutputHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
           }
         ]
       }

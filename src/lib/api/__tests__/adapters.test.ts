@@ -1,7 +1,12 @@
 import { describe, it, expect } from 'vitest'
 import { BN } from '@coral-xyz/anchor'
 
-import { anchorPathToFE, anchorPositionToFE } from '@/lib/api/adapters'
+import {
+  anchorLeverageConfigToFE,
+  anchorPairRiskStateToFE,
+  anchorPathToFE,
+  anchorPositionToFE,
+} from '@/lib/api/adapters'
 import { SCALE } from '@/lib/constants'
 
 function rawPosition(overrides: Record<string, unknown> = {}) {
@@ -41,6 +46,26 @@ function rawPath(overrides: Record<string, unknown> = {}) {
     totalTimeWeightedExposure: new BN(0),
     currentImpliedProbability: 2500,
     initialAmplitude: new BN(SCALE),
+    ...overrides,
+  }
+}
+
+function rawRiskParams(overrides: Record<string, unknown> = {}) {
+  return {
+    maxLeverage: 5,
+    maxMarketLeveragedOi: new BN(40_000 * SCALE),
+    maxPairLeveragedOi: new BN(100_000 * SCALE),
+    maxPathLeveragedOi: new BN(10_000 * SCALE),
+    maxPathClusterLeveragedOi: new BN(25_000 * SCALE),
+    vaultUtilizationCeilingBps: 7500,
+    borrowBaseRateBps: 100,
+    borrowKinkUtilizationBps: 6000,
+    borrowKinkRateBps: 800,
+    borrowMaxRateBps: 2000,
+    liquidationThreshold: new BN(Math.round(1.15 * SCALE)),
+    keeperRewardBps: 50,
+    profitWarmupCheckpoints: 4,
+    minPairBufferBps: 2500,
     ...overrides,
   }
 }
@@ -133,5 +158,58 @@ describe('anchorPositionToFE', () => {
       estimatedPayout: 42.5,
     })
     expect(pos.estimatedPayout).toBe(42.5)
+  })
+})
+
+describe('Mode 2 sidecar adapters', () => {
+  it('converts LeverageConfig into frontend units', () => {
+    const config = anchorLeverageConfigToFE(
+      {
+        authority: { toBase58: () => 'authority' },
+        status: { accepted: {} },
+        currentParams: rawRiskParams(),
+        pendingParams: rawRiskParams({ maxLeverage: 3 }),
+        simulatorOutputHash: Array(32).fill(1),
+        pendingSimulatorOutputHash: Array(32).fill(2),
+        activationDelaySeconds: new BN(86_400),
+        stagedAt: new BN(1_700_000_000),
+        acceptedAt: new BN(1_700_086_400),
+      },
+      'config-pda',
+    )
+
+    expect(config.status).toBe('accepted')
+    expect(config.currentParams.maxPairLeveragedOi).toBe(100_000)
+    expect(config.pendingParams.maxLeverage).toBe(3)
+    expect(config.currentParams.liquidationThreshold).toBeCloseTo(1.15)
+    expect(config.simulatorOutputHash).toBe('01'.repeat(32))
+    expect(config.pendingSimulatorOutputHash).toBe('02'.repeat(32))
+    expect(config.activationDelaySeconds).toBe(86_400)
+    expect(config.acceptedAt).toBe(1_700_086_400_000)
+  })
+
+  it('converts PairRiskState into frontend units', () => {
+    const state = anchorPairRiskStateToFE(
+      {
+        authority: { toBase58: () => 'authority' },
+        baseMint: { toBase58: () => 'base' },
+        quoteMint: { toBase58: () => 'quote' },
+        status: { drainOnly: {} },
+        maxPairLeveragedOi: new BN(250_000 * SCALE),
+        maxLeverage: 4,
+        bufferTargetBps: 2500,
+        bufferDrainThresholdBps: 1500,
+        bufferReopenThresholdBps: 2000,
+        lastStatusChange: new BN(1_700_000_000),
+        configHash: Array(32).fill(3),
+      },
+      'pair-risk-pda',
+    )
+
+    expect(state.status).toBe('drainOnly')
+    expect(state.maxPairLeveragedOi).toBe(250_000)
+    expect(state.maxLeverage).toBe(4)
+    expect(state.configHash).toBe('03'.repeat(32))
+    expect(state.lastStatusChange).toBe(1_700_000_000_000)
   })
 })

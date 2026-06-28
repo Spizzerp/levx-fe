@@ -13,6 +13,7 @@ import type {
   Market,
   MarketGroup,
   MarketGroupLink,
+  Mode2Readiness,
   PathTone,
   PredictionPath,
   PricePoint,
@@ -512,6 +513,14 @@ export async function getMarketPathPreviews(
     marketIds.map((id) => [id, MARKETS.find((m) => m.id === id)?.paths ?? []]),
   )
   return delay(previews)
+}
+
+export async function getMode2Readiness(): Promise<Mode2Readiness> {
+  return delay({
+    leverageEnabled: false,
+    leverageConfig: null,
+    pairRiskStates: [],
+  })
 }
 
 export async function getUserPosition(

@@ -10,12 +10,17 @@
 import type { BN } from '@coral-xyz/anchor'
 
 import type {
+  LeverageConfig,
+  LeverageConfigStatus,
+  LeverageRiskParams,
   Market,
   MarketGroup,
   MarketGroupKind,
   MarketGroupLink,
   MarketGroupStatus,
   MarketState,
+  PairRiskState,
+  PairRiskStatus,
   PathOrigin,
   PredictionPath,
   PricePoint,
@@ -50,6 +55,14 @@ function parseMarketGroupKind(raw: Record<string, unknown>): MarketGroupKind {
 
 function parseMarketGroupStatus(raw: Record<string, unknown>): MarketGroupStatus {
   return Object.keys(raw)[0] as MarketGroupStatus
+}
+
+function parseLeverageConfigStatus(raw: Record<string, unknown>): LeverageConfigStatus {
+  return Object.keys(raw)[0] as LeverageConfigStatus
+}
+
+function parsePairRiskStatus(raw: Record<string, unknown>): PairRiskStatus {
+  return Object.keys(raw)[0] as PairRiskStatus
 }
 
 function parsePathOrigin(raw: Record<string, unknown>): PathOrigin {
@@ -142,6 +155,57 @@ export function anchorMarketGroupLinkToFE(raw: any, address: string): MarketGrou
     timeframeSeconds: raw.timeframeSeconds,
     linkedAt: i64(raw.linkedAt) * 1000,
     groupKind: parseMarketGroupKind(raw.groupKind),
+  }
+}
+
+export function anchorLeverageRiskParamsToFE(raw: any): LeverageRiskParams {
+  return {
+    maxLeverage: raw.maxLeverage,
+    maxMarketLeveragedOi: bn(raw.maxMarketLeveragedOi, true),
+    maxPairLeveragedOi: bn(raw.maxPairLeveragedOi, true),
+    maxPathLeveragedOi: bn(raw.maxPathLeveragedOi, true),
+    maxPathClusterLeveragedOi: bn(raw.maxPathClusterLeveragedOi, true),
+    vaultUtilizationCeilingBps: raw.vaultUtilizationCeilingBps,
+    borrowBaseRateBps: raw.borrowBaseRateBps,
+    borrowKinkUtilizationBps: raw.borrowKinkUtilizationBps,
+    borrowKinkRateBps: raw.borrowKinkRateBps,
+    borrowMaxRateBps: raw.borrowMaxRateBps,
+    liquidationThreshold: bn(raw.liquidationThreshold, true),
+    keeperRewardBps: raw.keeperRewardBps,
+    profitWarmupCheckpoints: raw.profitWarmupCheckpoints,
+    minPairBufferBps: raw.minPairBufferBps,
+  }
+}
+
+export function anchorLeverageConfigToFE(raw: any, address: string): LeverageConfig {
+  return {
+    address,
+    authority: raw.authority.toBase58(),
+    status: parseLeverageConfigStatus(raw.status),
+    currentParams: anchorLeverageRiskParamsToFE(raw.currentParams),
+    pendingParams: anchorLeverageRiskParamsToFE(raw.pendingParams),
+    simulatorOutputHash: bytesToHex(raw.simulatorOutputHash),
+    pendingSimulatorOutputHash: bytesToHex(raw.pendingSimulatorOutputHash),
+    activationDelaySeconds: i64(raw.activationDelaySeconds),
+    stagedAt: i64(raw.stagedAt) * 1000,
+    acceptedAt: i64(raw.acceptedAt) * 1000,
+  }
+}
+
+export function anchorPairRiskStateToFE(raw: any, address: string): PairRiskState {
+  return {
+    address,
+    authority: raw.authority.toBase58(),
+    baseMint: raw.baseMint.toBase58(),
+    quoteMint: raw.quoteMint.toBase58(),
+    status: parsePairRiskStatus(raw.status),
+    maxPairLeveragedOi: bn(raw.maxPairLeveragedOi, true),
+    maxLeverage: raw.maxLeverage,
+    bufferTargetBps: raw.bufferTargetBps,
+    bufferDrainThresholdBps: raw.bufferDrainThresholdBps,
+    bufferReopenThresholdBps: raw.bufferReopenThresholdBps,
+    lastStatusChange: i64(raw.lastStatusChange) * 1000,
+    configHash: bytesToHex(raw.configHash),
   }
 }
 

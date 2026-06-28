@@ -47,6 +47,8 @@ export type MarketGroupKind =
   | 'custom'
 
 export type MarketGroupStatus = 'active' | 'paused' | 'retired'
+export type LeverageConfigStatus = 'accepted' | 'staged'
+export type PairRiskStatus = 'active' | 'drainOnly' | 'resetPending' | 'paused'
 
 /* ── Price data ────────────────────────────────────────────── */
 
@@ -236,6 +238,59 @@ export interface MarketGroupLink {
   timeframeSeconds: number
   linkedAt: number
   groupKind: MarketGroupKind
+}
+
+/* ── Dormant Mode 2 sidecars ─────────────────────────────── */
+
+export interface LeverageRiskParams {
+  maxLeverage: number
+  maxMarketLeveragedOi: number
+  maxPairLeveragedOi: number
+  maxPathLeveragedOi: number
+  maxPathClusterLeveragedOi: number
+  vaultUtilizationCeilingBps: number
+  borrowBaseRateBps: number
+  borrowKinkUtilizationBps: number
+  borrowKinkRateBps: number
+  borrowMaxRateBps: number
+  liquidationThreshold: number
+  keeperRewardBps: number
+  profitWarmupCheckpoints: number
+  minPairBufferBps: number
+}
+
+export interface LeverageConfig {
+  address: string
+  authority: string
+  status: LeverageConfigStatus
+  currentParams: LeverageRiskParams
+  pendingParams: LeverageRiskParams
+  simulatorOutputHash: string
+  pendingSimulatorOutputHash: string
+  activationDelaySeconds: number
+  stagedAt: number
+  acceptedAt: number
+}
+
+export interface PairRiskState {
+  address: string
+  authority: string
+  baseMint: string
+  quoteMint: string
+  status: PairRiskStatus
+  maxPairLeveragedOi: number
+  maxLeverage: number
+  bufferTargetBps: number
+  bufferDrainThresholdBps: number
+  bufferReopenThresholdBps: number
+  lastStatusChange: number
+  configHash: string
+}
+
+export interface Mode2Readiness {
+  leverageEnabled: false
+  leverageConfig: LeverageConfig | null
+  pairRiskStates: PairRiskState[]
 }
 
 /* ── User position ─────────────────────────────────────────── */
