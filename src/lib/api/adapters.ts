@@ -49,20 +49,24 @@ export function parseMarketState(raw: Record<string, unknown>): MarketState {
   return key.toLowerCase() as MarketState
 }
 
+function parseAnchorVariant<T extends string>(raw: Record<string, unknown>): T {
+  return Object.keys(raw)[0] as T
+}
+
 function parseMarketGroupKind(raw: Record<string, unknown>): MarketGroupKind {
-  return Object.keys(raw)[0] as MarketGroupKind
+  return parseAnchorVariant<MarketGroupKind>(raw)
 }
 
 function parseMarketGroupStatus(raw: Record<string, unknown>): MarketGroupStatus {
-  return Object.keys(raw)[0] as MarketGroupStatus
+  return parseAnchorVariant<MarketGroupStatus>(raw)
 }
 
 function parseLeverageConfigStatus(raw: Record<string, unknown>): LeverageConfigStatus {
-  return Object.keys(raw)[0] as LeverageConfigStatus
+  return parseAnchorVariant<LeverageConfigStatus>(raw)
 }
 
 function parsePairRiskStatus(raw: Record<string, unknown>): PairRiskStatus {
-  return Object.keys(raw)[0] as PairRiskStatus
+  return parseAnchorVariant<PairRiskStatus>(raw)
 }
 
 function parsePathOrigin(raw: Record<string, unknown>): PathOrigin {

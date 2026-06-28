@@ -76,7 +76,10 @@ export function VaultPage() {
                 {pairRiskStates.slice(0, 6).map((state) => (
                   <div
                     key={state.address}
-                    className="border-line flex items-center justify-between rounded-lg border px-4 py-3"
+                    className={cn(
+                      'border-line flex items-center justify-between',
+                      'rounded-lg border px-4 py-3',
+                    )}
                   >
                     <div className="min-w-0">
                       <p className="text-ink-strong font-mono text-sm uppercase">

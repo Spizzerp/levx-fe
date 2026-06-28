@@ -53,10 +53,6 @@ function closeMarketDisabledReason(market: Market): string {
   return 'Close market'
 }
 
-function anchorVariant(value: string): Record<string, object> {
-  return { [value]: {} }
-}
-
 function isPubkey(value: string): boolean {
   try {
     new PublicKey(value)
@@ -482,7 +478,10 @@ function MarketGroupAdminPanel() {
               <select
                 value={groupKind}
                 onChange={(e) => setGroupKind(e.target.value as MarketGroupKind)}
-                className="border-line-strong bg-surface text-ink-strong rounded-lg border px-3 py-3 font-mono text-sm"
+                className={cn(
+                  'border-line-strong bg-surface text-ink-strong',
+                  'rounded-lg border px-3 py-3 font-mono text-sm',
+                )}
               >
                 {MARKET_GROUP_KIND_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -493,7 +492,10 @@ function MarketGroupAdminPanel() {
               <select
                 value={groupStatus}
                 onChange={(e) => setGroupStatus(e.target.value as MarketGroupStatus)}
-                className="border-line-strong bg-surface text-ink-strong rounded-lg border px-3 py-3 font-mono text-sm"
+                className={cn(
+                  'border-line-strong bg-surface text-ink-strong',
+                  'rounded-lg border px-3 py-3 font-mono text-sm',
+                )}
               >
                 {MARKET_GROUP_STATUS_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -695,6 +697,7 @@ const PAIR_RISK_STATUS_OPTIONS: { value: PairRiskStatus; label: string }[] = [
   { value: 'resetPending', label: 'Reset pending' },
   { value: 'paused', label: 'Paused' },
 ]
+const MIN_LEVERAGE_CONFIG_DELAY_SECONDS = 86_400
 
 function Mode2AdminPanel() {
   const queryClient = useQueryClient()
@@ -746,10 +749,42 @@ function Mode2AdminPanel() {
     }
   }
 
+  function buildPairRiskParams(baseMint: PublicKey, quoteMint: PublicKey) {
+    const bufferTarget = parseBoundedInt('Buffer target', bufferTargetBps, 0, 10_000)
+    const bufferDrain = parseBoundedInt('Buffer drain', bufferDrainThresholdBps, 0, 10_000)
+    const bufferReopen = parseBoundedInt('Buffer reopen', bufferReopenThresholdBps, 0, 10_000)
+    if (bufferDrain > bufferTarget) {
+      throw new Error('Buffer drain must be less than or equal to target')
+    }
+    if (bufferTarget > bufferReopen) {
+      throw new Error('Buffer reopen must be greater than or equal to target')
+    }
+    const minBuffer = readiness?.leverageConfig?.currentParams.minPairBufferBps
+    if (typeof minBuffer === 'number' && bufferTarget < minBuffer) {
+      throw new Error(`Buffer target must be at least current config min (${minBuffer})`)
+    }
+
+    return {
+      baseMint,
+      quoteMint,
+      status: anchorEnum(pairStatus),
+      maxPairLeveragedOi: parseUsdcBn('Pair max OI', pairMaxOi),
+      maxLeverage: parseBoundedInt('Pair max leverage', pairMaxLeverage, 1, 50),
+      bufferTargetBps: bufferTarget,
+      bufferDrainThresholdBps: bufferDrain,
+      bufferReopenThresholdBps: bufferReopen,
+    }
+  }
+
   const riskParamsError = useMemo(() => {
     try {
       buildRiskParams()
-      parseBoundedInt('Activation delay', activationDelaySeconds, 0, 2_592_000)
+      parseBoundedInt(
+        'Activation delay',
+        activationDelaySeconds,
+        MIN_LEVERAGE_CONFIG_DELAY_SECONDS,
+        2_592_000,
+      )
       return ''
     } catch (err) {
       return (err as Error).message
@@ -764,6 +799,54 @@ function Mode2AdminPanel() {
     minPairBufferBps,
     vaultUtilizationCeilingBps,
   ])
+  const pairParamsError = useMemo(() => {
+    try {
+      if (pairBaseMint.trim() && !isPubkey(pairBaseMint)) {
+        throw new Error('Base mint must be a valid public key')
+      }
+      if (pairQuoteMint.trim() && !isPubkey(pairQuoteMint)) {
+        throw new Error('Quote mint must be a valid public key')
+      }
+      if (isPubkey(pairBaseMint) && isPubkey(pairQuoteMint)) {
+        buildPairRiskParams(new PublicKey(pairBaseMint), new PublicKey(pairQuoteMint))
+      } else {
+        parseUsdcBn('Pair max OI', pairMaxOi)
+        parseBoundedInt('Pair max leverage', pairMaxLeverage, 1, 50)
+        const bufferTarget = parseBoundedInt('Buffer target', bufferTargetBps, 0, 10_000)
+        const bufferDrain = parseBoundedInt(
+          'Buffer drain',
+          bufferDrainThresholdBps,
+          0,
+          10_000,
+        )
+        const bufferReopen = parseBoundedInt(
+          'Buffer reopen',
+          bufferReopenThresholdBps,
+          0,
+          10_000,
+        )
+        if (bufferDrain > bufferTarget) {
+          throw new Error('Buffer drain must be less than or equal to target')
+        }
+        if (bufferTarget > bufferReopen) {
+          throw new Error('Buffer reopen must be greater than or equal to target')
+        }
+      }
+      return ''
+    } catch (err) {
+      return (err as Error).message
+    }
+  }, [
+    bufferDrainThresholdBps,
+    bufferReopenThresholdBps,
+    bufferTargetBps,
+    pairBaseMint,
+    pairMaxLeverage,
+    pairMaxOi,
+    pairQuoteMint,
+    pairStatus,
+    readiness?.leverageConfig?.currentParams.minPairBufferBps,
+  ])
   const normalizedSimulatorHash = isBytes32Hex(simulatorOutputHash)
     ? normalizeBytes32Hex(simulatorOutputHash)
     : ''
@@ -774,8 +857,7 @@ function Mode2AdminPanel() {
     !!publicKey &&
     isPubkey(pairBaseMint) &&
     isPubkey(pairQuoteMint) &&
-    Number(pairMaxOi) > 0 &&
-    Number(pairMaxLeverage) > 0
+    !pairParamsError
 
   async function sendMode2Instruction(
     action: NonNullable<typeof pendingAction>,
@@ -827,7 +909,12 @@ function Mode2AdminPanel() {
       currentParams: buildRiskParams(),
       simulatorOutputHash: bytes32HexToArray(normalizedSimulatorHash),
       activationDelaySeconds: new BN(
-        parseBoundedInt('Activation delay', activationDelaySeconds, 0, 2_592_000),
+        parseBoundedInt(
+          'Activation delay',
+          activationDelaySeconds,
+          MIN_LEVERAGE_CONFIG_DELAY_SECONDS,
+          2_592_000,
+        ),
       ),
     }
     const ix = await program.methods
@@ -905,21 +992,20 @@ function Mode2AdminPanel() {
 
   async function handleInitializePairRisk() {
     if (!program || !publicKey || !canSubmitPair) return
-    const baseMint = new PublicKey(pairBaseMint)
-    const quoteMint = new PublicKey(pairQuoteMint)
+    let baseMint: PublicKey
+    let quoteMint: PublicKey
+    let params: ReturnType<typeof buildPairRiskParams>
+    try {
+      baseMint = new PublicKey(pairBaseMint)
+      quoteMint = new PublicKey(pairQuoteMint)
+      params = buildPairRiskParams(baseMint, quoteMint)
+    } catch (err) {
+      toast.error('Mode 2 pair risk input invalid', { message: (err as Error).message })
+      return
+    }
     const [protocolPda] = deriveProtocolPda()
     const [leverageConfigPda] = deriveLeverageConfigPda()
     const [pairRiskStatePda] = derivePairRiskStatePda(baseMint, quoteMint)
-    const params = {
-      baseMint,
-      quoteMint,
-      status: anchorVariant(pairStatus),
-      maxPairLeveragedOi: parseUsdcBn('Pair max OI', pairMaxOi),
-      maxLeverage: parseBoundedInt('Pair max leverage', pairMaxLeverage, 1, 50),
-      bufferTargetBps: parseBoundedInt('Buffer target', bufferTargetBps, 0, 10_000),
-      bufferDrainThresholdBps: parseBoundedInt('Buffer drain', bufferDrainThresholdBps, 0, 10_000),
-      bufferReopenThresholdBps: parseBoundedInt('Buffer reopen', bufferReopenThresholdBps, 0, 10_000),
-    }
     const ix = await program.methods
       .initializePairRiskState(params)
       .accountsPartial({
@@ -951,7 +1037,7 @@ function Mode2AdminPanel() {
     const [protocolPda] = deriveProtocolPda()
     const [pairRiskStatePda] = derivePairRiskStatePda(baseMint, quoteMint)
     const ix = await program.methods
-      .updatePairRiskStatus(anchorVariant(pairStatus))
+      .updatePairRiskStatus(anchorEnum(pairStatus))
       .accountsPartial({
         protocolState: protocolPda,
         pairRiskState: pairRiskStatePda,
@@ -1006,7 +1092,7 @@ function Mode2AdminPanel() {
               <Input
                 label="Delay seconds"
                 type="number"
-                min={0}
+                min={MIN_LEVERAGE_CONFIG_DELAY_SECONDS}
                 value={activationDelaySeconds}
                 onChange={(e) => setActivationDelaySeconds(e.target.value)}
               />
@@ -1101,7 +1187,10 @@ function Mode2AdminPanel() {
             <select
               value={pairStatus}
               onChange={(e) => setPairStatus(e.target.value as PairRiskStatus)}
-              className="border-line-strong bg-surface text-ink-strong rounded-lg border px-3 py-3 font-mono text-sm"
+              className={cn(
+                'border-line-strong bg-surface text-ink-strong',
+                'rounded-lg border px-3 py-3 font-mono text-sm',
+              )}
             >
               {PAIR_RISK_STATUS_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -1140,6 +1229,9 @@ function Mode2AdminPanel() {
                 onChange={(e) => setBufferReopenThresholdBps(e.target.value)}
               />
             </div>
+            {pairParamsError && (
+              <p className="text-bear font-mono text-xs uppercase">{pairParamsError}</p>
+            )}
             <div className="grid grid-cols-1 gap-3 [@media(min-width:1181px)]:grid-cols-2">
               <Button
                 variant="secondary"
