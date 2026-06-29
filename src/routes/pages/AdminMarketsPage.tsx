@@ -10,6 +10,7 @@ import { Input } from '@/ui/Input'
 import { cn } from '@/lib/cn'
 import { buildTransaction } from '@/lib/chain/buildTransaction'
 import { getPriorityFee } from '@/lib/chain/priorityFee'
+import { parseScaledDecimalBn } from '@/lib/fixedPoint'
 import { useIsAdmin } from '@/lib/hooks/useIsAdmin'
 import { useMarkets, useMode2Readiness } from '@/lib/api/hooks'
 import { formatUSD } from '@/lib/format'
@@ -71,11 +72,7 @@ function parseBoundedInt(label: string, value: string, min: number, max: number)
 }
 
 function parseUsdcBn(label: string, value: string): BN {
-  const parsed = Number(value)
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    throw new Error(`${label} must be greater than zero`)
-  }
-  return new BN(Math.round(parsed * SCALE))
+  return parseScaledDecimalBn(label, value, 6)
 }
 
 function MarketGroupAdminPanel() {
