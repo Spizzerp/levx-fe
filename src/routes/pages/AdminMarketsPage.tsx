@@ -717,7 +717,7 @@ function Mode2AdminPanel() {
   const [pairMaxLeverage, setPairMaxLeverage] = useState('5')
   const [bufferTargetBps, setBufferTargetBps] = useState('2500')
   const [bufferDrainThresholdBps, setBufferDrainThresholdBps] = useState('1500')
-  const [bufferReopenThresholdBps, setBufferReopenThresholdBps] = useState('2000')
+  const [bufferReopenThresholdBps, setBufferReopenThresholdBps] = useState('3000')
   const [pendingAction, setPendingAction] = useState<
     'init-config' | 'stage-config' | 'accept-config' | 'init-pair' | 'update-pair' | null
   >(null)
@@ -746,7 +746,7 @@ function Mode2AdminPanel() {
     }
   }
 
-  function buildPairRiskParams(baseMint: PublicKey, quoteMint: PublicKey) {
+  function parsePairRiskInputs() {
     const bufferTarget = parseBoundedInt('Buffer target', bufferTargetBps, 0, 10_000)
     const bufferDrain = parseBoundedInt('Buffer drain', bufferDrainThresholdBps, 0, 10_000)
     const bufferReopen = parseBoundedInt('Buffer reopen', bufferReopenThresholdBps, 0, 10_000)
@@ -762,14 +762,20 @@ function Mode2AdminPanel() {
     }
 
     return {
-      baseMint,
-      quoteMint,
-      status: anchorEnum(pairStatus),
       maxPairLeveragedOi: parseUsdcBn('Pair max OI', pairMaxOi),
       maxLeverage: parseBoundedInt('Pair max leverage', pairMaxLeverage, 1, 50),
       bufferTargetBps: bufferTarget,
       bufferDrainThresholdBps: bufferDrain,
       bufferReopenThresholdBps: bufferReopen,
+    }
+  }
+
+  function buildPairRiskParams(baseMint: PublicKey, quoteMint: PublicKey) {
+    return {
+      baseMint,
+      quoteMint,
+      status: anchorEnum(pairStatus),
+      ...parsePairRiskInputs(),
     }
   }
 
@@ -804,31 +810,7 @@ function Mode2AdminPanel() {
       if (pairQuoteMint.trim() && !isPubkey(pairQuoteMint)) {
         throw new Error('Quote mint must be a valid public key')
       }
-      if (isPubkey(pairBaseMint) && isPubkey(pairQuoteMint)) {
-        buildPairRiskParams(new PublicKey(pairBaseMint), new PublicKey(pairQuoteMint))
-      } else {
-        parseUsdcBn('Pair max OI', pairMaxOi)
-        parseBoundedInt('Pair max leverage', pairMaxLeverage, 1, 50)
-        const bufferTarget = parseBoundedInt('Buffer target', bufferTargetBps, 0, 10_000)
-        const bufferDrain = parseBoundedInt(
-          'Buffer drain',
-          bufferDrainThresholdBps,
-          0,
-          10_000,
-        )
-        const bufferReopen = parseBoundedInt(
-          'Buffer reopen',
-          bufferReopenThresholdBps,
-          0,
-          10_000,
-        )
-        if (bufferDrain > bufferTarget) {
-          throw new Error('Buffer drain must be less than or equal to target')
-        }
-        if (bufferTarget > bufferReopen) {
-          throw new Error('Buffer reopen must be greater than or equal to target')
-        }
-      }
+      parsePairRiskInputs()
       return ''
     } catch (err) {
       return (err as Error).message

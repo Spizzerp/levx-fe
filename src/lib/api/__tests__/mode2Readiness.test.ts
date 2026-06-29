@@ -86,7 +86,7 @@ describe('getMode2Readiness', () => {
                 maxLeverage: 5,
                 bufferTargetBps: 2500,
                 bufferDrainThresholdBps: 1500,
-                bufferReopenThresholdBps: 2000,
+                bufferReopenThresholdBps: 3000,
                 lastStatusChange: new BN(1_700_000_000),
                 configHash: Array(32).fill(3),
               },
