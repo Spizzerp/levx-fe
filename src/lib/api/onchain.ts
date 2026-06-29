@@ -8,6 +8,7 @@
 import { PublicKey } from '@solana/web3.js'
 
 import type {
+  Mode2Readiness,
   Market,
   MarketGroup,
   MarketGroupLink,
@@ -17,9 +18,11 @@ import type {
 } from '@/types/market'
 
 import {
+  anchorLeverageConfigToFE,
   anchorMarketGroupLinkToFE,
   anchorMarketGroupToFE,
   anchorMarketToFE,
+  anchorPairRiskStateToFE,
   anchorPathToFE,
   anchorPositionToFE,
   parseMarketState,
@@ -28,6 +31,7 @@ import { resolveBaseMintLabel } from './pairLabels'
 import { getReadOnlyProgram } from '../solana/program'
 import {
   PROGRAM_ID,
+  deriveLeverageConfigPda,
   deriveMarketGroupLinkPda,
   deriveMarketPda,
   derivePathChunkPda,
@@ -303,6 +307,13 @@ type MarketGroupAccountClients = Record<string, MarketGroupAccountClient | undef
 
 type MarketGroupJoin = { group?: MarketGroup; link: MarketGroupLink }
 
+type Mode2AccountClient = {
+  all?: () => Promise<any[]>
+  fetchNullable?: (address: PublicKey) => Promise<any | null>
+}
+
+type Mode2AccountClients = Record<string, Mode2AccountClient | undefined>
+
 async function fetchMarketGroupJoins(program: any): Promise<Map<number, MarketGroupJoin>> {
   const accounts = program.account as MarketGroupAccountClients
   if (!accounts.marketGroupLink?.all || !accounts.marketGroup?.all) {
@@ -386,6 +397,40 @@ export async function attachMarketGroups(program: any, markets: Market[]): Promi
 
 export async function attachMarketGroup(program: any, market: Market): Promise<Market> {
   return applyMarketGroupJoin(market, await fetchMarketGroupJoin(program, market.marketId))
+}
+
+export async function getMode2Readiness(): Promise<Mode2Readiness> {
+  const program = getReadOnlyProgram()
+  const accounts = program.account as Mode2AccountClients
+  const [leverageConfigPda] = deriveLeverageConfigPda()
+  let leverageConfig: Mode2Readiness['leverageConfig'] = null
+
+  if (accounts.leverageConfig?.fetchNullable) {
+    try {
+      const raw = await accounts.leverageConfig.fetchNullable(leverageConfigPda)
+      leverageConfig = raw ? anchorLeverageConfigToFE(raw, leverageConfigPda.toBase58()) : null
+    } catch (err) {
+      console.warn('[onchain] Failed to fetch leverage config:', (err as Error).message)
+    }
+  }
+
+  let pairRiskStates: Mode2Readiness['pairRiskStates'] = []
+  if (accounts.pairRiskState?.all) {
+    try {
+      const riskAccounts = await accounts.pairRiskState.all()
+      pairRiskStates = riskAccounts.map((acc) =>
+        anchorPairRiskStateToFE(acc.account, acc.publicKey.toBase58()),
+      )
+    } catch (err) {
+      console.warn('[onchain] Failed to fetch pair risk states:', (err as Error).message)
+    }
+  }
+
+  return {
+    leverageEnabled: false,
+    leverageConfig,
+    pairRiskStates,
+  }
 }
 
 export async function getMarkets(): Promise<Market[]> {

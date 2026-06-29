@@ -93,6 +93,11 @@ describe('EVENT_INVALIDATION_MAP', () => {
       'MarketGroupClosed',
       'MarketLinkedToGroup',
       'MarketUnlinkedFromGroup',
+      'LeverageConfigInitialized',
+      'LeverageConfigStaged',
+      'LeverageConfigAccepted',
+      'PairRiskStateInitialized',
+      'PairRiskStatusUpdated',
     ]
     for (const name of expected) {
       expect(EVENT_INVALIDATION_MAP[name]).toBeDefined()
@@ -134,6 +139,18 @@ describe('EVENT_INVALIDATION_MAP', () => {
   it('market group lifecycle changes invalidate the market list', () => {
     for (const ev of ['MarketGroupCreated', 'MarketGroupStatusUpdated', 'MarketGroupClosed']) {
       expect(EVENT_INVALIDATION_MAP[ev]({})).toEqual([['markets']])
+    }
+  })
+
+  it('Mode 2 sidecar changes invalidate readiness state', () => {
+    for (const ev of [
+      'LeverageConfigInitialized',
+      'LeverageConfigStaged',
+      'LeverageConfigAccepted',
+      'PairRiskStateInitialized',
+      'PairRiskStatusUpdated',
+    ]) {
+      expect(EVENT_INVALIDATION_MAP[ev]({})).toEqual([['mode2Readiness']])
     }
   })
 

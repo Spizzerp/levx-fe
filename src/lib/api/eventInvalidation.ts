@@ -106,6 +106,13 @@ export const EVENT_INVALIDATION_MAP: Readonly<Record<string, InvalidationFactory
   MarketLinkedToGroup: withMarket((mk) => [['market', mk], ['markets']]),
   MarketUnlinkedFromGroup: withMarket((mk) => [['market', mk], ['markets']]),
 
+  // ── Dormant Mode 2 sidecars ──────────────────────────────────────
+  LeverageConfigInitialized: () => [['mode2Readiness']],
+  LeverageConfigStaged: () => [['mode2Readiness']],
+  LeverageConfigAccepted: () => [['mode2Readiness']],
+  PairRiskStateInitialized: () => [['mode2Readiness']],
+  PairRiskStatusUpdated: () => [['mode2Readiness']],
+
   // ── User-driven (wager / exit / claim) ────────────────────────────
   WagerPlaced: withMarket((mk) => [
     ['market', mk],

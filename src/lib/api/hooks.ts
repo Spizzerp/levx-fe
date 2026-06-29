@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import type { PublicKey } from '@solana/web3.js'
 import { useMemo } from 'react'
 
-import type { CurrentPrice, Market, UserPosition } from '@/types/market'
+import type { CurrentPrice, Market, Mode2Readiness, UserPosition } from '@/types/market'
 import { useWalletStore } from '@/stores/walletStore'
 
 /**
@@ -22,6 +22,7 @@ const USE_MOCK = import.meta.env.APP_USE_MOCK === 'true'
 const MARKETS_REFETCH_MS = 60_000
 const MARKET_REFETCH_MS = 60_000
 const POSITIONS_REFETCH_MS = 60_000
+const MODE2_READINESS_REFETCH_MS = 60_000
 const STALE_MS = 5_000
 const PATH_PREVIEWS_STALE_MS = 60_000
 
@@ -69,6 +70,18 @@ export function useMarketPathPreviews(marketIds: readonly string[]) {
     enabled: normalizedIds.length > 0,
     refetchInterval: false,
     staleTime: PATH_PREVIEWS_STALE_MS,
+  })
+}
+
+export function useMode2Readiness() {
+  return useQuery({
+    queryKey: ['mode2Readiness'],
+    queryFn: async (): Promise<Mode2Readiness> => {
+      const api = await getApi()
+      return api.getMode2Readiness()
+    },
+    refetchInterval: MODE2_READINESS_REFETCH_MS,
+    staleTime: STALE_MS,
   })
 }
 

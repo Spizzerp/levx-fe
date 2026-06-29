@@ -56,6 +56,74 @@
       "args": []
     },
     {
+      "name": "accept_leverage_config_after_delay",
+      "discriminator": [
+        5,
+        17,
+        203,
+        208,
+        199,
+        106,
+        34,
+        41
+      ],
+      "accounts": [
+        {
+          "name": "protocol_state",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "leverage_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  101,
+                  118,
+                  101,
+                  114,
+                  97,
+                  103,
+                  101,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "activate_market",
       "discriminator": [
         10,
@@ -2333,6 +2401,205 @@
       ]
     },
     {
+      "name": "initialize_leverage_config",
+      "discriminator": [
+        59,
+        159,
+        112,
+        190,
+        6,
+        192,
+        68,
+        26
+      ],
+      "accounts": [
+        {
+          "name": "protocol_state",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "leverage_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  101,
+                  118,
+                  101,
+                  114,
+                  97,
+                  103,
+                  101,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "params",
+          "type": {
+            "defined": {
+              "name": "InitializeLeverageConfigParams"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "initialize_pair_risk_state",
+      "discriminator": [
+        106,
+        196,
+        82,
+        72,
+        203,
+        169,
+        207,
+        139
+      ],
+      "accounts": [
+        {
+          "name": "protocol_state",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "leverage_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  101,
+                  118,
+                  101,
+                  114,
+                  97,
+                  103,
+                  101,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "pair_risk_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  105,
+                  114,
+                  95,
+                  114,
+                  105,
+                  115,
+                  107,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "params.base_mint"
+              },
+              {
+                "kind": "arg",
+                "path": "params.quote_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "params",
+          "type": {
+            "defined": {
+              "name": "PairRiskStateParams"
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "initialize_protocol",
       "discriminator": [
         188,
@@ -3426,6 +3693,83 @@
       "args": []
     },
     {
+      "name": "stage_leverage_config",
+      "discriminator": [
+        251,
+        51,
+        55,
+        53,
+        163,
+        149,
+        68,
+        207
+      ],
+      "accounts": [
+        {
+          "name": "protocol_state",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "leverage_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  101,
+                  118,
+                  101,
+                  114,
+                  97,
+                  103,
+                  101,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "params",
+          "type": {
+            "defined": {
+              "name": "StageLeverageConfigParams"
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "submit_eigendecomp",
       "discriminator": [
         159,
@@ -3850,6 +4194,93 @@
       ]
     },
     {
+      "name": "update_pair_risk_status",
+      "discriminator": [
+        219,
+        111,
+        8,
+        162,
+        230,
+        128,
+        136,
+        127
+      ],
+      "accounts": [
+        {
+          "name": "protocol_state",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "pair_risk_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  105,
+                  114,
+                  95,
+                  114,
+                  105,
+                  115,
+                  107,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pair_risk_state.base_mint",
+                "account": "PairRiskState"
+              },
+              {
+                "kind": "account",
+                "path": "pair_risk_state.quote_mint",
+                "account": "PairRiskState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "status",
+          "type": {
+            "defined": {
+              "name": "PairRiskStatus"
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "void_market",
       "discriminator": [
         243,
@@ -4015,6 +4446,19 @@
       ]
     },
     {
+      "name": "LeverageConfig",
+      "discriminator": [
+        75,
+        136,
+        85,
+        193,
+        13,
+        219,
+        3,
+        171
+      ]
+    },
+    {
       "name": "Market",
       "discriminator": [
         219,
@@ -4051,6 +4495,19 @@
         34,
         79,
         96
+      ]
+    },
+    {
+      "name": "PairRiskState",
+      "discriminator": [
+        14,
+        34,
+        77,
+        152,
+        189,
+        248,
+        70,
+        64
       ]
     },
     {
@@ -4277,6 +4734,45 @@
       ]
     },
     {
+      "name": "LeverageConfigAccepted",
+      "discriminator": [
+        155,
+        190,
+        24,
+        98,
+        244,
+        143,
+        132,
+        11
+      ]
+    },
+    {
+      "name": "LeverageConfigInitialized",
+      "discriminator": [
+        96,
+        212,
+        228,
+        0,
+        237,
+        226,
+        6,
+        185
+      ]
+    },
+    {
+      "name": "LeverageConfigStaged",
+      "discriminator": [
+        10,
+        239,
+        163,
+        91,
+        195,
+        191,
+        210,
+        255
+      ]
+    },
+    {
       "name": "MarketActivated",
       "discriminator": [
         196,
@@ -4443,6 +4939,32 @@
         75,
         89,
         26
+      ]
+    },
+    {
+      "name": "PairRiskStateInitialized",
+      "discriminator": [
+        165,
+        208,
+        218,
+        245,
+        254,
+        98,
+        119,
+        80
+      ]
+    },
+    {
+      "name": "PairRiskStatusUpdated",
+      "discriminator": [
+        115,
+        38,
+        173,
+        111,
+        205,
+        67,
+        113,
+        123
       ]
     },
     {
@@ -5010,6 +5532,26 @@
       "code": 6065,
       "name": "MarketGroupNotEmpty",
       "msg": "Market group still has linked markets"
+    },
+    {
+      "code": 6066,
+      "name": "InvalidLeverageConfig",
+      "msg": "Invalid leverage configuration"
+    },
+    {
+      "code": 6067,
+      "name": "LeverageConfigNotStaged",
+      "msg": "Leverage configuration is not staged"
+    },
+    {
+      "code": 6068,
+      "name": "LeverageConfigDelayActive",
+      "msg": "Leverage configuration delay has not elapsed"
+    },
+    {
+      "code": 6069,
+      "name": "InvalidPairRiskState",
+      "msg": "Invalid pair risk state"
     }
   ],
   "types": [
@@ -5789,6 +6331,35 @@
       }
     },
     {
+      "name": "InitializeLeverageConfigParams",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "current_params",
+            "type": {
+              "defined": {
+                "name": "LeverageRiskParams"
+              }
+            }
+          },
+          {
+            "name": "simulator_output_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "activation_delay_seconds",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "LevVault",
       "type": {
         "kind": "struct",
@@ -5929,6 +6500,265 @@
           {
             "name": "bump",
             "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LeverageConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "LeverageConfigStatus"
+              }
+            }
+          },
+          {
+            "name": "current_params",
+            "type": {
+              "defined": {
+                "name": "LeverageRiskParams"
+              }
+            }
+          },
+          {
+            "name": "pending_params",
+            "type": {
+              "defined": {
+                "name": "LeverageRiskParams"
+              }
+            }
+          },
+          {
+            "name": "simulator_output_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "pending_simulator_output_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "activation_delay_seconds",
+            "type": "i64"
+          },
+          {
+            "name": "staged_at",
+            "type": "i64"
+          },
+          {
+            "name": "accepted_at",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "LeverageConfigAccepted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "config",
+            "type": "pubkey"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "accepted_at",
+            "type": "i64"
+          },
+          {
+            "name": "simulator_output_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "max_leverage",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LeverageConfigInitialized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "config",
+            "type": "pubkey"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "simulator_output_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "activation_delay_seconds",
+            "type": "i64"
+          },
+          {
+            "name": "max_leverage",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LeverageConfigStaged",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "config",
+            "type": "pubkey"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "staged_at",
+            "type": "i64"
+          },
+          {
+            "name": "earliest_accept_at",
+            "type": "i64"
+          },
+          {
+            "name": "pending_simulator_output_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "LeverageConfigStatus",
+      "repr": {
+        "kind": "rust"
+      },
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Accepted"
+          },
+          {
+            "name": "Staged"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LeverageRiskParams",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "max_leverage",
+            "type": "u8"
+          },
+          {
+            "name": "max_market_leveraged_oi",
+            "type": "u64"
+          },
+          {
+            "name": "max_pair_leveraged_oi",
+            "type": "u64"
+          },
+          {
+            "name": "max_path_leveraged_oi",
+            "type": "u64"
+          },
+          {
+            "name": "max_path_cluster_leveraged_oi",
+            "type": "u64"
+          },
+          {
+            "name": "vault_utilization_ceiling_bps",
+            "type": "u16"
+          },
+          {
+            "name": "borrow_base_rate_bps",
+            "type": "u16"
+          },
+          {
+            "name": "borrow_kink_utilization_bps",
+            "type": "u16"
+          },
+          {
+            "name": "borrow_kink_rate_bps",
+            "type": "u16"
+          },
+          {
+            "name": "borrow_max_rate_bps",
+            "type": "u16"
+          },
+          {
+            "name": "liquidation_threshold",
+            "type": "u64"
+          },
+          {
+            "name": "keeper_reward_bps",
+            "type": "u16"
+          },
+          {
+            "name": "profit_warmup_checkpoints",
+            "type": "u16"
+          },
+          {
+            "name": "min_pair_buffer_bps",
+            "type": "u16"
           }
         ]
       }
@@ -6809,6 +7639,220 @@
           {
             "name": "reason",
             "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PairRiskState",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "base_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "quote_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "PairRiskStatus"
+              }
+            }
+          },
+          {
+            "name": "max_pair_leveraged_oi",
+            "type": "u64"
+          },
+          {
+            "name": "max_leverage",
+            "type": "u8"
+          },
+          {
+            "name": "buffer_target_bps",
+            "type": "u16"
+          },
+          {
+            "name": "buffer_drain_threshold_bps",
+            "type": "u16"
+          },
+          {
+            "name": "buffer_reopen_threshold_bps",
+            "type": "u16"
+          },
+          {
+            "name": "last_status_change",
+            "type": "i64"
+          },
+          {
+            "name": "config_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "PairRiskStateInitialized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pair_risk_state",
+            "type": "pubkey"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "base_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "quote_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "status",
+            "type": "u8"
+          },
+          {
+            "name": "max_pair_leveraged_oi",
+            "type": "u64"
+          },
+          {
+            "name": "max_leverage",
+            "type": "u8"
+          },
+          {
+            "name": "config_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "PairRiskStateParams",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "base_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "quote_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "PairRiskStatus"
+              }
+            }
+          },
+          {
+            "name": "max_pair_leveraged_oi",
+            "type": "u64"
+          },
+          {
+            "name": "max_leverage",
+            "type": "u8"
+          },
+          {
+            "name": "buffer_target_bps",
+            "type": "u16"
+          },
+          {
+            "name": "buffer_drain_threshold_bps",
+            "type": "u16"
+          },
+          {
+            "name": "buffer_reopen_threshold_bps",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PairRiskStatus",
+      "repr": {
+        "kind": "rust"
+      },
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Active"
+          },
+          {
+            "name": "DrainOnly"
+          },
+          {
+            "name": "ResetPending"
+          },
+          {
+            "name": "Paused"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PairRiskStatusUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pair_risk_state",
+            "type": "pubkey"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "old_status",
+            "type": "u8"
+          },
+          {
+            "name": "new_status",
+            "type": "u8"
+          },
+          {
+            "name": "last_status_change",
+            "type": "i64"
           }
         ]
       }
@@ -7852,6 +8896,31 @@
               "lands."
             ],
             "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "StageLeverageConfigParams",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pending_params",
+            "type": {
+              "defined": {
+                "name": "LeverageRiskParams"
+              }
+            }
+          },
+          {
+            "name": "simulator_output_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
           }
         ]
       }

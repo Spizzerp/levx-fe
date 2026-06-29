@@ -67,8 +67,8 @@ export function isBytes32Hex(input: string): boolean {
   }
 }
 
-export function anchorEnum(value: MarketGroupKind | MarketGroupStatus): Record<string, object> {
-  return { [value]: {} }
+export function anchorEnum<T extends string>(value: T): Record<T, object> {
+  return { [value]: {} } as Record<T, object>
 }
 
 export type MarketGroupConstraintFormValues = {
