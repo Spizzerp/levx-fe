@@ -97,7 +97,9 @@ describe('VaultPage', () => {
     render(<VaultPage />)
 
     expect(screen.getByText('Dormant Config')).toBeInTheDocument()
-    expect(screen.getByText('accepted')).toBeInTheDocument()
+    expect(screen.getByText('Leverage unavailable')).toBeInTheDocument()
+    expect(screen.getAllByText('Accepted').length).toBeGreaterThan(0)
+    expect(screen.getByText('SOL/USDC')).toBeInTheDocument()
     expect(screen.getByText('$100,000')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'deposit' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'withdraw' })).toBeDisabled()
