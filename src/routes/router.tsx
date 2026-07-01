@@ -1,7 +1,11 @@
 import { createRootRoute, createRoute, createRouter, redirect } from '@tanstack/react-router'
 
 import { AdminPage } from '@/routes/pages/AdminPage'
-import { AdminMarketsPage } from '@/routes/pages/AdminMarketsPage'
+import {
+  AdminMarketGroupsPage,
+  AdminMarketsPage,
+  AdminMode2GatePage,
+} from '@/routes/pages/AdminMarketsPage'
 import { DocsLayout } from '@/routes/pages/DocsPage'
 import { LabsChartPage } from '@/routes/pages/LabsChartPage'
 import { LandingPage } from '@/routes/pages/LandingPage'
@@ -120,6 +124,18 @@ const adminRoute = createRoute({
   component: AdminMarketsPage,
 })
 
+const adminMarketGroupsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/admin/market-groups',
+  component: AdminMarketGroupsPage,
+})
+
+const adminMode2GateRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/admin/mode2-gate',
+  component: AdminMode2GatePage,
+})
+
 const adminProvidersRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/admin/providers',
@@ -185,6 +201,8 @@ const routeTree = rootRoute.addChildren([
   providersRoute,
   providerRoute,
   adminRoute,
+  adminMarketGroupsRoute,
+  adminMode2GateRoute,
   adminProvidersRoute,
   adminCreateRoute,
   labsChartRoute,

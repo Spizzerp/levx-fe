@@ -1,6 +1,19 @@
 import { useNavigate } from '@tanstack/react-router'
 import { AnchorProvider, BN, parseIdlErrors, translateError } from '@coral-xyz/anchor'
-import { FolderPlus, Info, Link2, Plus, ShieldCheck, Trash2, Unlink2 } from 'lucide-react'
+import {
+  ArrowLeft,
+  Boxes,
+  ChevronRight,
+  FolderPlus,
+  Gauge,
+  Info,
+  Link2,
+  Plus,
+  RotateCcw,
+  ShieldCheck,
+  Trash2,
+  Unlink2,
+} from 'lucide-react'
 import {
   useCallback,
   useEffect,
@@ -15,6 +28,7 @@ import { PublicKey, SystemProgram, Transaction, TransactionInstruction } from '@
 
 import { Button } from '@/ui/Button'
 import { Input } from '@/ui/Input'
+import { TokenPairIcon } from '@/ui/TokenPairIcon'
 import { cn } from '@/lib/cn'
 import { buildTransaction } from '@/lib/chain/buildTransaction'
 import { getPriorityFee } from '@/lib/chain/priorityFee'
@@ -48,6 +62,7 @@ import {
 import { toast } from '@/stores/toastStore'
 import { useWalletStore } from '@/stores/walletStore'
 import type {
+  LeverageConfig,
   Market,
   MarketGroupKind,
   MarketGroupStatus,
@@ -88,6 +103,125 @@ function parseBoundedInt(label: string, value: string, min: number, max: number)
 
 function parseUsdcBn(label: string, value: string): BN {
   return parseScaledDecimalBn(label, value, 6)
+}
+
+function AdminAccessMessage() {
+  return (
+    <main className="px-10 pt-6 pb-12">
+      <h1 className="font-display text-ink-strong mb-4 text-[56px] leading-none font-medium tracking-[-0.01em] [font-variation-settings:'ROND'_100]">
+        Admin
+      </h1>
+      <p className="text-ink-muted font-mono text-xs tracking-normal uppercase">
+        Connect an admin wallet to access this page.
+      </p>
+    </main>
+  )
+}
+
+function AdminPageHeader({
+  title = 'Admin',
+  subtitle,
+  backTo,
+  action,
+}: {
+  title?: string
+  subtitle: string
+  backTo?: '/admin'
+  action?: ReactNode
+}) {
+  const navigate = useNavigate()
+  return (
+    <header className="mb-8 flex flex-wrap items-end justify-between gap-4">
+      <div>
+        {backTo && (
+          <button
+            type="button"
+            onClick={() => void navigate({ to: backTo })}
+            className={cn(
+              'text-ink-muted mb-5 inline-flex items-center gap-2 font-mono text-xs uppercase',
+              'duration-short ease-levx hover:text-ink-strong transition-colors',
+            )}
+          >
+            <ArrowLeft size={14} strokeWidth={1.75} />
+            Admin hub
+          </button>
+        )}
+        <h1 className="font-display text-ink-strong mb-4 text-[56px] leading-none font-medium tracking-[-0.01em] [font-variation-settings:'ROND'_100]">
+          {title}
+        </h1>
+        <p className="text-ink-muted font-mono text-xs tracking-normal uppercase">{subtitle}</p>
+      </div>
+      {action}
+    </header>
+  )
+}
+
+function AdminManagementCard({
+  title,
+  description,
+  meta,
+  to,
+  icon,
+  tone = 'success',
+}: {
+  title: string
+  description: string
+  meta: string
+  to: '/admin/market-groups' | '/admin/mode2-gate'
+  icon: ReactNode
+  tone?: 'success' | 'accent'
+}) {
+  const navigate = useNavigate()
+  return (
+    <button
+      type="button"
+      onClick={() => void navigate({ to })}
+      className={cn(
+        'market-card-hover-glow group relative min-h-[220px] overflow-hidden rounded-[24px] border',
+        'border-line from-surface-1 to-surface-2 bg-gradient-to-b p-6 text-left',
+        'duration-medium ease-levx transition-all',
+        'hover:-translate-y-1.5 hover:shadow-[0_32px_64px_-16px_rgba(0,0,0,0.7)]',
+        tone === 'success' ? 'hover:border-success/50' : 'hover:border-accent/50',
+      )}
+    >
+      <div
+        className="pointer-events-none absolute inset-0 opacity-[0.03] transition-opacity duration-500 group-hover:opacity-[0.06]"
+        style={{
+          backgroundImage: 'radial-gradient(circle, var(--ink-strong) 1px, transparent 1px)',
+          backgroundSize: '12px 12px',
+        }}
+      />
+      <div
+        className={cn(
+          'pointer-events-none absolute inset-x-0 bottom-0 h-24 opacity-0 blur-2xl transition-opacity duration-500 group-hover:opacity-45',
+          tone === 'success' ? 'bg-success/20' : 'bg-accent/20',
+        )}
+      />
+      <div className="relative z-[1] flex h-full flex-col justify-between gap-8">
+        <div className="flex items-start justify-between gap-4">
+          <div className="border-line bg-surface/50 text-ink-muted group-hover:border-ink group-hover:text-ink-strong flex h-11 w-11 items-center justify-center rounded-full border transition-colors">
+            {icon}
+          </div>
+          <ChevronRight
+            size={18}
+            strokeWidth={1.75}
+            className="text-ink-dim group-hover:text-ink-strong transition-transform duration-300 group-hover:translate-x-1"
+          />
+        </div>
+        <div>
+          <div className="text-ink-dim mb-3 font-mono text-[10px] tracking-wider uppercase">
+            {meta}
+          </div>
+          <h2 className="text-ink-strong font-display text-3xl leading-none font-medium tracking-normal [font-variation-settings:'ROND'_100]">
+            {title}
+          </h2>
+          <p className="text-ink-muted mt-4 max-w-[46ch] font-mono text-sm leading-relaxed">
+            {description}
+          </p>
+        </div>
+      </div>
+    </button>
+  )
 }
 
 function MarketGroupAdminPanel() {
@@ -729,6 +863,29 @@ const MODE2_PAIR_DEFAULTS = {
   bufferDrainThresholdBps: '2000',
   bufferReopenThresholdBps: '3000',
 }
+const MODE2_SUPPORTED_PAIRS = [
+  {
+    label: 'SOL/USDC',
+    base: 'SOL',
+    quote: 'USDC',
+    baseMint: 'So11111111111111111111111111111111111111112',
+    quoteMint: '6xz4EVw6rYFnfJwgumXsBt28xgjvKjpAWpwzdvPUJkhz',
+  },
+  {
+    label: 'BTC/USDC',
+    base: 'BTC',
+    quote: 'USDC',
+    baseMint: '3BZPwbcqB5kKScF3TEXxwNfx5ipV13kbRVDvfVp5c6fv',
+    quoteMint: '6xz4EVw6rYFnfJwgumXsBt28xgjvKjpAWpwzdvPUJkhz',
+  },
+  {
+    label: 'ETH/USDC',
+    base: 'ETH',
+    quote: 'USDC',
+    baseMint: '7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs',
+    quoteMint: '6xz4EVw6rYFnfJwgumXsBt28xgjvKjpAWpwzdvPUJkhz',
+  },
+] as const
 const EMPTY_PAIR_RISK_STATES: PairRiskState[] = []
 const MODE2_FIELD_HELP = {
   simulatorHash:
@@ -807,6 +964,16 @@ function Mode2StatusPill({
       {children}
     </span>
   )
+}
+
+function PairRiskStatusBadge({ status }: { status: PairRiskStatus }) {
+  const tone =
+    status === 'active'
+      ? 'safe'
+      : status === 'paused' || status === 'resetPending'
+        ? 'warning'
+        : 'neutral'
+  return <Mode2StatusPill tone={tone}>{formatStatusLabel(status)}</Mode2StatusPill>
 }
 
 function Mode2FieldShell({
@@ -953,6 +1120,30 @@ function Mode2AdminPanel() {
     [pairBaseMint, pairQuoteMint, pairRiskStates],
   )
 
+  const loadLeverageConfig = useCallback((config: LeverageConfig) => {
+    setSimulatorOutputHash(config.simulatorOutputHash)
+    setActivationDelaySeconds(String(config.activationDelaySeconds))
+    setMaxLeverage(String(config.currentParams.maxLeverage))
+    setMaxPairOi(inputAmount(config.currentParams.maxPairLeveragedOi))
+    setMaxMarketOi(inputAmount(config.currentParams.maxMarketLeveragedOi))
+    setMaxPathOi(inputAmount(config.currentParams.maxPathLeveragedOi))
+    setMaxClusterOi(inputAmount(config.currentParams.maxPathClusterLeveragedOi))
+    setVaultUtilizationCeilingBps(String(config.currentParams.vaultUtilizationCeilingBps))
+    setMinPairBufferBps(String(config.currentParams.minPairBufferBps))
+  }, [])
+
+  const loadMode2ConfigDefaults = useCallback(() => {
+    setSimulatorOutputHash(MODE2_SIMULATOR_HASH)
+    setActivationDelaySeconds(MODE2_CONFIG_DEFAULTS.activationDelaySeconds)
+    setMaxLeverage(MODE2_CONFIG_DEFAULTS.maxLeverage)
+    setMaxPairOi(MODE2_CONFIG_DEFAULTS.maxPairOi)
+    setMaxMarketOi(MODE2_CONFIG_DEFAULTS.maxMarketOi)
+    setMaxPathOi(MODE2_CONFIG_DEFAULTS.maxPathOi)
+    setMaxClusterOi(MODE2_CONFIG_DEFAULTS.maxClusterOi)
+    setVaultUtilizationCeilingBps(MODE2_CONFIG_DEFAULTS.vaultUtilizationCeilingBps)
+    setMinPairBufferBps(MODE2_CONFIG_DEFAULTS.minPairBufferBps)
+  }, [])
+
   const loadPairRiskState = useCallback((state: PairRiskState) => {
     setPairBaseMint(state.baseMint)
     setPairQuoteMint(state.quoteMint)
@@ -964,19 +1155,36 @@ function Mode2AdminPanel() {
     setBufferReopenThresholdBps(String(state.bufferReopenThresholdBps))
   }, [])
 
+  const loadPairDefaults = useCallback(() => {
+    setPairStatus(MODE2_PAIR_DEFAULTS.status)
+    setPairMaxOi(MODE2_PAIR_DEFAULTS.maxPairOi)
+    setPairMaxLeverage(MODE2_PAIR_DEFAULTS.maxLeverage)
+    setBufferTargetBps(MODE2_PAIR_DEFAULTS.bufferTargetBps)
+    setBufferDrainThresholdBps(MODE2_PAIR_DEFAULTS.bufferDrainThresholdBps)
+    setBufferReopenThresholdBps(MODE2_PAIR_DEFAULTS.bufferReopenThresholdBps)
+  }, [])
+
+  const selectSupportedPair = useCallback(
+    (pair: (typeof MODE2_SUPPORTED_PAIRS)[number]) => {
+      const existing = pairRiskStates.find(
+        (state) => state.baseMint === pair.baseMint && state.quoteMint === pair.quoteMint,
+      )
+      if (existing) {
+        loadPairRiskState(existing)
+        return
+      }
+      setPairBaseMint(pair.baseMint)
+      setPairQuoteMint(pair.quoteMint)
+      loadPairDefaults()
+    },
+    [loadPairDefaults, loadPairRiskState, pairRiskStates],
+  )
+
   useEffect(() => {
     if (!leverageConfig || hasSyncedMode2Inputs) return
-    setSimulatorOutputHash(leverageConfig.simulatorOutputHash)
-    setActivationDelaySeconds(String(leverageConfig.activationDelaySeconds))
-    setMaxLeverage(String(leverageConfig.currentParams.maxLeverage))
-    setMaxPairOi(inputAmount(leverageConfig.currentParams.maxPairLeveragedOi))
-    setMaxMarketOi(inputAmount(leverageConfig.currentParams.maxMarketLeveragedOi))
-    setMaxPathOi(inputAmount(leverageConfig.currentParams.maxPathLeveragedOi))
-    setMaxClusterOi(inputAmount(leverageConfig.currentParams.maxPathClusterLeveragedOi))
-    setVaultUtilizationCeilingBps(String(leverageConfig.currentParams.vaultUtilizationCeilingBps))
-    setMinPairBufferBps(String(leverageConfig.currentParams.minPairBufferBps))
+    loadLeverageConfig(leverageConfig)
     setHasSyncedMode2Inputs(true)
-  }, [hasSyncedMode2Inputs, leverageConfig])
+  }, [hasSyncedMode2Inputs, leverageConfig, loadLeverageConfig])
 
   useEffect(() => {
     if (pairBaseMint || pairQuoteMint || pairRiskStates.length === 0) return
@@ -1394,6 +1602,24 @@ function Mode2AdminPanel() {
               <p className="text-ink-dim mt-1 font-mono text-xs">
                 Initialize is one-time. Use Stage and Accept for future parameter updates.
               </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button
+                  variant="secondary"
+                  className="min-h-8 px-3 py-2 text-[10px]"
+                  disabled={!leverageConfig}
+                  onClick={() => leverageConfig && loadLeverageConfig(leverageConfig)}
+                >
+                  <RotateCcw size={12} strokeWidth={1.75} className="mr-2" />
+                  Reset to live
+                </Button>
+                <Button
+                  variant="secondary"
+                  className="min-h-8 px-3 py-2 text-[10px]"
+                  onClick={loadMode2ConfigDefaults}
+                >
+                  Use devnet params
+                </Button>
+              </div>
             </div>
             <div className="grid grid-cols-1 gap-4">
               <Mode2InfoInput
@@ -1532,9 +1758,7 @@ function Mode2AdminPanel() {
                         {formatAddress(state.baseMint)} → {formatAddress(state.quoteMint)}
                       </span>
                     </span>
-                    <span className="text-ink-muted font-mono text-[10px] uppercase">
-                      {formatStatusLabel(state.status)}
-                    </span>
+                    <PairRiskStatusBadge status={state.status} />
                   </button>
                 )
               })}
@@ -1579,11 +1803,66 @@ function Mode2AdminPanel() {
                 Pair action
               </h3>
               <p className="text-ink-dim mt-1 font-mono text-xs">
-                Select an existing pair to update its status, or paste a supported pair to
-                initialize a new risk state.
+                Select SOL, BTC, or ETH to load canonical devnet mints. Existing pair states load
+                their live values automatically.
               </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button
+                  variant="secondary"
+                  className="min-h-8 px-3 py-2 text-[10px]"
+                  disabled={!selectedPairRiskState}
+                  onClick={() => selectedPairRiskState && loadPairRiskState(selectedPairRiskState)}
+                >
+                  <RotateCcw size={12} strokeWidth={1.75} className="mr-2" />
+                  Reset pair
+                </Button>
+                <Button
+                  variant="secondary"
+                  className="min-h-8 px-3 py-2 text-[10px]"
+                  onClick={loadPairDefaults}
+                >
+                  Use defaults
+                </Button>
+              </div>
             </div>
             <div className="grid grid-cols-1 gap-4">
+              <div className="grid grid-cols-1 gap-2 [@media(min-width:1181px)]:grid-cols-3">
+                {MODE2_SUPPORTED_PAIRS.map((pair) => {
+                  const selected =
+                    pair.baseMint === pairBaseMint && pair.quoteMint === pairQuoteMint
+                  const existingState = pairRiskStates.find(
+                    (state) =>
+                      state.baseMint === pair.baseMint && state.quoteMint === pair.quoteMint,
+                  )
+                  return (
+                    <button
+                      key={pair.label}
+                      type="button"
+                      onClick={() => selectSupportedPair(pair)}
+                      className={cn(
+                        'flex items-center justify-between gap-3 rounded-lg border px-3 py-3 text-left',
+                        'duration-short ease-levx transition-[border-color,background-color,color]',
+                        selected
+                          ? 'border-ink-strong bg-ink-strong/5'
+                          : 'border-line hover:border-line-strong bg-transparent',
+                      )}
+                    >
+                      <span className="flex min-w-0 items-center gap-2">
+                        <TokenPairIcon base={pair.base} quote={pair.quote} size={24} />
+                        <span className="min-w-0">
+                          <span className="text-ink-strong block truncate font-mono text-xs font-bold">
+                            {pair.label}
+                          </span>
+                          <span className="text-ink-dim block font-mono text-[10px] uppercase">
+                            {existingState ? 'On-chain' : 'New pair'}
+                          </span>
+                        </span>
+                      </span>
+                      {existingState && <PairRiskStatusBadge status={existingState.status} />}
+                    </button>
+                  )
+                })}
+              </div>
               <Mode2InfoInput
                 label="Base mint"
                 help={MODE2_FIELD_HELP.baseMint}
@@ -1681,11 +1960,50 @@ function Mode2AdminPanel() {
   )
 }
 
+export function AdminMarketGroupsPage() {
+  const isAdmin = useIsAdmin()
+
+  if (!isAdmin) return <AdminAccessMessage />
+
+  return (
+    <main className="px-10 pt-6 pb-12">
+      <AdminPageHeader
+        title="Market Groups"
+        subtitle="Create hierarchy sidecars, link markets, and manage recovery operations"
+        backTo="/admin"
+      />
+      <MarketGroupAdminPanel />
+    </main>
+  )
+}
+
+export function AdminMode2GatePage() {
+  const isAdmin = useIsAdmin()
+
+  if (!isAdmin) return <AdminAccessMessage />
+
+  return (
+    <main className="px-10 pt-6 pb-12">
+      <AdminPageHeader
+        title="Mode 2 Gate"
+        subtitle="Configure dormant leverage sidecars without enabling leverage"
+        backTo="/admin"
+      />
+      <Mode2AdminPanel />
+    </main>
+  )
+}
+
 export function AdminMarketsPage() {
   const isAdmin = useIsAdmin()
   const navigate = useNavigate()
   const { data: markets, isLoading } = useMarkets()
+  const { data: readiness } = useMode2Readiness()
   const closeMarket = useCloseMarket()
+  const groupedMarkets = markets?.filter((market) => market.groupKeyHash).length ?? 0
+  const mode2Status = readiness?.leverageConfig
+    ? `${formatStatusLabel(readiness.leverageConfig.status)} · ${readiness.pairRiskStates.length} pairs`
+    : 'No config'
 
   const handleCloseMarket = (market: Market) => {
     const label = market.pair || `Market ${market.marketId}`
@@ -1694,39 +2012,38 @@ export function AdminMarketsPage() {
   }
 
   if (!isAdmin) {
-    return (
-      <main className="px-10 pt-6 pb-12">
-        <h1 className="font-display text-ink-strong mb-4 text-[56px] leading-none font-medium tracking-[-0.01em] [font-variation-settings:'ROND'_100]">
-          Admin
-        </h1>
-        <p className="text-ink-muted font-mono text-xs tracking-normal uppercase">
-          Connect an admin wallet to access this page.
-        </p>
-      </main>
-    )
+    return <AdminAccessMessage />
   }
 
   return (
     <main className="px-10 pt-6 pb-12">
-      <header className="mb-8 flex items-end justify-between">
-        <div>
-          <h1 className="font-display text-ink-strong mb-4 text-[56px] leading-none font-medium tracking-[-0.01em] [font-variation-settings:'ROND'_100]">
-            Admin
-          </h1>
-          <p className="text-ink-muted font-mono text-xs tracking-normal uppercase">
-            Manage markets
-          </p>
-        </div>
-        {markets && markets.length > 0 && (
+      <AdminPageHeader
+        subtitle="Manage markets"
+        action={
           <Button variant="primary" onClick={() => void navigate({ to: '/admin/create' })}>
             <Plus size={14} strokeWidth={2} className="mr-2" />
             New market
           </Button>
-        )}
-      </header>
+        }
+      />
 
-      <MarketGroupAdminPanel />
-      <Mode2AdminPanel />
+      <section className="mb-10 grid grid-cols-1 gap-6 [@media(min-width:980px)]:grid-cols-2">
+        <AdminManagementCard
+          title="Market groups"
+          description="Create hierarchy sidecars, link existing markets, and recover or close empty groups without changing child settlement."
+          meta={`${groupedMarkets} grouped markets`}
+          to="/admin/market-groups"
+          icon={<Boxes size={20} strokeWidth={1.75} />}
+        />
+        <AdminManagementCard
+          title="Mode 2 gate"
+          description="Review dormant leverage sidecars, stage config updates, and manage pair risk states while leverage remains unavailable."
+          meta={mode2Status}
+          to="/admin/mode2-gate"
+          icon={<Gauge size={20} strokeWidth={1.75} />}
+          tone="accent"
+        />
+      </section>
 
       {/* ── Existing markets ───────────────────────────────── */}
       {isLoading && (
