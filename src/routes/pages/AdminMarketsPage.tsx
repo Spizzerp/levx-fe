@@ -1,7 +1,15 @@
 import { useNavigate } from '@tanstack/react-router'
 import { AnchorProvider, BN, parseIdlErrors, translateError } from '@coral-xyz/anchor'
-import { FolderPlus, Link2, Plus, ShieldCheck, Trash2, Unlink2 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { FolderPlus, Info, Link2, Plus, ShieldCheck, Trash2, Unlink2 } from 'lucide-react'
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useState,
+  type ComponentProps,
+  type ReactNode,
+} from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { PublicKey, SystemProgram, Transaction, TransactionInstruction } from '@solana/web3.js'
 
@@ -13,7 +21,8 @@ import { getPriorityFee } from '@/lib/chain/priorityFee'
 import { parseScaledDecimalBn } from '@/lib/fixedPoint'
 import { useIsAdmin } from '@/lib/hooks/useIsAdmin'
 import { useMarkets, useMode2Readiness } from '@/lib/api/hooks'
-import { formatUSD } from '@/lib/format'
+import { formatAddress, formatUSD } from '@/lib/format'
+import { resolveBaseMintLabel } from '@/lib/api/pairLabels'
 import { SCALE } from '@/lib/constants'
 import { useCloseMarket, useProgram } from '@/lib/solana'
 import {
@@ -38,7 +47,13 @@ import {
 } from '@/lib/marketGroups'
 import { toast } from '@/stores/toastStore'
 import { useWalletStore } from '@/stores/walletStore'
-import type { Market, MarketGroupKind, MarketGroupStatus, PairRiskStatus } from '@/types/market'
+import type {
+  Market,
+  MarketGroupKind,
+  MarketGroupStatus,
+  PairRiskState,
+  PairRiskStatus,
+} from '@/types/market'
 
 function canCloseMarket(market: Market): boolean {
   return (
@@ -695,34 +710,280 @@ const PAIR_RISK_STATUS_OPTIONS: { value: PairRiskStatus; label: string }[] = [
   { value: 'paused', label: 'Paused' },
 ]
 const MIN_LEVERAGE_CONFIG_DELAY_SECONDS = 86_400
+const MODE2_SIMULATOR_HASH = '463edae705a65e430031f1ef0d85a3cb2568690206af41d87504c44095bc4d3b'
+const MODE2_CONFIG_DEFAULTS = {
+  activationDelaySeconds: '86400',
+  maxLeverage: '10',
+  maxPairOi: '5000',
+  maxMarketOi: '1000',
+  maxPathOi: '250',
+  maxClusterOi: '500',
+  vaultUtilizationCeilingBps: '8000',
+  minPairBufferBps: '1000',
+}
+const MODE2_PAIR_DEFAULTS = {
+  status: 'drainOnly' as PairRiskStatus,
+  maxPairOi: '2000',
+  maxLeverage: '5',
+  bufferTargetBps: '2500',
+  bufferDrainThresholdBps: '2000',
+  bufferReopenThresholdBps: '3000',
+}
+const EMPTY_PAIR_RISK_STATES: PairRiskState[] = []
+const MODE2_FIELD_HELP = {
+  simulatorHash:
+    '32-byte hash of the simulator report backing these parameters. It gives governance a stable risk-review reference.',
+  activationDelaySeconds:
+    'Minimum delay before a staged config can be accepted. Devnet currently uses 86,400 seconds.',
+  maxLeverage:
+    'Global leverage ceiling. Pair risk states can choose lower caps, but should not exceed this governance limit.',
+  maxPairOi:
+    'Maximum leveraged open interest allowed across one base/quote pair, expressed in USDC.',
+  maxMarketOi: 'Maximum leveraged open interest allowed on a single market, expressed in USDC.',
+  maxPathOi: 'Maximum leveraged exposure allowed on one predicted path.',
+  maxClusterOi:
+    'Maximum leveraged exposure allowed across correlated paths in the same risk cluster.',
+  vaultCeilingBps:
+    'Maximum vault utilization in basis points before Mode 2 should stop adding new risk.',
+  minBufferBps:
+    'Minimum pair buffer target in basis points. Pair targets must stay at or above this floor.',
+  baseMint: 'Base asset mint for the pair risk account, such as SOL, BTC, or ETH.',
+  quoteMint: 'Quote or collateral mint paired with the base asset.',
+  pairStatus:
+    'Operational safety state for this pair. Drain only is the conservative dormant setting.',
+  pairMaxOi: 'Pair-specific leveraged open-interest cap, expressed in USDC.',
+  pairMaxLeverage: 'Pair-specific leverage cap. Keep it at or below the global max leverage.',
+  bufferTargetBps: 'Normal buffer target for this pair, in basis points.',
+  bufferDrainBps:
+    'Buffer threshold where this pair should move toward reducing risk instead of adding it.',
+  bufferReopenBps:
+    'Buffer threshold required before a drained pair is eligible to reopen in a future activation.',
+}
+
+function formatBps(value: number): string {
+  return `${(value / 100).toLocaleString(undefined, { maximumFractionDigits: 2 })}%`
+}
+
+function formatStatusLabel(value: string): string {
+  return value.replace(/([A-Z])/g, ' $1').replace(/^./, (char) => char.toUpperCase())
+}
+
+function formatHash(hash: string): string {
+  if (!hash) return 'Not set'
+  return `${hash.slice(0, 8)}…${hash.slice(-8)}`
+}
+
+function inputAmount(value: number): string {
+  return Number.isFinite(value) ? String(value) : ''
+}
+
+function Mode2Metric({ label, value, detail }: { label: string; value: string; detail?: string }) {
+  return (
+    <div className="border-line rounded-md border px-3 py-3">
+      <div className="text-ink-muted font-mono text-[10px] tracking-wide uppercase">{label}</div>
+      <div className="text-ink-strong mt-1 truncate font-mono text-sm">{value}</div>
+      {detail && <div className="text-ink-dim mt-1 truncate font-mono text-[11px]">{detail}</div>}
+    </div>
+  )
+}
+
+function Mode2StatusPill({
+  tone,
+  children,
+}: {
+  tone: 'safe' | 'warning' | 'neutral'
+  children: string
+}) {
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center rounded-full border px-2.5 py-1',
+        'font-mono text-[10px] font-bold tracking-wide uppercase',
+        tone === 'safe' && 'border-bull/40 bg-bull/10 text-bull',
+        tone === 'warning' && 'border-accent/40 bg-accent-subtle text-accent',
+        tone === 'neutral' && 'border-line-strong bg-surface text-ink-muted',
+      )}
+    >
+      {children}
+    </span>
+  )
+}
+
+function Mode2FieldShell({
+  label,
+  help,
+  htmlFor,
+  children,
+}: {
+  label: string
+  help: string
+  htmlFor: string
+  children: (describedBy: string | undefined) => ReactNode
+}) {
+  const helpId = useId()
+  const [expanded, setExpanded] = useState(false)
+  const describedBy = expanded ? helpId : undefined
+
+  return (
+    <div className="flex flex-col">
+      <div className="flex items-center gap-1.5">
+        <label htmlFor={htmlFor} className="text-label text-ink-muted font-mono uppercase">
+          {label}
+        </label>
+        <button
+          type="button"
+          aria-label={`About ${label}`}
+          aria-expanded={expanded}
+          aria-controls={helpId}
+          onClick={() => setExpanded((value) => !value)}
+          className={cn(
+            'border-line text-ink-dim inline-flex h-5 w-5 items-center justify-center rounded-full border',
+            'duration-short ease-levx transition-[border-color,background-color,color]',
+            'hover:border-line-strong hover:text-ink-strong focus-visible:border-ink-strong focus-visible:outline-none',
+            expanded && 'border-line-strong bg-surface-1 text-ink-strong',
+          )}
+        >
+          <Info size={11} strokeWidth={1.75} />
+        </button>
+      </div>
+      {expanded && (
+        <p
+          id={helpId}
+          className="border-line bg-surface/50 text-ink-muted mt-2 rounded-md border px-3 py-2 font-mono text-[11px] leading-relaxed"
+        >
+          {help}
+        </p>
+      )}
+      {children(describedBy)}
+    </div>
+  )
+}
+
+type Mode2InfoInputProps = Omit<ComponentProps<typeof Input>, 'label'> & {
+  label: string
+  help: string
+}
+
+function Mode2InfoInput({ label, help, ...props }: Mode2InfoInputProps) {
+  const inputId = useId()
+  return (
+    <Mode2FieldShell label={label} help={help} htmlFor={inputId}>
+      {(describedBy) => <Input id={inputId} aria-describedby={describedBy} {...props} />}
+    </Mode2FieldShell>
+  )
+}
+
+function Mode2InfoSelect({
+  label,
+  help,
+  value,
+  onChange,
+  children,
+}: {
+  label: string
+  help: string
+  value: PairRiskStatus
+  onChange: (value: PairRiskStatus) => void
+  children: ReactNode
+}) {
+  const selectId = useId()
+  return (
+    <Mode2FieldShell label={label} help={help} htmlFor={selectId}>
+      {(describedBy) => (
+        <select
+          id={selectId}
+          value={value}
+          aria-describedby={describedBy}
+          onChange={(e) => onChange(e.target.value as PairRiskStatus)}
+          className={cn(
+            'border-line-strong bg-surface text-ink-strong',
+            'mt-3 rounded-lg border px-3 py-3 font-mono text-sm',
+          )}
+        >
+          {children}
+        </select>
+      )}
+    </Mode2FieldShell>
+  )
+}
 
 function Mode2AdminPanel() {
   const queryClient = useQueryClient()
   const program = useProgram()
   const publicKey = useWalletStore((s) => s.publicKey)
   const { data: readiness } = useMode2Readiness()
-  const [simulatorOutputHash, setSimulatorOutputHash] = useState('')
-  const [activationDelaySeconds, setActivationDelaySeconds] = useState('86400')
-  const [maxLeverage, setMaxLeverage] = useState('5')
-  const [maxPairOi, setMaxPairOi] = useState('100000')
-  const [maxMarketOi, setMaxMarketOi] = useState('40000')
-  const [maxPathOi, setMaxPathOi] = useState('10000')
-  const [maxClusterOi, setMaxClusterOi] = useState('25000')
-  const [vaultUtilizationCeilingBps, setVaultUtilizationCeilingBps] = useState('7500')
-  const [minPairBufferBps, setMinPairBufferBps] = useState('2500')
+  const [simulatorOutputHash, setSimulatorOutputHash] = useState(MODE2_SIMULATOR_HASH)
+  const [activationDelaySeconds, setActivationDelaySeconds] = useState(
+    MODE2_CONFIG_DEFAULTS.activationDelaySeconds,
+  )
+  const [maxLeverage, setMaxLeverage] = useState(MODE2_CONFIG_DEFAULTS.maxLeverage)
+  const [maxPairOi, setMaxPairOi] = useState(MODE2_CONFIG_DEFAULTS.maxPairOi)
+  const [maxMarketOi, setMaxMarketOi] = useState(MODE2_CONFIG_DEFAULTS.maxMarketOi)
+  const [maxPathOi, setMaxPathOi] = useState(MODE2_CONFIG_DEFAULTS.maxPathOi)
+  const [maxClusterOi, setMaxClusterOi] = useState(MODE2_CONFIG_DEFAULTS.maxClusterOi)
+  const [vaultUtilizationCeilingBps, setVaultUtilizationCeilingBps] = useState(
+    MODE2_CONFIG_DEFAULTS.vaultUtilizationCeilingBps,
+  )
+  const [minPairBufferBps, setMinPairBufferBps] = useState(MODE2_CONFIG_DEFAULTS.minPairBufferBps)
   const [pairBaseMint, setPairBaseMint] = useState('')
   const [pairQuoteMint, setPairQuoteMint] = useState('')
-  const [pairStatus, setPairStatus] = useState<PairRiskStatus>('active')
-  const [pairMaxOi, setPairMaxOi] = useState('100000')
-  const [pairMaxLeverage, setPairMaxLeverage] = useState('5')
-  const [bufferTargetBps, setBufferTargetBps] = useState('2500')
-  const [bufferDrainThresholdBps, setBufferDrainThresholdBps] = useState('1500')
-  const [bufferReopenThresholdBps, setBufferReopenThresholdBps] = useState('3000')
+  const [pairStatus, setPairStatus] = useState<PairRiskStatus>(MODE2_PAIR_DEFAULTS.status)
+  const [pairMaxOi, setPairMaxOi] = useState(MODE2_PAIR_DEFAULTS.maxPairOi)
+  const [pairMaxLeverage, setPairMaxLeverage] = useState(MODE2_PAIR_DEFAULTS.maxLeverage)
+  const [bufferTargetBps, setBufferTargetBps] = useState(MODE2_PAIR_DEFAULTS.bufferTargetBps)
+  const [bufferDrainThresholdBps, setBufferDrainThresholdBps] = useState(
+    MODE2_PAIR_DEFAULTS.bufferDrainThresholdBps,
+  )
+  const [bufferReopenThresholdBps, setBufferReopenThresholdBps] = useState(
+    MODE2_PAIR_DEFAULTS.bufferReopenThresholdBps,
+  )
   const [pendingAction, setPendingAction] = useState<
     'init-config' | 'stage-config' | 'accept-config' | 'init-pair' | 'update-pair' | null
   >(null)
+  const [hasSyncedMode2Inputs, setHasSyncedMode2Inputs] = useState(false)
 
-  function buildRiskParams() {
+  const leverageConfig = readiness?.leverageConfig ?? null
+  const pairRiskStates = readiness?.pairRiskStates ?? EMPTY_PAIR_RISK_STATES
+  const minPairBufferBpsForPair = leverageConfig?.currentParams.minPairBufferBps
+  const selectedPairRiskState = useMemo(
+    () =>
+      pairRiskStates.find(
+        (state) => state.baseMint === pairBaseMint && state.quoteMint === pairQuoteMint,
+      ) ?? null,
+    [pairBaseMint, pairQuoteMint, pairRiskStates],
+  )
+
+  const loadPairRiskState = useCallback((state: PairRiskState) => {
+    setPairBaseMint(state.baseMint)
+    setPairQuoteMint(state.quoteMint)
+    setPairStatus(state.status)
+    setPairMaxOi(inputAmount(state.maxPairLeveragedOi))
+    setPairMaxLeverage(String(state.maxLeverage))
+    setBufferTargetBps(String(state.bufferTargetBps))
+    setBufferDrainThresholdBps(String(state.bufferDrainThresholdBps))
+    setBufferReopenThresholdBps(String(state.bufferReopenThresholdBps))
+  }, [])
+
+  useEffect(() => {
+    if (!leverageConfig || hasSyncedMode2Inputs) return
+    setSimulatorOutputHash(leverageConfig.simulatorOutputHash)
+    setActivationDelaySeconds(String(leverageConfig.activationDelaySeconds))
+    setMaxLeverage(String(leverageConfig.currentParams.maxLeverage))
+    setMaxPairOi(inputAmount(leverageConfig.currentParams.maxPairLeveragedOi))
+    setMaxMarketOi(inputAmount(leverageConfig.currentParams.maxMarketLeveragedOi))
+    setMaxPathOi(inputAmount(leverageConfig.currentParams.maxPathLeveragedOi))
+    setMaxClusterOi(inputAmount(leverageConfig.currentParams.maxPathClusterLeveragedOi))
+    setVaultUtilizationCeilingBps(String(leverageConfig.currentParams.vaultUtilizationCeilingBps))
+    setMinPairBufferBps(String(leverageConfig.currentParams.minPairBufferBps))
+    setHasSyncedMode2Inputs(true)
+  }, [hasSyncedMode2Inputs, leverageConfig])
+
+  useEffect(() => {
+    if (pairBaseMint || pairQuoteMint || pairRiskStates.length === 0) return
+    loadPairRiskState(pairRiskStates[0])
+  }, [loadPairRiskState, pairBaseMint, pairQuoteMint, pairRiskStates])
+
+  const buildRiskParams = useCallback(() => {
     return {
       maxLeverage: parseBoundedInt('Max leverage', maxLeverage, 1, 50),
       maxMarketLeveragedOi: parseUsdcBn('Max market OI', maxMarketOi),
@@ -735,18 +996,26 @@ function Mode2AdminPanel() {
         1,
         10_000,
       ),
-      borrowBaseRateBps: 100,
+      borrowBaseRateBps: 200,
       borrowKinkUtilizationBps: 6_000,
-      borrowKinkRateBps: 800,
-      borrowMaxRateBps: 2_000,
-      liquidationThreshold: new BN(Math.round(1.15 * SCALE)),
+      borrowKinkRateBps: 1_500,
+      borrowMaxRateBps: 10_000,
+      liquidationThreshold: new BN(Math.round(1.1 * SCALE)),
       keeperRewardBps: 50,
-      profitWarmupCheckpoints: 4,
+      profitWarmupCheckpoints: 3,
       minPairBufferBps: parseBoundedInt('Min pair buffer', minPairBufferBps, 0, 10_000),
     }
-  }
+  }, [
+    maxClusterOi,
+    maxLeverage,
+    maxMarketOi,
+    maxPairOi,
+    maxPathOi,
+    minPairBufferBps,
+    vaultUtilizationCeilingBps,
+  ])
 
-  function parsePairRiskInputs() {
+  const parsePairRiskInputs = useCallback(() => {
     const bufferTarget = parseBoundedInt('Buffer target', bufferTargetBps, 0, 10_000)
     const bufferDrain = parseBoundedInt('Buffer drain', bufferDrainThresholdBps, 0, 10_000)
     const bufferReopen = parseBoundedInt('Buffer reopen', bufferReopenThresholdBps, 0, 10_000)
@@ -756,9 +1025,10 @@ function Mode2AdminPanel() {
     if (bufferTarget > bufferReopen) {
       throw new Error('Buffer reopen must be greater than or equal to target')
     }
-    const minBuffer = readiness?.leverageConfig?.currentParams.minPairBufferBps
-    if (typeof minBuffer === 'number' && bufferTarget < minBuffer) {
-      throw new Error(`Buffer target must be at least current config min (${minBuffer})`)
+    if (typeof minPairBufferBpsForPair === 'number' && bufferTarget < minPairBufferBpsForPair) {
+      throw new Error(
+        `Buffer target must be at least current config min (${minPairBufferBpsForPair})`,
+      )
     }
 
     return {
@@ -768,7 +1038,14 @@ function Mode2AdminPanel() {
       bufferDrainThresholdBps: bufferDrain,
       bufferReopenThresholdBps: bufferReopen,
     }
-  }
+  }, [
+    bufferDrainThresholdBps,
+    bufferReopenThresholdBps,
+    bufferTargetBps,
+    minPairBufferBpsForPair,
+    pairMaxLeverage,
+    pairMaxOi,
+  ])
 
   function buildPairRiskParams(baseMint: PublicKey, quoteMint: PublicKey) {
     return {
@@ -792,16 +1069,7 @@ function Mode2AdminPanel() {
     } catch (err) {
       return (err as Error).message
     }
-  }, [
-    activationDelaySeconds,
-    maxClusterOi,
-    maxLeverage,
-    maxMarketOi,
-    maxPairOi,
-    maxPathOi,
-    minPairBufferBps,
-    vaultUtilizationCeilingBps,
-  ])
+  }, [activationDelaySeconds, buildRiskParams])
   const pairParamsError = useMemo(() => {
     try {
       if (pairBaseMint.trim() && !isPubkey(pairBaseMint)) {
@@ -815,28 +1083,22 @@ function Mode2AdminPanel() {
     } catch (err) {
       return (err as Error).message
     }
-  }, [
-    bufferDrainThresholdBps,
-    bufferReopenThresholdBps,
-    bufferTargetBps,
-    pairBaseMint,
-    pairMaxLeverage,
-    pairMaxOi,
-    pairQuoteMint,
-    pairStatus,
-    readiness?.leverageConfig?.currentParams.minPairBufferBps,
-  ])
+  }, [pairBaseMint, pairQuoteMint, parsePairRiskInputs])
   const normalizedSimulatorHash = isBytes32Hex(simulatorOutputHash)
     ? normalizeBytes32Hex(simulatorOutputHash)
     : ''
-  const canSubmitConfig =
-    !!program && !!publicKey && !!normalizedSimulatorHash && !riskParamsError
+  const canSubmitConfig = !!program && !!publicKey && !!normalizedSimulatorHash && !riskParamsError
   const canSubmitPair =
     !!program &&
     !!publicKey &&
     isPubkey(pairBaseMint) &&
     isPubkey(pairQuoteMint) &&
     !pairParamsError
+  const canInitializeConfig = canSubmitConfig && !leverageConfig
+  const canStageConfig = canSubmitConfig && !!leverageConfig
+  const canAcceptConfig = !!program && !!publicKey && leverageConfig?.status === 'staged'
+  const canInitializePair = canSubmitPair && !!leverageConfig && !selectedPairRiskState
+  const canUpdatePair = canSubmitPair && !!selectedPairRiskState
 
   async function sendMode2Instruction(
     action: NonNullable<typeof pendingAction>,
@@ -881,7 +1143,7 @@ function Mode2AdminPanel() {
   }
 
   async function handleInitializeConfig() {
-    if (!program || !publicKey || !canSubmitConfig) return
+    if (!program || !publicKey || !canInitializeConfig) return
     const [protocolPda] = deriveProtocolPda()
     const [leverageConfigPda] = deriveLeverageConfigPda()
     const params = {
@@ -919,7 +1181,7 @@ function Mode2AdminPanel() {
   }
 
   async function handleStageConfig() {
-    if (!program || !publicKey || !canSubmitConfig) return
+    if (!program || !publicKey || !canStageConfig) return
     const [protocolPda] = deriveProtocolPda()
     const [leverageConfigPda] = deriveLeverageConfigPda()
     const params = {
@@ -948,7 +1210,7 @@ function Mode2AdminPanel() {
   }
 
   async function handleAcceptConfig() {
-    if (!program || !publicKey) return
+    if (!program || !publicKey || !canAcceptConfig) return
     const [protocolPda] = deriveProtocolPda()
     const [leverageConfigPda] = deriveLeverageConfigPda()
     const ix = await program.methods
@@ -970,7 +1232,7 @@ function Mode2AdminPanel() {
   }
 
   async function handleInitializePairRisk() {
-    if (!program || !publicKey || !canSubmitPair) return
+    if (!program || !publicKey || !canInitializePair) return
     let baseMint: PublicKey
     let quoteMint: PublicKey
     let params: ReturnType<typeof buildPairRiskParams>
@@ -1010,7 +1272,7 @@ function Mode2AdminPanel() {
   }
 
   async function handleUpdatePairRiskStatus() {
-    if (!program || !publicKey || !isPubkey(pairBaseMint) || !isPubkey(pairQuoteMint)) return
+    if (!program || !publicKey || !canUpdatePair) return
     const baseMint = new PublicKey(pairBaseMint)
     const quoteMint = new PublicKey(pairQuoteMint)
     const [protocolPda] = deriveProtocolPda()
@@ -1038,200 +1300,379 @@ function Mode2AdminPanel() {
 
   return (
     <section className="border-line mb-10 border-b pb-8">
-      <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
+      <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
         <div>
           <h2 className="text-ink-strong text-caption font-mono font-bold tracking-wide uppercase">
             Mode 2 gate
           </h2>
-          <p className="text-ink-dim mt-1 font-mono text-caption">
-            Dormant sidecars only · leverage remains unavailable
+          <p className="text-ink-dim text-caption mt-1 font-mono">
+            Dormant leverage setup. Admin actions here configure sidecars only.
           </p>
         </div>
-        <div className="text-ink-muted font-mono text-xs uppercase">
-          {readiness?.leverageConfig
-            ? `${readiness.leverageConfig.status} · ${readiness.pairRiskStates.length} pairs`
-            : 'No config'}
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Mode2StatusPill tone={readiness?.leverageEnabled ? 'warning' : 'safe'}>
+            {readiness?.leverageEnabled ? 'Leverage on' : 'Leverage off'}
+          </Mode2StatusPill>
+          <Mode2StatusPill tone={leverageConfig?.status === 'accepted' ? 'safe' : 'neutral'}>
+            {leverageConfig ? formatStatusLabel(leverageConfig.status) : 'No config'}
+          </Mode2StatusPill>
+          <Mode2StatusPill tone="neutral">
+            {`${pairRiskStates.length} pair${pairRiskStates.length === 1 ? '' : 's'}`}
+          </Mode2StatusPill>
         </div>
+      </div>
+
+      <div className="border-line bg-surface/50 mb-6 rounded-lg border px-4 py-3">
+        <p className="text-ink-muted font-mono text-xs leading-relaxed">
+          Current devnet state: Mode 2 sidecars can be read by the app, but leveraged positions, LP
+          deposits, liquidations, and Mode 2 claims remain disabled until a later activation
+          sequence flips protocol leverage on.
+        </p>
       </div>
 
       <div className="grid grid-cols-1 gap-8 [@media(min-width:1100px)]:grid-cols-2">
         <div className="border-line rounded-lg border p-5">
-          <div className="mb-4 flex items-center gap-2">
-            <ShieldCheck size={15} strokeWidth={1.75} className="text-ink-muted" />
-            <span className="text-ink-strong text-label font-mono uppercase">Config</span>
-          </div>
-          <div className="grid grid-cols-1 gap-4">
-            <Input
-              label="Simulator hash"
-              value={simulatorOutputHash}
-              onChange={(e) => setSimulatorOutputHash(e.target.value)}
-              placeholder="32-byte hex"
-            />
-            <div className="grid grid-cols-2 gap-4">
-              <Input
-                label="Delay seconds"
-                type="number"
-                min={MIN_LEVERAGE_CONFIG_DELAY_SECONDS}
-                value={activationDelaySeconds}
-                onChange={(e) => setActivationDelaySeconds(e.target.value)}
-              />
-              <Input
-                label="Max leverage"
-                type="number"
-                min={1}
-                max={50}
-                value={maxLeverage}
-                onChange={(e) => setMaxLeverage(e.target.value)}
-              />
+          <div className="mb-5 flex items-start justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <ShieldCheck size={15} strokeWidth={1.75} className="text-ink-muted" />
+              <span className="text-ink-strong text-label font-mono uppercase">Global config</span>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <Input label="Max pair OI" value={maxPairOi} onChange={(e) => setMaxPairOi(e.target.value)} />
-              <Input
-                label="Max market OI"
-                value={maxMarketOi}
-                onChange={(e) => setMaxMarketOi(e.target.value)}
-              />
-              <Input label="Max path OI" value={maxPathOi} onChange={(e) => setMaxPathOi(e.target.value)} />
-              <Input
-                label="Max cluster OI"
-                value={maxClusterOi}
-                onChange={(e) => setMaxClusterOi(e.target.value)}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <Input
-                label="Vault ceiling bps"
-                type="number"
-                min={1}
-                max={10000}
-                value={vaultUtilizationCeilingBps}
-                onChange={(e) => setVaultUtilizationCeilingBps(e.target.value)}
-              />
-              <Input
-                label="Min buffer bps"
-                type="number"
-                min={0}
-                max={10000}
-                value={minPairBufferBps}
-                onChange={(e) => setMinPairBufferBps(e.target.value)}
-              />
-            </div>
-            {riskParamsError && (
-              <p className="text-bear font-mono text-xs uppercase">{riskParamsError}</p>
+            {leverageConfig && (
+              <span className="text-ink-muted font-mono text-[10px] uppercase">
+                {formatAddress(leverageConfig.address)}
+              </span>
             )}
-            <div className="grid grid-cols-1 gap-3 [@media(min-width:1181px)]:grid-cols-3">
-              <Button
-                variant="secondary"
-                disabled={!canSubmitConfig || pendingAction === 'init-config'}
-                onClick={handleInitializeConfig}
-              >
-                {pendingAction === 'init-config' ? 'Initializing' : 'Initialize'}
-              </Button>
-              <Button
-                variant="secondary"
-                disabled={!canSubmitConfig || pendingAction === 'stage-config'}
-                onClick={handleStageConfig}
-              >
-                {pendingAction === 'stage-config' ? 'Staging' : 'Stage'}
-              </Button>
-              <Button
-                variant="secondary"
-                disabled={!program || !publicKey || pendingAction === 'accept-config'}
-                onClick={handleAcceptConfig}
-              >
-                {pendingAction === 'accept-config' ? 'Accepting' : 'Accept'}
-              </Button>
+          </div>
+
+          {leverageConfig ? (
+            <div className="mb-6 grid grid-cols-2 gap-3">
+              <Mode2Metric
+                label="Config hash"
+                value={formatHash(leverageConfig.simulatorOutputHash)}
+                detail="Simulator report"
+              />
+              <Mode2Metric
+                label="Delay"
+                value={`${leverageConfig.activationDelaySeconds.toLocaleString()}s`}
+                detail="Config acceptance guard"
+              />
+              <Mode2Metric
+                label="Protocol max"
+                value={`${leverageConfig.currentParams.maxLeverage}x`}
+                detail="Global ceiling"
+              />
+              <Mode2Metric
+                label="Pair OI cap"
+                value={`$${formatUSD(leverageConfig.currentParams.maxPairLeveragedOi)}`}
+                detail="Global pair cap"
+              />
+              <Mode2Metric
+                label="Market OI cap"
+                value={`$${formatUSD(leverageConfig.currentParams.maxMarketLeveragedOi)}`}
+                detail="Per market"
+              />
+              <Mode2Metric
+                label="Min buffer"
+                value={formatBps(leverageConfig.currentParams.minPairBufferBps)}
+                detail="Pair risk floor"
+              />
+            </div>
+          ) : (
+            <div className="border-line bg-surface/40 mb-6 rounded-md border px-4 py-4">
+              <p className="text-ink-muted font-mono text-sm">No leverage config exists yet.</p>
+              <p className="text-ink-dim mt-1 font-mono text-xs">
+                Initialize once with a simulator hash, then stage future parameter changes.
+              </p>
+            </div>
+          )}
+
+          <div className="border-line border-t pt-5">
+            <div className="mb-4">
+              <h3 className="text-ink-strong font-mono text-xs font-bold tracking-wide uppercase">
+                Config action
+              </h3>
+              <p className="text-ink-dim mt-1 font-mono text-xs">
+                Initialize is one-time. Use Stage and Accept for future parameter updates.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 gap-4">
+              <Mode2InfoInput
+                label="Simulator hash"
+                help={MODE2_FIELD_HELP.simulatorHash}
+                value={simulatorOutputHash}
+                onChange={(e) => setSimulatorOutputHash(e.target.value)}
+                placeholder="32-byte hex"
+              />
+              <div className="grid grid-cols-2 gap-4">
+                <Mode2InfoInput
+                  label="Delay seconds"
+                  help={MODE2_FIELD_HELP.activationDelaySeconds}
+                  type="number"
+                  min={MIN_LEVERAGE_CONFIG_DELAY_SECONDS}
+                  value={activationDelaySeconds}
+                  onChange={(e) => setActivationDelaySeconds(e.target.value)}
+                />
+                <Mode2InfoInput
+                  label="Max leverage"
+                  help={MODE2_FIELD_HELP.maxLeverage}
+                  type="number"
+                  min={1}
+                  max={50}
+                  value={maxLeverage}
+                  onChange={(e) => setMaxLeverage(e.target.value)}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <Mode2InfoInput
+                  label="Max pair OI"
+                  help={MODE2_FIELD_HELP.maxPairOi}
+                  value={maxPairOi}
+                  onChange={(e) => setMaxPairOi(e.target.value)}
+                />
+                <Mode2InfoInput
+                  label="Max market OI"
+                  help={MODE2_FIELD_HELP.maxMarketOi}
+                  value={maxMarketOi}
+                  onChange={(e) => setMaxMarketOi(e.target.value)}
+                />
+                <Mode2InfoInput
+                  label="Max path OI"
+                  help={MODE2_FIELD_HELP.maxPathOi}
+                  value={maxPathOi}
+                  onChange={(e) => setMaxPathOi(e.target.value)}
+                />
+                <Mode2InfoInput
+                  label="Max cluster OI"
+                  help={MODE2_FIELD_HELP.maxClusterOi}
+                  value={maxClusterOi}
+                  onChange={(e) => setMaxClusterOi(e.target.value)}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <Mode2InfoInput
+                  label="Vault ceiling bps"
+                  help={MODE2_FIELD_HELP.vaultCeilingBps}
+                  type="number"
+                  min={1}
+                  max={10000}
+                  value={vaultUtilizationCeilingBps}
+                  onChange={(e) => setVaultUtilizationCeilingBps(e.target.value)}
+                />
+                <Mode2InfoInput
+                  label="Min buffer bps"
+                  help={MODE2_FIELD_HELP.minBufferBps}
+                  type="number"
+                  min={0}
+                  max={10000}
+                  value={minPairBufferBps}
+                  onChange={(e) => setMinPairBufferBps(e.target.value)}
+                />
+              </div>
+              {riskParamsError && (
+                <p className="text-bear font-mono text-xs uppercase">{riskParamsError}</p>
+              )}
+              <div className="grid grid-cols-1 gap-3 [@media(min-width:1181px)]:grid-cols-3">
+                <Button
+                  variant="secondary"
+                  disabled={!canInitializeConfig || pendingAction === 'init-config'}
+                  onClick={handleInitializeConfig}
+                >
+                  {pendingAction === 'init-config'
+                    ? 'Initializing'
+                    : leverageConfig
+                      ? 'Initialized'
+                      : 'Initialize config'}
+                </Button>
+                <Button
+                  variant="secondary"
+                  disabled={!canStageConfig || pendingAction === 'stage-config'}
+                  onClick={handleStageConfig}
+                >
+                  {pendingAction === 'stage-config' ? 'Staging' : 'Stage update'}
+                </Button>
+                <Button
+                  variant="secondary"
+                  disabled={!canAcceptConfig || pendingAction === 'accept-config'}
+                  onClick={handleAcceptConfig}
+                >
+                  {pendingAction === 'accept-config' ? 'Accepting' : 'Accept staged'}
+                </Button>
+              </div>
             </div>
           </div>
         </div>
 
         <div className="border-line rounded-lg border p-5">
-          <div className="mb-4 flex items-center gap-2">
+          <div className="mb-5 flex items-center gap-2">
             <ShieldCheck size={15} strokeWidth={1.75} className="text-ink-muted" />
             <span className="text-ink-strong text-label font-mono uppercase">Pair risk</span>
           </div>
-          <div className="grid grid-cols-1 gap-4">
-            <Input
-              label="Base mint"
-              value={pairBaseMint}
-              onChange={(e) => setPairBaseMint(e.target.value)}
-              placeholder="Base mint pubkey"
-            />
-            <Input
-              label="Quote mint"
-              value={pairQuoteMint}
-              onChange={(e) => setPairQuoteMint(e.target.value)}
-              placeholder="Quote mint pubkey"
-            />
-            <select
-              value={pairStatus}
-              onChange={(e) => setPairStatus(e.target.value as PairRiskStatus)}
-              className={cn(
-                'border-line-strong bg-surface text-ink-strong',
-                'rounded-lg border px-3 py-3 font-mono text-sm',
+
+          {pairRiskStates.length > 0 ? (
+            <div className="mb-5 grid grid-cols-1 gap-2">
+              {pairRiskStates.map((state) => {
+                const label = resolveBaseMintLabel(state.baseMint)
+                const selected = selectedPairRiskState?.address === state.address
+                return (
+                  <button
+                    key={state.address}
+                    type="button"
+                    onClick={() => loadPairRiskState(state)}
+                    className={cn(
+                      'flex items-center justify-between gap-3 rounded-md border px-3 py-3 text-left',
+                      'duration-short ease-levx transition-[border-color,background-color,color]',
+                      selected
+                        ? 'border-ink-strong bg-ink-strong/5'
+                        : 'border-line hover:border-line-strong bg-transparent',
+                    )}
+                  >
+                    <span>
+                      <span className="text-ink-strong block font-mono text-sm">{label.pair}</span>
+                      <span className="text-ink-dim block font-mono text-[11px]">
+                        {formatAddress(state.baseMint)} → {formatAddress(state.quoteMint)}
+                      </span>
+                    </span>
+                    <span className="text-ink-muted font-mono text-[10px] uppercase">
+                      {formatStatusLabel(state.status)}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="border-line bg-surface/40 mb-5 rounded-md border px-4 py-4">
+              <p className="text-ink-muted font-mono text-sm">No pair risk states yet.</p>
+              <p className="text-ink-dim mt-1 font-mono text-xs">
+                Initialize a supported pair after the global config exists.
+              </p>
+            </div>
+          )}
+
+          {selectedPairRiskState && (
+            <div className="mb-6 grid grid-cols-2 gap-3">
+              <Mode2Metric
+                label="Selected pair"
+                value={resolveBaseMintLabel(selectedPairRiskState.baseMint).pair}
+                detail={formatAddress(selectedPairRiskState.address)}
+              />
+              <Mode2Metric
+                label="Safety state"
+                value={formatStatusLabel(selectedPairRiskState.status)}
+                detail="Current on-chain status"
+              />
+              <Mode2Metric
+                label="Pair OI cap"
+                value={`$${formatUSD(selectedPairRiskState.maxPairLeveragedOi)}`}
+                detail={`${selectedPairRiskState.maxLeverage}x max`}
+              />
+              <Mode2Metric
+                label="Buffer band"
+                value={`${formatBps(selectedPairRiskState.bufferDrainThresholdBps)} / ${formatBps(selectedPairRiskState.bufferTargetBps)} / ${formatBps(selectedPairRiskState.bufferReopenThresholdBps)}`}
+                detail="Drain / target / reopen"
+              />
+            </div>
+          )}
+
+          <div className="border-line border-t pt-5">
+            <div className="mb-4">
+              <h3 className="text-ink-strong font-mono text-xs font-bold tracking-wide uppercase">
+                Pair action
+              </h3>
+              <p className="text-ink-dim mt-1 font-mono text-xs">
+                Select an existing pair to update its status, or paste a supported pair to
+                initialize a new risk state.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 gap-4">
+              <Mode2InfoInput
+                label="Base mint"
+                help={MODE2_FIELD_HELP.baseMint}
+                value={pairBaseMint}
+                onChange={(e) => setPairBaseMint(e.target.value)}
+                placeholder="Base mint pubkey"
+              />
+              <Mode2InfoInput
+                label="Quote mint"
+                help={MODE2_FIELD_HELP.quoteMint}
+                value={pairQuoteMint}
+                onChange={(e) => setPairQuoteMint(e.target.value)}
+                placeholder="Quote mint pubkey"
+              />
+              <Mode2InfoSelect
+                label="Pair status"
+                help={MODE2_FIELD_HELP.pairStatus}
+                value={pairStatus}
+                onChange={setPairStatus}
+              >
+                {PAIR_RISK_STATUS_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </Mode2InfoSelect>
+              <div className="grid grid-cols-2 gap-4">
+                <Mode2InfoInput
+                  label="Pair max OI"
+                  help={MODE2_FIELD_HELP.pairMaxOi}
+                  value={pairMaxOi}
+                  onChange={(e) => setPairMaxOi(e.target.value)}
+                />
+                <Mode2InfoInput
+                  label="Pair max leverage"
+                  help={MODE2_FIELD_HELP.pairMaxLeverage}
+                  type="number"
+                  min={1}
+                  max={50}
+                  value={pairMaxLeverage}
+                  onChange={(e) => setPairMaxLeverage(e.target.value)}
+                />
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <Mode2InfoInput
+                  label="Target bps"
+                  help={MODE2_FIELD_HELP.bufferTargetBps}
+                  type="number"
+                  value={bufferTargetBps}
+                  onChange={(e) => setBufferTargetBps(e.target.value)}
+                />
+                <Mode2InfoInput
+                  label="Drain bps"
+                  help={MODE2_FIELD_HELP.bufferDrainBps}
+                  type="number"
+                  value={bufferDrainThresholdBps}
+                  onChange={(e) => setBufferDrainThresholdBps(e.target.value)}
+                />
+                <Mode2InfoInput
+                  label="Reopen bps"
+                  help={MODE2_FIELD_HELP.bufferReopenBps}
+                  type="number"
+                  value={bufferReopenThresholdBps}
+                  onChange={(e) => setBufferReopenThresholdBps(e.target.value)}
+                />
+              </div>
+              {pairParamsError && (
+                <p className="text-bear font-mono text-xs uppercase">{pairParamsError}</p>
               )}
-            >
-              {PAIR_RISK_STATUS_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-            <div className="grid grid-cols-2 gap-4">
-              <Input label="Pair max OI" value={pairMaxOi} onChange={(e) => setPairMaxOi(e.target.value)} />
-              <Input
-                label="Pair max leverage"
-                type="number"
-                min={1}
-                max={50}
-                value={pairMaxLeverage}
-                onChange={(e) => setPairMaxLeverage(e.target.value)}
-              />
-            </div>
-            <div className="grid grid-cols-3 gap-4">
-              <Input
-                label="Target bps"
-                type="number"
-                value={bufferTargetBps}
-                onChange={(e) => setBufferTargetBps(e.target.value)}
-              />
-              <Input
-                label="Drain bps"
-                type="number"
-                value={bufferDrainThresholdBps}
-                onChange={(e) => setBufferDrainThresholdBps(e.target.value)}
-              />
-              <Input
-                label="Reopen bps"
-                type="number"
-                value={bufferReopenThresholdBps}
-                onChange={(e) => setBufferReopenThresholdBps(e.target.value)}
-              />
-            </div>
-            {pairParamsError && (
-              <p className="text-bear font-mono text-xs uppercase">{pairParamsError}</p>
-            )}
-            <div className="grid grid-cols-1 gap-3 [@media(min-width:1181px)]:grid-cols-2">
-              <Button
-                variant="secondary"
-                disabled={!canSubmitPair || pendingAction === 'init-pair'}
-                onClick={handleInitializePairRisk}
-              >
-                {pendingAction === 'init-pair' ? 'Initializing' : 'Initialize pair'}
-              </Button>
-              <Button
-                variant="secondary"
-                disabled={
-                  !program ||
-                  !publicKey ||
-                  !isPubkey(pairBaseMint) ||
-                  !isPubkey(pairQuoteMint) ||
-                  pendingAction === 'update-pair'
-                }
-                onClick={handleUpdatePairRiskStatus}
-              >
-                {pendingAction === 'update-pair' ? 'Updating' : 'Update status'}
-              </Button>
+              <div className="grid grid-cols-1 gap-3 [@media(min-width:1181px)]:grid-cols-2">
+                <Button
+                  variant="secondary"
+                  disabled={!canInitializePair || pendingAction === 'init-pair'}
+                  onClick={handleInitializePairRisk}
+                >
+                  {pendingAction === 'init-pair'
+                    ? 'Initializing'
+                    : selectedPairRiskState
+                      ? 'Pair initialized'
+                      : 'Initialize pair'}
+                </Button>
+                <Button
+                  variant="secondary"
+                  disabled={!canUpdatePair || pendingAction === 'update-pair'}
+                  onClick={handleUpdatePairRiskStatus}
+                >
+                  {pendingAction === 'update-pair' ? 'Updating' : 'Update status'}
+                </Button>
+              </div>
             </div>
           </div>
         </div>
