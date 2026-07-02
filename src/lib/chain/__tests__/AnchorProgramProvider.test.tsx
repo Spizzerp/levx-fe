@@ -15,10 +15,8 @@ vi.mock('@solana/wallet-adapter-react', () => ({
   useConnection: () => ({ connection: {} }),
 }))
 
-import {
-  AnchorProgramProvider,
-  useAnchorProgram,
-} from '@/lib/chain/AnchorProgramProvider'
+import { AnchorProgramProvider } from '@/lib/chain/AnchorProgramProvider'
+import { useAnchorProgram } from '@/lib/chain/anchorProgramContext'
 
 const KEY_A = new PublicKey('11111111111111111111111111111111')
 const KEY_B = new PublicKey('So11111111111111111111111111111111111111112')
@@ -89,9 +87,7 @@ describe('AnchorProgramProvider', () => {
     )
 
     walletState.publicKey = KEY_B
-    rerender(
-      React.createElement(AnchorProgramProvider, null, React.createElement(Probe)),
-    )
+    rerender(React.createElement(AnchorProgramProvider, null, React.createElement(Probe)))
 
     // At least one capture happened per render; memo must recompute when key changes.
     // Both values are null in Phase 2 — the invariant we assert is that the memo

@@ -82,7 +82,7 @@ export function LineTool({
       useDrawingStore.getState().beginStroke()
       onStrokeStart?.()
     },
-    [marketStart, margin.left, margin.top, onStrokeStart],
+    [marketStart, margin, onStrokeStart],
   )
 
   const onPointerMove = useCallback(
@@ -109,7 +109,7 @@ export function LineTool({
         preview.setAttribute('y2', String(chartY))
       }
     },
-    [margin.left, margin.top, onStrokeEnd],
+    [margin, onStrokeEnd],
   )
 
   const endStroke = useCallback(
@@ -176,7 +176,7 @@ export function LineTool({
 
       startRef.current = null
     },
-    [checkpointXs, margin.left, margin.top, onStrokeEnd],
+    [checkpointXs, margin, onStrokeEnd],
   )
 
   const onLostCapture = useCallback(() => {

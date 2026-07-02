@@ -49,9 +49,7 @@ function interpolateY(pts: { x: number; y: number }[], x: number): number | null
 
 function toPathD(points: { x: number; y: number }[]): string {
   if (points.length === 0) return ''
-  return points
-    .map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`)
-    .join(' ')
+  return points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
 }
 
 /* ── Component ───────────────────────────────────────────────── */
@@ -85,9 +83,15 @@ export function ChartMorphLine({
   const rafRef = useRef(0)
 
   const dataRef = useRef(dataPoints)
-  dataRef.current = dataPoints
   const onRevealRef = useRef(onRevealChart)
-  onRevealRef.current = onRevealChart
+
+  useEffect(() => {
+    dataRef.current = dataPoints
+  }, [dataPoints])
+
+  useEffect(() => {
+    onRevealRef.current = onRevealChart
+  }, [onRevealChart])
 
   const phaseRef = useRef<'loading' | 'morphing' | 'fading' | 'done'>(
     isLoading ? 'loading' : 'done',

@@ -18,6 +18,7 @@ dist-ssr
 
 .claude/
 .opencode/
+.serena/
 
 # Editor directories and files
 .vscode/*

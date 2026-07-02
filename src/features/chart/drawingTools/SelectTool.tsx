@@ -244,7 +244,7 @@ export function SelectTool({
         mode,
       })
     },
-    [hitTestDot, margin.left, margin.top, onStrokeStart, setCursor],
+    [hitTestDot, margin, onStrokeStart, setCursor],
   )
 
   const onPointerMove = useCallback(
@@ -300,7 +300,7 @@ export function SelectTool({
       const hitIdx = hitTestDot(chartX, chartY)
       setCursor(hitIdx >= 0 ? 'grab' : 'default')
     },
-    [marquee, margin.left, margin.top, onStrokeEnd, hitTestDot, setCursor],
+    [marquee, margin, onStrokeEnd, hitTestDot, setCursor],
   )
 
   const onPointerUp = useCallback(
@@ -414,27 +414,28 @@ export function SelectTool({
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerCancel}
       />
-      {marquee && (() => {
-        const x = Math.min(marquee.startChartX, marquee.curChartX)
-        const y = Math.min(marquee.startChartY, marquee.curChartY)
-        const w = Math.abs(marquee.curChartX - marquee.startChartX)
-        const h = Math.abs(marquee.curChartY - marquee.startChartY)
-        return (
-          <rect
-            x={x}
-            y={y}
-            width={w}
-            height={h}
-            fill={DRAW_IN_FLIGHT}
-            fillOpacity={0.08}
-            stroke={DRAW_IN_FLIGHT}
-            strokeWidth={1}
-            strokeDasharray="3 3"
-            pointerEvents="none"
-            data-testid="select-marquee"
-          />
-        )
-      })()}
+      {marquee &&
+        (() => {
+          const x = Math.min(marquee.startChartX, marquee.curChartX)
+          const y = Math.min(marquee.startChartY, marquee.curChartY)
+          const w = Math.abs(marquee.curChartX - marquee.startChartX)
+          const h = Math.abs(marquee.curChartY - marquee.startChartY)
+          return (
+            <rect
+              x={x}
+              y={y}
+              width={w}
+              height={h}
+              fill={DRAW_IN_FLIGHT}
+              fillOpacity={0.08}
+              stroke={DRAW_IN_FLIGHT}
+              strokeWidth={1}
+              strokeDasharray="3 3"
+              pointerEvents="none"
+              data-testid="select-marquee"
+            />
+          )
+        })()}
     </>
   )
 }
