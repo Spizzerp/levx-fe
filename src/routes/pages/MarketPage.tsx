@@ -31,7 +31,7 @@ import { useMode2Readiness } from '@/lib/api/hooks'
 import { useMarket, useUserPosition } from '@/lib/chain'
 import { parseMarketState } from '@/lib/api/adapters'
 import { formatMarketGroupLabel } from '@/features/marketGroups/groupPresentation'
-import { resolveBaseMintLabel } from '@/lib/api/pairLabels'
+import { resolvePairLabel } from '@/lib/api/pairLabels'
 import { isMarketWageringOpen } from '@/lib/market/status'
 import { useProgram } from '@/lib/solana/program'
 import { deriveMarketPda } from '@/lib/solana/pda'
@@ -163,7 +163,9 @@ function Mode2MarketReadinessCard({
   configStatus: string | null
   pairRiskState: PairRiskState | null
 }) {
-  const pairLabel = pairRiskState ? resolveBaseMintLabel(pairRiskState.baseMint).pair : null
+  const pairLabel = pairRiskState
+    ? resolvePairLabel(pairRiskState.baseMint, pairRiskState.quoteMint).pair
+    : null
 
   return (
     <div className="border-line bg-surface/40 mb-8 rounded-lg border px-4 py-4">
@@ -256,7 +258,7 @@ export function MarketPage() {
     if (!pair || !mode2Readiness?.pairRiskStates) return null
     return (
       mode2Readiness.pairRiskStates.find(
-        (state) => resolveBaseMintLabel(state.baseMint).pair === pair,
+        (state) => resolvePairLabel(state.baseMint, state.quoteMint).pair === pair,
       ) ?? null
     )
   }, [mode2Readiness?.pairRiskStates, pair])

@@ -5,7 +5,7 @@ import { Input } from '@/ui/Input'
 import { TokenPairIcon } from '@/ui/TokenPairIcon'
 import { cn } from '@/lib/cn'
 import { useMode2Readiness } from '@/lib/api/hooks'
-import { resolveBaseMintLabel } from '@/lib/api/pairLabels'
+import { resolvePairLabel } from '@/lib/api/pairLabels'
 import { formatAddress, formatUSD } from '@/lib/format'
 import { PageLayout } from '@/layouts/PageLayout'
 import type { PairRiskStatus } from '@/types/market'
@@ -126,13 +126,13 @@ export function VaultPage() {
                   >
                     <div className="flex min-w-0 items-center gap-3">
                       <TokenPairIcon
-                        base={resolveBaseMintLabel(state.baseMint).base}
-                        quote={resolveBaseMintLabel(state.baseMint).quote}
+                        base={resolvePairLabel(state.baseMint, state.quoteMint).base}
+                        quote={resolvePairLabel(state.baseMint, state.quoteMint).quote}
                         size={28}
                       />
                       <div className="min-w-0">
                         <p className="text-ink-strong font-mono text-sm uppercase">
-                          {resolveBaseMintLabel(state.baseMint).pair}
+                          {resolvePairLabel(state.baseMint, state.quoteMint).pair}
                         </p>
                         <p className="text-ink-dim mt-1 font-mono text-xs uppercase">
                           {state.maxLeverage}× max · ${formatUSD(state.maxPairLeveragedOi)} OI

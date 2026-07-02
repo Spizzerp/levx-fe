@@ -36,7 +36,7 @@ import { parseScaledDecimalBn } from '@/lib/fixedPoint'
 import { useIsAdmin } from '@/lib/hooks/useIsAdmin'
 import { useMarkets, useMode2Readiness } from '@/lib/api/hooks'
 import { formatAddress, formatUSD } from '@/lib/format'
-import { resolveBaseMintLabel } from '@/lib/api/pairLabels'
+import { resolvePairLabel } from '@/lib/api/pairLabels'
 import { SCALE } from '@/lib/constants'
 import { useCloseMarket, useProgram } from '@/lib/solana'
 import {
@@ -1737,7 +1737,7 @@ function Mode2AdminPanel() {
           {pairRiskStates.length > 0 ? (
             <div className="mb-5 grid grid-cols-1 gap-2">
               {pairRiskStates.map((state) => {
-                const label = resolveBaseMintLabel(state.baseMint)
+                const label = resolvePairLabel(state.baseMint, state.quoteMint)
                 const selected = selectedPairRiskState?.address === state.address
                 return (
                   <button
@@ -1776,7 +1776,10 @@ function Mode2AdminPanel() {
             <div className="mb-6 grid grid-cols-2 gap-3">
               <Mode2Metric
                 label="Selected pair"
-                value={resolveBaseMintLabel(selectedPairRiskState.baseMint).pair}
+                value={
+                  resolvePairLabel(selectedPairRiskState.baseMint, selectedPairRiskState.quoteMint)
+                    .pair
+                }
                 detail={formatAddress(selectedPairRiskState.address)}
               />
               <Mode2Metric
