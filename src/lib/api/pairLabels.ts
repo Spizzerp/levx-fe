@@ -23,6 +23,10 @@ export interface PairLabel {
   quote: string
 }
 
+export const KNOWN_DEVNET_QUOTE_MINTS: Readonly<Record<string, string>> = {
+  '6xz4EVw6rYFnfJwgumXsBt28xgjvKjpAWpwzdvPUJkhz': 'USDC',
+}
+
 /**
  * Known devnet test mints. Keep in sync with AdminPage's `PAIRS` array.
  * Adding a row here makes the corresponding market render with a nice label
@@ -49,4 +53,29 @@ export function resolveBaseMintLabel(baseMint: PublicKey | string): PairLabel {
   if (known) return known
   const short = key.slice(0, 4)
   return { pair: `${short}…/USDC`, base: short, quote: 'USDC' }
+}
+
+function shortMintLabel(mint: string): string {
+  return `${mint.slice(0, 4)}…`
+}
+
+/**
+ * Resolve a friendly pair label from the full `(baseMint, quoteMint)` tuple.
+ * Mode 2 pair-risk accounts are keyed by both mints, so the quote side must
+ * participate in the label lookup rather than assuming `/USDC`.
+ */
+export function resolvePairLabel(
+  baseMint: PublicKey | string,
+  quoteMint: PublicKey | string,
+): PairLabel {
+  const baseKey = typeof baseMint === 'string' ? baseMint : baseMint.toBase58()
+  const quoteKey = typeof quoteMint === 'string' ? quoteMint : quoteMint.toBase58()
+  const baseLabel = KNOWN_DEVNET_MINTS[baseKey]?.base ?? shortMintLabel(baseKey)
+  const quoteLabel = KNOWN_DEVNET_QUOTE_MINTS[quoteKey] ?? shortMintLabel(quoteKey)
+
+  return {
+    pair: `${baseLabel}/${quoteLabel}`,
+    base: baseLabel,
+    quote: quoteLabel,
+  }
 }

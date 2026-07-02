@@ -27,7 +27,7 @@ import {
   anchorPositionToFE,
   parseMarketState,
 } from './adapters'
-import { resolveBaseMintLabel } from './pairLabels'
+import { resolvePairLabel } from './pairLabels'
 import { getReadOnlyProgram } from '../solana/program'
 import {
   PROGRAM_ID,
@@ -37,6 +37,7 @@ import {
   derivePathChunkPda,
   derivePathPda,
   derivePositionPda,
+  deriveProtocolPda,
 } from '../solana/pda'
 import {
   activeMaskFromPricingMask,
@@ -309,6 +310,7 @@ type MarketGroupJoin = { group?: MarketGroup; link: MarketGroupLink }
 
 type Mode2AccountClient = {
   all?: () => Promise<any[]>
+  fetch?: (address: PublicKey) => Promise<any>
   fetchNullable?: (address: PublicKey) => Promise<any | null>
 }
 
@@ -402,32 +404,32 @@ export async function attachMarketGroup(program: any, market: Market): Promise<M
 export async function getMode2Readiness(): Promise<Mode2Readiness> {
   const program = getReadOnlyProgram()
   const accounts = program.account as Mode2AccountClients
+  const [protocolPda] = deriveProtocolPda()
   const [leverageConfigPda] = deriveLeverageConfigPda()
+  const protocolClient = accounts.protocolState
+  if (!protocolClient?.fetch) {
+    throw new Error('ProtocolState account client is unavailable')
+  }
+
+  const protocolRaw = await protocolClient.fetch(protocolPda)
+  const leverageEnabled = Boolean(protocolRaw.leverageEnabled)
   let leverageConfig: Mode2Readiness['leverageConfig'] = null
 
   if (accounts.leverageConfig?.fetchNullable) {
-    try {
-      const raw = await accounts.leverageConfig.fetchNullable(leverageConfigPda)
-      leverageConfig = raw ? anchorLeverageConfigToFE(raw, leverageConfigPda.toBase58()) : null
-    } catch (err) {
-      console.warn('[onchain] Failed to fetch leverage config:', (err as Error).message)
-    }
+    const raw = await accounts.leverageConfig.fetchNullable(leverageConfigPda)
+    leverageConfig = raw ? anchorLeverageConfigToFE(raw, leverageConfigPda.toBase58()) : null
   }
 
   let pairRiskStates: Mode2Readiness['pairRiskStates'] = []
   if (accounts.pairRiskState?.all) {
-    try {
-      const riskAccounts = await accounts.pairRiskState.all()
-      pairRiskStates = riskAccounts.map((acc) =>
-        anchorPairRiskStateToFE(acc.account, acc.publicKey.toBase58()),
-      )
-    } catch (err) {
-      console.warn('[onchain] Failed to fetch pair risk states:', (err as Error).message)
-    }
+    const riskAccounts = await accounts.pairRiskState.all()
+    pairRiskStates = riskAccounts.map((acc) =>
+      anchorPairRiskStateToFE(acc.account, acc.publicKey.toBase58()),
+    )
   }
 
   return {
-    leverageEnabled: false,
+    leverageEnabled,
     leverageConfig,
     pairRiskStates,
   }
@@ -460,7 +462,7 @@ export async function getMarkets(): Promise<Market[]> {
         return null
       }
 
-      const pairInfo = resolveBaseMintLabel(raw.baseMint)
+      const pairInfo = resolvePairLabel(raw.baseMint, raw.quoteMint)
       market.pair = pairInfo.pair
       market.base = pairInfo.base
       market.quote = pairInfo.quote
@@ -485,7 +487,7 @@ export async function getMarket(id: string): Promise<Market> {
   const eigenPolicy = await loadEigenCachePolicy(program, marketId, marketPda, raw)
   market.eigenCacheStatus = eigenPolicy.status
 
-  const pairInfo = resolveBaseMintLabel(raw.baseMint)
+  const pairInfo = resolvePairLabel(raw.baseMint, raw.quoteMint)
   market.pair = pairInfo.pair
   market.base = pairInfo.base
   market.quote = pairInfo.quote
@@ -622,7 +624,7 @@ export async function getPosition(
     )
     const path = anchorPathToFE(pathRaw, startTimeMs, checkpointInterval)
     applyDerivedPathDisplay(path)
-    const pairInfo = resolveBaseMintLabel(marketRaw.baseMint)
+    const pairInfo = resolvePairLabel(marketRaw.baseMint, marketRaw.quoteMint)
     const marketState = parseMarketState(marketRaw.state) as MarketState
     const numPaths = numericValue(marketRaw.numPaths, 'market.numPaths')
     const shareQuantitiesScaled = scaledArray(
@@ -712,7 +714,7 @@ export async function getUserPositions(wallet: PublicKey | null): Promise<UserPo
     if (mkt === undefined) {
       try {
         const marketRaw: any = await program.account.market.fetch(marketPubkey)
-        const pairInfo = resolveBaseMintLabel(marketRaw.baseMint)
+        const pairInfo = resolvePairLabel(marketRaw.baseMint, marketRaw.quoteMint)
         const numPaths = numericValue(marketRaw.numPaths, 'market.numPaths')
         mkt = {
           marketIdNum: numericValue(marketRaw.marketId, 'market.marketId'),

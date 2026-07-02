@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import type { ReactNode } from 'react'
+import type { AnchorHTMLAttributes, ReactNode } from 'react'
 
 // Mock env config before any other imports (mirrors MarketPage.test.tsx)
 vi.mock('@/env/env.config', () => ({
@@ -18,12 +18,18 @@ vi.mock('@/env/env.config', () => ({
 // Mock navigate so the DataTable row click doesn't crash outside the router
 const navigateSpy = vi.fn()
 let searchParams: { view?: 'table' | 'grid' } = {}
+type LinkMockProps = AnchorHTMLAttributes<HTMLAnchorElement> & {
+  children: ReactNode
+  params?: { groupKeyHash?: string }
+  to: string
+}
+
 vi.mock('@tanstack/react-router', async () => {
   const actual =
     await vi.importActual<typeof import('@tanstack/react-router')>('@tanstack/react-router')
   return {
     ...actual,
-    Link: ({ children, params, to, ...props }: any) => (
+    Link: ({ children, params, to, ...props }: LinkMockProps) => (
       <a href={params?.groupKeyHash ? `/markets/group/${params.groupKeyHash}` : to} {...props}>
         {children}
       </a>
@@ -63,6 +69,8 @@ function makeMarket(overrides: Partial<Market> & Pick<Market, 'id' | 'pair' | 's
     pair: overrides.pair,
     base: overrides.pair.split('/')[0],
     quote: overrides.pair.split('/')[1],
+    baseMint: `${overrides.pair.split('/')[0]}-mint`,
+    quoteMint: `${overrides.pair.split('/')[1]}-mint`,
     vault: '',
     state: overrides.state,
     pool: 100_000,
@@ -255,9 +263,9 @@ describe('MarketsPage', () => {
     const { container } = renderPage()
 
     expect(useMarketPathPreviewsMock).toHaveBeenCalledWith([market.id])
-    expect(container.querySelectorAll('[data-testid="market-mini-ai-path"]').length).toBeGreaterThan(
-      0,
-    )
+    expect(
+      container.querySelectorAll('[data-testid="market-mini-ai-path"]').length,
+    ).toBeGreaterThan(0)
   })
 
   it('renders a Paths column in the DataTable header (MARKET-01)', async () => {

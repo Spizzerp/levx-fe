@@ -28,6 +28,7 @@ import { PublicKey, SystemProgram, Transaction, TransactionInstruction } from '@
 
 import { Button } from '@/ui/Button'
 import { Input } from '@/ui/Input'
+import { Mode2StatusBadge, PairRiskStatusBadge } from '@/ui/Mode2StatusBadge'
 import { TokenPairIcon } from '@/ui/TokenPairIcon'
 import { cn } from '@/lib/cn'
 import { buildTransaction } from '@/lib/chain/buildTransaction'
@@ -35,8 +36,8 @@ import { getPriorityFee } from '@/lib/chain/priorityFee'
 import { parseScaledDecimalBn } from '@/lib/fixedPoint'
 import { useIsAdmin } from '@/lib/hooks/useIsAdmin'
 import { useMarkets, useMode2Readiness } from '@/lib/api/hooks'
-import { formatAddress, formatUSD } from '@/lib/format'
-import { resolveBaseMintLabel } from '@/lib/api/pairLabels'
+import { formatAddress, formatHash, formatStatusLabel, formatUSD } from '@/lib/format'
+import { resolvePairLabel } from '@/lib/api/pairLabels'
 import { SCALE } from '@/lib/constants'
 import { useCloseMarket, useProgram } from '@/lib/solana'
 import {
@@ -921,15 +922,6 @@ function formatBps(value: number): string {
   return `${(value / 100).toLocaleString(undefined, { maximumFractionDigits: 2 })}%`
 }
 
-function formatStatusLabel(value: string): string {
-  return value.replace(/([A-Z])/g, ' $1').replace(/^./, (char) => char.toUpperCase())
-}
-
-function formatHash(hash: string): string {
-  if (!hash) return 'Not set'
-  return `${hash.slice(0, 8)}…${hash.slice(-8)}`
-}
-
 function inputAmount(value: number): string {
   return Number.isFinite(value) ? String(value) : ''
 }
@@ -942,38 +934,6 @@ function Mode2Metric({ label, value, detail }: { label: string; value: string; d
       {detail && <div className="text-ink-dim mt-1 truncate font-mono text-[11px]">{detail}</div>}
     </div>
   )
-}
-
-function Mode2StatusPill({
-  tone,
-  children,
-}: {
-  tone: 'safe' | 'warning' | 'neutral'
-  children: string
-}) {
-  return (
-    <span
-      className={cn(
-        'inline-flex items-center rounded-full border px-2.5 py-1',
-        'font-mono text-[10px] font-bold tracking-wide uppercase',
-        tone === 'safe' && 'border-bull/40 bg-bull/10 text-bull',
-        tone === 'warning' && 'border-accent/40 bg-accent-subtle text-accent',
-        tone === 'neutral' && 'border-line-strong bg-surface text-ink-muted',
-      )}
-    >
-      {children}
-    </span>
-  )
-}
-
-function PairRiskStatusBadge({ status }: { status: PairRiskStatus }) {
-  const tone =
-    status === 'active'
-      ? 'safe'
-      : status === 'paused' || status === 'resetPending'
-        ? 'warning'
-        : 'neutral'
-  return <Mode2StatusPill tone={tone}>{formatStatusLabel(status)}</Mode2StatusPill>
 }
 
 function Mode2FieldShell({
@@ -1518,15 +1478,15 @@ function Mode2AdminPanel() {
           </p>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <Mode2StatusPill tone={readiness?.leverageEnabled ? 'warning' : 'safe'}>
+          <Mode2StatusBadge tone={readiness?.leverageEnabled ? 'warning' : 'safe'}>
             {readiness?.leverageEnabled ? 'Leverage on' : 'Leverage off'}
-          </Mode2StatusPill>
-          <Mode2StatusPill tone={leverageConfig?.status === 'accepted' ? 'safe' : 'neutral'}>
+          </Mode2StatusBadge>
+          <Mode2StatusBadge tone={leverageConfig?.status === 'accepted' ? 'safe' : 'neutral'}>
             {leverageConfig ? formatStatusLabel(leverageConfig.status) : 'No config'}
-          </Mode2StatusPill>
-          <Mode2StatusPill tone="neutral">
+          </Mode2StatusBadge>
+          <Mode2StatusBadge tone="neutral">
             {`${pairRiskStates.length} pair${pairRiskStates.length === 1 ? '' : 's'}`}
-          </Mode2StatusPill>
+          </Mode2StatusBadge>
         </div>
       </div>
 
@@ -1737,7 +1697,7 @@ function Mode2AdminPanel() {
           {pairRiskStates.length > 0 ? (
             <div className="mb-5 grid grid-cols-1 gap-2">
               {pairRiskStates.map((state) => {
-                const label = resolveBaseMintLabel(state.baseMint)
+                const label = resolvePairLabel(state.baseMint, state.quoteMint)
                 const selected = selectedPairRiskState?.address === state.address
                 return (
                   <button
@@ -1776,7 +1736,10 @@ function Mode2AdminPanel() {
             <div className="mb-6 grid grid-cols-2 gap-3">
               <Mode2Metric
                 label="Selected pair"
-                value={resolveBaseMintLabel(selectedPairRiskState.baseMint).pair}
+                value={
+                  resolvePairLabel(selectedPairRiskState.baseMint, selectedPairRiskState.quoteMint)
+                    .pair
+                }
                 detail={formatAddress(selectedPairRiskState.address)}
               />
               <Mode2Metric

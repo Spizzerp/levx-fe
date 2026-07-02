@@ -1,6 +1,6 @@
 import { Link, useParams } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, Layers, Plus } from 'lucide-react'
+import { ArrowLeft, Layers, Lock, Plus } from 'lucide-react'
 
 import { Button } from '@/ui/Button'
 import { ChartFrame } from '@/features/chart/ChartFrame'
@@ -27,9 +27,12 @@ import { SlippageSelector } from '@/ui/SlippageSelector'
 import { Stub } from '@/ui/Stub'
 import { UserPositionCard } from '@/features/market/UserPositionCard'
 import { cn } from '@/lib/cn'
+import { useMode2Readiness } from '@/lib/api/hooks'
 import { useMarket, useUserPosition } from '@/lib/chain'
 import { parseMarketState } from '@/lib/api/adapters'
 import { formatMarketGroupLabel } from '@/features/marketGroups/groupPresentation'
+import { toneForPairRiskStatus, type Mode2StatusTone } from '@/lib/mode2Status'
+import { resolvePairLabel } from '@/lib/api/pairLabels'
 import { isMarketWageringOpen } from '@/lib/market/status'
 import { useProgram } from '@/lib/solana/program'
 import { deriveMarketPda } from '@/lib/solana/pda'
@@ -54,10 +57,17 @@ import {
   formatDeltaBps,
   formatMarketDurationLabel,
   formatPrice,
+  formatStatusLabel,
   formatUSD,
   maxLeverageByDuration,
 } from '@/lib/format'
-import type { Market, PredictionPath, PricePoint, UserPosition } from '@/types/market'
+import type {
+  Market,
+  PairRiskState,
+  PredictionPath,
+  PricePoint,
+  UserPosition,
+} from '@/types/market'
 
 const META_SEP = <span className="text-line-strong mx-0.5">·</span>
 
@@ -148,12 +158,151 @@ function ClaimButton({ market, position }: { market: Market; position?: UserPosi
   )
 }
 
+function Mode2MarketReadinessCard({
+  configStatus,
+  pairRiskState,
+  readinessLoading,
+  readinessError,
+  leverageEnabled,
+}: {
+  configStatus: string | null
+  pairRiskState: PairRiskState | null
+  readinessLoading: boolean
+  readinessError: boolean
+  leverageEnabled: boolean | null
+}) {
+  const pairLabel = pairRiskState
+    ? resolvePairLabel(pairRiskState.baseMint, pairRiskState.quoteMint).pair
+    : null
+  const configValue = readinessLoading
+    ? 'Loading'
+    : readinessError
+      ? 'Unavailable'
+      : configStatus
+        ? formatStatusLabel(configStatus)
+        : 'Missing'
+  const pairValue = readinessLoading
+    ? 'Loading'
+    : readinessError
+      ? 'Unavailable'
+      : pairRiskState
+        ? `${pairLabel} · ${formatStatusLabel(pairRiskState.status)}`
+        : 'No pair sidecar'
+  const activationValue = readinessLoading
+    ? 'Loading'
+    : readinessError
+      ? 'Unavailable'
+      : leverageEnabled
+        ? 'On'
+        : 'Off'
+
+  return (
+    <div className="border-line bg-surface/40 mb-8 rounded-lg border px-4 py-4">
+      <div className="mb-3 flex items-start gap-3">
+        <div
+          className={cn(
+            'border-line bg-surface/60 mt-0.5 flex h-8 w-8 items-center justify-center',
+            'rounded-full border',
+          )}
+        >
+          <Lock size={15} strokeWidth={1.75} className="text-ink-dim" aria-hidden />
+        </div>
+        <div>
+          <p className="text-ink-strong font-mono text-xs font-bold tracking-wide uppercase">
+            Leverage unavailable
+          </p>
+          <p className="text-ink-muted mt-1 font-mono text-xs leading-relaxed">
+            Mode 2 sidecars are visible, but leveraged positions are not enabled for this market.
+          </p>
+        </div>
+      </div>
+      <div className="border-line grid grid-cols-1 gap-3 border-t pt-3">
+        <Mode2MarketGateRow
+          label="Global config"
+          value={configValue}
+          tone={
+            readinessLoading
+              ? 'neutral'
+              : configStatus === 'accepted' && !readinessError
+                ? 'safe'
+                : 'warning'
+          }
+        />
+        <Mode2MarketGateRow
+          label="Pair risk"
+          value={pairValue}
+          tone={
+            readinessLoading
+              ? 'neutral'
+              : readinessError || !pairRiskState
+                ? 'warning'
+                : toneForPairRiskStatus(pairRiskState.status)
+          }
+        />
+        <Mode2MarketGateRow
+          label="Activation flag"
+          value={activationValue}
+          tone={
+            readinessLoading
+              ? 'neutral'
+              : readinessError
+                ? 'warning'
+                : leverageEnabled
+                  ? 'safe'
+                  : 'muted'
+          }
+        />
+      </div>
+    </div>
+  )
+}
+
+function Mode2MarketGateRow({
+  label,
+  value,
+  tone,
+}: {
+  label: string
+  value: string
+  tone: Mode2StatusTone
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <span className="text-ink-dim font-mono text-[10px] tracking-wide uppercase">{label}</span>
+      <span
+        className={cn(
+          'max-w-[180px] truncate text-right font-mono text-[10px] font-bold tracking-wide uppercase',
+          tone === 'safe' && 'text-success',
+          tone === 'neutral' && 'text-ink-muted',
+          tone === 'warning' && 'text-warning',
+          tone === 'muted' && 'text-ink-dim',
+        )}
+      >
+        {value}
+      </span>
+    </div>
+  )
+}
+
 export function MarketPage() {
   const { id } = useParams({ from: '/market/$id' })
   const { data: market, isLoading, isError, refetch } = useMarket(id)
   const { data: userPosition } = useUserPosition(id)
+  const {
+    data: mode2Readiness,
+    isLoading: isMode2ReadinessLoading,
+    isError: isMode2ReadinessError,
+  } = useMode2Readiness({ enabled: !!market && !market.leverageEnabled })
 
   const pair = market?.pair ?? null
+  const mode2PairRiskState = useMemo(() => {
+    if (!market || !mode2Readiness?.pairRiskStates) return null
+    return (
+      mode2Readiness.pairRiskStates.find(
+        (state) => state.baseMint === market.baseMint && state.quoteMint === market.quoteMint,
+      ) ?? null
+    )
+  }, [market, mode2Readiness?.pairRiskStates])
   const feedId = pair ? feedIdForPair(pair) : null
   usePythFeed(feedId)
   const latestTick = useLatestPrice(feedId)
@@ -196,9 +345,7 @@ export function MarketPage() {
   const [selectedPathIds, setSelectedPathIds] = useState<Set<string>>(new Set())
   const [userPaths, setUserPaths] = useState<PredictionPath[]>([])
   const [hoveredPathId, setHoveredPathId] = useState<string | null>(null)
-  const [pathUploadStatus, setPathUploadStatus] = useState<'authorizing' | 'uploading' | null>(
-    null,
-  )
+  const [pathUploadStatus, setPathUploadStatus] = useState<'authorizing' | 'uploading' | null>(null)
   const [leverage, setLeverage] = useState(22)
   const [collateral, setCollateral] = useState('25.00')
   const [now, setNow] = useState(() => Date.now())
@@ -230,8 +377,7 @@ export function MarketPage() {
   const chartTotalCheckpoints = market?.totalCheckpoints ?? 0
   const chartCheckpointIntervalMs = chartCheckpointInterval * 1000
   const chartMarketEnd = market
-    ? market.startTime +
-      Math.max(0, market.totalCheckpoints - 1) * chartCheckpointIntervalMs
+    ? market.startTime + Math.max(0, market.totalCheckpoints - 1) * chartCheckpointIntervalMs
     : now
 
   const durationMs = Math.max(0, chartMarketEnd - chartMarketStart)
@@ -344,19 +490,13 @@ export function MarketPage() {
       if (opt.onChainStatus === 'pending') return true
       const optCreator = opt.creator || selfWallet
       return !market.paths.some(
-        (p) =>
-          p.origin === 'user' &&
-          p.creator === optCreator &&
-          p.pathIndex === opt.pathIndex,
+        (p) => p.origin === 'user' && p.creator === optCreator && p.pathIndex === opt.pathIndex,
       )
     })
   }, [userPaths, market, selfWallet])
 
   // Combine AI paths + user-drawn paths for chart
-  const allPaths = useMemo(
-    () => [...aiPaths, ...visibleUserPaths],
-    [aiPaths, visibleUserPaths],
-  )
+  const allPaths = useMemo(() => [...aiPaths, ...visibleUserPaths], [aiPaths, visibleUserPaths])
 
   const handleConfirmDrawing = async () => {
     if (drawingState.phase !== 'ready' || !market) return
@@ -514,11 +654,7 @@ export function MarketPage() {
 
   const isInDrawMode = drawingPhase !== 'idle'
   const confirmPathLabel =
-    pathUploadStatus === 'uploading'
-      ? 'Uploading…'
-      : addPath.isPending
-        ? 'Authorizing…'
-        : 'Confirm'
+    pathUploadStatus === 'uploading' ? 'Uploading…' : addPath.isPending ? 'Authorizing…' : 'Confirm'
 
   /* ── Early returns AFTER all hooks ─────────────────────────── */
   if (isLoading) return <Stub title="Loading Market..." />
@@ -549,8 +685,7 @@ export function MarketPage() {
   const showClaimCard = market.state === 'settled'
   const showVoidPanel = market.state === 'void'
   const pendingPathTarget = market.targetNumPaths
-  const showPendingIndicator =
-    market.state === 'pending' && market.numPaths < pendingPathTarget
+  const showPendingIndicator = market.state === 'pending' && market.numPaths < pendingPathTarget
   const showPositionRail = !showWagerRail && !showVoidPanel && !!userPosition
   const showRail =
     showWagerRail || showMaturityCard || showClaimCard || showVoidPanel || showPositionRail
@@ -584,11 +719,7 @@ export function MarketPage() {
             <h1 className="font-display text-ink-strong text-display-lg leading-none font-medium tracking-tighter [font-variation-settings:'ROND'_100]">
               {formatPrice(priceDisplay)}
             </h1>
-            <MarketTimeProgress
-              startTime={chartMarketStart}
-              endTime={chartMarketEnd}
-              now={now}
-            />
+            <MarketTimeProgress startTime={chartMarketStart} endTime={chartMarketEnd} now={now} />
           </div>
           <div className="text-ink-muted text-caption mt-2 flex items-baseline gap-3 font-mono">
             <span className={cn('font-bold', deltaColor)}>{formatDeltaBps(deltaDisplay)}</span>
@@ -636,7 +767,7 @@ export function MarketPage() {
                 'border-line-strong text-ink-muted hover:border-ink hover:text-ink',
                 'text-label font-mono tracking-wider uppercase',
                 'duration-short ease-levx transition-[border-color,color]',
-                'focus-visible:ring-ink-strong focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-surface',
+                'focus-visible:ring-ink-strong focus-visible:ring-offset-surface focus-visible:ring-2 focus-visible:ring-offset-2',
               )}
             >
               <Layers size={14} strokeWidth={1.5} aria-hidden />
@@ -903,7 +1034,18 @@ export function MarketPage() {
               </>
             )}
 
-            {!market.leverageEnabled && <hr className="bg-line my-9 mb-8 h-px border-0" />}
+            {!market.leverageEnabled && (
+              <>
+                <hr className="bg-line my-9 mb-8 h-px border-0" />
+                <Mode2MarketReadinessCard
+                  configStatus={mode2Readiness?.leverageConfig?.status ?? null}
+                  pairRiskState={mode2PairRiskState}
+                  readinessLoading={isMode2ReadinessLoading}
+                  readinessError={isMode2ReadinessError}
+                  leverageEnabled={mode2Readiness?.leverageEnabled ?? null}
+                />
+              </>
+            )}
 
             <div className="mb-6 flex items-center justify-between gap-3">
               <UsdcBalance />

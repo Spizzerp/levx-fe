@@ -145,6 +145,10 @@ export interface Market {
   pair: string // "BTC/USDC"
   base: string // "BTC"
   quote: string // "USDC"
+  /** Base asset mint pubkey, used for non-display joins. */
+  baseMint: string
+  /** Quote/collateral mint pubkey, used for non-display joins. */
+  quoteMint: string
   /** On-chain market vault token account (base-58). */
   vault: string
   state: MarketState
@@ -288,7 +292,7 @@ export interface PairRiskState {
 }
 
 export interface Mode2Readiness {
-  leverageEnabled: false
+  leverageEnabled: boolean
   leverageConfig: LeverageConfig | null
   pairRiskStates: PairRiskState[]
 }

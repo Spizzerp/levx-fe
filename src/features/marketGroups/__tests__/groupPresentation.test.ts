@@ -43,14 +43,16 @@ function market(overrides: Partial<Market>): Market {
     pathsScored: 0,
     pathsDissolved: 0,
     ...overrides,
+    baseMint: overrides.baseMint ?? 'BTC-mint',
+    quoteMint: overrides.quoteMint ?? 'USDC-mint',
   }
 }
 
 describe('market group presentation', () => {
   it('formats readable labels from group kind and hash prefix', () => {
-    expect(formatMarketGroupLabel({ groupKind: 'assetSeason', groupKeyHash: 'ab'.repeat(32) })).toBe(
-      'Asset season abababab',
-    )
+    expect(
+      formatMarketGroupLabel({ groupKind: 'assetSeason', groupKeyHash: 'ab'.repeat(32) }),
+    ).toBe('Asset season abababab')
     expect(formatMarketGroupLabel({ groupKind: 'season', groupKeyHash: 'cd'.repeat(32) })).toBe(
       'Season cdcdcdcd',
     )
