@@ -31,6 +31,7 @@ import { useMode2Readiness } from '@/lib/api/hooks'
 import { useMarket, useUserPosition } from '@/lib/chain'
 import { parseMarketState } from '@/lib/api/adapters'
 import { formatMarketGroupLabel } from '@/features/marketGroups/groupPresentation'
+import { toneForPairRiskStatus, type Mode2StatusTone } from '@/lib/mode2Status'
 import { resolvePairLabel } from '@/lib/api/pairLabels'
 import { isMarketWageringOpen } from '@/lib/market/status'
 import { useProgram } from '@/lib/solana/program'
@@ -56,6 +57,7 @@ import {
   formatDeltaBps,
   formatMarketDurationLabel,
   formatPrice,
+  formatStatusLabel,
   formatUSD,
   maxLeverageByDuration,
 } from '@/lib/format'
@@ -159,13 +161,40 @@ function ClaimButton({ market, position }: { market: Market; position?: UserPosi
 function Mode2MarketReadinessCard({
   configStatus,
   pairRiskState,
+  readinessLoading,
+  readinessError,
+  leverageEnabled,
 }: {
   configStatus: string | null
   pairRiskState: PairRiskState | null
+  readinessLoading: boolean
+  readinessError: boolean
+  leverageEnabled: boolean | null
 }) {
   const pairLabel = pairRiskState
     ? resolvePairLabel(pairRiskState.baseMint, pairRiskState.quoteMint).pair
     : null
+  const configValue = readinessLoading
+    ? 'Loading'
+    : readinessError
+      ? 'Unavailable'
+      : configStatus
+        ? formatStatusLabel(configStatus)
+        : 'Missing'
+  const pairValue = readinessLoading
+    ? 'Loading'
+    : readinessError
+      ? 'Unavailable'
+      : pairRiskState
+        ? `${pairLabel} · ${formatStatusLabel(pairRiskState.status)}`
+        : 'No pair sidecar'
+  const activationValue = readinessLoading
+    ? 'Loading'
+    : readinessError
+      ? 'Unavailable'
+      : leverageEnabled
+        ? 'On'
+        : 'Off'
 
   return (
     <div className="border-line bg-surface/40 mb-8 rounded-lg border px-4 py-4">
@@ -190,25 +219,43 @@ function Mode2MarketReadinessCard({
       <div className="border-line grid grid-cols-1 gap-3 border-t pt-3">
         <Mode2MarketGateRow
           label="Global config"
-          value={configStatus ? formatStatusLabel(configStatus) : 'Missing'}
-          tone={configStatus === 'accepted' ? 'ready' : 'warning'}
+          value={configValue}
+          tone={
+            readinessLoading
+              ? 'neutral'
+              : configStatus === 'accepted' && !readinessError
+                ? 'safe'
+                : 'warning'
+          }
         />
         <Mode2MarketGateRow
           label="Pair risk"
-          value={
-            pairRiskState
-              ? `${pairLabel} · ${formatStatusLabel(pairRiskState.status)}`
-              : 'No pair sidecar'
+          value={pairValue}
+          tone={
+            readinessLoading
+              ? 'neutral'
+              : readinessError || !pairRiskState
+                ? 'warning'
+                : toneForPairRiskStatus(pairRiskState.status)
           }
-          tone={pairRiskState ? pairRiskTone(pairRiskState.status) : 'warning'}
         />
-        <Mode2MarketGateRow label="Activation flag" value="Off" tone="muted" />
+        <Mode2MarketGateRow
+          label="Activation flag"
+          value={activationValue}
+          tone={
+            readinessLoading
+              ? 'neutral'
+              : readinessError
+                ? 'warning'
+                : leverageEnabled
+                  ? 'safe'
+                  : 'muted'
+          }
+        />
       </div>
     </div>
   )
 }
-
-type Mode2GateTone = 'ready' | 'neutral' | 'warning' | 'muted'
 
 function Mode2MarketGateRow({
   label,
@@ -217,7 +264,7 @@ function Mode2MarketGateRow({
 }: {
   label: string
   value: string
-  tone: Mode2GateTone
+  tone: Mode2StatusTone
 }) {
   return (
     <div className="flex items-center justify-between gap-4">
@@ -225,7 +272,7 @@ function Mode2MarketGateRow({
       <span
         className={cn(
           'max-w-[180px] truncate text-right font-mono text-[10px] font-bold tracking-wide uppercase',
-          tone === 'ready' && 'text-success',
+          tone === 'safe' && 'text-success',
           tone === 'neutral' && 'text-ink-muted',
           tone === 'warning' && 'text-warning',
           tone === 'muted' && 'text-ink-dim',
@@ -237,31 +284,25 @@ function Mode2MarketGateRow({
   )
 }
 
-function pairRiskTone(status: PairRiskState['status']): Mode2GateTone {
-  if (status === 'active') return 'ready'
-  if (status === 'drainOnly') return 'neutral'
-  return 'warning'
-}
-
-function formatStatusLabel(value: string): string {
-  return value.replace(/([A-Z])/g, ' $1').replace(/^./, (char) => char.toUpperCase())
-}
-
 export function MarketPage() {
   const { id } = useParams({ from: '/market/$id' })
   const { data: market, isLoading, isError, refetch } = useMarket(id)
   const { data: userPosition } = useUserPosition(id)
-  const { data: mode2Readiness } = useMode2Readiness()
+  const {
+    data: mode2Readiness,
+    isLoading: isMode2ReadinessLoading,
+    isError: isMode2ReadinessError,
+  } = useMode2Readiness({ enabled: !!market && !market.leverageEnabled })
 
   const pair = market?.pair ?? null
   const mode2PairRiskState = useMemo(() => {
-    if (!pair || !mode2Readiness?.pairRiskStates) return null
+    if (!market || !mode2Readiness?.pairRiskStates) return null
     return (
       mode2Readiness.pairRiskStates.find(
-        (state) => resolvePairLabel(state.baseMint, state.quoteMint).pair === pair,
+        (state) => state.baseMint === market.baseMint && state.quoteMint === market.quoteMint,
       ) ?? null
     )
-  }, [mode2Readiness?.pairRiskStates, pair])
+  }, [market, mode2Readiness?.pairRiskStates])
   const feedId = pair ? feedIdForPair(pair) : null
   usePythFeed(feedId)
   const latestTick = useLatestPrice(feedId)
@@ -999,6 +1040,9 @@ export function MarketPage() {
                 <Mode2MarketReadinessCard
                   configStatus={mode2Readiness?.leverageConfig?.status ?? null}
                   pairRiskState={mode2PairRiskState}
+                  readinessLoading={isMode2ReadinessLoading}
+                  readinessError={isMode2ReadinessError}
+                  leverageEnabled={mode2Readiness?.leverageEnabled ?? null}
                 />
               </>
             )}

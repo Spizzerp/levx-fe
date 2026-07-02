@@ -26,6 +26,12 @@ import { formatAiPathLabel } from '@/lib/pathLabels'
 const DAY = 24 * 60 * 60 * 1000
 const HOUR = 60 * 60 * 1000
 const MINUTE = 60 * 1000
+const MOCK_USDC_MINT = '6xz4EVw6rYFnfJwgumXsBt28xgjvKjpAWpwzdvPUJkhz'
+const MOCK_BASE_MINTS: Readonly<Record<string, string>> = {
+  BTC: '3BZPwbcqB5kKScF3TEXxwNfx5ipV13kbRVDvfVp5c6fv',
+  ETH: '7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs',
+  SOL: 'So11111111111111111111111111111111111111112',
+}
 
 /** Sensible defaults for on-chain fields not yet populated in mock layer. */
 const ON_CHAIN_DEFAULTS: Pick<
@@ -65,10 +71,15 @@ function makeMarket(
     Pick<Market, 'id' | 'marketId' | 'pair' | 'base' | 'quote' | 'state'>,
 ): Market {
   const now = Date.now()
+  const baseMint = overrides.baseMint ?? MOCK_BASE_MINTS[overrides.base] ?? `${overrides.base}-mint`
+  const quoteMint =
+    overrides.quoteMint ?? (overrides.quote === 'USDC' ? MOCK_USDC_MINT : `${overrides.quote}-mint`)
   return {
     pool: 100_000,
     traders: 500,
     vault: '',
+    baseMint,
+    quoteMint,
     startTime: now - 7 * DAY,
     endTime: now + 7 * DAY,
     checkpointInterval: 3600,

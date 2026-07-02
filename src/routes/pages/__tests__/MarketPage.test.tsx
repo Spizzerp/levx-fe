@@ -81,6 +81,7 @@ vi.mock('@/lib/api/hooks', async () => {
   return {
     ...actual,
     useMarket: vi.fn(),
+    useMode2Readiness: vi.fn(),
     useUserPosition: vi.fn(),
   }
 })
@@ -202,6 +203,8 @@ const TEST_MARKET = {
   pair: 'BTC/USDC',
   base: 'BTC',
   quote: 'USDC',
+  baseMint: '3BZPwbcqB5kKScF3TEXxwNfx5ipV13kbRVDvfVp5c6fv',
+  quoteMint: '6xz4EVw6rYFnfJwgumXsBt28xgjvKjpAWpwzdvPUJkhz',
   vault: '11111111111111111111111111111111',
   state: 'active' as const,
   pool: 248_901,
@@ -304,6 +307,16 @@ beforeEach(async () => {
   const { useUserPosition } = await import('@/lib/api/hooks')
   ;(useUserPosition as ReturnType<typeof vi.fn>).mockReturnValue({
     data: null,
+    isLoading: false,
+    isError: false,
+  })
+  const { useMode2Readiness } = await import('@/lib/api/hooks')
+  ;(useMode2Readiness as ReturnType<typeof vi.fn>).mockReturnValue({
+    data: {
+      leverageEnabled: false,
+      leverageConfig: null,
+      pairRiskStates: [],
+    },
     isLoading: false,
     isError: false,
   })
@@ -496,6 +509,80 @@ describe('MarketPage state-gated controls', () => {
     await setMarketState('active')
     renderMarketPage()
     expect(wagerPanelQuery()).toBeInTheDocument()
+  })
+
+  it('joins Mode 2 pair risk by market mints instead of display pair labels', async () => {
+    const baseMint = 'So11111111111111111111111111111111111111112'
+    const quoteMint = 'BPFLoader1111111111111111111111111111111111'
+    await setMarketState('active', {
+      leverageEnabled: false,
+      pair: 'SOL/USDC',
+      base: 'SOL',
+      quote: 'USDC',
+      baseMint,
+      quoteMint,
+    })
+    const { useMode2Readiness } = await import('@/lib/api/hooks')
+    ;(useMode2Readiness as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: {
+        leverageEnabled: false,
+        leverageConfig: { status: 'accepted' },
+        pairRiskStates: [
+          {
+            address: 'pair-risk',
+            authority: 'authority',
+            baseMint,
+            quoteMint,
+            status: 'drainOnly',
+            maxPairLeveragedOi: 100_000,
+            maxLeverage: 5,
+            bufferTargetBps: 2500,
+            bufferDrainThresholdBps: 1500,
+            bufferReopenThresholdBps: 3000,
+            lastStatusChange: 0,
+            configHash: '00'.repeat(32),
+          },
+        ],
+      },
+      isLoading: false,
+      isError: false,
+    })
+
+    renderMarketPage()
+
+    expect(screen.getByText('Leverage unavailable')).toBeInTheDocument()
+    expect(screen.getByText('SOL/BPFL… · Drain Only')).toBeInTheDocument()
+    expect(screen.queryByText('No pair sidecar')).not.toBeInTheDocument()
+  })
+
+  it('does not render Mode 2 readiness loading or failure as confirmed missing state', async () => {
+    await setMarketState('active', { leverageEnabled: false })
+    const { useMode2Readiness } = await import('@/lib/api/hooks')
+    ;(useMode2Readiness as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: undefined,
+      isLoading: true,
+      isError: false,
+    })
+    const { rerender } = renderMarketPage()
+
+    expect(screen.getAllByText('Loading').length).toBeGreaterThan(0)
+    expect(screen.queryByText('Missing')).not.toBeInTheDocument()
+    expect(screen.queryByText('No pair sidecar')).not.toBeInTheDocument()
+    ;(useMode2Readiness as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+    })
+    rerender(
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
+        <MarketPage />
+      </QueryClientProvider>,
+    )
+
+    expect(screen.getAllByText('Unavailable').length).toBeGreaterThan(0)
+    expect(screen.queryByText('Missing')).not.toBeInTheDocument()
   })
 
   it('mounts the wager panel when market.state is Sampling before the wagering cutoff (MARKET-04)', async () => {

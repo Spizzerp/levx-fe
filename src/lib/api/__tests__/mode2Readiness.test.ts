@@ -47,7 +47,13 @@ function rawRiskParams(overrides: Record<string, unknown> = {}) {
 
 describe('getMode2Readiness', () => {
   it('falls back to inactive readiness when sidecar clients are unavailable', async () => {
-    getReadOnlyProgram.mockReturnValueOnce({ account: {} })
+    getReadOnlyProgram.mockReturnValueOnce({
+      account: {
+        protocolState: {
+          fetch: vi.fn().mockResolvedValue({ leverageEnabled: false }),
+        },
+      },
+    })
     const { getMode2Readiness } = await import('@/lib/api/onchain')
 
     await expect(getMode2Readiness()).resolves.toEqual({
@@ -60,6 +66,9 @@ describe('getMode2Readiness', () => {
   it('fetches dormant config and pair risk sidecars when available', async () => {
     getReadOnlyProgram.mockReturnValueOnce({
       account: {
+        protocolState: {
+          fetch: vi.fn().mockResolvedValue({ leverageEnabled: true }),
+        },
         leverageConfig: {
           fetchNullable: vi.fn().mockResolvedValue({
             authority: { toBase58: () => 'authority' },
@@ -99,7 +108,7 @@ describe('getMode2Readiness', () => {
 
     const readiness = await getMode2Readiness()
 
-    expect(readiness.leverageEnabled).toBe(false)
+    expect(readiness.leverageEnabled).toBe(true)
     expect(readiness.leverageConfig?.status).toBe('accepted')
     expect(readiness.leverageConfig?.currentParams.maxPairLeveragedOi).toBe(100_000)
     expect(readiness.pairRiskStates).toHaveLength(1)

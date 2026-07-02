@@ -80,6 +80,17 @@ export function formatAddress(base58: string): string {
   return `${base58.slice(0, 4)}···${base58.slice(-4)}`
 }
 
+/** Render Anchor-style camelCase enum variants as readable labels. */
+export function formatStatusLabel(value: string): string {
+  return value.replace(/([A-Z])/g, ' $1').replace(/^./, (char) => char.toUpperCase())
+}
+
+/** Truncate a 32-byte hex hash for compact UI display. */
+export function formatHash(hash: string): string {
+  if (!hash) return 'Not set'
+  return `${hash.slice(0, 8)}…${hash.slice(-8)}`
+}
+
 /** Build a Solana explorer URL for an address. */
 export function explorerAddressUrl(base58: string, cluster: string): string {
   const clusterParam = cluster === 'mainnet' ? 'mainnet-beta' : cluster

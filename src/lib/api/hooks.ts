@@ -73,13 +73,14 @@ export function useMarketPathPreviews(marketIds: readonly string[]) {
   })
 }
 
-export function useMode2Readiness() {
+export function useMode2Readiness(options: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: ['mode2Readiness'],
     queryFn: async (): Promise<Mode2Readiness> => {
       const api = await getApi()
       return api.getMode2Readiness()
     },
+    enabled: options.enabled ?? true,
     refetchInterval: MODE2_READINESS_REFETCH_MS,
     staleTime: STALE_MS,
   })

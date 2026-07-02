@@ -2,13 +2,13 @@ import { Lock, ShieldCheck } from 'lucide-react'
 
 import { Button } from '@/ui/Button'
 import { Input } from '@/ui/Input'
+import { PairRiskStatusBadge } from '@/ui/Mode2StatusBadge'
 import { TokenPairIcon } from '@/ui/TokenPairIcon'
 import { cn } from '@/lib/cn'
 import { useMode2Readiness } from '@/lib/api/hooks'
 import { resolvePairLabel } from '@/lib/api/pairLabels'
-import { formatAddress, formatUSD } from '@/lib/format'
+import { formatAddress, formatHash, formatStatusLabel, formatUSD } from '@/lib/format'
 import { PageLayout } from '@/layouts/PageLayout'
-import type { PairRiskStatus } from '@/types/market'
 
 /**
  * Mode 2 (leveraged via levUSD vault) is not yet enabled on-chain.
@@ -16,15 +16,19 @@ import type { PairRiskStatus } from '@/types/market'
  * and market leverage controls remain unavailable.
  */
 export function VaultPage() {
-  const { data: readiness, isLoading } = useMode2Readiness()
+  const { data: readiness, isLoading, isError } = useMode2Readiness()
   const config = readiness?.leverageConfig ?? null
   const currentParams = config?.currentParams ?? null
   const pairRiskStates = readiness?.pairRiskStates ?? []
   const simulatorHashReady =
     !!config?.simulatorOutputHash && !/^0+$/.test(config.simulatorOutputHash)
-  const statusSummary = config
-    ? `${formatStatusLabel(config.status)} config · ${pairRiskStates.length} pair${pairRiskStates.length === 1 ? '' : 's'}`
-    : 'No leverage config'
+  const statusSummary = isLoading
+    ? 'Loading readiness'
+    : isError
+      ? 'Readiness unavailable'
+      : config
+        ? `${formatStatusLabel(config.status)} config · ${pairRiskStates.length} pair${pairRiskStates.length === 1 ? '' : 's'}`
+        : 'No leverage config'
 
   return (
     <PageLayout title="Vault" subtitle="Mode 2 readiness — dormant leverage and pair-risk sidecars">
@@ -43,7 +47,12 @@ export function VaultPage() {
         />
         <div className="relative flex flex-col gap-4 [@media(min-width:900px)]:flex-row [@media(min-width:900px)]:items-center [@media(min-width:900px)]:justify-between">
           <div className="flex items-start gap-4">
-            <div className="border-line bg-surface/50 flex h-11 w-11 items-center justify-center rounded-full border">
+            <div
+              className={cn(
+                'border-line bg-surface/50 flex h-11 w-11 items-center justify-center',
+                'rounded-full border',
+              )}
+            >
               <Lock size={20} strokeWidth={1.5} className="text-ink-dim" aria-hidden />
             </div>
             <div>
@@ -78,11 +87,21 @@ export function VaultPage() {
           <div className="flex flex-col gap-6">
             <MetricRow
               label="Config account"
-              value={isLoading ? 'Loading' : config ? 'Present' : 'Missing'}
+              value={
+                isLoading ? 'Loading' : isError ? 'Unavailable' : config ? 'Present' : 'Missing'
+              }
             />
             <MetricRow
               label="Config status"
-              value={config ? formatStatusLabel(config.status) : '—'}
+              value={
+                isLoading
+                  ? 'Loading'
+                  : isError
+                    ? 'Unavailable'
+                    : config
+                      ? formatStatusLabel(config.status)
+                      : '—'
+              }
             />
             <MetricRow
               label="Simulator hash"
@@ -110,43 +129,46 @@ export function VaultPage() {
             <h2 className="text-ink-strong text-caption mb-5 font-mono font-bold tracking-wide uppercase">
               Pair Risk
             </h2>
-            {pairRiskStates.length === 0 ? (
+            {isError ? (
+              <p className="text-warning text-caption font-mono uppercase">
+                Readiness fetch unavailable
+              </p>
+            ) : pairRiskStates.length === 0 ? (
               <p className="text-ink-dim text-caption font-mono uppercase">
                 No pair sidecars found
               </p>
             ) : (
               <div className="flex flex-col gap-3">
-                {pairRiskStates.slice(0, 6).map((state) => (
-                  <div
-                    key={state.address}
-                    className={cn(
-                      'border-line flex items-center justify-between gap-4',
-                      'rounded-lg border px-4 py-3',
-                    )}
-                  >
-                    <div className="flex min-w-0 items-center gap-3">
-                      <TokenPairIcon
-                        base={resolvePairLabel(state.baseMint, state.quoteMint).base}
-                        quote={resolvePairLabel(state.baseMint, state.quoteMint).quote}
-                        size={28}
-                      />
-                      <div className="min-w-0">
+                {pairRiskStates.slice(0, 6).map((state) => {
+                  const label = resolvePairLabel(state.baseMint, state.quoteMint)
+                  return (
+                    <div
+                      key={state.address}
+                      className={cn(
+                        'border-line flex items-center justify-between gap-4',
+                        'rounded-lg border px-4 py-3',
+                      )}
+                    >
+                      <div className="flex min-w-0 items-center gap-3">
+                        <TokenPairIcon base={label.base} quote={label.quote} size={28} />
+                        <div className="min-w-0">
+                          <p className="text-ink-strong font-mono text-sm uppercase">
+                            {label.pair}
+                          </p>
+                          <p className="text-ink-dim mt-1 font-mono text-xs uppercase">
+                            {state.maxLeverage}× max · ${formatUSD(state.maxPairLeveragedOi)} OI
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 flex-col items-end gap-1">
+                        <PairRiskStatusBadge status={state.status} />
                         <p className="text-ink-strong font-mono text-sm uppercase">
-                          {resolvePairLabel(state.baseMint, state.quoteMint).pair}
-                        </p>
-                        <p className="text-ink-dim mt-1 font-mono text-xs uppercase">
-                          {state.maxLeverage}× max · ${formatUSD(state.maxPairLeveragedOi)} OI
+                          {formatAddress(state.baseMint)} / {formatAddress(state.quoteMint)}
                         </p>
                       </div>
                     </div>
-                    <div className="flex shrink-0 flex-col items-end gap-1">
-                      <PairRiskBadge status={state.status} />
-                      <p className="text-ink-strong font-mono text-sm uppercase">
-                        {formatAddress(state.baseMint)} / {formatAddress(state.quoteMint)}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </div>
@@ -233,30 +255,6 @@ function GateRow({
       </span>
     </div>
   )
-}
-
-function PairRiskBadge({ status }: { status: PairRiskStatus }) {
-  return (
-    <span
-      className={cn(
-        'rounded-full border px-2.5 py-1 font-mono text-[10px] font-bold tracking-wide uppercase',
-        status === 'active' && 'border-success/40 bg-success/10 text-success',
-        status === 'drainOnly' && 'border-line-strong bg-surface text-ink-muted',
-        (status === 'paused' || status === 'resetPending') &&
-          'border-warning/40 bg-warning/10 text-warning',
-      )}
-    >
-      {formatStatusLabel(status)}
-    </span>
-  )
-}
-
-function formatStatusLabel(value: string): string {
-  return value.replace(/([A-Z])/g, ' $1').replace(/^./, (char) => char.toUpperCase())
-}
-
-function formatHash(hash: string): string {
-  return `${hash.slice(0, 8)}…${hash.slice(-8)}`
 }
 
 function formatDelay(seconds: number): string {

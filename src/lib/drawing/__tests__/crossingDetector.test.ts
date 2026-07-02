@@ -85,6 +85,8 @@ const mockMarket = (overrides: Partial<Market> = {}): Market => {
     pair: 'SOL/USDC',
     base: 'SOL',
     quote: 'USDC',
+    baseMint: 'So11111111111111111111111111111111111111112',
+    quoteMint: '6xz4EVw6rYFnfJwgumXsBt28xgjvKjpAWpwzdvPUJkhz',
     vault: '',
     state: 'active',
     pool: 0,

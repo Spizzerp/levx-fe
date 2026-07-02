@@ -1,5 +1,6 @@
 import { act, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { AnchorHTMLAttributes, ReactNode } from 'react'
 
 import type { Market } from '@/types/market'
 
@@ -14,12 +15,18 @@ type UseMarketsState = {
   refetch?: () => void
 }
 
+type LinkMockProps = AnchorHTMLAttributes<HTMLAnchorElement> & {
+  children: ReactNode
+  params?: { groupKeyHash?: string }
+  to: string
+}
+
 vi.mock('@tanstack/react-router', async () => {
   const actual =
     await vi.importActual<typeof import('@tanstack/react-router')>('@tanstack/react-router')
   return {
     ...actual,
-    Link: ({ children, params, to, ...props }: any) => (
+    Link: ({ children, params, to, ...props }: LinkMockProps) => (
       <a href={params?.groupKeyHash ? `/markets/group/${params.groupKeyHash}` : to} {...props}>
         {children}
       </a>
@@ -84,6 +91,8 @@ function makeMarket(overrides: Partial<Market>): Market {
     groupKind: 'season',
     timeframeSeconds: 86_400,
     ...overrides,
+    baseMint: overrides.baseMint ?? 'BTC-mint',
+    quoteMint: overrides.quoteMint ?? 'USDC-mint',
   }
 }
 
@@ -161,7 +170,10 @@ describe('MarketGroupPage', () => {
     renderPage()
 
     expect(screen.getByText(/no child markets found/i)).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /back to markets/i })).toHaveAttribute('href', '/markets')
+    expect(screen.getByRole('link', { name: /back to markets/i })).toHaveAttribute(
+      'href',
+      '/markets',
+    )
   })
 
   it('renders an error state with retry', () => {

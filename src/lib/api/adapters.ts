@@ -97,6 +97,8 @@ export function anchorMarketToFE(raw: any, id: string): Market {
     pair: '',
     base: '',
     quote: '',
+    baseMint: raw.baseMint.toBase58(),
+    quoteMint: raw.quoteMint.toBase58(),
     vault: raw.vault.toBase58(),
     state: parseMarketState(raw.state),
     pool: bn(raw.totalPool, true),
