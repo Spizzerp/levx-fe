@@ -83,7 +83,7 @@ export function FreehandTool({
       useDrawingStore.getState().beginStroke()
       onStrokeStart?.()
     },
-    [marketStart, margin.left, margin.top, onStrokeStart],
+    [marketStart, margin, onStrokeStart],
   )
 
   const onPointerMove = useCallback(
@@ -136,7 +136,7 @@ export function FreehandTool({
       prevDomainXRef.current = domainX
       prevDomainYRef.current = domainY
     },
-    [checkpointXs, margin.left, margin.top, onStrokeEnd],
+    [checkpointXs, margin, onStrokeEnd],
   )
 
   const endStroke = useCallback(

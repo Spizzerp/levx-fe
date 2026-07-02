@@ -1,11 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { sampleBezierAtCheckpoints, type BezierAnchor } from '@/lib/drawing/bezierSampling'
-import {
-  DRAW_COMMIT_FILL,
-  DRAW_COMMIT_INK,
-  DRAW_IN_FLIGHT,
-} from '@/lib/drawing/colors'
+import { DRAW_COMMIT_FILL, DRAW_COMMIT_INK, DRAW_IN_FLIGHT } from '@/lib/drawing/colors'
 import { clientToChart, getFutureRegion } from '@/lib/drawing/pointer'
 import { DRAG_THRESHOLD_PX, type MinimalScale } from '@/lib/drawing/types'
 import { useBezierStore } from '@/stores/bezierStore'
@@ -52,10 +48,7 @@ const HANDLE_HIT_RADIUS = 8
 const ANCHOR_HIT_RADIUS = 9
 
 /** Snap a domain x to the closest checkpoint timestamp. */
-function snapToNearestCheckpoint(
-  domainX: number,
-  checkpointXs: readonly number[],
-): number {
+function snapToNearestCheckpoint(domainX: number, checkpointXs: readonly number[]): number {
   if (checkpointXs.length === 0) return domainX
   let bestIdx = 0
   let bestDist = Math.abs(domainX - checkpointXs[0])
@@ -196,9 +189,7 @@ export function BezierTool({
       const target = e.target as HTMLElement | null
       if (
         target &&
-        (target.tagName === 'INPUT' ||
-          target.tagName === 'TEXTAREA' ||
-          target.isContentEditable)
+        (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
       ) {
         return
       }
@@ -253,7 +244,7 @@ export function BezierTool({
         handleDomainY: domainY,
       })
     },
-    [marketStart, margin.left, margin.top],
+    [marketStart, margin],
   )
 
   const onPointerMove = useCallback(
@@ -277,7 +268,7 @@ export function BezierTool({
         handleDomainY: domainY,
       })
     },
-    [drag, margin.left, margin.top],
+    [drag, margin],
   )
 
   const onPointerUp = useCallback(
@@ -290,18 +281,13 @@ export function BezierTool({
       const d = drag
       if (!d) return
 
-      const dragPx = Math.hypot(
-        d.handleChartX - d.startChartX,
-        d.handleChartY - d.startChartY,
-      )
+      const dragPx = Math.hypot(d.handleChartX - d.startChartX, d.handleChartY - d.startChartY)
       const isCorner = dragPx < DRAG_THRESHOLD_PX
 
       const newAnchor: BezierAnchor = {
         domainX: d.startDomainX,
         domainY: d.startDomainY,
-        outHandle: isCorner
-          ? null
-          : { domainX: d.handleDomainX, domainY: d.handleDomainY },
+        outHandle: isCorner ? null : { domainX: d.handleDomainX, domainY: d.handleDomainY },
       }
 
       // One placement → one history entry.
@@ -402,32 +388,29 @@ export function BezierTool({
       next[cur.anchorIdx] = updated
       useBezierStore.getState().setAnchors(next)
     },
-    [checkpointXs, margin.left, margin.top],
+    [checkpointXs, margin],
   )
 
-  const onComponentPointerUp = useCallback(
-    (e: React.PointerEvent<SVGCircleElement>) => {
-      try {
-        e.currentTarget.releasePointerCapture(e.pointerId)
-      } catch {
-        // already released
-      }
-      // Push one history entry for the whole gesture. Every pointermove
-      // allocates a new anchors array via setAnchors, so before !== after
-      // by reference whenever pointermove fired at least once. A click
-      // without drag never triggers setAnchors → references stay equal →
-      // skip the push (no-op gesture, nothing to undo).
-      const before = preEditRef.current
-      const after = useBezierStore.getState().anchors
-      if (before !== null && before !== after) {
-        useBezierStore.getState().pushEdit(before, after)
-      }
-      preEditRef.current = null
-      editRef.current = null
-      setEditTarget(null)
-    },
-    [],
-  )
+  const onComponentPointerUp = useCallback((e: React.PointerEvent<SVGCircleElement>) => {
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId)
+    } catch {
+      // already released
+    }
+    // Push one history entry for the whole gesture. Every pointermove
+    // allocates a new anchors array via setAnchors, so before !== after
+    // by reference whenever pointermove fired at least once. A click
+    // without drag never triggers setAnchors → references stay equal →
+    // skip the push (no-op gesture, nothing to undo).
+    const before = preEditRef.current
+    const after = useBezierStore.getState().anchors
+    if (before !== null && before !== after) {
+      useBezierStore.getState().pushEdit(before, after)
+    }
+    preEditRef.current = null
+    editRef.current = null
+    setEditTarget(null)
+  }, [])
 
   // ----------------------------------------------------------------
   // Render — derive chart-coords from domain anchors via current scales.

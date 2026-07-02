@@ -5,5 +5,6 @@ export {
   useUserPosition,
   useUserPositions,
 } from './hooks'
-export { AnchorProgramProvider, useAnchorProgram } from './AnchorProgramProvider'
+export { AnchorProgramProvider } from './AnchorProgramProvider'
+export { useAnchorProgram } from './anchorProgramContext'
 export { buildTransaction, type BuildTransactionOptions } from './buildTransaction'
