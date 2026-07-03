@@ -139,7 +139,7 @@ describe('MarketGroupPage', () => {
 
     renderPage()
 
-    expect(screen.getByRole('heading', { name: /btc\/usdc 1d season/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /2 pairs 1d season/i })).toBeInTheDocument()
     expect(screen.getByText(/2 independent markets/i)).toBeInTheDocument()
     expect(screen.getByText(/grouping is discovery-only/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /BTC\/USDC/i })).toBeInTheDocument()

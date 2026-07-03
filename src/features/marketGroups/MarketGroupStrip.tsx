@@ -7,9 +7,10 @@ import { formatUSD } from '@/lib/format'
 
 type MarketGroupStripProps = {
   groups: readonly MarketGroupSummary[]
+  totalMarketCount: number
 }
 
-export function MarketGroupStrip({ groups }: MarketGroupStripProps) {
+export function MarketGroupStrip({ groups, totalMarketCount }: MarketGroupStripProps) {
   if (groups.length === 0) return null
 
   return (
@@ -35,9 +36,7 @@ export function MarketGroupStrip({ groups }: MarketGroupStripProps) {
           )}
         >
           All markets
-          <span className="text-ink-dim">
-            {groups.reduce((sum, group) => sum + group.totalMarkets, 0)}
-          </span>
+          <span className="text-ink-dim">{totalMarketCount}</span>
         </Link>
       </div>
 

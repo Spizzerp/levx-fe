@@ -64,6 +64,14 @@ describe('market group presentation', () => {
     expect(formatMarketGroupLabel({ groupKind: 'season', groupKeyHash: 'cd'.repeat(32) })).toBe(
       'Season cdcdcdcd',
     )
+    expect(
+      formatMarketGroupLabel({
+        groupKind: 'league',
+        groupKeyHash: 'ef'.repeat(32),
+        pair: 'BTC/USDC',
+        pairCount: 2,
+      }),
+    ).toBe('2 pairs League')
     expect(formatMarketGroupLabel({ groupKeyHash: undefined })).toBe('Ungrouped')
   })
 
@@ -186,6 +194,20 @@ describe('market group presentation', () => {
 
     expect(summaries).toHaveLength(1)
     expect(summaries[0]?.endTime).toBe(Date.UTC(2026, 0, 9))
+  })
+
+  it('labels multi-pair groups by pair count instead of the first child pair', () => {
+    const groupKeyHash = '45'.repeat(32)
+    const summaries = buildMarketGroupSummaries([
+      market({ id: 'btc', pair: 'BTC/USDC', groupKeyHash, groupKind: 'league' }),
+      market({ id: 'eth', pair: 'ETH/USDC', groupKeyHash, groupKind: 'league' }),
+    ])
+
+    expect(summaries[0]).toMatchObject({
+      label: '2 pairs League',
+      subtitle: '2 pairs · League · 2 markets',
+      pairs: ['BTC/USDC', 'ETH/USDC'],
+    })
   })
 
   it('returns only child markets for a selected group hash', () => {

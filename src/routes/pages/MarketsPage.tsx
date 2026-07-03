@@ -478,7 +478,9 @@ export function MarketsPage() {
         </div>
       )}
 
-      {hasAnyMarkets && <MarketGroupStrip groups={groupedMarkets} />}
+      {hasAnyMarkets && (
+        <MarketGroupStrip groups={groupedMarkets} totalMarketCount={markets?.length ?? 0} />
+      )}
 
       {hasAnyMarkets && (
         <AnimatePresence mode="wait" initial={false}>

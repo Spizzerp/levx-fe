@@ -354,12 +354,17 @@ describe('MarketsPage', () => {
           groupKeyHash,
           groupKind: 'season',
         }),
+        makeMarket({
+          id: 'flat',
+          pair: 'ETH/USDC',
+          state: 'active',
+        }),
       ],
     })
 
     renderPage()
 
-    expect(screen.getByRole('link', { name: /all markets/i })).toHaveAttribute('href', '/markets')
+    expect(screen.getByRole('link', { name: /all markets 2/i })).toHaveAttribute('href', '/markets')
     const link = screen.getByRole('link', { name: /btc\/usdc season/i })
     expect(link).toHaveAttribute('href', `/markets/group/${groupKeyHash}`)
   })

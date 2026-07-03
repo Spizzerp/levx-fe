@@ -79,14 +79,16 @@ export function formatMarketGroupLabel(args: {
   groupKind?: MarketGroupKind
   groupKeyHash?: string
   pair?: string
+  pairCount?: number
   timeframeSeconds?: number
 }): string {
   if (!args.groupKeyHash) return 'Ungrouped'
   const kind = args.groupKind ? MARKET_GROUP_KIND_LABELS[args.groupKind] : undefined
   const timeframe = formatTimeframeLabel(args.timeframeSeconds)
+  const scope = args.pairCount && args.pairCount > 1 ? `${args.pairCount} pairs` : args.pair
 
-  if (args.pair && timeframe) return `${args.pair} ${timeframe} ${kind ?? 'Group'}`
-  if (args.pair) return `${args.pair} ${kind ?? 'Group'}`
+  if (scope && timeframe) return `${scope} ${timeframe} ${kind ?? 'Group'}`
+  if (scope) return `${scope} ${kind ?? 'Group'}`
   if (timeframe) return `${timeframe} ${kind ?? 'Group'}`
   return `${kind ?? 'Group'} ${args.groupKeyHash.slice(0, 8)}`
 }
@@ -154,6 +156,7 @@ export function buildMarketGroupSummaries(
       groupKind: summary.kind,
       groupKeyHash: summary.groupKeyHash,
       pair: summary.primaryPair,
+      pairCount: summary.pairs.length,
       timeframeSeconds: summary.timeframeSeconds,
     })
     summary.subtitle = formatMarketGroupSubtitle(summary)
