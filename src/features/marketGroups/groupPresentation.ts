@@ -158,7 +158,7 @@ function preferSeasonMetadata(
   if (!current) return next
   if (!next) return current
   if (next.displayName && !current.displayName) return next
-  if (next.description && !current.description) return { ...current, ...next }
+  if (next.description && !current.description) return { ...current, description: next.description }
   return current
 }
 

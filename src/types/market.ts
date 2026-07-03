@@ -50,6 +50,7 @@ export type MarketGroupStatus = 'active' | 'paused' | 'retired'
 export type LeverageConfigStatus = 'accepted' | 'staged'
 export type PairRiskStatus = 'active' | 'drainOnly' | 'resetPending' | 'paused'
 
+/** Optional indexed/provider season metadata; chain-only market reads infer a fallback. */
 export interface MarketSeasonMetadata {
   seasonKey: string
   seasonId?: string | null
