@@ -168,7 +168,6 @@ describe('market group presentation', () => {
         pair: 'SOL/USDC',
         timeframeSeconds: 86_400,
         seasonKey: 'SOL/USDC:2026:1d',
-        pair: 'SOL/USDC',
         base: 'SOL',
         seasonMetadata: {
           seasonKey: 'SOL/USDC:2026:1d',
