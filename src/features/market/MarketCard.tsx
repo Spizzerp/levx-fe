@@ -3,7 +3,10 @@ import { Layers } from 'lucide-react'
 
 import { StatusDot } from '@/ui/StatusDot'
 import { TokenPairIcon } from '@/ui/TokenPairIcon'
-import { formatMarketGroupLabel } from '@/features/marketGroups/groupPresentation'
+import {
+  formatMarketGroupLabel,
+  getMarketSeasonMetadata,
+} from '@/features/marketGroups/groupPresentation'
 import { cn } from '@/lib/cn'
 import { formatCountdown, formatMarketDurationLabel, formatShortDate } from '@/lib/format'
 import { getMarketDisplayState } from '@/lib/market/status'
@@ -93,11 +96,13 @@ export function MarketCard({ market, now, onClick }: MarketCardProps) {
   const durationLabel = formatMarketDurationLabel(market.startTime, market.endTime)
   const endDateLabel = formatShortDate(market.endTime)
   const displayState = getMarketDisplayState(market)
+  const seasonMetadata = getMarketSeasonMetadata(market)
   const groupLabel = market.groupKeyHash
     ? formatMarketGroupLabel({
         groupKind: market.groupKind,
         groupKeyHash: market.groupKeyHash,
         pair: market.pair,
+        seasonMetadata,
         timeframeSeconds: market.timeframeSeconds,
       })
     : null

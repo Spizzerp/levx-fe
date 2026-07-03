@@ -47,4 +47,18 @@ describe('MarketGroupSummary', () => {
 
     expect(screen.getByText('Open-ended')).toBeInTheDocument()
   })
+
+  it('shows season metadata when present', () => {
+    render(
+      <MarketGroupSummary
+        summary={makeSummary({ productSeason: '2026', horizonLabel: '1D' })}
+        now={Date.UTC(2026, 0, 1)}
+      />,
+    )
+
+    expect(screen.getByText('Season')).toBeInTheDocument()
+    expect(screen.getByText('2026')).toBeInTheDocument()
+    expect(screen.getByText('Horizon')).toBeInTheDocument()
+    expect(screen.getAllByText('1D').length).toBeGreaterThan(0)
+  })
 })

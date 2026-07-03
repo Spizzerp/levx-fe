@@ -58,6 +58,40 @@ describe('market group presentation', () => {
         groupKind: 'assetSeason',
         groupKeyHash: 'ab'.repeat(32),
         pair: 'SOL/USDC',
+        seasonMetadata: {
+          seasonKey: 'SOL/USDC:2026:1d',
+          pair: 'SOL/USDC',
+          productSeason: '2026',
+          horizon: '1d',
+          timeframeSeconds: 86_400,
+          startTime: Date.UTC(2026, 0, 1),
+          endTime: Date.UTC(2026, 0, 2),
+        },
+        timeframeSeconds: 86_400,
+      }),
+    ).toBe('SOL/USDC 2026 1D Season')
+    expect(
+      formatMarketGroupLabel({
+        groupKind: 'assetSeason',
+        groupKeyHash: 'ab'.repeat(32),
+        pair: 'SOL/USDC',
+        seasonMetadata: {
+          seasonKey: 'SOL/USDC:2026:1d',
+          pair: 'SOL/USDC',
+          productSeason: '2026',
+          horizon: '1d',
+          timeframeSeconds: 86_400,
+          startTime: Date.UTC(2026, 0, 1),
+          endTime: Date.UTC(2026, 0, 2),
+          displayName: 'SOL Daily 2026',
+        },
+      }),
+    ).toBe('SOL Daily 2026')
+    expect(
+      formatMarketGroupLabel({
+        groupKind: 'assetSeason',
+        groupKeyHash: 'ab'.repeat(32),
+        pair: 'SOL/USDC',
         timeframeSeconds: 86_400,
       }),
     ).toBe('SOL/USDC 1D Season')
@@ -119,6 +153,98 @@ describe('market group presentation', () => {
       pendingMarkets: 1,
       settledMarkets: 1,
       endTime: Date.UTC(2026, 0, 7),
+    })
+  })
+
+  it('prefers indexed season metadata for group summaries', () => {
+    const groupKeyHash = '89'.repeat(32)
+    const summaries = buildMarketGroupSummaries([
+      market({
+        id: 'indexed-season',
+        marketId: 8,
+        state: 'active',
+        groupKeyHash,
+        groupKind: 'assetSeason',
+        pair: 'SOL/USDC',
+        timeframeSeconds: 86_400,
+        seasonKey: 'SOL/USDC:2026:1d',
+        base: 'SOL',
+        seasonMetadata: {
+          seasonKey: 'SOL/USDC:2026:1d',
+          seasonId: 'sol-2026-1d',
+          assetSeasonAddress: 'season-group',
+          parentStatus: 'active',
+          groupKeyHash,
+          groupKind: 'assetSeason',
+          parentGroup: null,
+          pair: 'SOL/USDC',
+          productSeason: '2026',
+          horizon: '1d',
+          timeframeSeconds: 86_400,
+          startTime: Date.UTC(2026, 0, 1),
+          endTime: Date.UTC(2026, 0, 2),
+          displayName: 'SOL 2026 Daily Season',
+          description: 'Provider-indexed SOL daily markets for the 2026 season.',
+        },
+      }),
+    ])
+
+    expect(summaries[0]).toMatchObject({
+      label: 'SOL 2026 Daily Season',
+      subtitle: 'Provider-indexed SOL daily markets for the 2026 season.',
+      seasonKey: 'SOL/USDC:2026:1d',
+      seasonId: 'sol-2026-1d',
+      productSeason: '2026',
+      horizonLabel: '1D',
+    })
+  })
+
+  it('does not clobber established season fields when adopting a later description', () => {
+    const groupKeyHash = '98'.repeat(32)
+    const summaries = buildMarketGroupSummaries([
+      market({
+        id: 'daily',
+        marketId: 9,
+        groupKeyHash,
+        groupKind: 'assetSeason',
+        pair: 'SOL/USDC',
+        timeframeSeconds: 86_400,
+        seasonMetadata: {
+          seasonKey: 'SOL/USDC:2024:1d',
+          pair: 'SOL/USDC',
+          productSeason: '2024',
+          horizon: '1d',
+          timeframeSeconds: 86_400,
+          startTime: Date.UTC(2024, 0, 1),
+          endTime: Date.UTC(2024, 0, 2),
+        },
+      }),
+      market({
+        id: 'weekly',
+        marketId: 10,
+        groupKeyHash,
+        groupKind: 'assetSeason',
+        pair: 'SOL/USDC',
+        timeframeSeconds: 604_800,
+        seasonMetadata: {
+          seasonKey: 'SOL/USDC:2025:7d',
+          pair: 'SOL/USDC',
+          productSeason: '2025',
+          horizon: '7d',
+          timeframeSeconds: 604_800,
+          startTime: Date.UTC(2025, 0, 1),
+          endTime: Date.UTC(2025, 0, 8),
+          description: 'Later indexed description.',
+        },
+      }),
+    ])
+
+    expect(summaries[0]).toMatchObject({
+      label: 'SOL/USDC 2024 1D Season',
+      subtitle: 'Later indexed description.',
+      seasonKey: 'SOL/USDC:2024:1d',
+      productSeason: '2024',
+      horizonLabel: '1D',
     })
   })
 

@@ -1,6 +1,12 @@
 import { getMarketDisplayState } from '@/lib/market/status'
 import { MARKET_GROUP_CONSTRAINT_FLAGS } from '@/lib/marketGroups'
-import type { Market, MarketGroupKind, MarketGroupStatus, MarketState } from '@/types/market'
+import type {
+  Market,
+  MarketGroupKind,
+  MarketGroupStatus,
+  MarketSeasonMetadata,
+  MarketState,
+} from '@/types/market'
 
 export type MarketGroupSummary = {
   groupKeyHash: string
@@ -12,6 +18,12 @@ export type MarketGroupSummary = {
   parentGroup?: string | null
   primaryPair?: string
   pairs: string[]
+  seasonMetadata?: MarketSeasonMetadata
+  seasonKey?: string
+  seasonId?: string | null
+  productSeason?: string
+  horizonLabel?: string
+  description?: string | null
   timeframeSeconds?: number
   timeframeLabel?: string
   childMarketCount?: number
@@ -75,20 +87,105 @@ export function formatTimeframeLabel(timeframeSeconds?: number): string | undefi
   return `${timeframeSeconds}S`
 }
 
+function formatHorizonLabel(horizon?: string, timeframeSeconds?: number): string | undefined {
+  if (!horizon) return formatTimeframeLabel(timeframeSeconds)
+  const match = horizon.match(/^(\d+)([a-zA-Z]+)$/)
+  if (!match) return horizon.toUpperCase()
+  return `${match[1]}${match[2].toUpperCase()}`
+}
+
+function productSeasonFromTime(startTime: number): string {
+  return String(new Date(startTime).getUTCFullYear())
+}
+
+function parseProviderSeasonKey(market: Market): MarketSeasonMetadata | undefined {
+  if (!market.seasonKey) return undefined
+  const parts = market.seasonKey.split(':')
+  if (parts.length !== 3) return undefined
+  const [pair, productSeason, horizon] = parts
+  if (pair !== market.pair || !productSeason || !horizon) return undefined
+
+  return {
+    seasonKey: market.seasonKey,
+    groupKeyHash: market.groupKeyHash ?? null,
+    groupKind: market.groupKind ?? null,
+    parentGroup: market.parentGroup ?? market.group?.parentGroup ?? null,
+    pair,
+    productSeason,
+    horizon,
+    timeframeSeconds:
+      market.timeframeSeconds ?? Math.round((market.endTime - market.startTime) / 1000),
+    startTime: market.startTime,
+    endTime: market.endTime,
+  }
+}
+
+function inferSeasonMetadata(market: Market): MarketSeasonMetadata | undefined {
+  if (!market.groupKeyHash || !market.timeframeSeconds) return undefined
+  if (
+    market.groupKind !== 'season' &&
+    market.groupKind !== 'assetSeason' &&
+    market.groupKind !== 'horizon'
+  ) {
+    return undefined
+  }
+
+  const horizon = formatTimeframeLabel(market.timeframeSeconds)?.toLowerCase()
+  if (!horizon) return undefined
+
+  return {
+    seasonKey: `${market.pair}:${productSeasonFromTime(market.startTime)}:${horizon}`,
+    groupKeyHash: market.groupKeyHash,
+    groupKind: market.groupKind,
+    parentGroup: market.parentGroup ?? market.group?.parentGroup ?? null,
+    pair: market.pair,
+    productSeason: productSeasonFromTime(market.startTime),
+    horizon,
+    timeframeSeconds: market.timeframeSeconds,
+    startTime: market.startTime,
+    endTime: market.endTime,
+  }
+}
+
+export function getMarketSeasonMetadata(market: Market): MarketSeasonMetadata | undefined {
+  return market.seasonMetadata ?? parseProviderSeasonKey(market) ?? inferSeasonMetadata(market)
+}
+
+function preferSeasonMetadata(
+  current: MarketSeasonMetadata | undefined,
+  next: MarketSeasonMetadata | undefined,
+): MarketSeasonMetadata | undefined {
+  if (!current) return next
+  if (!next) return current
+  if (next.displayName && !current.displayName) return next
+  if (next.description && !current.description) return { ...current, description: next.description }
+  return current
+}
+
 export function formatMarketGroupLabel(args: {
   groupKind?: MarketGroupKind
   groupKeyHash?: string
   pair?: string
   pairCount?: number
+  seasonMetadata?: MarketSeasonMetadata
   timeframeSeconds?: number
 }): string {
   if (!args.groupKeyHash) return 'Ungrouped'
+  if (args.seasonMetadata?.displayName) return args.seasonMetadata.displayName
+
   const kind = args.groupKind ? MARKET_GROUP_KIND_LABELS[args.groupKind] : undefined
   const timeframe = formatTimeframeLabel(args.timeframeSeconds)
   const scope = args.pairCount && args.pairCount > 1 ? `${args.pairCount} pairs` : args.pair
+  const season = args.seasonMetadata?.productSeason
+  const horizon = formatHorizonLabel(
+    args.seasonMetadata?.horizon,
+    args.seasonMetadata?.timeframeSeconds,
+  )
 
+  if (scope && season && horizon) return `${scope} ${season} ${horizon} ${kind ?? 'Group'}`
   if (scope && timeframe) return `${scope} ${timeframe} ${kind ?? 'Group'}`
   if (scope) return `${scope} ${kind ?? 'Group'}`
+  if (season && horizon) return `${season} ${horizon} ${kind ?? 'Group'}`
   if (timeframe) return `${timeframe} ${kind ?? 'Group'}`
   return `${kind ?? 'Group'} ${args.groupKeyHash.slice(0, 8)}`
 }
@@ -109,6 +206,7 @@ export function buildMarketGroupSummaries(
     if (!market.groupKeyHash) continue
 
     const existing = summaries.get(market.groupKeyHash)
+    const marketSeasonMetadata = getMarketSeasonMetadata(market)
     const summary =
       existing ??
       ({
@@ -119,6 +217,15 @@ export function buildMarketGroupSummaries(
         parentGroup: market.parentGroup ?? market.group?.parentGroup,
         primaryPair: market.pair,
         pairs: [],
+        seasonMetadata: marketSeasonMetadata,
+        seasonKey: marketSeasonMetadata?.seasonKey ?? market.seasonKey,
+        seasonId: marketSeasonMetadata?.seasonId,
+        productSeason: marketSeasonMetadata?.productSeason,
+        horizonLabel: formatHorizonLabel(
+          marketSeasonMetadata?.horizon,
+          marketSeasonMetadata?.timeframeSeconds,
+        ),
+        description: marketSeasonMetadata?.description,
         timeframeSeconds: market.timeframeSeconds,
         timeframeLabel: formatTimeframeLabel(market.timeframeSeconds),
         childMarketCount: market.group?.childMarketCount,
@@ -126,6 +233,7 @@ export function buildMarketGroupSummaries(
           groupKind: market.groupKind,
           groupKeyHash: market.groupKeyHash,
           pair: market.pair,
+          seasonMetadata: marketSeasonMetadata,
           timeframeSeconds: market.timeframeSeconds,
         }),
         subtitle: '',
@@ -144,6 +252,15 @@ export function buildMarketGroupSummaries(
     summary.parentGroup ??= market.parentGroup ?? market.group?.parentGroup
     summary.primaryPair ??= market.pair
     if (!summary.pairs.includes(market.pair)) summary.pairs.push(market.pair)
+    summary.seasonMetadata = preferSeasonMetadata(summary.seasonMetadata, marketSeasonMetadata)
+    summary.seasonKey ??= summary.seasonMetadata?.seasonKey ?? market.seasonKey
+    summary.seasonId ??= summary.seasonMetadata?.seasonId
+    summary.productSeason ??= summary.seasonMetadata?.productSeason
+    summary.horizonLabel ??= formatHorizonLabel(
+      summary.seasonMetadata?.horizon,
+      summary.seasonMetadata?.timeframeSeconds,
+    )
+    summary.description ??= summary.seasonMetadata?.description
     summary.timeframeSeconds ??= market.timeframeSeconds
     summary.timeframeLabel ??= formatTimeframeLabel(market.timeframeSeconds)
     summary.childMarketCount ??= market.group?.childMarketCount
@@ -157,6 +274,7 @@ export function buildMarketGroupSummaries(
       groupKeyHash: summary.groupKeyHash,
       pair: summary.primaryPair,
       pairCount: summary.pairs.length,
+      seasonMetadata: summary.seasonMetadata,
       timeframeSeconds: summary.timeframeSeconds,
     })
     summary.subtitle = formatMarketGroupSubtitle(summary)
@@ -168,12 +286,17 @@ export function buildMarketGroupSummaries(
 }
 
 function formatMarketGroupSubtitle(summary: MarketGroupSummary): string {
+  if (summary.description) return summary.description
+
   const scope =
     summary.pairs.length > 1
       ? `${summary.pairs.length} pairs`
       : (summary.primaryPair ?? 'Market group')
   const context = summary.kind ? MARKET_GROUP_KIND_CONTEXT[summary.kind] : 'Group'
-  const timeframe = summary.timeframeLabel ? ` · ${summary.timeframeLabel}` : ''
+  const productSeason = summary.productSeason ? ` · ${summary.productSeason} season` : ''
+  const horizon = summary.horizonLabel ? ` · ${summary.horizonLabel} horizon` : ''
+  const timeframe =
+    !summary.horizonLabel && summary.timeframeLabel ? ` · ${summary.timeframeLabel}` : ''
   const children = `${summary.totalMarkets} ${summary.totalMarkets === 1 ? 'market' : 'markets'}`
-  return `${scope}${timeframe} · ${context ?? 'Group'} · ${children}`
+  return `${scope}${productSeason}${horizon}${timeframe} · ${context ?? 'Group'} · ${children}`
 }

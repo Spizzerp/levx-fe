@@ -45,12 +45,17 @@ export interface ProviderSeasonMetadata {
   season_id?: string | null
   asset_season_address?: string | null
   parent_status?: string | null
+  group_key_hash?: string | null
+  group_kind?: string | null
+  parent_group?: string | null
   pair: string
   product_season: string
   horizon: string
   timeframe_seconds: number
   start_time: number
   end_time: number
+  display_name?: string | null
+  description?: string | null
 }
 
 export interface ProviderMarketContext {

@@ -30,7 +30,10 @@ import { cn } from '@/lib/cn'
 import { useMode2Readiness } from '@/lib/api/hooks'
 import { useMarket, useUserPosition } from '@/lib/chain'
 import { parseMarketState } from '@/lib/api/adapters'
-import { formatMarketGroupLabel } from '@/features/marketGroups/groupPresentation'
+import {
+  formatMarketGroupLabel,
+  getMarketSeasonMetadata,
+} from '@/features/marketGroups/groupPresentation'
 import { toneForPairRiskStatus, type Mode2StatusTone } from '@/lib/mode2Status'
 import { resolvePairLabel } from '@/lib/api/pairLabels'
 import { isMarketWageringOpen } from '@/lib/market/status'
@@ -304,6 +307,7 @@ export function MarketPage() {
     )
   }, [market, mode2Readiness?.pairRiskStates])
   const feedId = pair ? feedIdForPair(pair) : null
+  const seasonMetadata = market ? getMarketSeasonMetadata(market) : undefined
   usePythFeed(feedId)
   const latestTick = useLatestPrice(feedId)
 
@@ -775,6 +779,7 @@ export function MarketPage() {
                 groupKind: market.groupKind,
                 groupKeyHash: market.groupKeyHash,
                 pair: market.pair,
+                seasonMetadata,
                 timeframeSeconds: market.timeframeSeconds,
               })}
             </Link>
