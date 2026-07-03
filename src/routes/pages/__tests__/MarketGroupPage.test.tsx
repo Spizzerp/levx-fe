@@ -139,8 +139,9 @@ describe('MarketGroupPage', () => {
 
     renderPage()
 
-    expect(screen.getByRole('heading', { name: /season abababab/i })).toBeInTheDocument()
-    expect(screen.getByText(/2 child markets/i)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /2 pairs 1d season/i })).toBeInTheDocument()
+    expect(screen.getByText(/2 independent markets/i)).toBeInTheDocument()
+    expect(screen.getByText(/grouping is discovery-only/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /BTC\/USDC/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /ETH\/USDC/i })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /SOL\/USDC/i })).not.toBeInTheDocument()
@@ -169,8 +170,8 @@ describe('MarketGroupPage', () => {
 
     renderPage()
 
-    expect(screen.getByText(/no child markets found/i)).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /back to markets/i })).toHaveAttribute(
+    expect(screen.getByText(/no markets in this group yet/i)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /view all markets/i })).toHaveAttribute(
       'href',
       '/markets',
     )

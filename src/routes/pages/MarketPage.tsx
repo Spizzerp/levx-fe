@@ -774,6 +774,8 @@ export function MarketPage() {
               {formatMarketGroupLabel({
                 groupKind: market.groupKind,
                 groupKeyHash: market.groupKeyHash,
+                pair: market.pair,
+                timeframeSeconds: market.timeframeSeconds,
               })}
             </Link>
           </div>

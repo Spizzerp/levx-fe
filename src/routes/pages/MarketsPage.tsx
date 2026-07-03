@@ -16,7 +16,10 @@ import { QueryErrorState } from '@/ui/QueryErrorState'
 import { StatusDot } from '@/ui/StatusDot'
 import { cn } from '@/lib/cn'
 import { useMarketPathPreviews, useMarkets } from '@/lib/chain'
-import { buildMarketGroupSummaries } from '@/features/marketGroups/groupPresentation'
+import {
+  buildMarketGroupSummaries,
+  formatMarketGroupLabel,
+} from '@/features/marketGroups/groupPresentation'
 import { getMarketDisplayState } from '@/lib/market/status'
 import { useNowTick } from '@/lib/hooks/useNowTick'
 import { feedIdForPair } from '@/lib/pyth/feedIds'
@@ -140,14 +143,32 @@ function buildColumns(now: number, marketHeader: ReactNode): DataTableColumn<Mar
       header: marketHeader,
       headerClassName: 'pl-6',
       cellClassName: 'pl-6',
-      render: (m) => (
-        <span className="flex items-center gap-3">
-          <span className="text-ink-strong font-mono text-sm font-bold tracking-wide uppercase">
-            {m.base}
+      render: (m) => {
+        const groupLabel = m.groupKeyHash
+          ? formatMarketGroupLabel({
+              groupKind: m.groupKind,
+              groupKeyHash: m.groupKeyHash,
+              pair: m.pair,
+              timeframeSeconds: m.timeframeSeconds,
+            })
+          : null
+
+        return (
+          <span className="flex min-w-0 items-center gap-3">
+            <span className="min-w-0">
+              <span className="text-ink-strong block font-mono text-sm font-bold tracking-wide uppercase">
+                {m.base}
+              </span>
+              {groupLabel && (
+                <span className="text-ink-dim mt-1 block truncate font-mono text-[10px] tracking-[0.12em] uppercase">
+                  {groupLabel}
+                </span>
+              )}
+            </span>
+            <TokenPairIcon base={m.base} quote={m.quote} size={32} />
           </span>
-          <TokenPairIcon base={m.base} quote={m.quote} size={32} />
-        </span>
-      ),
+        )
+      },
     },
     {
       key: 'state',
@@ -457,7 +478,9 @@ export function MarketsPage() {
         </div>
       )}
 
-      {hasAnyMarkets && <MarketGroupStrip groups={groupedMarkets} />}
+      {hasAnyMarkets && (
+        <MarketGroupStrip groups={groupedMarkets} totalMarketCount={markets?.length ?? 0} />
+      )}
 
       {hasAnyMarkets && (
         <AnimatePresence mode="wait" initial={false}>

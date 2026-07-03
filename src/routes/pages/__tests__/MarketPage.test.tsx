@@ -363,7 +363,7 @@ describe('MarketPage', () => {
 
     renderMarketPage()
 
-    expect(screen.getByRole('link', { name: /season abababab/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /btc\/usdc season/i })).toHaveAttribute(
       'href',
       `/markets/group/${groupKeyHash}`,
     )
