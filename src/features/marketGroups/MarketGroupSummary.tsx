@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react'
-import { Activity, Clock3, Layers, Users } from 'lucide-react'
+import { Activity, Clock3, Layers, ShieldCheck, Users, Wallet } from 'lucide-react'
 
 import { ChartFrame } from '@/features/chart/ChartFrame'
 import type { MarketGroupSummary as MarketGroupSummaryModel } from '@/features/marketGroups/groupPresentation'
+import { cn } from '@/lib/cn'
 import { formatCountdown, formatUSD } from '@/lib/format'
 
 type MarketGroupSummaryProps = {
@@ -10,9 +11,17 @@ type MarketGroupSummaryProps = {
   now: number
 }
 
-function Metric({ icon, label, value }: { icon: ReactNode; label: string; value: string | number }) {
+function Metric({
+  icon,
+  label,
+  value,
+}: {
+  icon: ReactNode
+  label: string
+  value: string | number
+}) {
   return (
-    <div className="border-line bg-surface/40 flex min-h-20 items-center gap-3 border p-4">
+    <div className={cn('flex min-h-20 items-center gap-3 border p-4', 'border-line bg-surface/40')}>
       <span className="text-ink-dim" aria-hidden>
         {icon}
       </span>
@@ -22,6 +31,13 @@ function Metric({ icon, label, value }: { icon: ReactNode; label: string; value:
       </div>
     </div>
   )
+}
+
+function statusLabel(status: MarketGroupSummaryModel['status']): string {
+  if (status === 'active') return 'Active'
+  if (status === 'paused') return 'Paused'
+  if (status === 'retired') return 'Retired'
+  return 'Indexed'
 }
 
 export function MarketGroupSummary({ summary, now }: MarketGroupSummaryProps) {
@@ -40,12 +56,26 @@ export function MarketGroupSummary({ summary, now }: MarketGroupSummaryProps) {
           <h2 className="text-ink-strong font-display text-3xl leading-tight font-bold">
             {summary.label}
           </h2>
-          <p className="text-ink-muted mt-1 font-mono text-xs uppercase">
-            {summary.totalMarkets} child {summary.totalMarkets === 1 ? 'market' : 'markets'}
-          </p>
+          <p className="text-ink-muted mt-1 font-mono text-xs uppercase">{summary.subtitle}</p>
         </div>
-        <div className="text-ink-muted font-mono text-xs uppercase">
-          {summary.groupKeyHash.slice(0, 8)}...{summary.groupKeyHash.slice(-6)}
+        <div className="flex flex-wrap items-center gap-2">
+          <span
+            className={cn(
+              'text-label inline-flex h-8 items-center gap-2 rounded-full border px-3',
+              'border-line-strong text-ink-muted font-mono uppercase',
+            )}
+          >
+            <ShieldCheck size={13} strokeWidth={1.5} aria-hidden />
+            {statusLabel(summary.status)}
+          </span>
+          <span
+            className={cn(
+              'text-label inline-flex h-8 items-center rounded-full border px-3',
+              'border-line-strong text-ink-dim font-mono uppercase',
+            )}
+          >
+            {summary.shortHash}
+          </span>
         </div>
       </div>
 
@@ -61,6 +91,11 @@ export function MarketGroupSummary({ summary, now }: MarketGroupSummaryProps) {
           icon={<Activity size={18} strokeWidth={1.5} />}
         />
         <Metric
+          label="Pool"
+          value={`${formatUSD(summary.totalPool)} USDC`}
+          icon={<Wallet size={18} strokeWidth={1.5} />}
+        />
+        <Metric
           label="Traders"
           value={summary.totalTraders.toLocaleString()}
           icon={<Users size={18} strokeWidth={1.5} />}
@@ -69,9 +104,16 @@ export function MarketGroupSummary({ summary, now }: MarketGroupSummaryProps) {
       </div>
 
       <div className="border-line mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 border-t pt-4">
-        <span className="text-label text-ink-dim font-mono uppercase">
-          Pool <span className="text-ink-muted">{formatUSD(summary.totalPool)}</span>
-        </span>
+        {summary.primaryPair && (
+          <span className="text-label text-ink-dim font-mono uppercase">
+            Pair <span className="text-ink-muted">{summary.primaryPair}</span>
+          </span>
+        )}
+        {summary.timeframeLabel && (
+          <span className="text-label text-ink-dim font-mono uppercase">
+            Timeframe <span className="text-ink-muted">{summary.timeframeLabel}</span>
+          </span>
+        )}
         <span className="text-label text-ink-dim font-mono uppercase">
           Pending <span className="text-ink-muted">{summary.pendingMarkets}</span>
         </span>

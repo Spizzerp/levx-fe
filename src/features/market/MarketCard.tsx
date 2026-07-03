@@ -1,7 +1,9 @@
 import { useMemo } from 'react'
+import { Layers } from 'lucide-react'
 
 import { StatusDot } from '@/ui/StatusDot'
 import { TokenPairIcon } from '@/ui/TokenPairIcon'
+import { formatMarketGroupLabel } from '@/features/marketGroups/groupPresentation'
 import { cn } from '@/lib/cn'
 import { formatCountdown, formatMarketDurationLabel, formatShortDate } from '@/lib/format'
 import { getMarketDisplayState } from '@/lib/market/status'
@@ -91,6 +93,14 @@ export function MarketCard({ market, now, onClick }: MarketCardProps) {
   const durationLabel = formatMarketDurationLabel(market.startTime, market.endTime)
   const endDateLabel = formatShortDate(market.endTime)
   const displayState = getMarketDisplayState(market)
+  const groupLabel = market.groupKeyHash
+    ? formatMarketGroupLabel({
+        groupKind: market.groupKind,
+        groupKeyHash: market.groupKeyHash,
+        pair: market.pair,
+        timeframeSeconds: market.timeframeSeconds,
+      })
+    : null
 
   return (
     <button
@@ -178,6 +188,17 @@ export function MarketCard({ market, now, onClick }: MarketCardProps) {
               ID: {market.marketId}
             </span>
           </div>
+          {groupLabel && (
+            <span
+              className={cn(
+                'mt-1 inline-flex h-6 max-w-full items-center gap-1.5 self-start rounded-full border px-2',
+                'border-line-strong text-ink-muted font-mono text-[10px] leading-none tracking-[0.1em] uppercase',
+              )}
+            >
+              <Layers size={11} strokeWidth={1.5} aria-hidden />
+              <span className="truncate">{groupLabel}</span>
+            </span>
+          )}
         </div>
 
         {/* Middle Section: Chart */}

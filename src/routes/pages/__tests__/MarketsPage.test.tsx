@@ -359,8 +359,8 @@ describe('MarketsPage', () => {
 
     renderPage()
 
-    expect(screen.getByRole('link', { name: /all groups/i })).toHaveAttribute('href', '/markets')
-    const link = screen.getByRole('link', { name: /season abababab/i })
+    expect(screen.getByRole('link', { name: /all markets/i })).toHaveAttribute('href', '/markets')
+    const link = screen.getByRole('link', { name: /btc\/usdc season/i })
     expect(link).toHaveAttribute('href', `/markets/group/${groupKeyHash}`)
   })
 

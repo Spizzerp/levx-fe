@@ -7,7 +7,17 @@ import type { MarketGroupSummary as MarketGroupSummaryModel } from '@/features/m
 function makeSummary(overrides: Partial<MarketGroupSummaryModel> = {}): MarketGroupSummaryModel {
   return {
     groupKeyHash: 'ab'.repeat(32),
-    label: 'Season abababab',
+    label: 'BTC/USDC 1D Season',
+    subtitle: 'BTC/USDC · 1D · Season · 2 markets',
+    shortHash: 'abababab...ababab',
+    kind: 'season',
+    status: 'active',
+    parentGroup: null,
+    primaryPair: 'BTC/USDC',
+    pairs: ['BTC/USDC'],
+    timeframeSeconds: 86_400,
+    timeframeLabel: '1D',
+    childMarketCount: 2,
     totalMarkets: 2,
     activeMarkets: 1,
     pendingMarkets: 1,

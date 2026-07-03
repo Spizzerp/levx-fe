@@ -52,7 +52,15 @@ describe('market group presentation', () => {
   it('formats readable labels from group kind and hash prefix', () => {
     expect(
       formatMarketGroupLabel({ groupKind: 'assetSeason', groupKeyHash: 'ab'.repeat(32) }),
-    ).toBe('Asset season abababab')
+    ).toBe('Season abababab')
+    expect(
+      formatMarketGroupLabel({
+        groupKind: 'assetSeason',
+        groupKeyHash: 'ab'.repeat(32),
+        pair: 'SOL/USDC',
+        timeframeSeconds: 86_400,
+      }),
+    ).toBe('SOL/USDC 1D Season')
     expect(formatMarketGroupLabel({ groupKind: 'season', groupKeyHash: 'cd'.repeat(32) })).toBe(
       'Season cdcdcdcd',
     )
@@ -94,7 +102,10 @@ describe('market group presentation', () => {
     expect(summaries).toHaveLength(1)
     expect(summaries[0]).toMatchObject({
       groupKeyHash,
-      label: 'Season abababab',
+      label: 'BTC/USDC Season',
+      subtitle: 'BTC/USDC · Season · 3 markets',
+      shortHash: 'abababab...ababab',
+      primaryPair: 'BTC/USDC',
       totalMarkets: 3,
       activeMarkets: 1,
       pendingMarkets: 1,
