@@ -101,6 +101,7 @@ export function MarketCard({ market, now, onClick }: MarketCardProps) {
     ? formatMarketGroupLabel({
         groupKind: market.groupKind,
         groupKeyHash: market.groupKeyHash,
+        groupMetadata: market.groupMetadata,
         pair: market.pair,
         seasonMetadata,
         timeframeSeconds: market.timeframeSeconds,

@@ -5,8 +5,10 @@ import type { AnchorHTMLAttributes, ReactNode } from 'react'
 import type { Market } from '@/types/market'
 
 const GROUP = 'ab'.repeat(32)
+const SLUG = 'btc-usdc-2026-1d-season'
 const navigateSpy = vi.fn()
 const refetch = vi.fn()
+let mockParams: { groupKeyHash?: string; slug?: string } = { groupKeyHash: GROUP }
 
 type UseMarketsState = {
   data?: Market[]
@@ -17,7 +19,7 @@ type UseMarketsState = {
 
 type LinkMockProps = AnchorHTMLAttributes<HTMLAnchorElement> & {
   children: ReactNode
-  params?: { groupKeyHash?: string }
+  params?: { groupKeyHash?: string; slug?: string }
   to: string
 }
 
@@ -27,12 +29,21 @@ vi.mock('@tanstack/react-router', async () => {
   return {
     ...actual,
     Link: ({ children, params, to, ...props }: LinkMockProps) => (
-      <a href={params?.groupKeyHash ? `/markets/group/${params.groupKeyHash}` : to} {...props}>
+      <a
+        href={
+          params?.groupKeyHash
+            ? `/markets/group/${params.groupKeyHash}`
+            : params?.slug
+              ? `/markets/groups/${params.slug}`
+              : to
+        }
+        {...props}
+      >
         {children}
       </a>
     ),
     useNavigate: () => navigateSpy,
-    useParams: () => ({ groupKeyHash: GROUP }),
+    useParams: () => mockParams,
   }
 })
 
@@ -50,7 +61,7 @@ vi.mock('@/lib/chain', () => ({
 }))
 
 import { useMarkets } from '@/lib/chain'
-import { MarketGroupPage } from '@/routes/pages/MarketGroupPage'
+import { MarketGroupPage, MarketGroupSlugPage } from '@/routes/pages/MarketGroupPage'
 
 function makeMarket(overrides: Partial<Market>): Market {
   const now = Date.now()
@@ -110,9 +121,15 @@ function renderPage() {
   return render(<MarketGroupPage />)
 }
 
+function renderSlugPage() {
+  mockParams = { slug: SLUG }
+  return render(<MarketGroupSlugPage />)
+}
+
 describe('MarketGroupPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockParams = { groupKeyHash: GROUP }
     setUseMarkets({ data: [] })
   })
 
@@ -145,6 +162,43 @@ describe('MarketGroupPage', () => {
     expect(screen.getByRole('button', { name: /BTC\/USDC/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /ETH\/USDC/i })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /SOL\/USDC/i })).not.toBeInTheDocument()
+  })
+
+  it('renders slug group page from indexed product metadata', () => {
+    setUseMarkets({
+      data: [
+        makeMarket({
+          id: 'rich',
+          groupMetadata: {
+            schemaVersion: 1,
+            groupKeyHash: GROUP,
+            groupKind: 'Season',
+            slug: SLUG,
+            displayName: 'BTC/USDC 2026 1D Season',
+            shortName: 'BTC 1D',
+            description: 'Indexed BTC season metadata.',
+            category: 'crypto',
+            pair: 'BTC/USDC',
+            baseAsset: 'BTC',
+            quoteAsset: 'USDC',
+            productSeason: '2026',
+            horizon: '1d',
+            timeframeSeconds: 86_400,
+            status: 'active',
+            iconKey: 'btc',
+            tags: ['btc'],
+            sortOrder: 0,
+            metadataHash: 'cd'.repeat(32),
+          },
+        }),
+      ],
+    })
+
+    renderSlugPage()
+
+    expect(screen.getByRole('heading', { name: /BTC\/USDC 2026 1D Season/i })).toBeInTheDocument()
+    expect(screen.getByText(/Indexed BTC season metadata/i)).toBeInTheDocument()
+    expect(screen.getByText(/Indexed metadata/i)).toBeInTheDocument()
   })
 
   it('ticks child market cards as time passes', () => {

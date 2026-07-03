@@ -4,6 +4,8 @@ import {
   buildMarketGroupSummaries,
   formatMarketGroupLabel,
   getMarketsForGroup,
+  getMarketsForGroupSlug,
+  marketGroupRouteParams,
 } from '@/features/marketGroups/groupPresentation'
 import { MARKET_GROUP_CONSTRAINT_FLAGS } from '@/lib/marketGroups'
 import type { Market } from '@/types/market'
@@ -107,6 +109,58 @@ describe('market group presentation', () => {
       }),
     ).toBe('2 pairs League')
     expect(formatMarketGroupLabel({ groupKeyHash: undefined })).toBe('Ungrouped')
+  })
+
+  it('prefers rich product metadata for labels and slug routes', () => {
+    const groupKeyHash = 'aa'.repeat(32)
+    const summaries = buildMarketGroupSummaries([
+      market({
+        id: 'rich',
+        groupKeyHash,
+        groupKind: 'season',
+        groupMetadata: {
+          schemaVersion: 1,
+          groupKeyHash,
+          groupKind: 'Season',
+          slug: 'btc-usdc-2026-1d-season',
+          displayName: 'BTC/USDC 2026 1D Season',
+          shortName: 'BTC 1D',
+          description: 'Rich BTC product metadata.',
+          category: 'crypto',
+          pair: 'BTC/USDC',
+          baseAsset: 'BTC',
+          quoteAsset: 'USDC',
+          productSeason: '2026',
+          horizon: '1d',
+          timeframeSeconds: 86_400,
+          startTime: Date.UTC(2026, 0, 1),
+          endTime: Date.UTC(2026, 0, 2),
+          status: 'active',
+          iconKey: 'btc',
+          tags: ['btc', 'daily'],
+          sortOrder: 3,
+          metadataHash: 'cd'.repeat(32),
+        },
+      }),
+    ])
+
+    expect(summaries[0]).toMatchObject({
+      label: 'BTC/USDC 2026 1D Season',
+      subtitle: 'Rich BTC product metadata.',
+      slug: 'btc-usdc-2026-1d-season',
+      metadataSource: 'indexed',
+      sortOrder: 3,
+    })
+    expect(marketGroupRouteParams(summaries[0])).toEqual({
+      to: '/markets/groups/$slug',
+      params: { slug: 'btc-usdc-2026-1d-season' },
+    })
+    expect(
+      getMarketsForGroupSlug(
+        [market({ id: 'a', groupMetadata: summaries[0].groupMetadata })],
+        'btc-usdc-2026-1d-season',
+      ),
+    ).toHaveLength(1)
   })
 
   it('builds summaries with lifecycle counts and totals', () => {

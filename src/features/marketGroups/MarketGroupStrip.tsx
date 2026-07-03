@@ -1,7 +1,10 @@
 import { Link } from '@tanstack/react-router'
 import { Activity, ArrowRight, Layers } from 'lucide-react'
 
-import type { MarketGroupSummary } from '@/features/marketGroups/groupPresentation'
+import {
+  marketGroupRouteParams,
+  type MarketGroupSummary,
+} from '@/features/marketGroups/groupPresentation'
 import { cn } from '@/lib/cn'
 import { formatUSD } from '@/lib/format'
 
@@ -44,8 +47,7 @@ export function MarketGroupStrip({ groups, totalMarketCount }: MarketGroupStripP
         {groups.map((group) => (
           <Link
             key={group.groupKeyHash}
-            to="/markets/group/$groupKeyHash"
-            params={{ groupKeyHash: group.groupKeyHash }}
+            {...marketGroupRouteParams(group)}
             className={cn(
               'group relative flex min-h-[156px] flex-col justify-between overflow-hidden rounded-2xl border p-4',
               'border-line bg-surface',

@@ -71,6 +71,16 @@ export function MarketGroupSummary({ summary, now }: MarketGroupSummaryProps) {
           <span
             className={cn(
               'text-label inline-flex h-8 items-center rounded-full border px-3',
+              summary.metadataSource === 'indexed'
+                ? 'border-success/30 text-success font-mono uppercase'
+                : 'border-line-strong text-ink-dim font-mono uppercase',
+            )}
+          >
+            {summary.metadataSource === 'indexed' ? 'Indexed metadata' : 'Inferred metadata'}
+          </span>
+          <span
+            className={cn(
+              'text-label inline-flex h-8 items-center rounded-full border px-3',
               'border-line-strong text-ink-dim font-mono uppercase',
             )}
           >

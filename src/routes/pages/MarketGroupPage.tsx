@@ -7,6 +7,7 @@ import { MarketGroupSummary } from '@/features/marketGroups/MarketGroupSummary'
 import {
   buildMarketGroupSummaries,
   getMarketsForGroup,
+  getMarketsForGroupSlug,
 } from '@/features/marketGroups/groupPresentation'
 import { PageLayout } from '@/layouts/PageLayout'
 import { useMarkets } from '@/lib/chain'
@@ -16,15 +17,28 @@ import { QueryErrorState } from '@/ui/QueryErrorState'
 
 export function MarketGroupPage() {
   const { groupKeyHash } = useParams({ from: '/markets/group/$groupKeyHash' })
+  return <MarketGroupPageContent groupKeyHash={groupKeyHash} />
+}
+
+export function MarketGroupSlugPage() {
+  const { slug } = useParams({ from: '/markets/groups/$slug' })
+  return <MarketGroupPageContent slug={slug} />
+}
+
+function MarketGroupPageContent({ groupKeyHash, slug }: { groupKeyHash?: string; slug?: string }) {
   const navigate = useNavigate()
   const { data: markets, isLoading, isError, refetch } = useMarkets()
   const now = useNowTick(1000)
 
   const childMarkets = useMemo(
-    () => getMarketsForGroup(markets, groupKeyHash),
-    [markets, groupKeyHash],
+    () =>
+      slug
+        ? getMarketsForGroupSlug(markets, slug)
+        : getMarketsForGroup(markets, groupKeyHash ?? ''),
+    [markets, groupKeyHash, slug],
   )
   const summary = useMemo(() => buildMarketGroupSummaries(childMarkets)[0], [childMarkets])
+  const lookupLabel = slug ?? groupKeyHash ?? 'group'
 
   return (
     <PageLayout title="Market Group" subtitle="Child markets settle independently.">
@@ -76,7 +90,7 @@ export function MarketGroupPage() {
             <p className="text-ink-strong font-display text-2xl">No markets in this group yet</p>
             <p className="text-ink-muted max-w-md font-mono text-xs uppercase">
               This group exists only when at least one indexed child market links to the hash{' '}
-              {groupKeyHash.slice(0, 8)}.
+              {lookupLabel.slice(0, 24)}.
             </p>
           </div>
           <Link
