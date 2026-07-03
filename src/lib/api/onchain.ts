@@ -16,6 +16,10 @@ import type {
   PathTone,
   UserPosition,
 } from '@/types/market'
+import {
+  enrichMarketWithProviderSeasonMetadata,
+  enrichMarketsWithProviderSeasonMetadata,
+} from '@/features/providerGateway/marketMetadata'
 
 import {
   anchorLeverageConfigToFE,
@@ -471,10 +475,11 @@ export async function getMarkets(): Promise<Market[]> {
     }),
   )
 
-  return attachMarketGroups(
+  const markets = await attachMarketGroups(
     program,
     marketResults.filter((market): market is Market => market !== null),
   )
+  return enrichMarketsWithProviderSeasonMetadata(markets)
 }
 
 export async function getMarket(id: string): Promise<Market> {
@@ -499,7 +504,7 @@ export async function getMarket(id: string): Promise<Market> {
     eigenCache: eigenPolicy.snapshot,
   })
 
-  return attachMarketGroup(program, market)
+  return enrichMarketWithProviderSeasonMetadata(await attachMarketGroup(program, market))
 }
 
 export async function getMarketPathPreviews(

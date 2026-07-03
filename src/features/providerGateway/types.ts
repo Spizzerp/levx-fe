@@ -63,6 +63,9 @@ export interface ProviderMarketContext {
   season_key: string
   season_id?: string | null
   season?: ProviderSeasonMetadata | null
+  group_key_hash?: string | null
+  group_kind?: string | null
+  parent_group?: string | null
   pair: string
   start_time: number
   end_time: number
@@ -76,6 +79,10 @@ export interface ProviderMarketContext {
 }
 
 export interface OpenProviderMarketsResponse {
+  markets: ProviderMarketContext[]
+}
+
+export interface ProviderMarketContextsResponse {
   markets: ProviderMarketContext[]
 }
 
