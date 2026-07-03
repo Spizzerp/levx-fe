@@ -109,7 +109,17 @@ export function MarketGroupSummary({ summary, now }: MarketGroupSummaryProps) {
             Pair <span className="text-ink-muted">{summary.primaryPair}</span>
           </span>
         )}
-        {summary.timeframeLabel && (
+        {summary.productSeason && (
+          <span className="text-label text-ink-dim font-mono uppercase">
+            Season <span className="text-ink-muted">{summary.productSeason}</span>
+          </span>
+        )}
+        {summary.horizonLabel && (
+          <span className="text-label text-ink-dim font-mono uppercase">
+            Horizon <span className="text-ink-muted">{summary.horizonLabel}</span>
+          </span>
+        )}
+        {!summary.horizonLabel && summary.timeframeLabel && (
           <span className="text-label text-ink-dim font-mono uppercase">
             Timeframe <span className="text-ink-muted">{summary.timeframeLabel}</span>
           </span>

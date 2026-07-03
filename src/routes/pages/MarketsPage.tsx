@@ -19,6 +19,7 @@ import { useMarketPathPreviews, useMarkets } from '@/lib/chain'
 import {
   buildMarketGroupSummaries,
   formatMarketGroupLabel,
+  getMarketSeasonMetadata,
 } from '@/features/marketGroups/groupPresentation'
 import { getMarketDisplayState } from '@/lib/market/status'
 import { useNowTick } from '@/lib/hooks/useNowTick'
@@ -144,11 +145,13 @@ function buildColumns(now: number, marketHeader: ReactNode): DataTableColumn<Mar
       headerClassName: 'pl-6',
       cellClassName: 'pl-6',
       render: (m) => {
+        const seasonMetadata = getMarketSeasonMetadata(m)
         const groupLabel = m.groupKeyHash
           ? formatMarketGroupLabel({
               groupKind: m.groupKind,
               groupKeyHash: m.groupKeyHash,
               pair: m.pair,
+              seasonMetadata,
               timeframeSeconds: m.timeframeSeconds,
             })
           : null

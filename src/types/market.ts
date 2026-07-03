@@ -50,6 +50,26 @@ export type MarketGroupStatus = 'active' | 'paused' | 'retired'
 export type LeverageConfigStatus = 'accepted' | 'staged'
 export type PairRiskStatus = 'active' | 'drainOnly' | 'resetPending' | 'paused'
 
+export interface MarketSeasonMetadata {
+  seasonKey: string
+  seasonId?: string | null
+  assetSeasonAddress?: string | null
+  parentStatus?: string | null
+  groupKeyHash?: string | null
+  groupKind?: MarketGroupKind | string | null
+  parentGroup?: string | null
+  pair: string
+  productSeason: string
+  horizon: string
+  timeframeSeconds: number
+  /** unix ms */
+  startTime: number
+  /** unix ms */
+  endTime: number
+  displayName?: string | null
+  description?: string | null
+}
+
 /* ── Price data ────────────────────────────────────────────── */
 
 export interface PricePoint {
@@ -214,6 +234,7 @@ export interface Market {
   parentGroup?: string
   timeframeSeconds?: number
   seasonKey?: string
+  seasonMetadata?: MarketSeasonMetadata
 }
 
 export interface MarketGroup {
