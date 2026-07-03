@@ -237,24 +237,10 @@ function ProductGroupsOperatorPanel() {
   const [description, setDescription] = useState(
     'SOL/USDC 2026 1D markets grouped for discovery. Child markets settle independently.',
   )
-  const [preview, setPreview] = useState<{
-    slug: string
-    seasonKey: string
-    groupKeyHash: string
-    metadataHash: string
-  } | null>(null)
-
-  useEffect(() => {
-    let cancelled = false
-    void buildCryptoGroupPreview({ pair, productSeason, horizon, displayName, description }).then(
-      (nextPreview) => {
-        if (!cancelled) setPreview(nextPreview)
-      },
-    )
-    return () => {
-      cancelled = true
-    }
-  }, [pair, productSeason, horizon, displayName, description])
+  const preview = useMemo(
+    () => buildCryptoGroupPreview({ pair, productSeason, horizon }),
+    [pair, productSeason, horizon],
+  )
 
   const groups = groupsQuery.data?.groups ?? []
   const groupedMarkets = marketsQuery.data?.filter((market) => market.groupKeyHash) ?? []
@@ -320,7 +306,8 @@ function ProductGroupsOperatorPanel() {
           <p className="text-label text-ink-dim font-mono uppercase">Preview only</p>
           <h2 className="text-ink-strong font-display text-2xl">Crypto product metadata</h2>
           <p className="text-ink-muted mt-1 font-mono text-xs uppercase">
-            Use server scripts to publish. This browser preview does not hold provider secrets.
+            Use server scripts to publish. Real group and metadata hashes come from indexed
+            provider data.
           </p>
         </div>
         <div className="grid gap-3 md:grid-cols-3">
@@ -357,10 +344,8 @@ function ProductGroupsOperatorPanel() {
           <Input value={description} onChange={(event) => setDescription(event.target.value)} />
         </div>
         <div className="border-line mt-4 grid gap-2 border-t pt-4 font-mono text-xs uppercase">
-          <PreviewRow label="Slug" value={preview?.slug ?? '...'} />
-          <PreviewRow label="Season key" value={preview?.seasonKey ?? '...'} />
-          <PreviewRow label="Group key hash" value={preview?.groupKeyHash ?? '...'} />
-          <PreviewRow label="Metadata hash" value={preview?.metadataHash ?? '...'} />
+          <PreviewRow label="Slug" value={preview.slug} />
+          <PreviewRow label="Season key" value={preview.seasonKey} />
         </div>
       </div>
     </section>
