@@ -15,6 +15,7 @@ function makeSummary(overrides: Partial<MarketGroupSummaryModel> = {}): MarketGr
     parentGroup: null,
     primaryPair: 'BTC/USDC',
     pairs: ['BTC/USDC'],
+    metadataSource: 'inferred',
     timeframeSeconds: 86_400,
     timeframeLabel: '1D',
     childMarketCount: 2,
@@ -25,6 +26,7 @@ function makeSummary(overrides: Partial<MarketGroupSummaryModel> = {}): MarketGr
     endTime: Date.UTC(2026, 0, 10),
     totalPool: 200_000,
     totalTraders: 50,
+    sortOrder: 0,
     ...overrides,
   }
 }

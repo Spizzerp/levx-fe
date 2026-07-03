@@ -36,8 +36,10 @@ import { getPriorityFee } from '@/lib/chain/priorityFee'
 import { parseScaledDecimalBn } from '@/lib/fixedPoint'
 import { useIsAdmin } from '@/lib/hooks/useIsAdmin'
 import { useMarkets, useMode2Readiness } from '@/lib/api/hooks'
+import { useProviderMarketGroups } from '@/features/providerGateway/api'
 import { formatAddress, formatHash, formatStatusLabel, formatUSD } from '@/lib/format'
 import { resolvePairLabel } from '@/lib/api/pairLabels'
+import { buildCryptoGroupPreview } from '@/features/marketGroups/productMetadata'
 import { SCALE } from '@/lib/constants'
 import { useCloseMarket, useProgram } from '@/lib/solana'
 import {
@@ -222,6 +224,149 @@ function AdminManagementCard({
         </div>
       </div>
     </button>
+  )
+}
+
+function ProductGroupsOperatorPanel() {
+  const groupsQuery = useProviderMarketGroups()
+  const marketsQuery = useMarkets()
+  const [pair, setPair] = useState('SOL/USDC')
+  const [productSeason, setProductSeason] = useState('2026')
+  const [horizon, setHorizon] = useState('1d')
+  const [displayName, setDisplayName] = useState('SOL/USDC 2026 1D Season')
+  const [description, setDescription] = useState(
+    'SOL/USDC 2026 1D markets grouped for discovery. Child markets settle independently.',
+  )
+  const preview = useMemo(
+    () => buildCryptoGroupPreview({ pair, productSeason, horizon }),
+    [pair, productSeason, horizon],
+  )
+
+  const groups = groupsQuery.data?.groups ?? []
+  const groupedMarkets = marketsQuery.data?.filter((market) => market.groupKeyHash) ?? []
+  const indexedGroupHashes = new Set(groups.map((group) => group.group_key_hash))
+  const missingMetadataCount = groupedMarkets.filter(
+    (market) => market.groupKeyHash && !indexedGroupHashes.has(market.groupKeyHash),
+  ).length
+  const coverage =
+    groupedMarkets.length === 0
+      ? 0
+      : Math.round(((groupedMarkets.length - missingMetadataCount) / groupedMarkets.length) * 100)
+
+  return (
+    <section className="mb-8 grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
+      <div className="border-line bg-surface/60 rounded-2xl border p-5">
+        <div className="mb-5 flex items-start justify-between gap-4">
+          <div>
+            <p className="text-label text-ink-dim font-mono uppercase">Product groups</p>
+            <h2 className="text-ink-strong font-display text-2xl">Indexed hierarchy coverage</h2>
+          </div>
+          <Button variant="secondary" onClick={() => void groupsQuery.refetch()}>
+            Refresh
+          </Button>
+        </div>
+        <div className="grid gap-3 md:grid-cols-3">
+          <MetricTile
+            label="Indexed groups"
+            value={groupsQuery.isLoading ? '...' : groups.length}
+          />
+          <MetricTile
+            label="Grouped markets"
+            value={marketsQuery.isLoading ? '...' : groupedMarkets.length}
+          />
+          <MetricTile label="Coverage" value={`${coverage}%`} />
+        </div>
+        {groupsQuery.isError && (
+          <p className="text-warn mt-4 font-mono text-xs uppercase">
+            Market group metadata API unavailable. FE will use inferred hash fallback.
+          </p>
+        )}
+        {missingMetadataCount > 0 && (
+          <p className="text-warn mt-4 font-mono text-xs uppercase">
+            {missingMetadataCount} grouped markets are still using inferred metadata.
+          </p>
+        )}
+        <div className="border-line mt-5 space-y-2 border-t pt-4">
+          {groups.slice(0, 5).map((group) => (
+            <div key={group.group_key_hash} className="flex items-center justify-between gap-3">
+              <span className="text-ink-strong truncate font-mono text-sm uppercase">
+                {group.display_name}
+              </span>
+              <span className="text-ink-dim shrink-0 font-mono text-xs">{group.slug}</span>
+            </div>
+          ))}
+          {groups.length === 0 && (
+            <p className="text-ink-dim font-mono text-xs uppercase">No rich groups indexed yet.</p>
+          )}
+        </div>
+      </div>
+
+      <div className="border-line bg-surface/60 rounded-2xl border p-5">
+        <div className="mb-5">
+          <p className="text-label text-ink-dim font-mono uppercase">Preview only</p>
+          <h2 className="text-ink-strong font-display text-2xl">Crypto product metadata</h2>
+          <p className="text-ink-muted mt-1 font-mono text-xs uppercase">
+            Use server scripts to publish. Real group and metadata hashes come from indexed
+            provider data.
+          </p>
+        </div>
+        <div className="grid gap-3 md:grid-cols-3">
+          <label className="space-y-1">
+            <span className="text-label text-ink-dim font-mono uppercase">Pair</span>
+            <select
+              value={pair}
+              onChange={(event) => {
+                const nextPair = event.target.value
+                setPair(nextPair)
+                setDisplayName(`${nextPair} ${productSeason} ${horizon.toUpperCase()} Season`)
+              }}
+              className="border-line bg-surface text-ink-strong h-11 w-full rounded-lg border px-3 font-mono text-sm"
+            >
+              <option>SOL/USDC</option>
+              <option>BTC/USDC</option>
+              <option>ETH/USDC</option>
+            </select>
+          </label>
+          <label className="space-y-1">
+            <span className="text-label text-ink-dim font-mono uppercase">Season</span>
+            <Input
+              value={productSeason}
+              onChange={(event) => setProductSeason(event.target.value)}
+            />
+          </label>
+          <label className="space-y-1">
+            <span className="text-label text-ink-dim font-mono uppercase">Horizon</span>
+            <Input value={horizon} onChange={(event) => setHorizon(event.target.value)} />
+          </label>
+        </div>
+        <div className="mt-3 grid gap-3">
+          <Input value={displayName} onChange={(event) => setDisplayName(event.target.value)} />
+          <Input value={description} onChange={(event) => setDescription(event.target.value)} />
+        </div>
+        <div className="border-line mt-4 grid gap-2 border-t pt-4 font-mono text-xs uppercase">
+          <PreviewRow label="Slug" value={preview.slug} />
+          <PreviewRow label="Season key" value={preview.seasonKey} />
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function MetricTile({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="border-line bg-surface/50 rounded-xl border p-4">
+      <div className="text-label text-ink-dim font-mono uppercase">{label}</div>
+      <div className="text-ink-strong mt-2 font-mono text-2xl font-bold">{value}</div>
+    </div>
+  )
+}
+
+function PreviewRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex min-w-0 items-center justify-between gap-3">
+      <span className="text-ink-dim shrink-0">{label}</span>
+      <span className="text-ink-muted truncate text-right">{value}</span>
+    </div>
   )
 }
 
@@ -1935,6 +2080,7 @@ export function AdminMarketGroupsPage() {
         subtitle="Create hierarchy sidecars, link markets, and manage recovery operations"
         backTo="/admin"
       />
+      <ProductGroupsOperatorPanel />
       <MarketGroupAdminPanel />
     </main>
   )

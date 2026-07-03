@@ -18,6 +18,7 @@ import {
   attachProviderSeasonMetadata,
   enrichMarketWithProviderSeasonMetadata,
   enrichMarketsWithProviderSeasonMetadata,
+  providerGroupMetadataToMarketGroupProductMetadata,
   providerMarketContextToSeasonMetadata,
 } from '../marketMetadata'
 
@@ -105,6 +106,45 @@ describe('provider market metadata', () => {
     expect(enriched.seasonMetadata?.displayName).toBe('SOL 2026 Daily Season')
     expect(enriched.seasonMetadata?.seasonKey).toBe('SOL/USDC:2026:1d')
     expect(enriched.seasonKey).toBe(`season:${'ab'.repeat(32)}:86400`)
+  })
+
+  it('prefers rich group metadata when provider contexts include it', () => {
+    const context = providerContext({
+      group_metadata: {
+        schema_version: 1,
+        group_key_hash: 'ab'.repeat(32),
+        group_kind: 'Season',
+        parent_group_key_hash: null,
+        slug: 'sol-usdc-2026-1d-season',
+        display_name: 'SOL/USDC 2026 1D Season',
+        short_name: 'SOL 1D',
+        description: 'Rich product metadata description.',
+        category: 'crypto',
+        pair: 'SOL/USDC',
+        base_asset: 'SOL',
+        quote_asset: 'USDC',
+        product_season: '2026',
+        horizon: '1d',
+        timeframe_seconds: 86_400,
+        start_time: 1_779_010_000,
+        end_time: 1_779_096_400,
+        status: 'active',
+        icon_key: 'sol',
+        tags: ['sol', 'daily'],
+        sort_order: 10,
+        metadata_hash: 'cd'.repeat(32),
+      },
+    })
+
+    const [enriched] = attachProviderSeasonMetadata([market()], [context])
+
+    expect(providerGroupMetadataToMarketGroupProductMetadata(context.group_metadata!).slug).toBe(
+      'sol-usdc-2026-1d-season',
+    )
+    expect(enriched.groupMetadata?.slug).toBe('sol-usdc-2026-1d-season')
+    expect(enriched.groupMetadata?.sortOrder).toBe(10)
+    expect(enriched.seasonMetadata?.displayName).toBe('SOL/USDC 2026 1D Season')
+    expect(enriched.seasonMetadata?.description).toBe('Rich product metadata description.')
   })
 
   it('enriches a market list from the all-context endpoint', async () => {

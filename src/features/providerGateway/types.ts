@@ -58,6 +58,33 @@ export interface ProviderSeasonMetadata {
   description?: string | null
 }
 
+export interface ProviderMarketGroupProductMetadata {
+  schema_version: number
+  group_key_hash: string
+  group_kind: string
+  parent_group_key_hash?: string | null
+  slug: string
+  display_name: string
+  short_name?: string | null
+  description: string
+  category: string
+  pair?: string | null
+  base_asset?: string | null
+  quote_asset?: string | null
+  product_season?: string | null
+  horizon?: string | null
+  timeframe_seconds?: number | null
+  start_time?: number | null
+  end_time?: number | null
+  status: string
+  icon_key?: string | null
+  tags?: string[]
+  sort_order?: number
+  metadata_hash: string
+  created_at?: string | null
+  updated_at?: string | null
+}
+
 export interface ProviderMarketContext {
   market_id: number
   season_key: string
@@ -76,6 +103,7 @@ export interface ProviderMarketContext {
   target_num_paths: number
   submission_deadline: number
   pyth_feed_id: string
+  group_metadata?: ProviderMarketGroupProductMetadata | null
 }
 
 export interface OpenProviderMarketsResponse {
@@ -84,6 +112,10 @@ export interface OpenProviderMarketsResponse {
 
 export interface ProviderMarketContextsResponse {
   markets: ProviderMarketContext[]
+}
+
+export interface ProviderMarketGroupsResponse {
+  groups: ProviderMarketGroupProductMetadata[]
 }
 
 export interface ProviderAttribution {

@@ -1,8 +1,9 @@
 import { apiFetch } from '@/api/client'
 import { env } from '@/env'
-import type { Market, MarketSeasonMetadata } from '@/types/market'
+import type { Market, MarketGroupProductMetadata, MarketSeasonMetadata } from '@/types/market'
 
 import type {
+  ProviderMarketGroupProductMetadata,
   ProviderMarketContext,
   ProviderMarketContextsResponse,
   ProviderSeasonMetadata,
@@ -58,10 +59,59 @@ export function providerSeasonMetadataToMarketSeasonMetadata(
   }
 }
 
+export function providerGroupMetadataToMarketGroupProductMetadata(
+  metadata: ProviderMarketGroupProductMetadata,
+): MarketGroupProductMetadata {
+  return {
+    schemaVersion: metadata.schema_version,
+    groupKeyHash: metadata.group_key_hash,
+    groupKind: metadata.group_kind,
+    parentGroupKeyHash: metadata.parent_group_key_hash ?? null,
+    slug: metadata.slug,
+    displayName: metadata.display_name,
+    shortName: metadata.short_name ?? null,
+    description: metadata.description,
+    category: metadata.category,
+    pair: metadata.pair ?? null,
+    baseAsset: metadata.base_asset ?? null,
+    quoteAsset: metadata.quote_asset ?? null,
+    productSeason: metadata.product_season ?? null,
+    horizon: metadata.horizon ?? null,
+    timeframeSeconds: metadata.timeframe_seconds ?? null,
+    startTime: metadata.start_time == null ? null : metadata.start_time * 1000,
+    endTime: metadata.end_time == null ? null : metadata.end_time * 1000,
+    status: metadata.status,
+    iconKey: metadata.icon_key ?? null,
+    tags: metadata.tags ?? [],
+    sortOrder: metadata.sort_order ?? 0,
+    metadataHash: metadata.metadata_hash,
+    createdAt: metadata.created_at ?? null,
+    updatedAt: metadata.updated_at ?? null,
+  }
+}
+
 export function providerMarketContextToSeasonMetadata(
   context: ProviderMarketContext,
 ): MarketSeasonMetadata {
-  return providerSeasonMetadataToMarketSeasonMetadata(providerSeasonFromContext(context))
+  const seasonMetadata = providerSeasonMetadataToMarketSeasonMetadata(
+    providerSeasonFromContext(context),
+  )
+  if (!context.group_metadata) return seasonMetadata
+  const groupMetadata = providerGroupMetadataToMarketGroupProductMetadata(context.group_metadata)
+  return {
+    ...seasonMetadata,
+    groupKeyHash: groupMetadata.groupKeyHash,
+    groupKind: groupMetadata.groupKind,
+    parentGroup: groupMetadata.parentGroupKeyHash ?? seasonMetadata.parentGroup,
+    pair: groupMetadata.pair ?? seasonMetadata.pair,
+    productSeason: groupMetadata.productSeason ?? seasonMetadata.productSeason,
+    horizon: groupMetadata.horizon ?? seasonMetadata.horizon,
+    timeframeSeconds: groupMetadata.timeframeSeconds ?? seasonMetadata.timeframeSeconds,
+    startTime: groupMetadata.startTime ?? seasonMetadata.startTime,
+    endTime: groupMetadata.endTime ?? seasonMetadata.endTime,
+    displayName: groupMetadata.displayName,
+    description: groupMetadata.description,
+  }
 }
 
 export function attachProviderSeasonMetadata(
@@ -71,14 +121,20 @@ export function attachProviderSeasonMetadata(
   if (markets.length === 0 || contexts.length === 0) return [...markets]
 
   const metadataByMarketId = new Map<number, MarketSeasonMetadata>()
+  const contextByMarketId = new Map<number, ProviderMarketContext>()
   for (const context of contexts) {
+    contextByMarketId.set(context.market_id, context)
     metadataByMarketId.set(context.market_id, providerMarketContextToSeasonMetadata(context))
   }
 
   return markets.map((market) => {
+    const context = contextByMarketId.get(market.marketId)
     const seasonMetadata = metadataByMarketId.get(market.marketId)
     if (!seasonMetadata) return market
-    return { ...market, seasonMetadata }
+    const groupMetadata = context?.group_metadata
+      ? providerGroupMetadataToMarketGroupProductMetadata(context.group_metadata)
+      : undefined
+    return { ...market, seasonMetadata, groupMetadata }
   })
 }
 

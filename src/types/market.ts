@@ -71,6 +71,35 @@ export interface MarketSeasonMetadata {
   description?: string | null
 }
 
+export interface MarketGroupProductMetadata {
+  schemaVersion: number
+  groupKeyHash: string
+  groupKind: MarketGroupKind | string
+  parentGroupKeyHash?: string | null
+  slug: string
+  displayName: string
+  shortName?: string | null
+  description: string
+  category: 'crypto' | 'sports' | 'macro' | 'custom' | string
+  pair?: string | null
+  baseAsset?: string | null
+  quoteAsset?: string | null
+  productSeason?: string | null
+  horizon?: string | null
+  timeframeSeconds?: number | null
+  /** unix ms */
+  startTime?: number | null
+  /** unix ms */
+  endTime?: number | null
+  status: MarketGroupStatus | string
+  iconKey?: string | null
+  tags: string[]
+  sortOrder: number
+  metadataHash: string
+  createdAt?: string | null
+  updatedAt?: string | null
+}
+
 /* ── Price data ────────────────────────────────────────────── */
 
 export interface PricePoint {
@@ -236,6 +265,7 @@ export interface Market {
   timeframeSeconds?: number
   seasonKey?: string
   seasonMetadata?: MarketSeasonMetadata
+  groupMetadata?: MarketGroupProductMetadata
 }
 
 export interface MarketGroup {

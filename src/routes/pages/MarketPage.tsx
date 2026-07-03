@@ -33,6 +33,7 @@ import { parseMarketState } from '@/lib/api/adapters'
 import {
   formatMarketGroupLabel,
   getMarketSeasonMetadata,
+  marketGroupRouteParams,
 } from '@/features/marketGroups/groupPresentation'
 import { toneForPairRiskStatus, type Mode2StatusTone } from '@/lib/mode2Status'
 import { resolvePairLabel } from '@/lib/api/pairLabels'
@@ -764,8 +765,10 @@ export function MarketPage() {
         {market.groupKeyHash && (
           <div className="mt-4">
             <Link
-              to="/markets/group/$groupKeyHash"
-              params={{ groupKeyHash: market.groupKeyHash }}
+              {...marketGroupRouteParams({
+                groupKeyHash: market.groupKeyHash,
+                slug: market.groupMetadata?.slug,
+              })}
               className={cn(
                 'inline-flex h-10 items-center gap-2 rounded-full border px-3',
                 'border-line-strong text-ink-muted hover:border-ink hover:text-ink',
@@ -778,6 +781,7 @@ export function MarketPage() {
               {formatMarketGroupLabel({
                 groupKind: market.groupKind,
                 groupKeyHash: market.groupKeyHash,
+                groupMetadata: market.groupMetadata,
                 pair: market.pair,
                 seasonMetadata,
                 timeframeSeconds: market.timeframeSeconds,

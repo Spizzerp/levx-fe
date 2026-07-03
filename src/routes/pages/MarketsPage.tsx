@@ -150,6 +150,7 @@ function buildColumns(now: number, marketHeader: ReactNode): DataTableColumn<Mar
           ? formatMarketGroupLabel({
               groupKind: m.groupKind,
               groupKeyHash: m.groupKeyHash,
+              groupMetadata: m.groupMetadata,
               pair: m.pair,
               seasonMetadata,
               timeframeSeconds: m.timeframeSeconds,

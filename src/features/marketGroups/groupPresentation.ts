@@ -2,6 +2,7 @@ import { getMarketDisplayState } from '@/lib/market/status'
 import { MARKET_GROUP_CONSTRAINT_FLAGS } from '@/lib/marketGroups'
 import type {
   Market,
+  MarketGroupProductMetadata,
   MarketGroupKind,
   MarketGroupStatus,
   MarketSeasonMetadata,
@@ -18,6 +19,9 @@ export type MarketGroupSummary = {
   parentGroup?: string | null
   primaryPair?: string
   pairs: string[]
+  groupMetadata?: MarketGroupProductMetadata
+  slug?: string
+  metadataSource: 'indexed' | 'inferred'
   seasonMetadata?: MarketSeasonMetadata
   seasonKey?: string
   seasonId?: string | null
@@ -34,6 +38,7 @@ export type MarketGroupSummary = {
   endTime?: number
   totalPool: number
   totalTraders: number
+  sortOrder: number
 }
 
 const MARKET_GROUP_KIND_LABELS: Partial<Record<MarketGroupKind, string>> = {
@@ -165,12 +170,14 @@ function preferSeasonMetadata(
 export function formatMarketGroupLabel(args: {
   groupKind?: MarketGroupKind
   groupKeyHash?: string
+  groupMetadata?: MarketGroupProductMetadata
   pair?: string
   pairCount?: number
   seasonMetadata?: MarketSeasonMetadata
   timeframeSeconds?: number
 }): string {
   if (!args.groupKeyHash) return 'Ungrouped'
+  if (args.groupMetadata?.displayName) return args.groupMetadata.displayName
   if (args.seasonMetadata?.displayName) return args.seasonMetadata.displayName
 
   const kind = args.groupKind ? MARKET_GROUP_KIND_LABELS[args.groupKind] : undefined
@@ -190,11 +197,29 @@ export function formatMarketGroupLabel(args: {
   return `${kind ?? 'Group'} ${args.groupKeyHash.slice(0, 8)}`
 }
 
+export function marketGroupRouteParams(
+  summary: Pick<MarketGroupSummary, 'groupKeyHash' | 'slug'>,
+):
+  | { to: '/markets/groups/$slug'; params: { slug: string } }
+  | { to: '/markets/group/$groupKeyHash'; params: { groupKeyHash: string } } {
+  if (summary.slug) {
+    return { to: '/markets/groups/$slug', params: { slug: summary.slug } }
+  }
+  return { to: '/markets/group/$groupKeyHash', params: { groupKeyHash: summary.groupKeyHash } }
+}
+
 export function getMarketsForGroup(
   markets: readonly Market[] | undefined,
   groupKeyHash: string,
 ): Market[] {
   return (markets ?? []).filter((market) => market.groupKeyHash === groupKeyHash)
+}
+
+export function getMarketsForGroupSlug(
+  markets: readonly Market[] | undefined,
+  slug: string,
+): Market[] {
+  return (markets ?? []).filter((market) => market.groupMetadata?.slug === slug)
 }
 
 export function buildMarketGroupSummaries(
@@ -207,6 +232,7 @@ export function buildMarketGroupSummaries(
 
     const existing = summaries.get(market.groupKeyHash)
     const marketSeasonMetadata = getMarketSeasonMetadata(market)
+    const marketGroupMetadata = market.groupMetadata
     const summary =
       existing ??
       ({
@@ -217,6 +243,9 @@ export function buildMarketGroupSummaries(
         parentGroup: market.parentGroup ?? market.group?.parentGroup,
         primaryPair: market.pair,
         pairs: [],
+        groupMetadata: marketGroupMetadata,
+        slug: marketGroupMetadata?.slug,
+        metadataSource: marketGroupMetadata ? 'indexed' : 'inferred',
         seasonMetadata: marketSeasonMetadata,
         seasonKey: marketSeasonMetadata?.seasonKey ?? market.seasonKey,
         seasonId: marketSeasonMetadata?.seasonId,
@@ -225,7 +254,7 @@ export function buildMarketGroupSummaries(
           marketSeasonMetadata?.horizon,
           marketSeasonMetadata?.timeframeSeconds,
         ),
-        description: marketSeasonMetadata?.description,
+        description: marketGroupMetadata?.description ?? marketSeasonMetadata?.description,
         timeframeSeconds: market.timeframeSeconds,
         timeframeLabel: formatTimeframeLabel(market.timeframeSeconds),
         childMarketCount: market.group?.childMarketCount,
@@ -244,6 +273,7 @@ export function buildMarketGroupSummaries(
         endTime: getGroupWindowEndTime(market),
         totalPool: 0,
         totalTraders: 0,
+        sortOrder: marketGroupMetadata?.sortOrder ?? 0,
       } satisfies MarketGroupSummary)
 
     const stateBucket = countState(getMarketDisplayState(market))
@@ -252,15 +282,23 @@ export function buildMarketGroupSummaries(
     summary.parentGroup ??= market.parentGroup ?? market.group?.parentGroup
     summary.primaryPair ??= market.pair
     if (!summary.pairs.includes(market.pair)) summary.pairs.push(market.pair)
+    if (!summary.groupMetadata && marketGroupMetadata) {
+      summary.groupMetadata = marketGroupMetadata
+      summary.slug = marketGroupMetadata.slug
+      summary.metadataSource = 'indexed'
+      summary.sortOrder = marketGroupMetadata.sortOrder
+    }
     summary.seasonMetadata = preferSeasonMetadata(summary.seasonMetadata, marketSeasonMetadata)
     summary.seasonKey ??= summary.seasonMetadata?.seasonKey ?? market.seasonKey
     summary.seasonId ??= summary.seasonMetadata?.seasonId
-    summary.productSeason ??= summary.seasonMetadata?.productSeason
+    summary.productSeason ??=
+      summary.groupMetadata?.productSeason ?? summary.seasonMetadata?.productSeason
     summary.horizonLabel ??= formatHorizonLabel(
-      summary.seasonMetadata?.horizon,
-      summary.seasonMetadata?.timeframeSeconds,
+      summary.groupMetadata?.horizon ?? summary.seasonMetadata?.horizon,
+      summary.groupMetadata?.timeframeSeconds ?? summary.seasonMetadata?.timeframeSeconds,
     )
-    summary.description ??= summary.seasonMetadata?.description
+    summary.description ??=
+      summary.groupMetadata?.description ?? summary.seasonMetadata?.description
     summary.timeframeSeconds ??= market.timeframeSeconds
     summary.timeframeLabel ??= formatTimeframeLabel(market.timeframeSeconds)
     summary.childMarketCount ??= market.group?.childMarketCount
@@ -272,6 +310,7 @@ export function buildMarketGroupSummaries(
     summary.label = formatMarketGroupLabel({
       groupKind: summary.kind,
       groupKeyHash: summary.groupKeyHash,
+      groupMetadata: summary.groupMetadata,
       pair: summary.primaryPair,
       pairCount: summary.pairs.length,
       seasonMetadata: summary.seasonMetadata,
@@ -282,7 +321,12 @@ export function buildMarketGroupSummaries(
     summaries.set(market.groupKeyHash, summary)
   }
 
-  return Array.from(summaries.values()).sort((a, b) => a.label.localeCompare(b.label))
+  return Array.from(summaries.values()).sort(
+    (a, b) =>
+      a.sortOrder - b.sortOrder ||
+      String(a.status ?? '').localeCompare(String(b.status ?? '')) ||
+      a.label.localeCompare(b.label),
+  )
 }
 
 function formatMarketGroupSubtitle(summary: MarketGroupSummary): string {

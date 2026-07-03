@@ -5,6 +5,7 @@ import { apiFetch } from '@/api/client'
 import type {
   OpenProviderMarketsResponse,
   PipelineStatus,
+  ProviderMarketGroupsResponse,
   ProviderLeaderboardResponse,
   ProviderResultsResponse,
   ProvidersResponse,
@@ -16,6 +17,7 @@ export const providerGatewayKeys = {
   status: ['providerGateway', 'status'] as const,
   providers: ['providerGateway', 'providers'] as const,
   openMarkets: ['providerGateway', 'openMarkets'] as const,
+  marketGroups: ['providerGateway', 'marketGroups'] as const,
   leaderboard: (windowDays: number, selectedOnly: boolean) =>
     ['providerGateway', 'leaderboard', windowDays, selectedOnly] as const,
   providerResults: (providerId: string | undefined) =>
@@ -46,6 +48,15 @@ export function useOpenProviderMarkets() {
     queryFn: () => apiFetch<OpenProviderMarketsResponse>('/api/v1/provider-markets/open'),
     staleTime: PROVIDER_GATEWAY_STALE_MS,
     refetchInterval: 30_000,
+  })
+}
+
+export function useProviderMarketGroups() {
+  return useQuery({
+    queryKey: providerGatewayKeys.marketGroups,
+    queryFn: () => apiFetch<ProviderMarketGroupsResponse>('/api/v1/market-groups'),
+    staleTime: PROVIDER_GATEWAY_STALE_MS,
+    refetchInterval: 60_000,
   })
 }
 

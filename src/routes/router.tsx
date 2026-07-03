@@ -10,7 +10,7 @@ import { DocsLayout } from '@/routes/pages/DocsPage'
 import { LabsChartPage } from '@/routes/pages/LabsChartPage'
 import { LandingPage } from '@/routes/pages/LandingPage'
 import { LeaderboardPage } from '@/routes/pages/LeaderboardPage'
-import { MarketGroupPage } from '@/routes/pages/MarketGroupPage'
+import { MarketGroupPage, MarketGroupSlugPage } from '@/routes/pages/MarketGroupPage'
 import { MarketPage } from '@/routes/pages/MarketPage'
 import { MarketsPage } from '@/routes/pages/MarketsPage'
 import { NotFoundPage } from '@/routes/pages/NotFoundPage'
@@ -71,6 +71,12 @@ const marketGroupRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/markets/group/$groupKeyHash',
   component: MarketGroupPage,
+})
+
+const marketGroupSlugRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/markets/groups/$slug',
+  component: MarketGroupSlugPage,
 })
 
 const positionsRoute = createRoute({
@@ -192,6 +198,7 @@ const routeTree = rootRoute.addChildren([
   indexRoute,
   marketsRoute,
   marketGroupRoute,
+  marketGroupSlugRoute,
   marketRoute,
   positionsRoute,
   vaultRoute,
