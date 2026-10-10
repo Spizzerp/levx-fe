@@ -995,6 +995,7 @@ export type Levx = {
       "accounts": [
         {
           "name": "market",
+          "writable": true,
           "pda": {
             "seeds": [
               {
