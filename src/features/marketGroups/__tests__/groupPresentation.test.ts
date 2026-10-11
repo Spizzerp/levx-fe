@@ -157,10 +157,13 @@ describe('market group presentation', () => {
     })
     expect(
       getMarketsForGroupSlug(
-        [market({ id: 'a', groupMetadata: summaries[0].groupMetadata })],
+        [
+          market({ id: 'a', groupKeyHash, groupMetadata: summaries[0].groupMetadata }),
+          market({ id: 'b', groupKeyHash }),
+        ],
         'btc-usdc-2026-1d-season',
       ),
-    ).toHaveLength(1)
+    ).toHaveLength(2)
   })
 
   it('builds summaries with lifecycle counts and totals', () => {
