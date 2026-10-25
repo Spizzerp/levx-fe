@@ -3653,6 +3653,60 @@ export type Levx = {
       "args": []
     },
     {
+      "name": "setKeeperAuthority",
+      "docs": [
+        "Governance: rotate `ProtocolState.keeper_authority`, the signer",
+        "`add_path` requires for AI paths (F21). Admin-gated (has_one =",
+        "authority); the default pubkey and a no-op are refused."
+      ],
+      "discriminator": [
+        29,
+        124,
+        191,
+        114,
+        184,
+        243,
+        33,
+        155
+      ],
+      "accounts": [
+        {
+          "name": "protocolState",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "protocolState"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "newKeeperAuthority",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
       "name": "settleMarket",
       "discriminator": [
         193,
@@ -4741,6 +4795,19 @@ export type Levx = {
       ]
     },
     {
+      "name": "keeperAuthorityUpdated",
+      "discriminator": [
+        117,
+        210,
+        216,
+        152,
+        224,
+        97,
+        65,
+        228
+      ]
+    },
+    {
       "name": "leverageConfigAccepted",
       "discriminator": [
         155,
@@ -5559,6 +5626,11 @@ export type Levx = {
       "code": 6069,
       "name": "invalidPairRiskState",
       "msg": "Invalid pair risk state"
+    },
+    {
+      "code": 6070,
+      "name": "keeperAuthorityUnchanged",
+      "msg": "The keeper authority is already that key"
     }
   ],
   "types": [
@@ -6362,6 +6434,29 @@ export type Levx = {
           {
             "name": "activationDelaySeconds",
             "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "keeperAuthorityUpdated",
+      "docs": [
+        "Governance: `set_keeper_authority` rotated the F21 AI-path signer."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "previous",
+            "type": "pubkey"
+          },
+          {
+            "name": "new",
+            "type": "pubkey"
           }
         ]
       }
