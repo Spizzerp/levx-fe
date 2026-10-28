@@ -70,6 +70,7 @@ function parsePairRiskStatus(raw: Record<string, unknown>): PairRiskStatus {
 }
 
 function parsePathOrigin(raw: Record<string, unknown>): PathOrigin {
+  // `external` (D17) is keeper-signed and treated exactly as `ai` by the program, so it shows as AI here.
   const key = Object.keys(raw)[0]
   return key === 'userDrawn' ? 'user' : 'ai'
 }

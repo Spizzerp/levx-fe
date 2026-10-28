@@ -71,6 +71,14 @@ function rawRiskParams(overrides: Record<string, unknown> = {}) {
 }
 
 describe('anchorPathToFE', () => {
+  it("maps the on-chain origins: UserDrawn → 'user', Ai and External (D17, treated as AI by the program) → 'ai'", () => {
+    const origin = (generationMethod: Record<string, unknown>) =>
+      anchorPathToFE(rawPath({ generationMethod }), 1_700_000_000_000, 60).origin
+    expect(origin({ userDrawn: {} })).toBe('user')
+    expect(origin({ ai: {} })).toBe('ai')
+    expect(origin({ external: {} })).toBe('ai')
+  })
+
   it('derives the display multiplier from implied probability bps', () => {
     const path = anchorPathToFE(rawPath(), 1_700_000_000_000, 60)
 

@@ -7979,7 +7979,7 @@ export type Levx = {
           {
             "name": "origin",
             "docs": [
-              "0 = Ai, 1 = UserDrawn (matches `PathOrigin` enum ordering)."
+              "0 = Ai, 1 = UserDrawn, 2 = External (matches `PathOrigin` enum ordering)."
             ],
             "type": "u8"
           },
@@ -8134,6 +8134,9 @@ export type Levx = {
           },
           {
             "name": "userDrawn"
+          },
+          {
+            "name": "external"
           }
         ]
       }
@@ -8992,7 +8995,8 @@ export type Levx = {
             "name": "keeperAuthority",
             "docs": [
               "F21: pubkey authorized to call `add_path` with",
-              "`generation_method = PathOrigin::Ai`. User-drawn paths remain",
+              "`generation_method = PathOrigin::Ai` or `PathOrigin::External`",
+              "(D17). User-drawn paths remain",
               "permissionless. Zero-initialized to `Pubkey::default()` immediately",
               "after migrate; must be set to the infra keeper pubkey before F21",
               "lands."

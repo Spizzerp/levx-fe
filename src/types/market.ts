@@ -25,7 +25,7 @@ export type MarketState =
  */
 export type PathTone = 'ultra-bull' | 'bull' | 'neutral' | 'bear' | 'ultra-bear' | 'custom'
 
-/** Maps to on-chain PathOrigin enum: Ai → 'ai', UserDrawn → 'user'. */
+/** Maps to on-chain PathOrigin enum: Ai → 'ai', UserDrawn → 'user', External → 'ai' (D17: treated as AI by the program). */
 export type PathOrigin = 'ai' | 'user'
 export type EigenCacheStatus =
   | 'disabled'
@@ -121,7 +121,7 @@ export interface PredictionPath {
   label: string
   /** UI-only: derived from price trajectory direction */
   tone: PathTone
-  /** on-chain: PathOrigin (Ai | UserDrawn) */
+  /** on-chain: PathOrigin (Ai | UserDrawn | External) */
   origin: PathOrigin
   /** LMSR price multiplier — payout per USDC wagered (derived from shares) */
   multiplier: number
