@@ -99,9 +99,11 @@ const MAX_PATH_UPLOAD_CHUNKS = 12
 // browser allocations during decode.
 const PATH_OUTCOME_CHUNK_COUNT_OFFSET = 137
 const PATH_OUTCOME_CHUNKS_CLOSED_OFFSET = 138
-const PATH_OUTCOME_GENERATION_METHOD_OFFSET = 139
+export const PATH_OUTCOME_GENERATION_METHOD_OFFSET = 139
 const PATH_OUTCOME_PRICES_LEN_OFFSET = 148
-const PATH_OUTCOME_FIXED_ACCOUNT_SIZE = 310
+export const PATH_OUTCOME_FIXED_ACCOUNT_SIZE = 310
+/** On-chain `PathOrigin` ordinals: 0 Ai, 1 UserDrawn, 2 External (D17). */
+const PATH_ORIGIN_MAX_ORDINAL = 2
 
 const warnedNumericCoercions = new Set<string>()
 
@@ -138,7 +140,7 @@ function readU32LE(data: Uint8Array, offset: number): number {
   )
 }
 
-function assertCurrentPathOutcomeLayout(data: Uint8Array, label: string): void {
+export function assertCurrentPathOutcomeLayout(data: Uint8Array, label: string): void {
   if (data.length < PATH_OUTCOME_FIXED_ACCOUNT_SIZE) {
     throw new Error(`${label} is shorter than the current PathOutcome layout`)
   }
@@ -151,7 +153,7 @@ function assertCurrentPathOutcomeLayout(data: Uint8Array, label: string): void {
   if (
     chunkCount > MAX_PATH_UPLOAD_CHUNKS ||
     chunksClosed > chunkCount ||
-    generationMethod > 1 ||
+    generationMethod > PATH_ORIGIN_MAX_ORDINAL ||
     predictedPricesLen > MAX_PATH_OUTCOME_CHECKPOINTS
   ) {
     throw new Error(`${label} appears to use a legacy/incompatible PathOutcome layout`)
