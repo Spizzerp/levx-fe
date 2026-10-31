@@ -19,10 +19,11 @@ vi.mock('@/env/env.config', () => ({
 }))
 
 // Mock @visx/responsive ParentSize — jsdom reports 0×0 because there's no real layout engine.
-// Provide a fixed 800×400 canvas so ChartInner renders instead of returning null.
+// Provide an 800×400 canvas so ChartInner renders instead of returning null; a test may start it at 0×0.
+const parentSize = vi.hoisted(() => ({ width: 800, height: 400 }))
 vi.mock('@visx/responsive', () => ({
   ParentSize: ({ children }: { children: (args: { width: number; height: number }) => React.ReactNode }) =>
-    children({ width: 800, height: 400 }),
+    children({ width: parentSize.width, height: parentSize.height }),
 }))
 import { buildAiPathFixture } from '@/tests/fixtures/aiPaths'
 import { useDrawingStore } from '@/stores/drawingStore'
@@ -48,12 +49,14 @@ const history = Array.from({ length: 10 }, (_, i) => ({
 }))
 
 beforeEach(() => {
+  parentSize.width = 800
+  parentSize.height = 400
   useDrawingStore.setState({ state: { phase: 'idle' }, totalCheckpoints: 0 })
   usePriceStore.setState({ ticks: {}, feeds: {}, levels: {}, trails: {} })
 })
 
-function renderChart(overrides: Partial<Parameters<typeof LevXChart>[0]> = {}) {
-  return render(
+function chartElement(overrides: Partial<Parameters<typeof LevXChart>[0]> = {}) {
+  return (
     <LevXChart
       history={history}
       predictions={paths}
@@ -63,8 +66,12 @@ function renderChart(overrides: Partial<Parameters<typeof LevXChart>[0]> = {}) {
       selectedPathId={paths[2].id}
       market={market}
       {...overrides}
-    />,
+    />
   )
+}
+
+function renderChart(overrides: Partial<Parameters<typeof LevXChart>[0]> = {}) {
+  return render(chartElement(overrides))
 }
 
 describe('LevXChart', () => {
@@ -95,6 +102,20 @@ describe('LevXChart', () => {
   it('renders distinct loading state', () => {
     renderChart({ isLoading: true })
     expect(screen.getByText(/loading/i)).toBeInTheDocument()
+  })
+
+  it('reveals the chart when its history loaded before the chart had a size', () => {
+    // A market opened in a background tab: the history arrives before the first layout.
+    parentSize.width = 0
+    parentSize.height = 0
+    const { rerender } = renderChart({ isLoading: true, history: [] })
+    rerender(chartElement({ isLoading: false }))
+
+    parentSize.width = 800
+    parentSize.height = 400
+    rerender(chartElement({ isLoading: false }))
+
+    expect(screen.getByTestId('price-line').parentElement).toHaveStyle({ opacity: '1' })
   })
 
   it('renders distinct error state', () => {

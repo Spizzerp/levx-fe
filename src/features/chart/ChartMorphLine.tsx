@@ -100,6 +100,13 @@ export function ChartMorphLine({
   const fadeStartRef = useRef(0)
   const frozenWaveTimeRef = useRef(0)
   const revealFiredRef = useRef(!isLoading)
+  const loadedAtMountRef = useRef(!isLoading)
+
+  // Mounted after the history loaded (the chart had no size yet, as in a background tab): there is
+  // nothing to morph, so the chart is revealed at once.
+  useEffect(() => {
+    if (loadedAtMountRef.current) onRevealRef.current()
+  }, [])
 
   useEffect(() => {
     if (isLoading) {
