@@ -123,13 +123,14 @@ export function usePriceHistory({
   })
 
   // Map, shift, flatten + sort across pages. react-query returns pages in fetch order
-  // (newest-first), so we sort by time to get ascending history.
+  // (newest-first), so we sort by time to get ascending history. A row's time is its bar's start,
+  // so the point there is the bar's open: the close belongs a bar later.
   const flat = useMemo<PricePoint[] | undefined>(() => {
     if (!query.data) return undefined
     const merged = query.data
       .flatMap((page) => {
         const k = shift !== null && !isPythOnly(page.sources) ? shift : 1
-        return page.rows.map((row) => ({ time: row.time * 1000, value: row.close * k }))
+        return page.rows.map((row) => ({ time: row.time * 1000, value: row.open * k }))
       })
       .sort((a, b) => a.time - b.time)
     // Dedupe by time (page boundaries may overlap by one bar)

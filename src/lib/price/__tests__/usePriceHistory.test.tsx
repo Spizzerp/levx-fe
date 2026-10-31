@@ -43,12 +43,13 @@ const T = 1_793_452_800
 /** 500 five-minute bars, in seconds. */
 const SPAN_5M = 500 * 300
 
-const row = (time: number, close: number): CandleRow => ({
+/** A bar opening at `open`; its close differs, so a test sees which price is plotted. */
+const row = (time: number, open: number): CandleRow => ({
   time,
-  open: close,
-  high: close,
-  low: close,
-  close,
+  open,
+  high: open + 0.3,
+  low: open - 0.2,
+  close: open + 0.1,
 })
 
 function candles(rows: CandleRow[], overrides: Partial<CandlesResponse> = {}): CandlesResponse {
@@ -95,7 +96,7 @@ describe('usePriceHistory', () => {
     vi.useRealTimers()
   })
 
-  it('maps rows to close-price points in ms', async () => {
+  it('maps rows to points in ms', async () => {
     mockFetchCandles.mockResolvedValue(candles([row(T - 600, 95.1), row(T - 300, 95.2)]))
 
     const { result } = render(PAIR, '1h')
@@ -112,6 +113,24 @@ describe('usePriceHistory', () => {
       to: T,
     })
     expect(result.current.hasMoreHistory).toBe(true)
+  })
+
+  it("plots each candle's open at its start", async () => {
+    // A bar's time is its start: the price at that moment is the open, not the close an hour on.
+    mockFetchCandles.mockResolvedValue(
+      candles([
+        { time: T - 7200, open: 95.0, high: 95.9, low: 94.8, close: 95.6 },
+        { time: T - 3600, open: 95.6, high: 96.2, low: 95.1, close: 95.3 },
+      ]),
+    )
+
+    const { result } = render(PAIR, '1h')
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(result.current.data).toEqual([
+      { time: (T - 7200) * 1000, value: 95.0 },
+      { time: (T - 3600) * 1000, value: 95.6 },
+    ])
   })
 
   it('pages backwards 500 bars at a time', async () => {

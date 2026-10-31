@@ -180,6 +180,27 @@ describe('useLeveledFeed', () => {
     expect(feedState()?.status).toBe('delayed')
   })
 
+  it('recovers to live after a silence', () => {
+    renderHook(() => useLeveledFeed(FEED))
+    fake.trade(95.7, T0)
+    pythUpdate(95.77, T0_SEC)
+
+    advance(6)
+    expect(latest()).toEqual({ time: T0 + 6000, value: 95.77, publishTime: T0_SEC + 6 })
+    expect(feedState()?.status).toBe('delayed')
+
+    // A heartbeat is enough: the buffered trade is still the latest price, put back on the level.
+    fake.heartbeat()
+    advance(1)
+    expect(latest()?.value).toBeCloseTo(95.77, 10)
+    expect(feedState()).toEqual({ status: 'live', leveled: true, levelAgeSec: 7 })
+
+    fake.trade(96)
+    advance(1)
+    expect(latest()?.value).toBeCloseTo((96 * 95.77) / 95.7, 10)
+    expect(feedState()?.status).toBe('live')
+  })
+
   it('reports nothing before the first event, then delayed with no tick when nothing arrives', () => {
     renderHook(() => useLeveledFeed(FEED))
 
@@ -192,15 +213,12 @@ describe('useLeveledFeed', () => {
     expect(feedState()?.status).toBe('delayed')
   })
 
-  it('first level factor falls back to the minute candle, then to unleveled', async () => {
-    const fetcher = vi
-      .fn()
-      .mockResolvedValueOnce({ time: T0_SEC - 60, open: 95.6, close: 95.8 })
-      .mockResolvedValueOnce(null)
+  it('first level factor falls back to the minute candle', async () => {
+    const fetcher = vi.fn().mockResolvedValueOnce({ time: T0_SEC - 60, open: 95.6, close: 95.8 })
     setCandleFetcher(fetcher)
 
     // No trade buffered yet: the minute candle containing the publish time gives Coinbase's price.
-    const first = renderHook(() => useLeveledFeed(FEED))
+    renderHook(() => useLeveledFeed(FEED))
     pythUpdate(95.77, T0_SEC - 30)
     await flushPromises()
 
@@ -211,27 +229,56 @@ describe('useLeveledFeed', () => {
     advance(1)
     expect(latest()?.value).toBeCloseTo((96 * 95.77) / 95.7, 10)
     expect(feedState()?.leveled).toBe(true)
+  })
 
-    // A fresh feed whose candle is unavailable stays unleveled until the next Pyth update.
-    first.unmount()
-    usePriceStore.setState({ ticks: {}, feeds: {}, levels: {} })
+  it('a fresh feed whose minute candle is unavailable stays unleveled until the next Pyth update', async () => {
+    const fetcher = vi.fn().mockResolvedValueOnce(null)
+    setCandleFetcher(fetcher)
+
     renderHook(() => useLeveledFeed(FEED))
-    const nowSec = T0_SEC + 1
-    pythUpdate(95.77, nowSec - 10)
+    pythUpdate(95.77, T0_SEC - 10)
     await flushPromises()
 
-    expect(fetcher).toHaveBeenCalledTimes(2)
+    expect(fetcher).toHaveBeenCalledOnce()
     expect(level()).toBeUndefined()
     fake.trade(96)
     advance(1)
     expect(latest()?.value).toBe(96)
     expect(feedState()).toEqual({ status: 'live', leveled: false, levelAgeSec: null })
 
-    pythUpdate(96.07, nowSec + 1)
+    pythUpdate(96.07, T0_SEC + 1)
     advance(1)
     expect(level()).toBeCloseTo(96.07 / 96, 12)
     expect(latest()?.value).toBeCloseTo(96.07, 10)
     expect(feedState()?.leveled).toBe(true)
+  })
+
+  it('a restarted feed keeps its level', () => {
+    const first = renderHook(() => useLeveledFeed(FEED))
+    fake.trade(95.7, T0)
+    pythUpdate(95.77, T0_SEC)
+    advance(1)
+    // React unmounts the previous page's subscription before mounting the next page's.
+    first.unmount()
+    advance(10)
+
+    renderHook(() => useLeveledFeed(FEED))
+    expect(fake.subscribe).toHaveBeenCalledTimes(2)
+    fake.trade(96)
+    advance(1)
+
+    // trade × the previous k, aged from the Pyth update that set it, not from the restart
+    expect(latest()).toEqual({
+      time: T0 + 12_000,
+      value: expect.closeTo((96 * 95.77) / 95.7, 10),
+      publishTime: T0_SEC + 12,
+    })
+    expect(feedState()).toEqual({ status: 'live', leveled: true, levelAgeSec: 12 })
+
+    // The last Pyth price survives too: a silent stream falls back to it.
+    advance(5)
+    expect(latest()).toEqual({ time: T0 + 17_000, value: 95.77, publishTime: T0_SEC + 17 })
+    expect(feedState()?.status).toBe('delayed')
   })
 
   it('a missing sponsored account leaves the feed unleveled', () => {

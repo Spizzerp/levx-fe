@@ -47,6 +47,18 @@ function getConnection(): Connection {
 const DELAYED: FeedState = { status: 'delayed', leveled: false, levelAgeSec: null }
 const LIVE_UNLEVELED: FeedState = { status: 'live', leveled: false, levelAgeSec: null }
 
+/** A feed's level (k and the publish time that set it) and its last Pyth price. */
+interface PythMemory {
+  level: { k: number; publishTime: number } | null
+  lastPythPrice: number | null
+}
+
+/**
+ * Outlives a feed's stop: navigating between pages unmounts the old page's hook before the new one
+ * mounts, so the runtime restarts, and it keeps the level until the next Pyth update re-measures it.
+ */
+const pythMemory = new Map<string, PythMemory>()
+
 /** Starts the feed's subscriptions and its once-a-second writer; returns the stop. */
 function startFeed(feedId: string, pair: SupportedPair): () => void {
   const { setTick, setFeedState, setLevel } = usePriceStore.getState()
@@ -54,8 +66,9 @@ function startFeed(feedId: string, pair: SupportedPair): () => void {
   const startedAt = Date.now()
   /** Local time of the last Coinbase event; the stream is silent when it is too old. */
   let heardAt: number | null = null
-  let level: { k: number; publishTime: number } | null = null
-  let lastPythPrice: number | null = null
+  const pyth: PythMemory = pythMemory.get(feedId) ?? { level: null, lastPythPrice: null }
+  pythMemory.set(feedId, pyth)
+  if (pyth.level) setLevel(feedId, pyth.level.k)
   /** Counts Pyth updates, so a slow candle answer can't overwrite a newer level. */
   let updates = 0
   let active = true
@@ -66,13 +79,13 @@ function startFeed(feedId: string, pair: SupportedPair): () => void {
   }
 
   function setK(k: number, publishTime: number) {
-    level = { k, publishTime }
+    pyth.level = { k, publishTime }
     setLevel(feedId, k)
   }
 
   // Both prices are taken at Pyth's publish time; with neither Coinbase price, the last k stays.
   function onUpdate(u: SponsoredUpdate) {
-    lastPythPrice = u.price
+    pyth.lastPythPrice = u.price
     const update = ++updates
     const traded = trades.priceAt(u.publishTime * 1000)
     if (traded !== null) {
@@ -94,14 +107,15 @@ function startFeed(feedId: string, pair: SupportedPair): () => void {
     const s = Math.floor(now / 1000)
     // Before the first event the stream gets the same grace as after one.
     if (now - (heardAt ?? startedAt) >= COINBASE_SILENT_MS) {
-      if (lastPythPrice !== null) {
-        setTick(feedId, { time: s * 1000, value: lastPythPrice, publishTime: s })
+      if (pyth.lastPythPrice !== null) {
+        setTick(feedId, { time: s * 1000, value: pyth.lastPythPrice, publishTime: s })
       }
       setFeedState(feedId, DELAYED)
       return
     }
     const trade = trades.latest()
     if (!trade) return
+    const { level } = pyth
     if (!level) {
       setTick(feedId, { time: s * 1000, value: trade.price, publishTime: s })
       setFeedState(feedId, LIVE_UNLEVELED)
@@ -170,10 +184,14 @@ export function __setConnectionForTests(c: Connection): void {
   connection = c
 }
 
-/** Test-only: stop every feed and restore the stream, the connection and the candle source. */
+/**
+ * Test-only: stop every feed, forget what the feeds learned from Pyth, and restore the stream, the
+ * connection and the candle source.
+ */
 export function __resetFreeFeedForTests(): void {
   for (const feed of feeds.values()) feed.stop()
   feeds.clear()
+  pythMemory.clear()
   stream = coinbaseStream
   connection = null
   fetchMinuteCandle = fetchPipelineMinuteCandle

@@ -17,6 +17,18 @@ describe('env.config', () => {
     expect(module.env.APP_HERMES_URL).toBe('')
   })
 
+  it('treats an empty APP_PRICE_SOURCE as free', async () => {
+    // `APP_PRICE_SOURCE=` in a .env file arrives as an empty string, not as unset
+    vi.stubEnv('APP_PRICE_SOURCE', '')
+    vi.stubEnv('APP_HERMES_URL', '')
+    vi.stubEnv('APP_RPC_URL', 'https://api.devnet.solana.com')
+    vi.stubEnv('APP_NETWORK', 'devnet')
+
+    const module = await import('@/env/env.config')
+    expect(module.env.APP_PRICE_SOURCE).toBe('free')
+    expect(module.env.APP_HERMES_URL).toBe('')
+  })
+
   it('requires APP_HERMES_URL when APP_PRICE_SOURCE is pyth', async () => {
     vi.stubEnv('APP_PRICE_SOURCE', 'pyth')
     vi.stubEnv('APP_HERMES_URL', '')
