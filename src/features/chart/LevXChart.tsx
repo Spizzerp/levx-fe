@@ -243,7 +243,9 @@ function ChartInner({
     for (const path of predictions) {
       const cutTime = path.dissolved ? checkpointXs[path.dissolvedAtCheckpoint - 1] : undefined
       if (cutTime !== undefined) {
-        byId.set(path.id, segmentPredictionPathAtTime(path.data, cutTime).elapsed)
+        const { elapsed } = segmentPredictionPathAtTime(path.data, cutTime)
+        // A cut on the first point (dissolved at checkpoint 0) keeps that point for the ×.
+        byId.set(path.id, elapsed.length > 0 ? elapsed : path.data.filter((p) => p.time <= cutTime))
       }
     }
     return byId

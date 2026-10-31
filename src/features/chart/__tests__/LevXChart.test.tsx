@@ -229,6 +229,19 @@ describe('LevXChart checkpoints', () => {
     )
   })
 
+  it('marks a path dissolved at the first checkpoint at the market start', () => {
+    const dissolved = { ...paths[0], dissolved: true, dissolvedAtCheckpoint: 1 }
+    renderChart({
+      nowTime: startTime + 45 * 60_000,
+      predictions: [dissolved, ...paths.slice(1)],
+    })
+    expect(screen.queryByTestId('dissolved-path')).toBeNull()
+    expect(Number(screen.getByTestId('dissolve-mark').getAttribute('x'))).toBeCloseTo(
+      xAt(startTime),
+      3,
+    )
+  })
+
   it('labels the next unsampled checkpoint with its countdown', () => {
     renderChart({
       nowTime: startTime + 70 * 60_000,
