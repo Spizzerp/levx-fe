@@ -6,11 +6,45 @@ describe('env.config', () => {
     vi.resetModules()
   })
 
-  it('throws when APP_HERMES_URL is missing', async () => {
+  it('defaults APP_PRICE_SOURCE to free and does not require APP_HERMES_URL', async () => {
+    vi.stubEnv('APP_PRICE_SOURCE', undefined)
+    vi.stubEnv('APP_HERMES_URL', undefined)
+    vi.stubEnv('APP_RPC_URL', 'https://api.devnet.solana.com')
+    vi.stubEnv('APP_NETWORK', 'devnet')
+
+    const module = await import('@/env/env.config')
+    expect(module.env.APP_PRICE_SOURCE).toBe('free')
+    expect(module.env.APP_HERMES_URL).toBe('')
+  })
+
+  it('treats an empty APP_PRICE_SOURCE as free', async () => {
+    // `APP_PRICE_SOURCE=` in a .env file arrives as an empty string, not as unset
+    vi.stubEnv('APP_PRICE_SOURCE', '')
     vi.stubEnv('APP_HERMES_URL', '')
     vi.stubEnv('APP_RPC_URL', 'https://api.devnet.solana.com')
     vi.stubEnv('APP_NETWORK', 'devnet')
-    await expect(import('@/env/env.config')).rejects.toThrow(/APP_HERMES_URL/)
+
+    const module = await import('@/env/env.config')
+    expect(module.env.APP_PRICE_SOURCE).toBe('free')
+    expect(module.env.APP_HERMES_URL).toBe('')
+  })
+
+  it('requires APP_HERMES_URL when APP_PRICE_SOURCE is pyth', async () => {
+    vi.stubEnv('APP_PRICE_SOURCE', 'pyth')
+    vi.stubEnv('APP_HERMES_URL', '')
+    vi.stubEnv('APP_RPC_URL', 'https://api.devnet.solana.com')
+    vi.stubEnv('APP_NETWORK', 'devnet')
+    await expect(import('@/env/env.config')).rejects.toThrow(
+      /APP_HERMES_URL is missing \(APP_PRICE_SOURCE=pyth\)/,
+    )
+  })
+
+  it('rejects an unknown APP_PRICE_SOURCE', async () => {
+    vi.stubEnv('APP_PRICE_SOURCE', 'hermes')
+    vi.stubEnv('APP_HERMES_URL', 'https://hermes.pyth.network')
+    vi.stubEnv('APP_RPC_URL', 'https://api.devnet.solana.com')
+    vi.stubEnv('APP_NETWORK', 'devnet')
+    await expect(import('@/env/env.config')).rejects.toThrow(/must be "free" or "pyth"/)
   })
 
   it('throws when APP_RPC_URL is missing', async () => {
@@ -31,11 +65,13 @@ describe('env.config', () => {
 
   it('returns typed env object when all required values present', async () => {
     vi.resetModules()
+    vi.stubEnv('APP_PRICE_SOURCE', 'pyth')
     vi.stubEnv('APP_HERMES_URL', 'https://hermes.pyth.network')
     vi.stubEnv('APP_RPC_URL', 'https://api.devnet.solana.com')
     vi.stubEnv('APP_NETWORK', 'devnet')
 
     const module = await import('@/env/env.config')
+    expect(module.env.APP_PRICE_SOURCE).toBe('pyth')
     expect(module.env.APP_HERMES_URL).toBe('https://hermes.pyth.network')
     expect(module.env.APP_RPC_URL).toBe('https://api.devnet.solana.com')
     expect(module.env.APP_NETWORK).toBe('devnet')

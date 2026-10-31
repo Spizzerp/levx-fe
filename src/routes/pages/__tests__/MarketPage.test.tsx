@@ -126,19 +126,19 @@ vi.mock('@/lib/solana/program', () => ({
   useProgram: () => null,
 }))
 
-// Mock usePythFeed so no real SSE is opened
-const usePythFeedSpy = vi.fn()
-vi.mock('@/lib/pyth/hooks', async () => {
-  const actual = await vi.importActual<typeof import('@/lib/pyth/hooks')>('@/lib/pyth/hooks')
+// Mock usePriceFeed so no live price stream is opened
+const usePriceFeedSpy = vi.fn()
+vi.mock('@/lib/price', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/price')>('@/lib/price')
   return {
     ...actual,
-    usePythFeed: (...args: unknown[]) => usePythFeedSpy(...args),
+    usePriceFeed: (...args: unknown[]) => usePriceFeedSpy(...args),
   }
 })
 
-// Mock useBenchmarksHistory so tests don't hit the network
-vi.mock('@/lib/pyth/useBenchmarksHistory', () => ({
-  useBenchmarksHistory: () => ({
+// Mock usePriceHistory so tests don't hit the network; the spy records the interval asked for
+const usePriceHistoryMock = vi.hoisted(() =>
+  vi.fn((_args: { pair: string | null; interval: string }) => ({
     data: undefined,
     isLoading: false,
     isError: false,
@@ -148,8 +148,17 @@ vi.mock('@/lib/pyth/useBenchmarksHistory', () => ({
     isFetchingOlder: false,
     hasMoreHistory: true,
     fetchOlder: () => {},
-  }),
+  })),
+)
+vi.mock('@/lib/price/usePriceHistory', () => ({
+  usePriceHistory: usePriceHistoryMock,
   useLazyHistoryTrigger: () => () => {},
+}))
+
+// Settled checkpoint prices come from chain; the page reads them through this hook
+const useCheckpointPricesMock = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/api/checkpointPrices', () => ({
+  useCheckpointPrices: useCheckpointPricesMock,
 }))
 
 // Mock wallet-adapter-react-ui so ConnectGate can render without the provider tree
@@ -192,9 +201,11 @@ vi.mock('@/lib/supabase/hooks', () => ({
   usePublishDrawFrame: () => () => {},
 }))
 
+import { useParams } from '@tanstack/react-router'
 import { MarketPage } from '@/routes/pages/MarketPage'
+import { PYTH_FEED_IDS } from '@/lib/pyth/feedIds'
 import { useDrawingStore } from '@/stores/drawingStore'
-import { usePythStore } from '@/stores/pythStore'
+import { usePriceStore } from '@/stores/priceStore'
 import type { Market, PredictionPath, UserPosition } from '@/types/market'
 
 const TEST_MARKET = {
@@ -280,8 +291,11 @@ function renderMarketPage() {
 
 beforeEach(async () => {
   useDrawingStore.setState({ state: { phase: 'idle' }, totalCheckpoints: 0 })
-  usePythStore.setState({ ticks: {}, status: 'idle' })
-  usePythFeedSpy.mockClear()
+  usePriceStore.setState({ ticks: {}, feeds: {}, levels: {}, trails: {} })
+  usePriceFeedSpy.mockClear()
+  usePriceHistoryMock.mockClear()
+  vi.mocked(useParams).mockReturnValue({ id: 'btc' } as never)
+  useCheckpointPricesMock.mockReturnValue([])
   claimMutateMock.mockClear()
   setVisible.mockClear()
   useMarketParticipantsMock.mockReturnValue({
@@ -380,11 +394,119 @@ describe('MarketPage', () => {
     expect(screen.queryByRole('link', { name: /season/i })).not.toBeInTheDocument()
   })
 
-  it('opens a Pyth SSE feed on mount for the current market pair', () => {
+  it('market page header shows the price, the change since start and the dot', () => {
+    const feedId = PYTH_FEED_IDS['BTC/USDC']
+    const now = Date.now()
+    usePriceStore.setState({
+      ticks: { [feedId]: { time: now, value: 73_500, publishTime: Math.floor(now / 1000) } },
+      feeds: { [feedId]: { status: 'live', leveled: true, levelAgeSec: 20 } },
+    })
+    // Checkpoint 0 settled at 70,000; the fixture's history (72,800) is not the baseline
+    useCheckpointPricesMock.mockReturnValue([
+      { index: 0, time: TEST_MARKET.startTime, price: 70_000 },
+      { index: 1, time: TEST_MARKET.startTime + 3_600_000, price: 71_000 },
+    ])
+
     renderMarketPage()
-    expect(usePythFeedSpy).toHaveBeenCalled()
+
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('73,500.00')
+    expect(screen.getByText('+5.00%')).toBeInTheDocument()
+    expect(screen.getByText(/since start/i)).toBeInTheDocument()
+    expect(
+      screen.getByTitle(
+        "Live price from Coinbase trades, kept on Pyth's level. Markets settle on Pyth.",
+      ),
+    ).toHaveTextContent('Live')
+  })
+
+  it('opens the live price feed on mount for the current market pair', () => {
+    renderMarketPage()
+    expect(usePriceFeedSpy).toHaveBeenCalled()
     // The feedId passed should be the BTC/USDC feed from PYTH_FEED_IDS
-    expect((usePythFeedSpy.mock.calls[0] as unknown[])[0]).toMatch(/^0x[a-f0-9]+$/)
+    expect((usePriceFeedSpy.mock.calls[0] as unknown[])[0]).toMatch(/^0x[a-f0-9]+$/)
+  })
+
+  it('the market page opens short markets on one-minute candles', async () => {
+    const HOUR_MS = 60 * 60 * 1000
+    const DAY_MS = 24 * HOUR_MS
+    for (const [durationMs, interval, label] of [
+      [HOUR_MS, '1m', '1M'],
+      [3 * DAY_MS, '5m', '5M'],
+      [30 * DAY_MS, '1h', '1H'],
+    ] as const) {
+      const startTime = Date.now() - durationMs / 2
+      await setMarketState('active', { startTime, endTime: startTime + durationMs })
+      const { unmount } = renderMarketPage()
+
+      expect(screen.getByRole('tab', { name: label, selected: true })).toBeInTheDocument()
+      expect(usePriceHistoryMock).toHaveBeenLastCalledWith(
+        expect.objectContaining({ pair: 'BTC/USDC', interval }),
+      )
+      unmount()
+    }
+  })
+
+  it("steps the opening interval up once the market started before that interval's history", async () => {
+    const HOUR_MS = 60 * 60 * 1000
+    const DAY_MS = 24 * HOUR_MS
+    // The pipeline holds 1m candles for a day, 5m for 30 days, 1h for 90 days, 1d for a year.
+    for (const [durationMs, ageMs, interval, label] of [
+      [HOUR_MS, 2 * DAY_MS, '5m', '5M'],
+      [HOUR_MS, 40 * DAY_MS, '1h', '1H'],
+      [3 * DAY_MS, 40 * DAY_MS, '1h', '1H'],
+      [HOUR_MS, 100 * DAY_MS, '1d', '1D'],
+      [30 * DAY_MS, 100 * DAY_MS, '1d', '1D'],
+    ] as const) {
+      const startTime = Date.now() - ageMs
+      await setMarketState('settled', { startTime, endTime: startTime + durationMs })
+      const { unmount } = renderMarketPage()
+
+      expect(screen.getByRole('tab', { name: label, selected: true })).toBeInTheDocument()
+      expect(usePriceHistoryMock).toHaveBeenLastCalledWith(
+        expect.objectContaining({ pair: 'BTC/USDC', interval }),
+      )
+      unmount()
+    }
+  })
+
+  it("keeps the user's interval for the market and opens the next market on its own", async () => {
+    const user = userEvent.setup()
+    const HOUR_MS = 60 * 60 * 1000
+    const hourly = { startTime: Date.now() - HOUR_MS / 2, endTime: Date.now() + HOUR_MS / 2 }
+    await setMarketState('active', hourly)
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    // A fresh element each time, so a rerender renders the page again rather than bailing out
+    const page = () => (
+      <QueryClientProvider client={queryClient}>
+        <MarketPage />
+      </QueryClientProvider>
+    )
+    const { rerender } = render(page())
+
+    await user.click(screen.getByRole('tab', { name: '15M' }))
+    expect(screen.getByRole('tab', { name: '15M', selected: true })).toBeInTheDocument()
+    expect(usePriceHistoryMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ interval: '15m' }),
+    )
+
+    // A refetch hands the page a new market object for the same market: the choice stays.
+    await setMarketState('active', { ...hourly, pool: 250_000 })
+    rerender(page())
+    expect(screen.getByRole('tab', { name: '15M', selected: true })).toBeInTheDocument()
+
+    // Navigating to another market keeps the page mounted; that market opens on its own default.
+    vi.mocked(useParams).mockReturnValue({ id: 'eth' } as never)
+    const monthStart = Date.now() - 10 * 24 * HOUR_MS
+    await setMarketState('active', {
+      id: 'eth',
+      startTime: monthStart,
+      endTime: monthStart + 30 * 24 * HOUR_MS,
+    })
+    rerender(page())
+    expect(screen.getByRole('tab', { name: '1H', selected: true })).toBeInTheDocument()
+    expect(usePriceHistoryMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ interval: '1h' }),
+    )
   })
 
   it('wires the "+ Draw Custom Path" button to drawingStore.enterDrawMode', async () => {
@@ -437,8 +559,8 @@ describe('MarketPage', () => {
     expect(useDrawingStore.getState().state.phase).toBe('idle')
   })
 
-  it('displays live price from pythStore tick when available (CHART-01)', async () => {
-    usePythStore.setState({
+  it('displays live price from the price store tick when available (CHART-01)', async () => {
+    usePriceStore.setState({
       ticks: {
         // BTC/USDC feed id from feedIds.ts
         '0xe62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43': {
@@ -447,7 +569,6 @@ describe('MarketPage', () => {
           publishTime: Math.floor(Date.now() / 1000),
         },
       },
-      status: 'connected',
     })
     renderMarketPage()
     // Header H1 should contain the live tick with cents precision.

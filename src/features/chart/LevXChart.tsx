@@ -11,8 +11,10 @@ import type { ReactNode } from 'react'
 
 import type { PredictionPath, PricePoint } from '@/types/market'
 import type { Market } from '@/types/market'
+import type { CheckpointPrice } from '@/lib/api/checkpointPrices'
+import { formatPrice } from '@/lib/format'
 import { useDrawingStore } from '@/stores/drawingStore'
-import { useLatestPrice } from '@/lib/pyth/hooks'
+import { useLatestPrice, usePriceTrail } from '@/lib/price'
 import { feedIdForPair } from '@/lib/pyth/feedIds'
 import { buildCheckpointXs } from '@/lib/drawing/geometry'
 import { useYAxisFreeze } from '@/lib/drawing/yFreeze'
@@ -61,6 +63,30 @@ const AI_PATH_PALETTE: readonly string[] = [
 const USER_DRAWN_STYLE = { stroke: '#8FA3C9', dash: '3 3', opacity: 0.85 } as const
 const AI_PATH_DASH = '4 4'
 const AI_PATH_OPACITY = 0.7
+const DISSOLVED_PATH_OPACITY = 0.35
+/** Checkpoint labels sit on a second row, below the y=12 [ START ] / [ ENDS ] markers. */
+const CHECKPOINT_LABEL_Y = 24
+/** The next checkpoint's countdown sits on a third row, clear of the newest dot's label. */
+const COUNTDOWN_LABEL_Y = 36
+const CHECKPOINT_LABEL_FONT_SIZE = 9
+const CHECKPOINT_LABEL_LETTER_SPACING_EM = 0.08
+/** Space Mono advances about 0.6 em per character. */
+const MONO_ADVANCE_EM = 0.6
+const CHECKPOINT_LABEL_CHAR_WIDTH_PX =
+  CHECKPOINT_LABEL_FONT_SIZE * (MONO_ADVANCE_EM + CHECKPOINT_LABEL_LETTER_SPACING_EM)
+/** A label closer than this to the next drawn label is skipped (dots always draw). */
+const CHECKPOINT_LABEL_GAP_PX = 6
+/** A guide closer than this to the previous drawn guide is skipped. */
+const CHECKPOINT_GUIDE_GAP_PX = 12
+
+function checkpointLabel(cp: CheckpointPrice): string {
+  return `#${cp.index + 1} · ${formatPrice(cp.price)}`
+}
+
+/** Estimated rendered width of a checkpoint label, from its character count. */
+function checkpointLabelWidth(text: string): number {
+  return text.length * CHECKPOINT_LABEL_CHAR_WIDTH_PX
+}
 
 function pathStyle(path: PredictionPath): { stroke: string; dash: string; opacity: number } {
   if (path.origin === 'user') return USER_DRAWN_STYLE
@@ -79,6 +105,8 @@ const C = {
   muted: 'var(--chart-muted, #999999)',
   grid: 'var(--chart-grid, #222222)',
   marker: 'var(--chart-marker, #999999)',
+  settled: 'var(--color-warning, #d4a843)',
+  surface: 'var(--color-surface, #000000)',
 }
 
 const bisectTime = bisector<PricePoint, number>((d) => d.time).left
@@ -109,7 +137,7 @@ export interface LevXChartProps {
   showOtherPositions?: boolean
   /** override fixed height; if omitted, fills parent */
   height?: number
-  /** Pair string used for pythStore subscription. If null, no live updates. */
+  /** Pair string used for the price store subscription. If null, no live updates. */
   pair?: string | null
   /** Loading state of the outer data layer. */
   isLoading?: boolean
@@ -117,6 +145,12 @@ export interface LevXChartProps {
   error?: Error | null
   /** The full market is needed to build checkpoint Xs for the draw-mode grid. */
   market?: Pick<Market, 'startTime' | 'checkpointInterval' | 'totalCheckpoints'> | null
+  /**
+   * On-chain settled price of each passed checkpoint, drawn as a labelled dot, with faint
+   * guides at the checkpoints still to come. Omit it to draw neither (e.g. previews).
+   * In checkpoint order, as `fetchCheckpointPrices` returns them (label thinning keeps the last).
+   */
+  checkpointPrices?: CheckpointPrice[]
   /**
    * Fires whenever the effective time-domain changes (pan/zoom/reset/default recompute).
    * Consumers use this to drive lazy-loaded data: when the left edge approaches the
@@ -174,6 +208,7 @@ function ChartInner({
   showOtherPositions,
   pair,
   market,
+  checkpointPrices,
   isLoading,
   onViewportChange,
   defaultView = 'market-focused',
@@ -199,17 +234,24 @@ function ChartInner({
     [],
   )
 
-  /* ── Pyth live tick subscription ────────────────────────── */
+  /* ── Live tick subscription ─────────────────────────────── */
   const feedId = pair ? feedIdForPair(pair) : null
   const latestTick = useLatestPrice(feedId)
+  const trail = usePriceTrail(feedId)
 
-  /* ── Merge live tick into visible history ────────────────── */
+  /* ── History, then the once-a-second trail, then the live tick ──
+   * Each point is drawn only when it is newer than the one before it, so the seconds the
+   * history's newest candle already covers are not drawn twice. */
   const mergedHistory = useMemo(() => {
-    if (!latestTick) return history
-    const lastHistoryPoint = history[history.length - 1]
-    if (lastHistoryPoint && latestTick.time <= lastHistoryPoint.time) return history
-    return [...history, { time: latestTick.time, value: latestTick.value }]
-  }, [history, latestTick])
+    let lastTime = history[history.length - 1]?.time ?? -Infinity
+    const tail: PricePoint[] = []
+    for (const tick of latestTick ? [...trail, latestTick] : trail) {
+      if (tick.time <= lastTime) continue
+      tail.push({ time: tick.time, value: tick.value })
+      lastTime = tick.time
+    }
+    return tail.length > 0 ? [...history, ...tail] : history
+  }, [history, trail, latestTick])
 
   const lastHistoryPoint = mergedHistory[mergedHistory.length - 1]
   const isMarketInProgress = nowTime > marketStart && nowTime < marketEnd
@@ -221,6 +263,23 @@ function ChartInner({
     () => (market ? buildCheckpointXs(market as Market) : []),
     [market],
   )
+
+  /* ── Dissolved paths end at the checkpoint that dissolved them ──
+   * `dissolvedAtCheckpoint` is that checkpoint's 0-based index + 1 (the program counts the
+   * checkpoint before dissolving), and checkpointXs[i] is checkpoint i's due time. */
+  const dissolvedPathData = useMemo(() => {
+    const byId = new Map<string, PricePoint[]>()
+    for (const path of predictions) {
+      const cutTime = path.dissolved ? checkpointXs[path.dissolvedAtCheckpoint - 1] : undefined
+      if (cutTime !== undefined) {
+        const { elapsed } = segmentPredictionPathAtTime(path.data, cutTime)
+        // A cut on the first point (dissolved at checkpoint 0) keeps that point for the ×.
+        byId.set(path.id, elapsed.length > 0 ? elapsed : path.data.filter((p) => p.time <= cutTime))
+      }
+    }
+    return byId
+  }, [predictions, checkpointXs])
+  const drawnData = (path: PredictionPath) => dissolvedPathData.get(path.id) ?? path.data
 
   /* ── Time domain ────────────────────────────────────────── */
   // Split into two memos so the active one keeps a stable reference: in
@@ -368,11 +427,12 @@ function ChartInner({
         return
       }
       const t = timeScale.invert(xInner).getTime()
-      // In the past → read from history. In the future → read from selected prediction (if any).
+      // In the past → read from history. In the future → read from selected prediction (if any),
+      // as drawn: a dissolved path has no values past its cut.
       let sourceData: PricePoint[] = mergedHistory
       if (t > nowTime && selectedPathId) {
         const selected = predictions.find((p) => p.id === selectedPathId)
-        if (selected) sourceData = selected.data
+        if (selected) sourceData = dissolvedPathData.get(selected.id) ?? selected.data
       }
       if (sourceData.length === 0) return
       const idx = bisectTime(sourceData, t, 1)
@@ -381,7 +441,7 @@ function ChartInner({
       const d = !d1 ? d0 : !d0 ? d1 : t - d0.time > d1.time - t ? d1 : d0
       if (d) setHover({ time: d.time, value: d.value })
     },
-    [innerWidth, selectedPathId, timeScale, mergedHistory, predictions, nowTime],
+    [innerWidth, selectedPathId, timeScale, mergedHistory, predictions, nowTime, dissolvedPathData],
   )
 
   const handleLeave = useCallback(() => setHover(null), [])
@@ -394,6 +454,35 @@ function ChartInner({
   const marketStartX = timeScale(marketStart)
   const showMarketEndMarker = marketEnd > nowTime
   const marketEndX = timeScale(marketEnd)
+
+  // Checkpoints not yet sampled and still ahead of now get a faint guide; the first is the next
+  // one and always draws, later ones are skipped when closer than the gap to the last drawn guide.
+  const sampledIndices = new Set(checkpointPrices?.map((cp) => cp.index))
+  const upcomingCheckpoints: { index: number; time: number; x: number }[] = []
+  if (checkpointPrices) {
+    for (let index = 0; index < checkpointXs.length; index++) {
+      const time = checkpointXs[index]
+      if (time <= nowTime || sampledIndices.has(index)) continue
+      const x = timeScale(time)
+      const previous = upcomingCheckpoints[upcomingCheckpoints.length - 1]
+      if (previous && x - previous.x < CHECKPOINT_GUIDE_GAP_PX) continue
+      upcomingCheckpoints.push({ index, time, x })
+    }
+  }
+
+  // Every settled checkpoint gets a dot; labels are walked from the newest back, and one that
+  // would come closer than the gap to the newer drawn label is skipped.
+  const settledCheckpoints = checkpointPrices ?? []
+  const labelledCheckpoints = new Set<number>()
+  let newerLabelLeft = Infinity
+  for (let i = settledCheckpoints.length - 1; i >= 0; i--) {
+    const cp = settledCheckpoints[i]
+    const x = timeScale(cp.time)
+    const halfWidth = checkpointLabelWidth(checkpointLabel(cp)) / 2
+    if (x + halfWidth + CHECKPOINT_LABEL_GAP_PX > newerLabelLeft) continue
+    labelledCheckpoints.add(cp.index)
+    newerLabelLeft = x - halfWidth
+  }
 
   return (
     <svg
@@ -447,6 +536,43 @@ function ChartInner({
           {predictions.map((path) => {
             const style = pathStyle(path)
             const isSelected = selectedPathId === path.id || selectedPathIds?.has(path.id)
+            const dissolvedData = dissolvedPathData.get(path.id)
+            if (dissolvedData) {
+              const cut = dissolvedData[dissolvedData.length - 1]
+              return (
+                <g key={path.id}>
+                  {dissolvedData.length > 1 && (
+                    <LinePath<PricePoint>
+                      data-testid="dissolved-path"
+                      data={dissolvedData}
+                      x={(d) => timeScale(d.time)}
+                      y={(d) => priceScale(d.value)}
+                      stroke={style.stroke}
+                      strokeWidth={1.5}
+                      strokeDasharray={style.dash}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      opacity={isSelected ? 0 : DISSOLVED_PATH_OPACITY}
+                      curve={CATMULL_ROM_ALPHA_05}
+                    />
+                  )}
+                  {cut && (
+                    <text
+                      data-testid="dissolve-mark"
+                      x={timeScale(cut.time)}
+                      y={priceScale(cut.value)}
+                      fontSize="12"
+                      fill={style.stroke}
+                      opacity={style.opacity}
+                      textAnchor="middle"
+                      dominantBaseline="central"
+                    >
+                      ×
+                    </text>
+                  )}
+                </g>
+              )
+            }
             const segments = isMarketInProgress
               ? segmentPredictionPathAtTime(path.data, nowTime)
               : { elapsed: [], future: path.data }
@@ -490,8 +616,8 @@ function ChartInner({
               .filter((p) => p.id !== selectedPathId && p.totalWagered > 0)
               .map((path) => {
                 const segments = isMarketInProgress
-                  ? segmentPredictionPathAtTime(path.data, nowTime)
-                  : { elapsed: [], future: path.data }
+                  ? segmentPredictionPathAtTime(drawnData(path), nowTime)
+                  : { elapsed: [], future: drawnData(path) }
                 return (
                   <g key={`wager-${path.id}`}>
                     {segments.elapsed.length > 1 && (
@@ -529,8 +655,8 @@ function ChartInner({
             .filter((p) => selectedPathIds?.has(p.id) || p.id === selectedPathId)
             .map((path) => {
               const segments = isMarketInProgress
-                ? segmentPredictionPathAtTime(path.data, nowTime)
-                : { elapsed: [], future: path.data }
+                ? segmentPredictionPathAtTime(drawnData(path), nowTime)
+                : { elapsed: [], future: drawnData(path) }
               return (
                 <g key={`sel-${path.id}`}>
                   {segments.elapsed.length > 1 && (
@@ -564,8 +690,8 @@ function ChartInner({
           {/* ── Non-interactive selected overlay (quiet dotted preview) ── */}
           {selected && !selectionInteractive && (() => {
             const segments = isMarketInProgress
-              ? segmentPredictionPathAtTime(selected.data, nowTime)
-              : { elapsed: [], future: selected.data }
+              ? segmentPredictionPathAtTime(drawnData(selected), nowTime)
+              : { elapsed: [], future: drawnData(selected) }
             return (
               <>
                 {segments.elapsed.length > 1 && (
@@ -602,6 +728,7 @@ function ChartInner({
 
           {/* ── Historical price line ───────────────── */}
           <LinePath<PricePoint>
+            data-testid="price-line"
             data={mergedHistory}
             x={(d) => timeScale(d.time)}
             y={(d) => priceScale(d.value)}
@@ -610,6 +737,67 @@ function ChartInner({
             strokeLinejoin="round"
             curve={curveMonotoneX}
           />
+
+          {/* ── Checkpoints: settled price dots, guides for the ones to come ── */}
+          {checkpointPrices && (
+            <g pointerEvents="none">
+              {upcomingCheckpoints.map(({ index, time, x }, i) => (
+                <g key={`upcoming-${index}`}>
+                  <Line
+                    data-testid="checkpoint-guide"
+                    from={{ x, y: 0 }}
+                    to={{ x, y: innerHeight }}
+                    stroke={C.muted}
+                    strokeWidth={1}
+                    strokeDasharray="2 4"
+                    opacity={0.25}
+                  />
+                  {i === 0 && (
+                    <text
+                      x={x}
+                      y={COUNTDOWN_LABEL_Y}
+                      fontFamily="Space Mono, monospace"
+                      fontSize={CHECKPOINT_LABEL_FONT_SIZE}
+                      letterSpacing={`${CHECKPOINT_LABEL_LETTER_SPACING_EM}em`}
+                      fill={C.muted}
+                      textAnchor="middle"
+                    >
+                      {`in ${Math.ceil((time - nowTime) / 60_000)} m`}
+                    </text>
+                  )}
+                </g>
+              ))}
+              {checkpointPrices.map((cp) => {
+                const x = timeScale(cp.time)
+                return (
+                  <g key={`settled-${cp.index}`}>
+                    <Circle
+                      data-testid="checkpoint-dot"
+                      cx={x}
+                      cy={priceScale(cp.price)}
+                      r={5}
+                      fill={C.settled}
+                      stroke={C.surface}
+                      strokeWidth={2}
+                    />
+                    {labelledCheckpoints.has(cp.index) && (
+                      <text
+                        x={x}
+                        y={CHECKPOINT_LABEL_Y}
+                        fontFamily="Space Mono, monospace"
+                        fontSize={CHECKPOINT_LABEL_FONT_SIZE}
+                        letterSpacing={`${CHECKPOINT_LABEL_LETTER_SPACING_EM}em`}
+                        fill={C.settled}
+                        textAnchor="middle"
+                      >
+                        {checkpointLabel(cp)}
+                      </text>
+                    )}
+                  </g>
+                )
+              })}
+            </g>
+          )}
 
           {/* ── Now marker ──────────────────────────── */}
           <Line

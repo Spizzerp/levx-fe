@@ -8,6 +8,7 @@ import { ConnectGate } from '@/features/wallet/ConnectGate'
 import { RequestUsdcButton } from '@/features/wallet/RequestUsdcButton'
 import { UsdcBalance } from '@/features/wallet/UsdcBalance'
 import { DrawingLayer } from '@/features/chart/DrawingLayer'
+import { LivePriceDot } from '@/features/market/LivePriceDot'
 import { MarketComments } from '@/features/market/MarketComments'
 import { Input } from '@/ui/Input'
 import { Label } from '@/ui/Label'
@@ -27,6 +28,7 @@ import { SlippageSelector } from '@/ui/SlippageSelector'
 import { Stub } from '@/ui/Stub'
 import { UserPositionCard } from '@/features/market/UserPositionCard'
 import { cn } from '@/lib/cn'
+import { useCheckpointPrices } from '@/lib/api/checkpointPrices'
 import { useMode2Readiness } from '@/lib/api/hooks'
 import { useMarket, useUserPosition } from '@/lib/chain'
 import { parseMarketState } from '@/lib/api/adapters'
@@ -49,16 +51,16 @@ import {
 } from '@/lib/solana/transactions'
 import { useUsdcBalance } from '@/lib/api/useUsdcBalance'
 import { toast } from '@/stores/toastStore'
-import { usePythFeed, useLatestPrice } from '@/lib/pyth/hooks'
+import { usePriceFeed, useLatestPrice, usePriceHistory, useLazyHistoryTrigger } from '@/lib/price'
+import { CACHE_WINDOW_SECONDS, INTERVAL_TO_RESOLUTION } from '@/lib/price/candlesClient'
+import { changeSinceStart } from '@/lib/price/change'
 import { feedIdForPair } from '@/lib/pyth/feedIds'
-import { useBenchmarksHistory, useLazyHistoryTrigger } from '@/lib/pyth/useBenchmarksHistory'
 import { buildAiPathFixture } from '@/tests/fixtures/aiPaths'
 
 import { useDrawingStore } from '@/stores/drawingStore'
 import { useWalletStore } from '@/stores/walletStore'
 import {
   formatCountdown,
-  formatDeltaBps,
   formatMarketDurationLabel,
   formatPrice,
   formatStatusLabel,
@@ -77,6 +79,27 @@ const META_SEP = <span className="text-line-strong mx-0.5">·</span>
 
 function isLiveUserDrawingState(state: Market['state'] | undefined): boolean {
   return state === 'active' || state === 'sampling'
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000
+
+/** The opening intervals, finest first. */
+const DEFAULT_INTERVAL_STEPS: readonly CandleInterval[] = ['1m', '5m', '1h', '1d']
+
+/**
+ * The interval a market opens on: one-minute candles up to a day, five-minute up to a week, else
+ * hourly. It steps up while the pipeline no longer holds that interval back to the market's start.
+ */
+function defaultCandleInterval(startTime: number, endTime: number, now: number): CandleInterval {
+  const durationMs = endTime - startTime
+  const byLength: CandleInterval =
+    durationMs <= DAY_MS ? '1m' : durationMs <= 7 * DAY_MS ? '5m' : '1h'
+  const ageSec = (now - startTime) / 1000
+  const steps = DEFAULT_INTERVAL_STEPS.slice(DEFAULT_INTERVAL_STEPS.indexOf(byLength))
+  return (
+    steps.find((interval) => ageSec <= CACHE_WINDOW_SECONDS[INTERVAL_TO_RESOLUTION[interval]]) ??
+    '1d'
+  )
 }
 
 function closestHistoryValue(
@@ -292,6 +315,10 @@ export function MarketPage() {
   const { id } = useParams({ from: '/market/$id' })
   const { data: market, isLoading, isError, refetch } = useMarket(id)
   const { data: userPosition } = useUserPosition(id)
+  const checkpointPrices = useCheckpointPrices(
+    market?.marketId ?? null,
+    market?.completedCheckpoints ?? 0,
+  )
   const {
     data: mode2Readiness,
     isLoading: isMode2ReadinessLoading,
@@ -309,24 +336,41 @@ export function MarketPage() {
   }, [market, mode2Readiness?.pairRiskStates])
   const feedId = pair ? feedIdForPair(pair) : null
   const seasonMetadata = market ? getMarketSeasonMetadata(market) : undefined
-  usePythFeed(feedId)
+  usePriceFeed(feedId)
   const latestTick = useLatestPrice(feedId)
 
-  const [candleInterval, setCandleInterval] = useState<CandleInterval>('1h')
+  // The market's length picks the opening interval; a choice in the picker holds for this market.
+  // The route keeps the page mounted from one market to the next, so the choice names its market.
+  const marketStartTime = market?.startTime
+  const marketEndTime = market?.endTime
+  const defaultInterval = useMemo(
+    () =>
+      marketStartTime !== undefined && marketEndTime !== undefined
+        ? defaultCandleInterval(marketStartTime, marketEndTime, Date.now())
+        : '1h',
+    [marketStartTime, marketEndTime],
+  )
+  const [chosenInterval, setChosenInterval] = useState<{
+    marketId: string
+    interval: CandleInterval
+  } | null>(null)
+  const candleInterval = chosenInterval?.marketId === id ? chosenInterval.interval : defaultInterval
+  const setCandleInterval = (interval: CandleInterval) =>
+    setChosenInterval({ marketId: id, interval })
 
   const {
-    data: benchmarksHistory,
-    isLoading: isBenchmarksLoading,
+    data: priceHistory,
+    isLoading: isHistoryLoading,
     fetchOlder,
     hasMoreHistory,
     isFetchingOlder,
-  } = useBenchmarksHistory({
+  } = usePriceHistory({
     pair,
     interval: candleInterval,
   })
 
   const onChartViewportChange = useLazyHistoryTrigger({
-    history: benchmarksHistory,
+    history: priceHistory,
     hasMoreHistory,
     isFetchingOlder,
     fetchOlder,
@@ -389,13 +433,10 @@ export function MarketPage() {
   const msRemaining = Math.max(0, chartMarketEnd - now)
   const leverageCap = maxLeverageByDuration(durationMs)
 
-  // Prefer real Benchmarks candles; fall back to mock history while loading
+  // Prefer the pipeline's candles; fall back to mock history while loading
   const chartHistory = useMemo(
-    () =>
-      benchmarksHistory && benchmarksHistory.length > 0
-        ? benchmarksHistory
-        : (market?.history ?? []),
-    [benchmarksHistory, market?.history],
+    () => (priceHistory && priceHistory.length > 0 ? priceHistory : (market?.history ?? [])),
+    [priceHistory, market?.history],
   )
 
   // Live price from Pyth tick; fall back to last history point
@@ -653,9 +694,16 @@ export function MarketPage() {
     return last && first ? last.value >= first.value : true
   }
 
-  // Delta is only available from the mock layer (not from live Pyth ticks in Phase 1)
-  const deltaDisplay = 0
-  const deltaColor = deltaDisplay >= 0 ? 'text-success' : 'text-accent'
+  // From checkpoint 0's settled price when it exists; no change shown before there is a price
+  const change =
+    priceDisplay > 0
+      ? changeSinceStart({
+          history: chartHistory,
+          marketStart: chartMarketStart,
+          checkpoint0Price: checkpointPrices.find((c) => c.index === 0)?.price,
+          current: priceDisplay,
+        })
+      : null
 
   const isInDrawMode = drawingPhase !== 'idle'
   const confirmPathLabel =
@@ -727,8 +775,17 @@ export function MarketPage() {
             <MarketTimeProgress startTime={chartMarketStart} endTime={chartMarketEnd} now={now} />
           </div>
           <div className="text-ink-muted text-caption mt-2 flex items-baseline gap-3 font-mono">
-            <span className={cn('font-bold', deltaColor)}>{formatDeltaBps(deltaDisplay)}</span>
-            <span>24H</span>
+            {change && (
+              <>
+                <span
+                  className={cn('font-bold', change.isPositive ? 'text-success' : 'text-accent')}
+                >
+                  {`${change.isPositive ? '+' : '-'}${change.value.toFixed(2)}%`}
+                </span>
+                <span>SINCE START</span>
+              </>
+            )}
+            <LivePriceDot feedId={feedId} />
           </div>
         </div>
 
@@ -813,7 +870,7 @@ export function MarketPage() {
               selectionInteractive={showWagerRail}
               showOtherPositions={showOtherPositions}
               pair={market.pair}
-              isLoading={isBenchmarksLoading}
+              isLoading={isHistoryLoading}
               error={null}
               onViewportChange={onChartViewportChange}
               market={{
@@ -821,6 +878,7 @@ export function MarketPage() {
                 checkpointInterval: chartCheckpointInterval,
                 totalCheckpoints: chartTotalCheckpoints,
               }}
+              checkpointPrices={checkpointPrices}
               renderDrawingOverlay={({
                 xScale,
                 yScale,

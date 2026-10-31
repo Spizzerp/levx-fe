@@ -12,10 +12,10 @@ import { formatCountdown, formatMarketDurationLabel, formatShortDate } from '@/l
 import { getMarketDisplayState } from '@/lib/market/status'
 
 import type { Market, MarketState } from '@/types/market'
-import type { PythTick } from '@/lib/pyth/types'
+import type { PriceTick } from '@/lib/price'
 import { feedIdForPair } from '@/lib/pyth/feedIds'
-import { useLatestPrice } from '@/lib/pyth/hooks'
-import { useBenchmarksHistory } from '@/lib/pyth/useBenchmarksHistory'
+import { useLatestPrice, usePriceHistory } from '@/lib/price'
+import { changeSinceStart } from '@/lib/price/change'
 import { MarketMiniChart } from './MarketMiniChart'
 
 const STATE_LABELS: Record<MarketState, string> = {
@@ -36,31 +36,13 @@ interface MarketCardProps {
 
 function appendLiveTick(
   history: Market['history'],
-  latestTick: PythTick | null,
+  latestTick: PriceTick | null,
 ): Market['history'] {
   if (!latestTick || !Number.isFinite(latestTick.value)) return history
 
   const lastHistoryPoint = history[history.length - 1]
   if (lastHistoryPoint && latestTick.time <= lastHistoryPoint.time) return history
   return [...history, { time: latestTick.time, value: latestTick.value }]
-}
-
-function calculatePctChange(args: { history: Market['history']; marketStart: number }): {
-  value: number
-  isPositive: boolean
-} {
-  if (args.history.length === 0) return { value: 0, isPositive: true }
-
-  const startPricePoint = args.history.reduce((prev, curr) =>
-    Math.abs(curr.time - args.marketStart) < Math.abs(prev.time - args.marketStart) ? curr : prev,
-  )
-
-  const latestPrice = args.history[args.history.length - 1].value
-  const startPrice = startPricePoint.value
-  if (startPrice === 0) return { value: 0, isPositive: true }
-
-  const diff = ((latestPrice - startPrice) / startPrice) * 100
-  return { value: Math.abs(diff), isPositive: diff >= 0 }
 }
 
 function marketTimeLabel(market: Market, now: number): { label: string; value: string } | null {
@@ -78,7 +60,7 @@ function marketTimeLabel(market: Market, now: number): { label: string; value: s
 export function MarketCard({ market, now, onClick }: MarketCardProps) {
   const feedId = feedIdForPair(market.pair)
   const latestTick = useLatestPrice(feedId)
-  const { data: realHistory } = useBenchmarksHistory({
+  const { data: realHistory } = usePriceHistory({
     pair: market.pair,
     interval: '1h',
   })
@@ -88,9 +70,10 @@ export function MarketCard({ market, now, onClick }: MarketCardProps) {
     () => appendLiveTick(historyToUse, latestTick),
     [historyToUse, latestTick],
   )
-  const { value: pctChange, isPositive } = calculatePctChange({
+  const { value: pctChange, isPositive } = changeSinceStart({
     history: liveHistory,
     marketStart: market.startTime,
+    current: liveHistory.at(-1)?.value ?? 0,
   })
   const timeLabel = marketTimeLabel(market, now)
   const durationLabel = formatMarketDurationLabel(market.startTime, market.endTime)

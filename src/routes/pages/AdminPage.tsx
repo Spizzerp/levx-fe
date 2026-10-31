@@ -36,8 +36,7 @@ import { logTransactionError } from '@/lib/solana/logTransactionError'
 import { resolveBaseMintLabel } from '@/lib/api/pairLabels'
 import { toast } from '@/stores/toastStore'
 import { useWalletStore } from '@/stores/walletStore'
-import { usePythFeed, useLatestPrice } from '@/lib/pyth/hooks'
-import { useBenchmarksHistory, useLazyHistoryTrigger } from '@/lib/pyth/useBenchmarksHistory'
+import { usePriceFeed, useLatestPrice, usePriceHistory, useLazyHistoryTrigger } from '@/lib/price'
 import { isBytes32Hex, normalizeBytes32Hex } from '@/lib/marketGroups'
 
 /* ── Pair config ─────────────────────────────────────────── */
@@ -424,28 +423,28 @@ export function AdminPage() {
 
   const pair = availablePairs[selectedPair] ?? availablePairs[0]
   const pairLabel = pair?.label ?? ''
-  // Hex prefix matches feedIdForPair() outputs ("0x…") so usePythFeed
-  // and useBenchmarksHistory keep accepting the same shape.
+  // Hex prefix matches feedIdForPair() outputs ("0x…") so usePriceFeed
+  // and usePriceHistory's level lookup key the same feed.
   const feedId = pair?.feedIdHex ? `0x${pair.feedIdHex}` : null
 
   // Live price feed
-  usePythFeed(feedId)
+  usePriceFeed(feedId)
   const latestTick = useLatestPrice(feedId)
 
   // Historical candles for chart backdrop
   const {
-    data: benchmarks,
-    isLoading: isBenchmarksLoading,
+    data: priceHistory,
+    isLoading: isHistoryLoading,
     fetchOlder,
     hasMoreHistory,
     isFetchingOlder,
-  } = useBenchmarksHistory({
+  } = usePriceHistory({
     pair: pairLabel,
     interval: '1h',
   })
 
   const onChartViewportChange = useLazyHistoryTrigger({
-    history: benchmarks,
+    history: priceHistory,
     hasMoreHistory,
     isFetchingOlder,
     fetchOlder,
@@ -461,11 +460,11 @@ export function AdminPage() {
   const checkpointsValid =
     totalCheckpoints >= MIN_CHECKPOINTS && totalCheckpoints <= MAX_CHECKPOINTS
 
-  // Use benchmarks as history; fallback to empty
-  const chartHistory = useMemo(() => benchmarks ?? [], [benchmarks])
+  // Use the price history; fallback to empty
+  const chartHistory = useMemo(() => priceHistory ?? [], [priceHistory])
 
-  // Derive base price from latest tick or last benchmark candle.
-  // PythTick exposes the price as `value` (not `price`) — see src/lib/pyth/types.ts.
+  // Derive base price from latest tick or last history candle.
+  // PriceTick exposes the price as `value` (not `price`) — see src/lib/price/types.ts.
   const basePrice = latestTick?.value ?? chartHistory[chartHistory.length - 1]?.value ?? 0
 
   // Build preview AI paths (stable seed from pair index so they don't flicker)
@@ -693,7 +692,7 @@ export function AdminPage() {
               marketStart={chartMarketStart}
               marketEnd={chartMarketEnd}
               pair={pairLabel}
-              isLoading={isBenchmarksLoading}
+              isLoading={isHistoryLoading}
               error={null}
               onViewportChange={onChartViewportChange}
               height={520}

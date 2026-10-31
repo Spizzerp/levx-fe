@@ -5,7 +5,7 @@ import type { ReactNode } from 'react'
 import { MarketCard } from '@/features/market/MarketCard'
 
 import type { Market } from '@/types/market'
-import type { PythTick } from '@/lib/pyth/types'
+import type { PriceTick } from '@/lib/price'
 
 vi.mock('@visx/responsive', () => ({
   ParentSize: ({
@@ -15,14 +15,11 @@ vi.mock('@visx/responsive', () => ({
   }) => children({ width: 640, height: 160 }),
 }))
 
-const useBenchmarksHistoryMock = vi.fn()
-vi.mock('@/lib/pyth/useBenchmarksHistory', () => ({
-  useBenchmarksHistory: (...args: unknown[]) => useBenchmarksHistoryMock(...args),
-}))
-
+const usePriceHistoryMock = vi.fn()
 const useLatestPriceMock = vi.fn()
-vi.mock('@/lib/pyth/hooks', () => ({
+vi.mock('@/lib/price', () => ({
   useLatestPrice: (...args: unknown[]) => useLatestPriceMock(...args),
+  usePriceHistory: (...args: unknown[]) => usePriceHistoryMock(...args),
 }))
 
 function makeMarket(overrides: Partial<Market> = {}): Market {
@@ -68,7 +65,7 @@ function makeMarket(overrides: Partial<Market> = {}): Market {
 
 describe('MarketCard', () => {
   beforeEach(() => {
-    useBenchmarksHistoryMock.mockReturnValue({ data: undefined })
+    usePriceHistoryMock.mockReturnValue({ data: undefined })
     useLatestPriceMock.mockReturnValue(null)
   })
 
@@ -79,13 +76,13 @@ describe('MarketCard', () => {
       { time: market.startTime, value: 100 },
       { time: market.startTime + 60 * 60 * 1000, value: 101 },
     ]
-    const latestTick: PythTick = {
+    const latestTick: PriceTick = {
       publishTime: Math.floor((market.startTime + 2 * 60 * 60 * 1000) / 1000),
       time: market.startTime + 2 * 60 * 60 * 1000,
       value: 110,
     }
 
-    useBenchmarksHistoryMock.mockReturnValue({ data: history })
+    usePriceHistoryMock.mockReturnValue({ data: history })
     useLatestPriceMock.mockReturnValue(latestTick)
 
     render(<MarketCard market={market} now={latestTick.time} onClick={vi.fn()} />)

@@ -18,10 +18,10 @@ vi.mock('@pythnetwork/hermes-client', () => ({
 }))
 
 describe('lib modules smoke test', () => {
-  it('src/lib/pyth/hooks exports usePythFeed and useLatestPrice', async () => {
-    const pyth = await import('@/lib/pyth/hooks')
-    expect(typeof pyth.usePythFeed).toBe('function')
-    expect(typeof pyth.useLatestPrice).toBe('function')
+  it('src/lib/price exports usePriceFeed and useLatestPrice', async () => {
+    const price = await import('@/lib/price')
+    expect(typeof price.usePriceFeed).toBe('function')
+    expect(typeof price.useLatestPrice).toBe('function')
   })
 
   it('src/lib/pyth/client exports getPythClient', async () => {

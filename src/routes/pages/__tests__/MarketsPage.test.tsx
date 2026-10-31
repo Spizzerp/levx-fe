@@ -58,6 +58,13 @@ vi.mock('@/lib/chain', async () => {
   }
 })
 
+// The grid view subscribes each pair's live price and each card loads history; neither reaches
+// the network in tests
+vi.mock('@/lib/price', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/price')>('@/lib/price')
+  return { ...actual, usePriceFeed: vi.fn(), usePriceHistory: () => ({ data: undefined }) }
+})
+
 import { MarketsPage } from '@/routes/pages/MarketsPage'
 import type { Market, MarketState } from '@/types/market'
 
