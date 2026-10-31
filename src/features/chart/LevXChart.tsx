@@ -230,7 +230,7 @@ function ChartInner({
     })
   }
   const handleRevealChart = useCallback(
-    () => setChartReveal((state) => ({ ...state, revealed: true })),
+    () => setChartReveal((state) => (state.revealed ? state : { ...state, revealed: true })),
     [],
   )
 
