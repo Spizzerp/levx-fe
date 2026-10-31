@@ -133,7 +133,9 @@ Failure even if it technically works (anti-goals):
   on today's basis, a few bps off for older candles)**. When the endpoint's `source` is `pyth`, the history is already on Pyth's level and
   is not shifted.
 - Opening the page mid-market: the stretch from the market's start to now is drawn from one-minute candles; only the part since the page
-  opened steps every second. Acceptable **(my call, stated in the brainstorm without objection)**.
+  opened steps every second. Acceptable **(my call, stated in the brainstorm without objection)**. A market that started longer ago
+  than the pipeline holds one-minute candles (a day) opens on the finest interval the cache still holds back to its start: five-minute
+  up to 30 days, hourly up to 90, daily beyond **(owner-approved fix, 2026-10-31)**.
 
 ### 5.3 Checkpoint dots and dissolved paths (my call, accepted in the mockup)
 

@@ -3,8 +3,18 @@
  * from the chain it builds paths from (Pyth when it has a key, else Coinbase, then Binance.US).
  */
 import { env } from '@/env/env.config'
+import type { CandleInterval } from '@/features/chart/TimeRangePicker'
 
 export type CandleResolution = '1' | '5' | '15' | '60' | 'D'
+
+/** Map each candle interval to the endpoint's resolution. */
+export const INTERVAL_TO_RESOLUTION: Record<CandleInterval, CandleResolution> = {
+  '1m': '1',
+  '5m': '5',
+  '15m': '15',
+  '1h': '60',
+  '1d': 'D',
+}
 
 /** Seconds per bar for each resolution. */
 export const RESOLUTION_SECONDS: Record<CandleResolution, number> = {
@@ -13,6 +23,18 @@ export const RESOLUTION_SECONDS: Record<CandleResolution, number> = {
   '15': 15 * 60,
   '60': 60 * 60,
   D: 24 * 60 * 60,
+}
+
+/**
+ * How far back the pipeline's cache holds each resolution, seconds (the pipeline's `CACHE_WINDOW_SEC`).
+ * A range older than this comes back empty.
+ */
+export const CACHE_WINDOW_SECONDS: Record<CandleResolution, number> = {
+  '1': 24 * 60 * 60,
+  '5': 30 * 24 * 60 * 60,
+  '15': 30 * 24 * 60 * 60,
+  '60': 90 * 24 * 60 * 60,
+  D: 365 * 24 * 60 * 60,
 }
 
 export interface CandleRow {

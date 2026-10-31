@@ -52,6 +52,7 @@ import {
 import { useUsdcBalance } from '@/lib/api/useUsdcBalance'
 import { toast } from '@/stores/toastStore'
 import { usePriceFeed, useLatestPrice, usePriceHistory, useLazyHistoryTrigger } from '@/lib/price'
+import { CACHE_WINDOW_SECONDS, INTERVAL_TO_RESOLUTION } from '@/lib/price/candlesClient'
 import { changeSinceStart } from '@/lib/price/change'
 import { feedIdForPair } from '@/lib/pyth/feedIds'
 import { buildAiPathFixture } from '@/tests/fixtures/aiPaths'
@@ -82,12 +83,23 @@ function isLiveUserDrawingState(state: Market['state'] | undefined): boolean {
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
-/** The interval a market opens on: one-minute candles up to a day, five-minute up to a week. */
-function defaultCandleInterval(startTime: number, endTime: number): CandleInterval {
+/** The opening intervals, finest first. */
+const DEFAULT_INTERVAL_STEPS: readonly CandleInterval[] = ['1m', '5m', '1h', '1d']
+
+/**
+ * The interval a market opens on: one-minute candles up to a day, five-minute up to a week, else
+ * hourly. It steps up while the pipeline no longer holds that interval back to the market's start.
+ */
+function defaultCandleInterval(startTime: number, endTime: number, now: number): CandleInterval {
   const durationMs = endTime - startTime
-  if (durationMs <= DAY_MS) return '1m'
-  if (durationMs <= 7 * DAY_MS) return '5m'
-  return '1h'
+  const byLength: CandleInterval =
+    durationMs <= DAY_MS ? '1m' : durationMs <= 7 * DAY_MS ? '5m' : '1h'
+  const ageSec = (now - startTime) / 1000
+  const steps = DEFAULT_INTERVAL_STEPS.slice(DEFAULT_INTERVAL_STEPS.indexOf(byLength))
+  return (
+    steps.find((interval) => ageSec <= CACHE_WINDOW_SECONDS[INTERVAL_TO_RESOLUTION[interval]]) ??
+    '1d'
+  )
 }
 
 function closestHistoryValue(
@@ -334,7 +346,7 @@ export function MarketPage() {
   const defaultInterval = useMemo(
     () =>
       marketStartTime !== undefined && marketEndTime !== undefined
-        ? defaultCandleInterval(marketStartTime, marketEndTime)
+        ? defaultCandleInterval(marketStartTime, marketEndTime, Date.now())
         : '1h',
     [marketStartTime, marketEndTime],
   )

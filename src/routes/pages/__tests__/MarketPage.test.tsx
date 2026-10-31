@@ -446,6 +446,29 @@ describe('MarketPage', () => {
     }
   })
 
+  it("steps the opening interval up once the market started before that interval's history", async () => {
+    const HOUR_MS = 60 * 60 * 1000
+    const DAY_MS = 24 * HOUR_MS
+    // The pipeline holds 1m candles for a day, 5m for 30 days, 1h for 90 days, 1d for a year.
+    for (const [durationMs, ageMs, interval, label] of [
+      [HOUR_MS, 2 * DAY_MS, '5m', '5M'],
+      [HOUR_MS, 40 * DAY_MS, '1h', '1H'],
+      [3 * DAY_MS, 40 * DAY_MS, '1h', '1H'],
+      [HOUR_MS, 100 * DAY_MS, '1d', '1D'],
+      [30 * DAY_MS, 100 * DAY_MS, '1d', '1D'],
+    ] as const) {
+      const startTime = Date.now() - ageMs
+      await setMarketState('settled', { startTime, endTime: startTime + durationMs })
+      const { unmount } = renderMarketPage()
+
+      expect(screen.getByRole('tab', { name: label, selected: true })).toBeInTheDocument()
+      expect(usePriceHistoryMock).toHaveBeenLastCalledWith(
+        expect.objectContaining({ pair: 'BTC/USDC', interval }),
+      )
+      unmount()
+    }
+  })
+
   it("keeps the user's interval for the market and opens the next market on its own", async () => {
     const user = userEvent.setup()
     const HOUR_MS = 60 * 60 * 1000

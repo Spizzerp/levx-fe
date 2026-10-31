@@ -2,21 +2,17 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useInfiniteQuery } from '@tanstack/react-query'
 
 import type { CandleInterval } from '@/features/chart/TimeRangePicker'
-import { CandlesRequestError, RESOLUTION_SECONDS, fetchCandles } from '@/lib/price/candlesClient'
-import type { CandleResolution, CandlesResponse } from '@/lib/price/candlesClient'
+import {
+  CandlesRequestError,
+  INTERVAL_TO_RESOLUTION,
+  RESOLUTION_SECONDS,
+  fetchCandles,
+} from '@/lib/price/candlesClient'
+import type { CandlesResponse } from '@/lib/price/candlesClient'
 import { useLevel } from '@/lib/price/hooks'
 import { priceSource } from '@/lib/price/source'
 import { feedIdForPair } from '@/lib/pyth/feedIds'
 import type { PricePoint } from '@/types/market'
-
-/** Map each candle interval to the endpoint's resolution. */
-const INTERVAL_TO_RESOLUTION: Record<CandleInterval, CandleResolution> = {
-  '1m': '1',
-  '5m': '5',
-  '15m': '15',
-  '1h': '60',
-  '1d': 'D',
-}
 
 /** Bars per page; the endpoint allows up to 1000 per request. */
 export const BARS_PER_PAGE = 500
