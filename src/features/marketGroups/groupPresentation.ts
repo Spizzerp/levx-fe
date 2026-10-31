@@ -219,7 +219,10 @@ export function getMarketsForGroupSlug(
   markets: readonly Market[] | undefined,
   slug: string,
 ): Market[] {
-  return (markets ?? []).filter((market) => market.groupMetadata?.slug === slug)
+  const groupKeyHash = (markets ?? []).find((market) => market.groupMetadata?.slug === slug)
+    ?.groupKeyHash
+  if (!groupKeyHash) return []
+  return getMarketsForGroup(markets, groupKeyHash)
 }
 
 export function buildMarketGroupSummaries(
