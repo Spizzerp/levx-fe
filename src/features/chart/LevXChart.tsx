@@ -66,6 +66,27 @@ const AI_PATH_OPACITY = 0.7
 const DISSOLVED_PATH_OPACITY = 0.35
 /** Checkpoint labels sit on a second row, below the y=12 [ START ] / [ ENDS ] markers. */
 const CHECKPOINT_LABEL_Y = 24
+/** The next checkpoint's countdown sits on a third row, clear of the newest dot's label. */
+const COUNTDOWN_LABEL_Y = 36
+const CHECKPOINT_LABEL_FONT_SIZE = 9
+const CHECKPOINT_LABEL_LETTER_SPACING_EM = 0.08
+/** Space Mono advances about 0.6 em per character. */
+const MONO_ADVANCE_EM = 0.6
+const CHECKPOINT_LABEL_CHAR_WIDTH_PX =
+  CHECKPOINT_LABEL_FONT_SIZE * (MONO_ADVANCE_EM + CHECKPOINT_LABEL_LETTER_SPACING_EM)
+/** A label closer than this to the next drawn label is skipped (dots always draw). */
+const CHECKPOINT_LABEL_GAP_PX = 6
+/** A guide closer than this to the previous drawn guide is skipped. */
+const CHECKPOINT_GUIDE_GAP_PX = 12
+
+function checkpointLabel(cp: CheckpointPrice): string {
+  return `#${cp.index + 1} · ${formatPrice(cp.price)}`
+}
+
+/** Estimated rendered width of a checkpoint label, from its character count. */
+function checkpointLabelWidth(text: string): number {
+  return text.length * CHECKPOINT_LABEL_CHAR_WIDTH_PX
+}
 
 function pathStyle(path: PredictionPath): { stroke: string; dash: string; opacity: number } {
   if (path.origin === 'user') return USER_DRAWN_STYLE
@@ -127,6 +148,7 @@ export interface LevXChartProps {
   /**
    * On-chain settled price of each passed checkpoint, drawn as a labelled dot, with faint
    * guides at the checkpoints still to come. Omit it to draw neither (e.g. previews).
+   * In checkpoint order, as `fetchCheckpointPrices` returns them (label thinning keeps the last).
    */
   checkpointPrices?: CheckpointPrice[]
   /**
@@ -398,11 +420,12 @@ function ChartInner({
         return
       }
       const t = timeScale.invert(xInner).getTime()
-      // In the past → read from history. In the future → read from selected prediction (if any).
+      // In the past → read from history. In the future → read from selected prediction (if any),
+      // as drawn: a dissolved path has no values past its cut.
       let sourceData: PricePoint[] = mergedHistory
       if (t > nowTime && selectedPathId) {
         const selected = predictions.find((p) => p.id === selectedPathId)
-        if (selected) sourceData = selected.data
+        if (selected) sourceData = dissolvedPathData.get(selected.id) ?? selected.data
       }
       if (sourceData.length === 0) return
       const idx = bisectTime(sourceData, t, 1)
@@ -411,7 +434,7 @@ function ChartInner({
       const d = !d1 ? d0 : !d0 ? d1 : t - d0.time > d1.time - t ? d1 : d0
       if (d) setHover({ time: d.time, value: d.value })
     },
-    [innerWidth, selectedPathId, timeScale, mergedHistory, predictions, nowTime],
+    [innerWidth, selectedPathId, timeScale, mergedHistory, predictions, nowTime, dissolvedPathData],
   )
 
   const handleLeave = useCallback(() => setHover(null), [])
@@ -425,13 +448,34 @@ function ChartInner({
   const showMarketEndMarker = marketEnd > nowTime
   const marketEndX = timeScale(marketEnd)
 
-  // Checkpoints not yet sampled and still ahead of now get a faint guide; the first is the next one.
+  // Checkpoints not yet sampled and still ahead of now get a faint guide; the first is the next
+  // one and always draws, later ones are skipped when closer than the gap to the last drawn guide.
   const sampledIndices = new Set(checkpointPrices?.map((cp) => cp.index))
-  const upcomingCheckpoints = checkpointPrices
-    ? checkpointXs.flatMap((time, index) =>
-        time > nowTime && !sampledIndices.has(index) ? [{ index, time }] : [],
-      )
-    : []
+  const upcomingCheckpoints: { index: number; time: number; x: number }[] = []
+  if (checkpointPrices) {
+    for (let index = 0; index < checkpointXs.length; index++) {
+      const time = checkpointXs[index]
+      if (time <= nowTime || sampledIndices.has(index)) continue
+      const x = timeScale(time)
+      const previous = upcomingCheckpoints[upcomingCheckpoints.length - 1]
+      if (previous && x - previous.x < CHECKPOINT_GUIDE_GAP_PX) continue
+      upcomingCheckpoints.push({ index, time, x })
+    }
+  }
+
+  // Every settled checkpoint gets a dot; labels are walked from the newest back, and one that
+  // would come closer than the gap to the newer drawn label is skipped.
+  const settledCheckpoints = checkpointPrices ?? []
+  const labelledCheckpoints = new Set<number>()
+  let newerLabelLeft = Infinity
+  for (let i = settledCheckpoints.length - 1; i >= 0; i--) {
+    const cp = settledCheckpoints[i]
+    const x = timeScale(cp.time)
+    const halfWidth = checkpointLabelWidth(checkpointLabel(cp)) / 2
+    if (x + halfWidth + CHECKPOINT_LABEL_GAP_PX > newerLabelLeft) continue
+    labelledCheckpoints.add(cp.index)
+    newerLabelLeft = x - halfWidth
+  }
 
   return (
     <svg
@@ -689,34 +733,32 @@ function ChartInner({
           {/* ── Checkpoints: settled price dots, guides for the ones to come ── */}
           {checkpointPrices && (
             <g pointerEvents="none">
-              {upcomingCheckpoints.map(({ index, time }, i) => {
-                const x = timeScale(time)
-                return (
-                  <g key={`upcoming-${index}`}>
-                    <Line
-                      from={{ x, y: 0 }}
-                      to={{ x, y: innerHeight }}
-                      stroke={C.muted}
-                      strokeWidth={1}
-                      strokeDasharray="2 4"
-                      opacity={0.25}
-                    />
-                    {i === 0 && (
-                      <text
-                        x={x}
-                        y={CHECKPOINT_LABEL_Y}
-                        fontFamily="Space Mono, monospace"
-                        fontSize="9"
-                        letterSpacing="0.08em"
-                        fill={C.muted}
-                        textAnchor="middle"
-                      >
-                        {`in ${Math.ceil((time - nowTime) / 60_000)} m`}
-                      </text>
-                    )}
-                  </g>
-                )
-              })}
+              {upcomingCheckpoints.map(({ index, time, x }, i) => (
+                <g key={`upcoming-${index}`}>
+                  <Line
+                    data-testid="checkpoint-guide"
+                    from={{ x, y: 0 }}
+                    to={{ x, y: innerHeight }}
+                    stroke={C.muted}
+                    strokeWidth={1}
+                    strokeDasharray="2 4"
+                    opacity={0.25}
+                  />
+                  {i === 0 && (
+                    <text
+                      x={x}
+                      y={COUNTDOWN_LABEL_Y}
+                      fontFamily="Space Mono, monospace"
+                      fontSize={CHECKPOINT_LABEL_FONT_SIZE}
+                      letterSpacing={`${CHECKPOINT_LABEL_LETTER_SPACING_EM}em`}
+                      fill={C.muted}
+                      textAnchor="middle"
+                    >
+                      {`in ${Math.ceil((time - nowTime) / 60_000)} m`}
+                    </text>
+                  )}
+                </g>
+              ))}
               {checkpointPrices.map((cp) => {
                 const x = timeScale(cp.time)
                 return (
@@ -730,17 +772,19 @@ function ChartInner({
                       stroke={C.surface}
                       strokeWidth={2}
                     />
-                    <text
-                      x={x}
-                      y={CHECKPOINT_LABEL_Y}
-                      fontFamily="Space Mono, monospace"
-                      fontSize="9"
-                      letterSpacing="0.08em"
-                      fill={C.settled}
-                      textAnchor="middle"
-                    >
-                      {`#${cp.index + 1} · ${formatPrice(cp.price)}`}
-                    </text>
+                    {labelledCheckpoints.has(cp.index) && (
+                      <text
+                        x={x}
+                        y={CHECKPOINT_LABEL_Y}
+                        fontFamily="Space Mono, monospace"
+                        fontSize={CHECKPOINT_LABEL_FONT_SIZE}
+                        letterSpacing={`${CHECKPOINT_LABEL_LETTER_SPACING_EM}em`}
+                        fill={C.settled}
+                        textAnchor="middle"
+                      >
+                        {checkpointLabel(cp)}
+                      </text>
+                    )}
                   </g>
                 )
               })}

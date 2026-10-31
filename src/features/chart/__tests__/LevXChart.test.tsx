@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import React from 'react'
 import { LevXChart } from '@/features/chart/LevXChart'
 
@@ -200,17 +200,91 @@ describe('LevXChart checkpoints', () => {
     return Number(numbers[numbers.length - 2])
   }
 
+  /** Label width as the chart estimates it: Space Mono at 9 px, 0.6 em advance + 0.08 em spacing. */
+  function labelWidth(text: string): number {
+    return text.length * 9 * (0.6 + 0.08)
+  }
+
+  /** Hovers the chart's hit area at a plot x. jsdom's bounding rect is all zeros. */
+  function hoverAt(container: HTMLElement, x: number) {
+    const hitArea = container.querySelector('rect[fill="transparent"][x="0"][y="0"]')!
+    fireEvent.pointerMove(hitArea, { clientX: 16 + x, buttons: 0 })
+  }
+
   it('draws one dot and label per settled checkpoint', () => {
+    // Six-hour checkpoints leave each label room (about 86 px apart on the 704 px plot).
+    const sixHours = 6 * 60 * 60
     renderChart({
-      nowTime: startTime + 45 * 60_000,
+      market: { startTime, checkpointInterval: sixHours, totalCheckpoints: 4 },
+      nowTime: startTime + 7 * 60 * 60_000,
       checkpointPrices: [
         { index: 0, time: startTime + 4_000, price: 95.41 },
-        { index: 1, time: startTime + intervalMs + 3_000, price: 96.02 },
+        { index: 1, time: startTime + sixHours * 1000 + 3_000, price: 96.02 },
       ],
     })
     expect(screen.getAllByTestId('checkpoint-dot')).toHaveLength(2)
     expect(screen.getByText('#1 · 95.41')).toBeInTheDocument()
     expect(screen.getByText('#2 · 96.02')).toBeInTheDocument()
+  })
+
+  it('thins checkpoint labels that would overlap and keeps the newest', () => {
+    const checkpointPrices = Array.from({ length: 48 }, (_, i) => ({
+      index: i,
+      time: startTime + i * intervalMs + 3_000,
+      price: 100 + i / 4,
+    }))
+    renderChart({ nowTime: endTime, checkpointPrices })
+
+    expect(screen.getAllByTestId('checkpoint-dot')).toHaveLength(48)
+    const labels = screen.getAllByText(/^#\d+ · /)
+    expect(labels.length).toBeGreaterThan(1)
+    expect(labels.length).toBeLessThan(48)
+    expect(screen.getByText('#48 · 111.75')).toBeInTheDocument()
+    const spans = labels
+      .map((label) => {
+        const x = Number(label.getAttribute('x'))
+        const half = labelWidth(label.textContent ?? '') / 2
+        return { left: x - half, right: x + half }
+      })
+      .sort((a, b) => a.left - b.left)
+    for (let i = 1; i < spans.length; i++) {
+      expect(spans[i].left).toBeGreaterThanOrEqual(spans[i - 1].right)
+    }
+  })
+
+  it('thins guides on a dense market and keeps the next one with its countdown', () => {
+    renderChart({
+      nowTime: startTime + 70 * 60_000,
+      checkpointPrices: [
+        { index: 0, time: startTime + 4_000, price: 95.41 },
+        { index: 1, time: startTime + intervalMs + 3_000, price: 96.02 },
+        { index: 2, time: startTime + 2 * intervalMs + 5_000, price: 96.5 },
+      ],
+    })
+    // Checkpoints 3 … 47 are ahead of now, about 7 px apart.
+    const guideXs = screen
+      .getAllByTestId('checkpoint-guide')
+      .map((guide) => Number(guide.getAttribute('x1')))
+    expect(guideXs.length).toBeGreaterThan(1)
+    expect(guideXs.length).toBeLessThan(45)
+    expect(guideXs[0]).toBeCloseTo(xAt(startTime + 3 * intervalMs), 3)
+    for (let i = 1; i < guideXs.length; i++) {
+      expect(guideXs[i] - guideXs[i - 1]).toBeGreaterThanOrEqual(12)
+    }
+    expect(screen.getByText('in 20 m')).toBeInTheDocument()
+  })
+
+  it('keeps the crosshair off a dissolved path past its cut', () => {
+    // paths[2] is the fixture's selected path; it dissolved at checkpoint 2 (start + 1 h).
+    const dissolved = { ...paths[2], dissolved: true, dissolvedAtCheckpoint: 3 }
+    const cutTime = startTime + 2 * intervalMs
+    const { container } = renderChart({
+      nowTime: startTime + 3 * 60 * 60_000,
+      predictions: [...paths.slice(0, 2), dissolved, ...paths.slice(3)],
+    })
+    hoverAt(container, xAt(startTime + 10 * 60 * 60_000))
+    const crosshair = container.querySelector('line[stroke-dasharray="1 3"]')!
+    expect(Number(crosshair.getAttribute('x1'))).toBeLessThanOrEqual(xAt(cutTime) + 1e-6)
   })
 
   it('cuts a dissolved path at its dissolving checkpoint', () => {
