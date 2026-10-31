@@ -182,3 +182,64 @@ describe('LevXChart', () => {
     expect(container.querySelector('svg')).toBeInTheDocument()
   })
 })
+
+describe('LevXChart checkpoints', () => {
+  const intervalMs = market.checkpointInterval * 1000
+
+  /** The default market-focused domain over the 800 − 16 − 80 px plot, as the chart computes it. */
+  function xAt(time: number): number {
+    const duration = endTime - startTime
+    const from = startTime - duration
+    const to = endTime + duration * 0.05
+    return ((time - from) / (to - from)) * (800 - 16 - 80)
+  }
+
+  /** The last x in an SVG path's `d` (the end point of the drawn line). */
+  function lastX(d: string | null): number {
+    const numbers = (d ?? '').match(/-?\d+(\.\d+)?(e-?\d+)?/g) ?? []
+    return Number(numbers[numbers.length - 2])
+  }
+
+  it('draws one dot and label per settled checkpoint', () => {
+    renderChart({
+      nowTime: startTime + 45 * 60_000,
+      checkpointPrices: [
+        { index: 0, time: startTime + 4_000, price: 95.41 },
+        { index: 1, time: startTime + intervalMs + 3_000, price: 96.02 },
+      ],
+    })
+    expect(screen.getAllByTestId('checkpoint-dot')).toHaveLength(2)
+    expect(screen.getByText('#1 · 95.41')).toBeInTheDocument()
+    expect(screen.getByText('#2 · 96.02')).toBeInTheDocument()
+  })
+
+  it('cuts a dissolved path at its dissolving checkpoint', () => {
+    const dissolved = { ...paths[0], dissolved: true, dissolvedAtCheckpoint: 3 }
+    const cutTime = startTime + 2 * intervalMs
+    renderChart({
+      nowTime: startTime + 3 * 60 * 60_000,
+      predictions: [dissolved, ...paths.slice(1)],
+    })
+    const line = screen.getByTestId('dissolved-path')
+    expect(lastX(line.getAttribute('d'))).toBeCloseTo(xAt(cutTime), 3)
+    expect(line.getAttribute('opacity')).toBe('0.35')
+    expect(Number(screen.getByTestId('dissolve-mark').getAttribute('x'))).toBeCloseTo(
+      xAt(cutTime),
+      3,
+    )
+  })
+
+  it('labels the next unsampled checkpoint with its countdown', () => {
+    renderChart({
+      nowTime: startTime + 70 * 60_000,
+      checkpointPrices: [
+        { index: 0, time: startTime + 4_000, price: 95.41 },
+        { index: 1, time: startTime + intervalMs + 3_000, price: 96.02 },
+        { index: 2, time: startTime + 2 * intervalMs + 5_000, price: 96.5 },
+      ],
+    })
+    // Checkpoint 3 is due at start + 90 min, 20 min after now.
+    expect(screen.getByText('in 20 m')).toBeInTheDocument()
+    expect(screen.getAllByText(/^in \d+ m$/)).toHaveLength(1)
+  })
+})

@@ -27,6 +27,7 @@ import { SlippageSelector } from '@/ui/SlippageSelector'
 import { Stub } from '@/ui/Stub'
 import { UserPositionCard } from '@/features/market/UserPositionCard'
 import { cn } from '@/lib/cn'
+import { useCheckpointPrices } from '@/lib/api/checkpointPrices'
 import { useMode2Readiness } from '@/lib/api/hooks'
 import { useMarket, useUserPosition } from '@/lib/chain'
 import { parseMarketState } from '@/lib/api/adapters'
@@ -291,6 +292,10 @@ export function MarketPage() {
   const { id } = useParams({ from: '/market/$id' })
   const { data: market, isLoading, isError, refetch } = useMarket(id)
   const { data: userPosition } = useUserPosition(id)
+  const checkpointPrices = useCheckpointPrices(
+    market?.marketId ?? null,
+    market?.completedCheckpoints ?? 0,
+  )
   const {
     data: mode2Readiness,
     isLoading: isMode2ReadinessLoading,
@@ -817,6 +822,7 @@ export function MarketPage() {
                 checkpointInterval: chartCheckpointInterval,
                 totalCheckpoints: chartTotalCheckpoints,
               }}
+              checkpointPrices={checkpointPrices}
               renderDrawingOverlay={({
                 xScale,
                 yScale,
