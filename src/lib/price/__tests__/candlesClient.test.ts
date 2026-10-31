@@ -126,6 +126,31 @@ describe('fetchPipelineMinuteCandle', () => {
     )
   })
 
+  it('the minute-candle fetcher ignores a Pyth-sourced candle', async () => {
+    // Pyth's price is not Coinbase's, so a Pyth-sourced candle can't measure the level
+    const minute = (sources: string[]) =>
+      json(
+        candles({
+          resolution: '1',
+          sources,
+          rows: [{ time: M, open: 95.6, high: 95.9, low: 95.5, close: 95.8 }],
+        }),
+      )
+
+    fetchMock.mockResolvedValueOnce(minute(['pyth']))
+    await expect(fetchPipelineMinuteCandle('SOL/USDC', M)).resolves.toBeNull()
+
+    fetchMock.mockResolvedValueOnce(minute(['coinbase']))
+    await expect(fetchPipelineMinuteCandle('SOL/USDC', M)).resolves.toEqual({
+      time: M,
+      open: 95.6,
+      close: 95.8,
+    })
+
+    fetchMock.mockResolvedValueOnce(minute(['coinbase', 'pyth']))
+    await expect(fetchPipelineMinuteCandle('SOL/USDC', M)).resolves.toBeNull()
+  })
+
   it('answers null when the minute is missing or the request fails', async () => {
     fetchMock.mockResolvedValueOnce(
       json(

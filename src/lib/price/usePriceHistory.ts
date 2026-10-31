@@ -21,9 +21,14 @@ const INTERVAL_TO_RESOLUTION: Record<CandleInterval, CandleResolution> = {
 /** Bars per page; the endpoint allows up to 1000 per request. */
 export const BARS_PER_PAGE = 500
 
-/** A cache still backfilling answers 503 candle_cache_warming; it is asked again this often. */
-const WARMING_RETRIES = 3
+/** A cache still backfilling answers 503 candle_cache_warming; it is asked again for two minutes. */
+const WARMING_RETRIES = 24
 const WARMING_RETRY_DELAY_MS = 5000
+/** Any other failure is retried once, as the app's default does, after react-query's first delay. */
+const OTHER_RETRIES = 1
+const OTHER_RETRY_DELAY_MS = 1000
+/** While the newest page is empty (the cache has nothing yet for now), it is asked again this often. */
+const EMPTY_POLL_MS = 15_000
 
 const isWarming = (error: Error) =>
   error instanceof CandlesRequestError && error.code === 'candle_cache_warming'
@@ -106,8 +111,13 @@ export function usePriceHistory({
       if (lastPage.rows.length === 0 || lastPage.window.from > from) return undefined
       return from - 1
     },
-    retry: (failureCount, error) => failureCount < WARMING_RETRIES && isWarming(error),
-    retryDelay: WARMING_RETRY_DELAY_MS,
+    retry: (failureCount, error) =>
+      failureCount < (isWarming(error) ? WARMING_RETRIES : OTHER_RETRIES),
+    retryDelay: (_failureCount, error) =>
+      isWarming(error) ? WARMING_RETRY_DELAY_MS : OTHER_RETRY_DELAY_MS,
+    // An empty newest page ends paging, so poll until the cache has rows for it; an empty older
+    // page is the end of the history and polls nothing.
+    refetchInterval: (q) => (q.state.data?.pages[0]?.rows.length === 0 ? EMPTY_POLL_MS : false),
     staleTime: 30_000,
     select: (data) => data.pages,
   })

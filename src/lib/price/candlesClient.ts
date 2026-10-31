@@ -108,19 +108,21 @@ export async function fetchCandles(args: {
 
 /**
  * The one-minute candle starting at `minuteStartSec`, or null on any failure: the free feed's
- * Coinbase price at a Pyth publish time its trade buffer doesn't reach.
+ * Coinbase price at a Pyth publish time its trade buffer doesn't reach. A series with any Pyth
+ * rows answers null, since Pyth's price measured against itself would give a level of 1.
  */
 export async function fetchPipelineMinuteCandle(
   pair: string,
   minuteStartSec: number,
 ): Promise<{ time: number; open: number; close: number } | null> {
   try {
-    const { rows } = await fetchCandles({
+    const { rows, sources } = await fetchCandles({
       pair,
       resolution: '1',
       from: minuteStartSec,
       to: minuteStartSec + 60,
     })
+    if (sources.includes('pyth')) return null
     const row = rows.find((r) => r.time === minuteStartSec)
     return row ? { time: row.time, open: row.open, close: row.close } : null
   } catch {

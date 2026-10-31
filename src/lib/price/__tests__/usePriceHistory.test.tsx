@@ -72,6 +72,12 @@ const warming = () =>
     'candle_cache_warming',
   )
 
+/**
+ * Runs the fake clock inside act. A 0 ms timeout set while the clock runs (react-query notifies
+ * observers through one) lands 1 ms later, so a flush after a fetch advances 1 ms.
+ */
+const tick = (ms: number) => act(() => vi.advanceTimersByTimeAsync(ms))
+
 function render(pair: string | null = PAIR, interval: '5m' | '1h' = '5m') {
   return renderHook(() => usePriceHistory({ pair, interval, toTime: T }), {
     wrapper: makeWrapper(),
@@ -151,19 +157,24 @@ describe('usePriceHistory', () => {
     expect(result.current.data).toHaveLength(2)
   })
 
-  it('stops paging at an empty page', async () => {
+  it('an empty older page still ends paging', async () => {
+    vi.useFakeTimers()
     mockFetchCandles
       .mockResolvedValueOnce(candles([row(T - 300, 95.2)]))
       .mockResolvedValueOnce(candles([]))
 
     const { result } = render()
-    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    await tick(1)
+    expect(result.current.isSuccess).toBe(true)
 
-    await act(async () => {
-      result.current.fetchOlder()
-    })
+    act(() => result.current.fetchOlder())
+    await tick(1)
 
-    await waitFor(() => expect(result.current.hasMoreHistory).toBe(false))
+    expect(mockFetchCandles).toHaveBeenCalledTimes(2)
+    expect(result.current.hasMoreHistory).toBe(false)
+    expect(result.current.data).toEqual([{ time: (T - 300) * 1000, value: 95.2 }])
+    // The newest page has rows, so nothing polls
+    await tick(10 * 60_000)
     expect(mockFetchCandles).toHaveBeenCalledTimes(2)
   })
 
@@ -205,33 +216,32 @@ describe('usePriceHistory', () => {
     expect(result.current.data).toEqual([{ time: (T - 300) * 1000, value: 95.2 }])
   })
 
-  it('retries a warming 503', async () => {
+  it('retries a warming 503 for up to two minutes', async () => {
     vi.useFakeTimers()
-    mockFetchCandles
-      .mockRejectedValueOnce(warming())
-      .mockRejectedValueOnce(warming())
-      .mockRejectedValueOnce(warming())
-      .mockResolvedValueOnce(candles([row(T - 300, 95.2)]))
+    mockFetchCandles.mockRejectedValue(warming())
 
     const { result } = render()
-    await act(() => vi.advanceTimersByTimeAsync(0))
+    await tick(0)
     expect(mockFetchCandles).toHaveBeenCalledTimes(1)
 
-    // Three retries, five seconds apart
-    for (let retry = 1; retry <= 3; retry++) {
-      await act(() => vi.advanceTimersByTimeAsync(4_999))
+    // 24 retries, five seconds apart
+    for (let retry = 1; retry <= 24; retry++) {
+      await tick(4_999)
       expect(mockFetchCandles).toHaveBeenCalledTimes(retry)
-      await act(() => vi.advanceTimersByTimeAsync(1))
+      await tick(1)
       expect(mockFetchCandles).toHaveBeenCalledTimes(retry + 1)
     }
-    // react-query notifies observers through a 0 ms timeout, which the fake clock runs 1 ms later
-    await act(() => vi.advanceTimersByTimeAsync(1))
+    await tick(1)
 
-    expect(result.current.isSuccess).toBe(true)
-    expect(result.current.data).toEqual([{ time: (T - 300) * 1000, value: 95.2 }])
+    // The 25th failure surfaces, and nothing asks again
+    expect(result.current.isError).toBe(true)
+    expect(result.current.error).toMatchObject({ code: 'candle_cache_warming' })
+    await tick(10 * 60_000)
+    expect(mockFetchCandles).toHaveBeenCalledTimes(25)
   })
 
-  it('does not retry a disabled cache', async () => {
+  it('retries other failures once', async () => {
+    vi.useFakeTimers()
     mockFetchCandles.mockRejectedValue(
       new CandlesRequestError(
         'API request failed: 503 Service Unavailable - candle_cache_disabled',
@@ -241,9 +251,43 @@ describe('usePriceHistory', () => {
     )
 
     const { result } = render()
+    await tick(0)
+    expect(mockFetchCandles).toHaveBeenCalledTimes(1)
+    await tick(999)
+    expect(mockFetchCandles).toHaveBeenCalledTimes(1)
+    await tick(1)
+    expect(mockFetchCandles).toHaveBeenCalledTimes(2)
+    await tick(1)
 
-    await waitFor(() => expect(result.current.isError).toBe(true))
-    expect(mockFetchCandles).toHaveBeenCalledOnce()
+    expect(result.current.isError).toBe(true)
+    expect(result.current.error).toMatchObject({ code: 'candle_cache_disabled' })
+    await tick(10 * 60_000)
+    expect(mockFetchCandles).toHaveBeenCalledTimes(2)
+  })
+
+  it('polls while the newest page is empty and stops once it has rows', async () => {
+    vi.useFakeTimers()
+    mockFetchCandles
+      .mockResolvedValueOnce(candles([]))
+      .mockResolvedValueOnce(candles([row(T - 300, 95.2)]))
+
+    const { result } = render()
+    await tick(1)
+    expect(result.current.data).toEqual([])
+    expect(result.current.hasMoreHistory).toBe(false)
+
+    await tick(14_000)
+    expect(mockFetchCandles).toHaveBeenCalledTimes(1)
+    await tick(1_000)
+    expect(mockFetchCandles).toHaveBeenCalledTimes(2)
+    // The refetch asks for the same newest page again
+    expect(mockFetchCandles.mock.calls[1][0]).toEqual(mockFetchCandles.mock.calls[0][0])
+    await tick(1)
+
+    expect(result.current.data).toEqual([{ time: (T - 300) * 1000, value: 95.2 }])
+    expect(result.current.hasMoreHistory).toBe(true)
+    await tick(10 * 60_000)
+    expect(mockFetchCandles).toHaveBeenCalledTimes(2)
   })
 
   it('does not fetch without a supported pair', () => {
