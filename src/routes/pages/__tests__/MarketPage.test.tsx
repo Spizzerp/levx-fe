@@ -136,9 +136,9 @@ vi.mock('@/lib/price', async () => {
   }
 })
 
-// Mock usePriceHistory so tests don't hit the network
-vi.mock('@/lib/price/usePriceHistory', () => ({
-  usePriceHistory: () => ({
+// Mock usePriceHistory so tests don't hit the network; the spy records the interval asked for
+const usePriceHistoryMock = vi.hoisted(() =>
+  vi.fn((_args: { pair: string | null; interval: string }) => ({
     data: undefined,
     isLoading: false,
     isError: false,
@@ -148,7 +148,10 @@ vi.mock('@/lib/price/usePriceHistory', () => ({
     isFetchingOlder: false,
     hasMoreHistory: true,
     fetchOlder: () => {},
-  }),
+  })),
+)
+vi.mock('@/lib/price/usePriceHistory', () => ({
+  usePriceHistory: usePriceHistoryMock,
   useLazyHistoryTrigger: () => () => {},
 }))
 
@@ -198,6 +201,7 @@ vi.mock('@/lib/supabase/hooks', () => ({
   usePublishDrawFrame: () => () => {},
 }))
 
+import { useParams } from '@tanstack/react-router'
 import { MarketPage } from '@/routes/pages/MarketPage'
 import { PYTH_FEED_IDS } from '@/lib/pyth/feedIds'
 import { useDrawingStore } from '@/stores/drawingStore'
@@ -289,6 +293,8 @@ beforeEach(async () => {
   useDrawingStore.setState({ state: { phase: 'idle' }, totalCheckpoints: 0 })
   usePriceStore.setState({ ticks: {}, feeds: {}, levels: {}, trails: {} })
   usePriceFeedSpy.mockClear()
+  usePriceHistoryMock.mockClear()
+  vi.mocked(useParams).mockReturnValue({ id: 'btc' } as never)
   useCheckpointPricesMock.mockReturnValue([])
   claimMutateMock.mockClear()
   setVisible.mockClear()
@@ -418,6 +424,66 @@ describe('MarketPage', () => {
     expect(usePriceFeedSpy).toHaveBeenCalled()
     // The feedId passed should be the BTC/USDC feed from PYTH_FEED_IDS
     expect((usePriceFeedSpy.mock.calls[0] as unknown[])[0]).toMatch(/^0x[a-f0-9]+$/)
+  })
+
+  it('the market page opens short markets on one-minute candles', async () => {
+    const HOUR_MS = 60 * 60 * 1000
+    const DAY_MS = 24 * HOUR_MS
+    for (const [durationMs, interval, label] of [
+      [HOUR_MS, '1m', '1M'],
+      [3 * DAY_MS, '5m', '5M'],
+      [30 * DAY_MS, '1h', '1H'],
+    ] as const) {
+      const startTime = Date.now() - durationMs / 2
+      await setMarketState('active', { startTime, endTime: startTime + durationMs })
+      const { unmount } = renderMarketPage()
+
+      expect(screen.getByRole('tab', { name: label, selected: true })).toBeInTheDocument()
+      expect(usePriceHistoryMock).toHaveBeenLastCalledWith(
+        expect.objectContaining({ pair: 'BTC/USDC', interval }),
+      )
+      unmount()
+    }
+  })
+
+  it("keeps the user's interval for the market and opens the next market on its own", async () => {
+    const user = userEvent.setup()
+    const HOUR_MS = 60 * 60 * 1000
+    const hourly = { startTime: Date.now() - HOUR_MS / 2, endTime: Date.now() + HOUR_MS / 2 }
+    await setMarketState('active', hourly)
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    // A fresh element each time, so a rerender renders the page again rather than bailing out
+    const page = () => (
+      <QueryClientProvider client={queryClient}>
+        <MarketPage />
+      </QueryClientProvider>
+    )
+    const { rerender } = render(page())
+
+    await user.click(screen.getByRole('tab', { name: '15M' }))
+    expect(screen.getByRole('tab', { name: '15M', selected: true })).toBeInTheDocument()
+    expect(usePriceHistoryMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ interval: '15m' }),
+    )
+
+    // A refetch hands the page a new market object for the same market: the choice stays.
+    await setMarketState('active', { ...hourly, pool: 250_000 })
+    rerender(page())
+    expect(screen.getByRole('tab', { name: '15M', selected: true })).toBeInTheDocument()
+
+    // Navigating to another market keeps the page mounted; that market opens on its own default.
+    vi.mocked(useParams).mockReturnValue({ id: 'eth' } as never)
+    const monthStart = Date.now() - 10 * 24 * HOUR_MS
+    await setMarketState('active', {
+      id: 'eth',
+      startTime: monthStart,
+      endTime: monthStart + 30 * 24 * HOUR_MS,
+    })
+    rerender(page())
+    expect(screen.getByRole('tab', { name: '1H', selected: true })).toBeInTheDocument()
+    expect(usePriceHistoryMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ interval: '1h' }),
+    )
   })
 
   it('wires the "+ Draw Custom Path" button to drawingStore.enterDrawMode', async () => {

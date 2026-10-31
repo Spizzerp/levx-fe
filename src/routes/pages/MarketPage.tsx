@@ -80,6 +80,16 @@ function isLiveUserDrawingState(state: Market['state'] | undefined): boolean {
   return state === 'active' || state === 'sampling'
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000
+
+/** The interval a market opens on: one-minute candles up to a day, five-minute up to a week. */
+function defaultCandleInterval(startTime: number, endTime: number): CandleInterval {
+  const durationMs = endTime - startTime
+  if (durationMs <= DAY_MS) return '1m'
+  if (durationMs <= 7 * DAY_MS) return '5m'
+  return '1h'
+}
+
 function closestHistoryValue(
   history: readonly PricePoint[],
   targetTime: number,
@@ -317,7 +327,24 @@ export function MarketPage() {
   usePriceFeed(feedId)
   const latestTick = useLatestPrice(feedId)
 
-  const [candleInterval, setCandleInterval] = useState<CandleInterval>('1h')
+  // The market's length picks the opening interval; a choice in the picker holds for this market.
+  // The route keeps the page mounted from one market to the next, so the choice names its market.
+  const marketStartTime = market?.startTime
+  const marketEndTime = market?.endTime
+  const defaultInterval = useMemo(
+    () =>
+      marketStartTime !== undefined && marketEndTime !== undefined
+        ? defaultCandleInterval(marketStartTime, marketEndTime)
+        : '1h',
+    [marketStartTime, marketEndTime],
+  )
+  const [chosenInterval, setChosenInterval] = useState<{
+    marketId: string
+    interval: CandleInterval
+  } | null>(null)
+  const candleInterval = chosenInterval?.marketId === id ? chosenInterval.interval : defaultInterval
+  const setCandleInterval = (interval: CandleInterval) =>
+    setChosenInterval({ marketId: id, interval })
 
   const {
     data: priceHistory,
