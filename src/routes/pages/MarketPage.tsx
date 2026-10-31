@@ -8,6 +8,7 @@ import { ConnectGate } from '@/features/wallet/ConnectGate'
 import { RequestUsdcButton } from '@/features/wallet/RequestUsdcButton'
 import { UsdcBalance } from '@/features/wallet/UsdcBalance'
 import { DrawingLayer } from '@/features/chart/DrawingLayer'
+import { LivePriceDot } from '@/features/market/LivePriceDot'
 import { MarketComments } from '@/features/market/MarketComments'
 import { Input } from '@/ui/Input'
 import { Label } from '@/ui/Label'
@@ -51,6 +52,7 @@ import {
 import { useUsdcBalance } from '@/lib/api/useUsdcBalance'
 import { toast } from '@/stores/toastStore'
 import { usePriceFeed, useLatestPrice, usePriceHistory, useLazyHistoryTrigger } from '@/lib/price'
+import { changeSinceStart } from '@/lib/price/change'
 import { feedIdForPair } from '@/lib/pyth/feedIds'
 import { buildAiPathFixture } from '@/tests/fixtures/aiPaths'
 
@@ -58,7 +60,6 @@ import { useDrawingStore } from '@/stores/drawingStore'
 import { useWalletStore } from '@/stores/walletStore'
 import {
   formatCountdown,
-  formatDeltaBps,
   formatMarketDurationLabel,
   formatPrice,
   formatStatusLabel,
@@ -654,9 +655,16 @@ export function MarketPage() {
     return last && first ? last.value >= first.value : true
   }
 
-  // Delta is only available from the mock layer (not from live Pyth ticks in Phase 1)
-  const deltaDisplay = 0
-  const deltaColor = deltaDisplay >= 0 ? 'text-success' : 'text-accent'
+  // From checkpoint 0's settled price when it exists; no change shown before there is a price
+  const change =
+    priceDisplay > 0
+      ? changeSinceStart({
+          history: chartHistory,
+          marketStart: chartMarketStart,
+          checkpoint0Price: checkpointPrices.find((c) => c.index === 0)?.price,
+          current: priceDisplay,
+        })
+      : null
 
   const isInDrawMode = drawingPhase !== 'idle'
   const confirmPathLabel =
@@ -728,8 +736,17 @@ export function MarketPage() {
             <MarketTimeProgress startTime={chartMarketStart} endTime={chartMarketEnd} now={now} />
           </div>
           <div className="text-ink-muted text-caption mt-2 flex items-baseline gap-3 font-mono">
-            <span className={cn('font-bold', deltaColor)}>{formatDeltaBps(deltaDisplay)}</span>
-            <span>24H</span>
+            {change && (
+              <>
+                <span
+                  className={cn('font-bold', change.isPositive ? 'text-success' : 'text-accent')}
+                >
+                  {`${change.isPositive ? '+' : '-'}${change.value.toFixed(2)}%`}
+                </span>
+                <span>SINCE START</span>
+              </>
+            )}
+            <LivePriceDot feedId={feedId} />
           </div>
         </div>
 

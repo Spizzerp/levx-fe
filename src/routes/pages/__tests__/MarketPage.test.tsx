@@ -152,6 +152,12 @@ vi.mock('@/lib/price/usePriceHistory', () => ({
   useLazyHistoryTrigger: () => () => {},
 }))
 
+// Settled checkpoint prices come from chain; the page reads them through this hook
+const useCheckpointPricesMock = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/api/checkpointPrices', () => ({
+  useCheckpointPrices: useCheckpointPricesMock,
+}))
+
 // Mock wallet-adapter-react-ui so ConnectGate can render without the provider tree
 const setVisible = vi.fn()
 vi.mock('@solana/wallet-adapter-react-ui', () => ({
@@ -193,6 +199,7 @@ vi.mock('@/lib/supabase/hooks', () => ({
 }))
 
 import { MarketPage } from '@/routes/pages/MarketPage'
+import { PYTH_FEED_IDS } from '@/lib/pyth/feedIds'
 import { useDrawingStore } from '@/stores/drawingStore'
 import { usePriceStore } from '@/stores/priceStore'
 import type { Market, PredictionPath, UserPosition } from '@/types/market'
@@ -282,6 +289,7 @@ beforeEach(async () => {
   useDrawingStore.setState({ state: { phase: 'idle' }, totalCheckpoints: 0 })
   usePriceStore.setState({ ticks: {}, feeds: {}, levels: {} })
   usePriceFeedSpy.mockClear()
+  useCheckpointPricesMock.mockReturnValue([])
   claimMutateMock.mockClear()
   setVisible.mockClear()
   useMarketParticipantsMock.mockReturnValue({
@@ -378,6 +386,31 @@ describe('MarketPage', () => {
     renderMarketPage()
 
     expect(screen.queryByRole('link', { name: /season/i })).not.toBeInTheDocument()
+  })
+
+  it('market page header shows the price, the change since start and the dot', () => {
+    const feedId = PYTH_FEED_IDS['BTC/USDC']
+    const now = Date.now()
+    usePriceStore.setState({
+      ticks: { [feedId]: { time: now, value: 73_500, publishTime: Math.floor(now / 1000) } },
+      feeds: { [feedId]: { status: 'live', leveled: true, levelAgeSec: 20 } },
+    })
+    // Checkpoint 0 settled at 70,000; the fixture's history (72,800) is not the baseline
+    useCheckpointPricesMock.mockReturnValue([
+      { index: 0, time: TEST_MARKET.startTime, price: 70_000 },
+      { index: 1, time: TEST_MARKET.startTime + 3_600_000, price: 71_000 },
+    ])
+
+    renderMarketPage()
+
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('73,500.00')
+    expect(screen.getByText('+5.00%')).toBeInTheDocument()
+    expect(screen.getByText(/since start/i)).toBeInTheDocument()
+    expect(
+      screen.getByTitle(
+        "Live price from Coinbase trades, kept on Pyth's level. Markets settle on Pyth.",
+      ),
+    ).toHaveTextContent('Live')
   })
 
   it('opens the live price feed on mount for the current market pair', () => {
