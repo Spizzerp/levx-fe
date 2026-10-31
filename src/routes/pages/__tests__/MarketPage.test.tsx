@@ -136,9 +136,9 @@ vi.mock('@/lib/price', async () => {
   }
 })
 
-// Mock useBenchmarksHistory so tests don't hit the network
-vi.mock('@/lib/pyth/useBenchmarksHistory', () => ({
-  useBenchmarksHistory: () => ({
+// Mock usePriceHistory so tests don't hit the network
+vi.mock('@/lib/price/usePriceHistory', () => ({
+  usePriceHistory: () => ({
     data: undefined,
     isLoading: false,
     isError: false,

@@ -6,6 +6,7 @@ import { useEffect } from 'react'
 import { Connection } from '@solana/web3.js'
 
 import { env } from '@/env/env.config'
+import { fetchPipelineMinuteCandle } from '@/lib/price/candlesClient'
 import { coinbaseStream } from '@/lib/price/coinbaseStream'
 import type { CoinbaseEvent, CoinbaseStream } from '@/lib/price/coinbaseStream'
 import { COINBASE_SILENT_MS, TradeBuffer, candlePriceAt, levelFactor } from '@/lib/price/leveling'
@@ -29,13 +30,11 @@ export type CandleFetcher = (
   minuteStartSec: number,
 ) => Promise<MinuteCandle | null>
 
-const noCandle: CandleFetcher = () => Promise.resolve(null)
-
-let fetchMinuteCandle: CandleFetcher = noCandle
+let fetchMinuteCandle: CandleFetcher = fetchPipelineMinuteCandle
 let stream: CoinbaseStream = coinbaseStream
 let connection: Connection | null = null
 
-/** The minute-candle source for the level fallback; until one is set, there is no candle. */
+/** The minute-candle source for the level fallback; the pipeline's one-minute candles by default. */
 export function setCandleFetcher(fetcher: CandleFetcher): void {
   fetchMinuteCandle = fetcher
 }
@@ -177,5 +176,5 @@ export function __resetFreeFeedForTests(): void {
   feeds.clear()
   stream = coinbaseStream
   connection = null
-  fetchMinuteCandle = noCandle
+  fetchMinuteCandle = fetchPipelineMinuteCandle
 }

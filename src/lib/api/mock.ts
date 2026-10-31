@@ -1,8 +1,8 @@
 /**
  * Mock API — stands in for the real indexer/RPC backend until it exists.
  *
- * Provides market metadata only. Historical prices come from Pyth Benchmarks
- * (useBenchmarksHistory) and live prices from the price layer (usePriceFeed).
+ * Provides market metadata only. Historical prices come from the pipeline's candles
+ * (usePriceHistory) and live prices from the price layer (usePriceFeed).
  *
  * When the real backend lands, replace these functions with `fetch` calls.
  * Types stay the same; the hooks in ./hooks.ts don't need to change.

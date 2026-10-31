@@ -14,8 +14,7 @@ import { getMarketDisplayState } from '@/lib/market/status'
 import type { Market, MarketState } from '@/types/market'
 import type { PriceTick } from '@/lib/price'
 import { feedIdForPair } from '@/lib/pyth/feedIds'
-import { useLatestPrice } from '@/lib/price'
-import { useBenchmarksHistory } from '@/lib/pyth/useBenchmarksHistory'
+import { useLatestPrice, usePriceHistory } from '@/lib/price'
 import { MarketMiniChart } from './MarketMiniChart'
 
 const STATE_LABELS: Record<MarketState, string> = {
@@ -78,7 +77,7 @@ function marketTimeLabel(market: Market, now: number): { label: string; value: s
 export function MarketCard({ market, now, onClick }: MarketCardProps) {
   const feedId = feedIdForPair(market.pair)
   const latestTick = useLatestPrice(feedId)
-  const { data: realHistory } = useBenchmarksHistory({
+  const { data: realHistory } = usePriceHistory({
     pair: market.pair,
     interval: '1h',
   })

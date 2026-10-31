@@ -15,14 +15,11 @@ vi.mock('@visx/responsive', () => ({
   }) => children({ width: 640, height: 160 }),
 }))
 
-const useBenchmarksHistoryMock = vi.fn()
-vi.mock('@/lib/pyth/useBenchmarksHistory', () => ({
-  useBenchmarksHistory: (...args: unknown[]) => useBenchmarksHistoryMock(...args),
-}))
-
+const usePriceHistoryMock = vi.fn()
 const useLatestPriceMock = vi.fn()
 vi.mock('@/lib/price', () => ({
   useLatestPrice: (...args: unknown[]) => useLatestPriceMock(...args),
+  usePriceHistory: (...args: unknown[]) => usePriceHistoryMock(...args),
 }))
 
 function makeMarket(overrides: Partial<Market> = {}): Market {
@@ -68,7 +65,7 @@ function makeMarket(overrides: Partial<Market> = {}): Market {
 
 describe('MarketCard', () => {
   beforeEach(() => {
-    useBenchmarksHistoryMock.mockReturnValue({ data: undefined })
+    usePriceHistoryMock.mockReturnValue({ data: undefined })
     useLatestPriceMock.mockReturnValue(null)
   })
 
@@ -85,7 +82,7 @@ describe('MarketCard', () => {
       value: 110,
     }
 
-    useBenchmarksHistoryMock.mockReturnValue({ data: history })
+    usePriceHistoryMock.mockReturnValue({ data: history })
     useLatestPriceMock.mockReturnValue(latestTick)
 
     render(<MarketCard market={market} now={latestTick.time} onClick={vi.fn()} />)

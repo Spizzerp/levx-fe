@@ -49,9 +49,8 @@ import {
 } from '@/lib/solana/transactions'
 import { useUsdcBalance } from '@/lib/api/useUsdcBalance'
 import { toast } from '@/stores/toastStore'
-import { usePriceFeed, useLatestPrice } from '@/lib/price'
+import { usePriceFeed, useLatestPrice, usePriceHistory, useLazyHistoryTrigger } from '@/lib/price'
 import { feedIdForPair } from '@/lib/pyth/feedIds'
-import { useBenchmarksHistory, useLazyHistoryTrigger } from '@/lib/pyth/useBenchmarksHistory'
 import { buildAiPathFixture } from '@/tests/fixtures/aiPaths'
 
 import { useDrawingStore } from '@/stores/drawingStore'
@@ -315,18 +314,18 @@ export function MarketPage() {
   const [candleInterval, setCandleInterval] = useState<CandleInterval>('1h')
 
   const {
-    data: benchmarksHistory,
-    isLoading: isBenchmarksLoading,
+    data: priceHistory,
+    isLoading: isHistoryLoading,
     fetchOlder,
     hasMoreHistory,
     isFetchingOlder,
-  } = useBenchmarksHistory({
+  } = usePriceHistory({
     pair,
     interval: candleInterval,
   })
 
   const onChartViewportChange = useLazyHistoryTrigger({
-    history: benchmarksHistory,
+    history: priceHistory,
     hasMoreHistory,
     isFetchingOlder,
     fetchOlder,
@@ -389,13 +388,10 @@ export function MarketPage() {
   const msRemaining = Math.max(0, chartMarketEnd - now)
   const leverageCap = maxLeverageByDuration(durationMs)
 
-  // Prefer real Benchmarks candles; fall back to mock history while loading
+  // Prefer the pipeline's candles; fall back to mock history while loading
   const chartHistory = useMemo(
-    () =>
-      benchmarksHistory && benchmarksHistory.length > 0
-        ? benchmarksHistory
-        : (market?.history ?? []),
-    [benchmarksHistory, market?.history],
+    () => (priceHistory && priceHistory.length > 0 ? priceHistory : (market?.history ?? [])),
+    [priceHistory, market?.history],
   )
 
   // Live price from Pyth tick; fall back to last history point
@@ -813,7 +809,7 @@ export function MarketPage() {
               selectionInteractive={showWagerRail}
               showOtherPositions={showOtherPositions}
               pair={market.pair}
-              isLoading={isBenchmarksLoading}
+              isLoading={isHistoryLoading}
               error={null}
               onViewportChange={onChartViewportChange}
               market={{
