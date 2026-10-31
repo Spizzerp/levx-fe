@@ -24,7 +24,7 @@ import {
 import { getMarketDisplayState } from '@/lib/market/status'
 import { useNowTick } from '@/lib/hooks/useNowTick'
 import { feedIdForPair } from '@/lib/pyth/feedIds'
-import { usePythFeed } from '@/lib/pyth/hooks'
+import { usePriceFeed } from '@/lib/price'
 import { formatCountdown, formatUSD } from '@/lib/format'
 import { PageLayout } from '@/layouts/PageLayout'
 import type { Market, MarketState } from '@/types/market'
@@ -110,12 +110,12 @@ function endsInLabel(m: Market, now: number): string {
 // Hidden below 1200px (matches old @media rule that hid columns 6 & 7)
 const NARROW_HIDE = '[@media(max-width:1200px)]:hidden'
 
-function PythFeedSubscription({ feedId }: { feedId: string }) {
-  usePythFeed(feedId)
+function PriceFeedSubscription({ feedId }: { feedId: string }) {
+  usePriceFeed(feedId)
   return null
 }
 
-function MarketGridPythSubscriptions({ markets }: { markets: Market[] }) {
+function MarketGridPriceSubscriptions({ markets }: { markets: Market[] }) {
   const feedIds = useMemo(
     () =>
       Array.from(
@@ -131,7 +131,7 @@ function MarketGridPythSubscriptions({ markets }: { markets: Market[] }) {
   return (
     <>
       {feedIds.map((feedId) => (
-        <PythFeedSubscription key={feedId} feedId={feedId} />
+        <PriceFeedSubscription key={feedId} feedId={feedId} />
       ))}
     </>
   )
@@ -553,7 +553,7 @@ export function MarketsPage() {
               exit={{ opacity: 0, y: -10, scale: 0.985 }}
               transition={{ duration: 0.24, ease: [0.25, 0.46, 0.45, 0.94] }}
             >
-              <MarketGridPythSubscriptions markets={gridItemsWithPathPreviews} />
+              <MarketGridPriceSubscriptions markets={gridItemsWithPathPreviews} />
 
               <motion.div
                 layout

@@ -21,7 +21,19 @@ export const usePriceStore = create<PriceStoreState>((set, get) => ({
     if (prev && tick.publishTime <= prev.publishTime) return
     set((s) => ({ ticks: { ...s.ticks, [feedId]: tick } }))
   },
-  setFeedState: (feedId, s) => set((state) => ({ feeds: { ...state.feeds, [feedId]: s } })),
+  setFeedState: (feedId, s) => {
+    const prev = get().feeds[feedId]
+    // Keep the previous object when nothing changed, so once-a-second writers don't re-render readers
+    if (
+      prev &&
+      prev.status === s.status &&
+      prev.leveled === s.leveled &&
+      prev.levelAgeSec === s.levelAgeSec
+    ) {
+      return
+    }
+    set((state) => ({ feeds: { ...state.feeds, [feedId]: s } }))
+  },
   setLevel: (feedId, k) => set((s) => ({ levels: { ...s.levels, [feedId]: k } })),
   getLatestTick: (feedId) => get().ticks[feedId] ?? null,
 }))

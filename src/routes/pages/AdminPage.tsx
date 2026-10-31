@@ -36,7 +36,7 @@ import { logTransactionError } from '@/lib/solana/logTransactionError'
 import { resolveBaseMintLabel } from '@/lib/api/pairLabels'
 import { toast } from '@/stores/toastStore'
 import { useWalletStore } from '@/stores/walletStore'
-import { usePythFeed, useLatestPrice } from '@/lib/pyth/hooks'
+import { usePriceFeed, useLatestPrice } from '@/lib/price'
 import { useBenchmarksHistory, useLazyHistoryTrigger } from '@/lib/pyth/useBenchmarksHistory'
 import { isBytes32Hex, normalizeBytes32Hex } from '@/lib/marketGroups'
 
@@ -424,12 +424,12 @@ export function AdminPage() {
 
   const pair = availablePairs[selectedPair] ?? availablePairs[0]
   const pairLabel = pair?.label ?? ''
-  // Hex prefix matches feedIdForPair() outputs ("0x…") so usePythFeed
+  // Hex prefix matches feedIdForPair() outputs ("0x…") so usePriceFeed
   // and useBenchmarksHistory keep accepting the same shape.
   const feedId = pair?.feedIdHex ? `0x${pair.feedIdHex}` : null
 
   // Live price feed
-  usePythFeed(feedId)
+  usePriceFeed(feedId)
   const latestTick = useLatestPrice(feedId)
 
   // Historical candles for chart backdrop
@@ -465,7 +465,7 @@ export function AdminPage() {
   const chartHistory = useMemo(() => benchmarks ?? [], [benchmarks])
 
   // Derive base price from latest tick or last benchmark candle.
-  // PythTick exposes the price as `value` (not `price`) — see src/lib/pyth/types.ts.
+  // PriceTick exposes the price as `value` (not `price`) — see src/lib/price/types.ts.
   const basePrice = latestTick?.value ?? chartHistory[chartHistory.length - 1]?.value ?? 0
 
   // Build preview AI paths (stable seed from pair index so they don't flicker)

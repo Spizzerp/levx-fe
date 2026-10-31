@@ -26,7 +26,7 @@ vi.mock('@visx/responsive', () => ({
 }))
 import { buildAiPathFixture } from '@/tests/fixtures/aiPaths'
 import { useDrawingStore } from '@/stores/drawingStore'
-import { usePythStore } from '@/stores/pythStore'
+import { usePriceStore } from '@/stores/priceStore'
 
 const startTime = 1_700_000_000_000
 const endTime = startTime + 48 * 30 * 60 * 1000
@@ -48,7 +48,7 @@ const history = Array.from({ length: 10 }, (_, i) => ({
 
 beforeEach(() => {
   useDrawingStore.setState({ state: { phase: 'idle' }, totalCheckpoints: 0 })
-  usePythStore.setState({ ticks: {}, status: 'idle' })
+  usePriceStore.setState({ ticks: {}, feeds: {}, levels: {} })
 })
 
 function renderChart(overrides: Partial<Parameters<typeof LevXChart>[0]> = {}) {
@@ -144,8 +144,8 @@ describe('LevXChart', () => {
     expect(container.querySelectorAll('svg path').length).toBe(beforeCount)
   })
 
-  it('appends Pyth live tick to visible history when pythStore has a newer tick', () => {
-    usePythStore.setState({
+  it('appends the live tick to visible history when the price store has a newer tick', () => {
+    usePriceStore.setState({
       ticks: {
         '0xef0d8b6fda2ceba41da15d4095d1da392a0d2f8ed0c6c7bc0f4cfac8c280b56d': {
           time: startTime + 60_000,
@@ -153,7 +153,6 @@ describe('LevXChart', () => {
           publishTime: Math.floor((startTime + 60_000) / 1000),
         },
       },
-      status: 'connected',
     })
     const { container } = renderChart({ pair: 'SOL/USDC' })
     // The merged history path should still render (can't easily assert specific d-value in jsdom, but the component must not crash and SVG must render)

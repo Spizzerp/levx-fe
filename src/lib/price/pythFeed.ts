@@ -1,11 +1,17 @@
 import { useEffect } from 'react'
 import type { HermesClient } from '@pythnetwork/hermes-client'
-import { getPythClient } from './client'
-import { usePythStore } from '@/stores/pythStore'
-import type { PythTick } from './types'
+
+import { COINBASE_SILENT_MS } from '@/lib/price/leveling'
+import type { FeedState, PriceTick } from '@/lib/price/types'
+import { getPythClient } from '@/lib/pyth/client'
+import { usePriceStore } from '@/stores/priceStore'
 
 /** Awaited EventSource type returned by HermesClient.getPriceUpdatesStream. */
 type HermesStream = Awaited<ReturnType<HermesClient['getPriceUpdatesStream']>>
+
+/** Pyth's stream is Pyth's own price, so it is always on Pyth's level. */
+const LIVE: FeedState = { status: 'live', leveled: true, levelAgeSec: 0 }
+const DELAYED: FeedState = { status: 'delayed', leveled: true, levelAgeSec: 0 }
 
 /** Convert Pyth fixed-point price object to a plain number. */
 function pythPriceToNumber(priceObj: { price: string; expo: number }): number {
@@ -14,11 +20,12 @@ function pythPriceToNumber(priceObj: { price: string; expo: number }): number {
 
 /**
  * Opens a Pyth Hermes SSE stream for the given feedId on mount.
- * Pushes deduplicated ticks into pythStore.
+ * Pushes deduplicated ticks into the price store, and once a second the feed state: live while a
+ * tick arrived within COINBASE_SILENT_MS, else delayed.
  * Reconnects with exponential backoff (1s → 2s → 4s... cap 30s, ±20% jitter) on error.
  * Closes the EventSource and cancels any pending reconnect on unmount.
  */
-export function usePythFeed(feedId: string | null): void {
+export function usePythHermesFeed(feedId: string | null): void {
   useEffect(() => {
     if (!feedId) return
 
@@ -28,9 +35,11 @@ export function usePythFeed(feedId: string | null): void {
     let source: HermesStream | null = null
     let cancelled = false
     let backoffMs = 1000
+    const startedAt = Date.now()
+    /** Local time of the last tick; before the first, the stream gets the same grace. */
+    let tickAt: number | null = null
 
     async function connect() {
-      usePythStore.getState().setStatus('connecting')
       try {
         const client = getPythClient()
         // HermesClient.getPriceUpdatesStream returns a Promise<EventSource> wrapper
@@ -46,7 +55,6 @@ export function usePythFeed(feedId: string | null): void {
 
         source = stream
         backoffMs = 1000 // reset backoff on successful connect
-        usePythStore.getState().setStatus('connected')
 
         const src = source // local non-null ref for the closure
 
@@ -68,12 +76,13 @@ export function usePythFeed(feedId: string | null): void {
                 price: feed.price.price,
                 expo: feed.price.expo,
               })
-              const tick: PythTick = {
+              const tick: PriceTick = {
                 publishTime,
                 time: publishTime * 1000,
                 value,
               }
-              usePythStore.getState().setPythTick(activeFeedId, tick)
+              usePriceStore.getState().setTick(activeFeedId, tick)
+              tickAt = Date.now()
             }
           } catch {
             // Ignore malformed SSE messages
@@ -91,7 +100,6 @@ export function usePythFeed(feedId: string | null): void {
     }
 
     function scheduleReconnect() {
-      usePythStore.getState().setStatus('reconnecting')
       const jitter = 1 + (Math.random() * 0.4 - 0.2) // ±20%
       const delay = Math.min(backoffMs * jitter, 30_000)
       backoffMs = Math.min(backoffMs * 2, 30_000)
@@ -100,21 +108,23 @@ export function usePythFeed(feedId: string | null): void {
       }, delay)
     }
 
+    function writeState() {
+      const now = Date.now()
+      if (now - (tickAt ?? startedAt) >= COINBASE_SILENT_MS) {
+        usePriceStore.getState().setFeedState(activeFeedId, DELAYED)
+      } else if (tickAt !== null) {
+        usePriceStore.getState().setFeedState(activeFeedId, LIVE)
+      }
+    }
+
     connect()
+    const stateTimer = setInterval(writeState, 1000)
 
     return () => {
       cancelled = true
+      clearInterval(stateTimer)
       source?.close()
       source = null
-      usePythStore.getState().setStatus('idle')
     }
   }, [feedId])
-}
-
-/**
- * Thin selector hook: returns the latest PythTick for a feedId, or null if none.
- * Re-renders only when the tick for this feedId changes.
- */
-export function useLatestPrice(feedId: string | null): PythTick | null {
-  return usePythStore((s) => (feedId ? (s.ticks[feedId] ?? null) : null))
 }

@@ -49,7 +49,7 @@ import {
 } from '@/lib/solana/transactions'
 import { useUsdcBalance } from '@/lib/api/useUsdcBalance'
 import { toast } from '@/stores/toastStore'
-import { usePythFeed, useLatestPrice } from '@/lib/pyth/hooks'
+import { usePriceFeed, useLatestPrice } from '@/lib/price'
 import { feedIdForPair } from '@/lib/pyth/feedIds'
 import { useBenchmarksHistory, useLazyHistoryTrigger } from '@/lib/pyth/useBenchmarksHistory'
 import { buildAiPathFixture } from '@/tests/fixtures/aiPaths'
@@ -309,7 +309,7 @@ export function MarketPage() {
   }, [market, mode2Readiness?.pairRiskStates])
   const feedId = pair ? feedIdForPair(pair) : null
   const seasonMetadata = market ? getMarketSeasonMetadata(market) : undefined
-  usePythFeed(feedId)
+  usePriceFeed(feedId)
   const latestTick = useLatestPrice(feedId)
 
   const [candleInterval, setCandleInterval] = useState<CandleInterval>('1h')

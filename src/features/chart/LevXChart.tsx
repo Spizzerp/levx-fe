@@ -12,7 +12,7 @@ import type { ReactNode } from 'react'
 import type { PredictionPath, PricePoint } from '@/types/market'
 import type { Market } from '@/types/market'
 import { useDrawingStore } from '@/stores/drawingStore'
-import { useLatestPrice } from '@/lib/pyth/hooks'
+import { useLatestPrice } from '@/lib/price'
 import { feedIdForPair } from '@/lib/pyth/feedIds'
 import { buildCheckpointXs } from '@/lib/drawing/geometry'
 import { useYAxisFreeze } from '@/lib/drawing/yFreeze'
@@ -109,7 +109,7 @@ export interface LevXChartProps {
   showOtherPositions?: boolean
   /** override fixed height; if omitted, fills parent */
   height?: number
-  /** Pair string used for pythStore subscription. If null, no live updates. */
+  /** Pair string used for the price store subscription. If null, no live updates. */
   pair?: string | null
   /** Loading state of the outer data layer. */
   isLoading?: boolean
@@ -199,7 +199,7 @@ function ChartInner({
     [],
   )
 
-  /* ── Pyth live tick subscription ────────────────────────── */
+  /* ── Live tick subscription ─────────────────────────────── */
   const feedId = pair ? feedIdForPair(pair) : null
   const latestTick = useLatestPrice(feedId)
 

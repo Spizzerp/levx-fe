@@ -126,13 +126,13 @@ vi.mock('@/lib/solana/program', () => ({
   useProgram: () => null,
 }))
 
-// Mock usePythFeed so no real SSE is opened
-const usePythFeedSpy = vi.fn()
-vi.mock('@/lib/pyth/hooks', async () => {
-  const actual = await vi.importActual<typeof import('@/lib/pyth/hooks')>('@/lib/pyth/hooks')
+// Mock usePriceFeed so no live price stream is opened
+const usePriceFeedSpy = vi.fn()
+vi.mock('@/lib/price', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/price')>('@/lib/price')
   return {
     ...actual,
-    usePythFeed: (...args: unknown[]) => usePythFeedSpy(...args),
+    usePriceFeed: (...args: unknown[]) => usePriceFeedSpy(...args),
   }
 })
 
@@ -194,7 +194,7 @@ vi.mock('@/lib/supabase/hooks', () => ({
 
 import { MarketPage } from '@/routes/pages/MarketPage'
 import { useDrawingStore } from '@/stores/drawingStore'
-import { usePythStore } from '@/stores/pythStore'
+import { usePriceStore } from '@/stores/priceStore'
 import type { Market, PredictionPath, UserPosition } from '@/types/market'
 
 const TEST_MARKET = {
@@ -280,8 +280,8 @@ function renderMarketPage() {
 
 beforeEach(async () => {
   useDrawingStore.setState({ state: { phase: 'idle' }, totalCheckpoints: 0 })
-  usePythStore.setState({ ticks: {}, status: 'idle' })
-  usePythFeedSpy.mockClear()
+  usePriceStore.setState({ ticks: {}, feeds: {}, levels: {} })
+  usePriceFeedSpy.mockClear()
   claimMutateMock.mockClear()
   setVisible.mockClear()
   useMarketParticipantsMock.mockReturnValue({
@@ -380,11 +380,11 @@ describe('MarketPage', () => {
     expect(screen.queryByRole('link', { name: /season/i })).not.toBeInTheDocument()
   })
 
-  it('opens a Pyth SSE feed on mount for the current market pair', () => {
+  it('opens the live price feed on mount for the current market pair', () => {
     renderMarketPage()
-    expect(usePythFeedSpy).toHaveBeenCalled()
+    expect(usePriceFeedSpy).toHaveBeenCalled()
     // The feedId passed should be the BTC/USDC feed from PYTH_FEED_IDS
-    expect((usePythFeedSpy.mock.calls[0] as unknown[])[0]).toMatch(/^0x[a-f0-9]+$/)
+    expect((usePriceFeedSpy.mock.calls[0] as unknown[])[0]).toMatch(/^0x[a-f0-9]+$/)
   })
 
   it('wires the "+ Draw Custom Path" button to drawingStore.enterDrawMode', async () => {
@@ -437,8 +437,8 @@ describe('MarketPage', () => {
     expect(useDrawingStore.getState().state.phase).toBe('idle')
   })
 
-  it('displays live price from pythStore tick when available (CHART-01)', async () => {
-    usePythStore.setState({
+  it('displays live price from the price store tick when available (CHART-01)', async () => {
+    usePriceStore.setState({
       ticks: {
         // BTC/USDC feed id from feedIds.ts
         '0xe62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43': {
@@ -447,7 +447,6 @@ describe('MarketPage', () => {
           publishTime: Math.floor(Date.now() / 1000),
         },
       },
-      status: 'connected',
     })
     renderMarketPage()
     // Header H1 should contain the live tick with cents precision.

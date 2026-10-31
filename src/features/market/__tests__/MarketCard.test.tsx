@@ -5,7 +5,7 @@ import type { ReactNode } from 'react'
 import { MarketCard } from '@/features/market/MarketCard'
 
 import type { Market } from '@/types/market'
-import type { PythTick } from '@/lib/pyth/types'
+import type { PriceTick } from '@/lib/price'
 
 vi.mock('@visx/responsive', () => ({
   ParentSize: ({
@@ -21,7 +21,7 @@ vi.mock('@/lib/pyth/useBenchmarksHistory', () => ({
 }))
 
 const useLatestPriceMock = vi.fn()
-vi.mock('@/lib/pyth/hooks', () => ({
+vi.mock('@/lib/price', () => ({
   useLatestPrice: (...args: unknown[]) => useLatestPriceMock(...args),
 }))
 
@@ -79,7 +79,7 @@ describe('MarketCard', () => {
       { time: market.startTime, value: 100 },
       { time: market.startTime + 60 * 60 * 1000, value: 101 },
     ]
-    const latestTick: PythTick = {
+    const latestTick: PriceTick = {
       publishTime: Math.floor((market.startTime + 2 * 60 * 60 * 1000) / 1000),
       time: market.startTime + 2 * 60 * 60 * 1000,
       value: 110,

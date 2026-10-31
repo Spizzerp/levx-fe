@@ -44,4 +44,36 @@ describe('priceStore', () => {
     expect(state.levels[FEED_A]).toBe(1.000731)
     expect(state.levels[FEED_B]).toBeUndefined()
   })
+
+  it('stores ticks for multiple feed ids independently', () => {
+    const { setTick } = usePriceStore.getState()
+    setTick(FEED_A, makeTick(1000, 100))
+    setTick(FEED_B, makeTick(1000, 200))
+
+    expect(usePriceStore.getState().getLatestTick(FEED_A)?.value).toBe(100)
+    expect(usePriceStore.getState().getLatestTick(FEED_B)?.value).toBe(200)
+  })
+
+  it('keeps the previous feed state object when every field is equal', () => {
+    const { setFeedState } = usePriceStore.getState()
+    const first: FeedState = { status: 'live', leveled: true, levelAgeSec: 12 }
+    setFeedState(FEED_A, first)
+    const feedsBefore = usePriceStore.getState().feeds
+    let notified = 0
+    const stop = usePriceStore.subscribe(() => notified++)
+
+    setFeedState(FEED_A, { status: 'live', leveled: true, levelAgeSec: 12 })
+    expect(usePriceStore.getState().feeds).toBe(feedsBefore)
+    expect(usePriceStore.getState().feeds[FEED_A]).toBe(first)
+    expect(notified).toBe(0)
+
+    setFeedState(FEED_A, { status: 'live', leveled: true, levelAgeSec: 13 })
+    stop()
+    expect(usePriceStore.getState().feeds[FEED_A]).toEqual({
+      status: 'live',
+      leveled: true,
+      levelAgeSec: 13,
+    })
+    expect(notified).toBe(1)
+  })
 })

@@ -12,9 +12,9 @@ import { formatCountdown, formatMarketDurationLabel, formatShortDate } from '@/l
 import { getMarketDisplayState } from '@/lib/market/status'
 
 import type { Market, MarketState } from '@/types/market'
-import type { PythTick } from '@/lib/pyth/types'
+import type { PriceTick } from '@/lib/price'
 import { feedIdForPair } from '@/lib/pyth/feedIds'
-import { useLatestPrice } from '@/lib/pyth/hooks'
+import { useLatestPrice } from '@/lib/price'
 import { useBenchmarksHistory } from '@/lib/pyth/useBenchmarksHistory'
 import { MarketMiniChart } from './MarketMiniChart'
 
@@ -36,7 +36,7 @@ interface MarketCardProps {
 
 function appendLiveTick(
   history: Market['history'],
-  latestTick: PythTick | null,
+  latestTick: PriceTick | null,
 ): Market['history'] {
   if (!latestTick || !Number.isFinite(latestTick.value)) return history
 
