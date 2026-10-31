@@ -32,6 +32,7 @@ export function LivePriceDot({ feedId }: { feedId: string | null }) {
   return (
     <span
       title={title}
+      aria-label={title}
       className={cn(
         'inline-flex items-center gap-1.5 font-mono uppercase',
         live ? 'text-success' : 'text-warning',

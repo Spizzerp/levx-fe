@@ -73,6 +73,31 @@ describe('LivePriceDot', () => {
     expect(screen.getByTitle(PYTH_COPY)).toHaveTextContent('Live')
   })
 
+  it.each([
+    ['live and leveled', 'free', { status: 'live', leveled: true, levelAgeSec: 12 }, LEVELED_COPY],
+    [
+      'live on an old level',
+      'free',
+      { status: 'live', leveled: true, levelAgeSec: 7 * 60 + 42 },
+      "Live price from Coinbase trades. Pyth's level last updated 7 min ago. Markets settle on Pyth.",
+    ],
+    [
+      'live and unleveled',
+      'free',
+      { status: 'live', leveled: false, levelAgeSec: null },
+      UNLEVELED_COPY,
+    ],
+    ['delayed', 'free', { status: 'delayed', leveled: false, levelAgeSec: null }, DELAYED_COPY],
+    ['live from Pyth', 'pyth', { status: 'live', leveled: true, levelAgeSec: 0 }, PYTH_COPY],
+  ] as const)('the dot is found by its accessible name when %s', (_case, source, state, copy) => {
+    vi.mocked(priceSource).mockReturnValue(source)
+    setFeed(state)
+    render(<LivePriceDot feedId={FEED} />)
+
+    // Screen readers get the same sentence as the hover
+    expect(screen.getByLabelText(copy)).toHaveAttribute('title', copy)
+  })
+
   it('renders nothing for a null feed id or before the feed reports', () => {
     const { container, rerender } = render(<LivePriceDot feedId={FEED} />)
     expect(container).toBeEmptyDOMElement()

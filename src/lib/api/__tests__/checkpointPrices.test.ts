@@ -1,5 +1,8 @@
 import { BN } from '@coral-xyz/anchor'
-import { describe, expect, it, vi } from 'vitest'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { renderHook, waitFor } from '@testing-library/react'
+import React from 'react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 // The real deriveSamplePda fails under jsdom (cross-realm Uint8Array check), so it is
 // replaced by a fake that names each address after the requested index.
@@ -15,7 +18,7 @@ vi.mock('@/lib/solana/program', () => ({
   getReadOnlyProgram: () => ({ account: { priceSample: { fetchMultiple } } }),
 }))
 
-import { fetchCheckpointPrices } from '@/lib/api/checkpointPrices'
+import { fetchCheckpointPrices, useCheckpointPrices } from '@/lib/api/checkpointPrices'
 import { deriveSamplePda } from '@/lib/solana/pda'
 
 function sample(checkpointIndex: number, timestampSec: number, price: number) {
@@ -48,5 +51,48 @@ describe('fetchCheckpointPrices', () => {
       { index: 0, time: 1_700_000_000_000, price: 95.41 },
       { index: 2, time: 1_700_003_600_000, price: 96 },
     ])
+  })
+})
+
+describe('useCheckpointPrices', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  function renderPrices() {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const hook = renderHook(() => useCheckpointPrices(7, 1), {
+      wrapper: ({ children }: { children: React.ReactNode }) =>
+        React.createElement(QueryClientProvider, { client }, children),
+    })
+    return {
+      ...hook,
+      fetchStatus: () => client.getQueryState(['checkpoint-prices', 7, 1])?.fetchStatus,
+    }
+  }
+
+  it('does not read the chain in mock mode', () => {
+    vi.stubEnv('APP_USE_MOCK', 'true')
+    fetchMultiple.mockReset().mockResolvedValue([sample(0, 1_700_000_000, 95_410_000)])
+
+    const { result, fetchStatus } = renderPrices()
+
+    // An enabled query is already fetching once mounted; this one never starts.
+    expect(fetchStatus()).toBe('idle')
+    expect(fetchMultiple).not.toHaveBeenCalled()
+    expect(result.current).toEqual([])
+  })
+
+  it('reads the sample accounts otherwise', async () => {
+    vi.stubEnv('APP_USE_MOCK', 'false')
+    fetchMultiple.mockReset().mockResolvedValue([sample(0, 1_700_000_000, 95_410_000)])
+
+    const { result, fetchStatus } = renderPrices()
+
+    expect(fetchStatus()).toBe('fetching')
+    await waitFor(() =>
+      expect(result.current).toEqual([{ index: 0, time: 1_700_000_000_000, price: 95.41 }]),
+    )
+    expect(fetchMultiple).toHaveBeenCalledOnce()
   })
 })

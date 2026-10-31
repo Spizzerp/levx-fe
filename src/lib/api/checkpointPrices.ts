@@ -41,12 +41,15 @@ export async function fetchCheckpointPrices(
   )
 }
 
-/** The market query refetches on `CheckpointSampled`, which changes `completed` and so the key. */
+/**
+ * The market query refetches on `CheckpointSampled`, which changes `completed` and so the key.
+ * Mock markets (APP_USE_MOCK) have no sample accounts, so nothing is read.
+ */
 export function useCheckpointPrices(marketId: number | null, completed: number): CheckpointPrice[] {
   const { data } = useQuery({
     queryKey: ['checkpoint-prices', marketId, completed],
     queryFn: () => fetchCheckpointPrices(marketId!, completed),
-    enabled: marketId !== null && completed > 0,
+    enabled: marketId !== null && completed > 0 && import.meta.env.APP_USE_MOCK !== 'true',
     // A settled sample never changes; a new checkpoint arrives under a new key.
     staleTime: Infinity,
   })

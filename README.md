@@ -55,7 +55,7 @@ APP_HERMES_URL=             # required only when APP_PRICE_SOURCE=pyth, e.g. htt
 
 # Optional
 APP_ENV=local
-APP_API_BASE_URL=
+APP_API_BASE_URL=           # required for chart history: the pipeline's public URL
 APP_ADMIN_WALLETS=          # comma-separated base58 pubkeys
 APP_USE_MOCK=               # "true" to use mock API responses
 ```
@@ -78,6 +78,10 @@ Going back to Pyth across the whole system:
 | Mode 1 keeper       | `PRICE_SOURCE=hermes` plus the key                                             |
 | keeper-mode2 and lp | `PRICE_SOURCE=hermes` plus the key                                             |
 | frontend            | `APP_PRICE_SOURCE=pyth` (plus `APP_HERMES_URL` at a relay, if needed), rebuild |
+
+With a Pyth key on the pipeline a candle series can still mix sources; the free mode's history shift
+treats only an all-Pyth series as already on Pyth's level and shifts a mixed one whole by the
+current level.
 
 ## Docs
 
