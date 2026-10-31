@@ -25,7 +25,7 @@ function setFeed(state: FeedState) {
 
 describe('LivePriceDot', () => {
   beforeEach(() => {
-    usePriceStore.setState({ ticks: {}, feeds: {}, levels: {} })
+    usePriceStore.setState({ ticks: {}, feeds: {}, levels: {}, trails: {} })
   })
 
   afterEach(() => {

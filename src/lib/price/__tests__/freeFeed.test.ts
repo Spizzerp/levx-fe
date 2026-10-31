@@ -92,7 +92,7 @@ describe('useLeveledFeed', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     vi.setSystemTime(T0)
-    usePriceStore.setState({ ticks: {}, feeds: {}, levels: {} })
+    usePriceStore.setState({ ticks: {}, feeds: {}, levels: {}, trails: {} })
     fake = createFakeStream()
     __setCoinbaseStreamForTests(fake.stream)
     __setConnectionForTests(fakeConnection)
@@ -316,7 +316,7 @@ describe('useLeveledFeed', () => {
     b.unmount()
     expect(sponsoredSubs[0].stop).toHaveBeenCalledOnce()
     expect(fake.unsubscribe).toHaveBeenCalledOnce()
-    usePriceStore.setState({ ticks: {}, feeds: {}, levels: {} })
+    usePriceStore.setState({ ticks: {}, feeds: {}, levels: {}, trails: {} })
     advance(2)
     expect(latest()).toBeUndefined()
 
@@ -333,7 +333,12 @@ describe('useLeveledFeed', () => {
 
     expect(subscribeSponsored).not.toHaveBeenCalled()
     expect(fake.subscribe).not.toHaveBeenCalled()
-    const { ticks, feeds, levels } = usePriceStore.getState()
-    expect({ ticks, feeds, levels }).toEqual({ ticks: {}, feeds: {}, levels: {} })
+    const { ticks, feeds, levels, trails } = usePriceStore.getState()
+    expect({ ticks, feeds, levels, trails }).toEqual({
+      ticks: {},
+      feeds: {},
+      levels: {},
+      trails: {},
+    })
   })
 })

@@ -73,4 +73,35 @@ describe('price hooks', () => {
 
     expect(result.current).toEqual({ tick, state, level: 1.0007, none: [null, null, null] })
   })
+
+  it('usePriceTrail keeps its array across unrelated writes', async () => {
+    const m = await load(undefined)
+    m.usePriceStore.setState({ ticks: {}, feeds: {}, levels: {}, trails: {} })
+    const { result } = renderHook(() => ({
+      trail: m.usePriceTrail(FEED),
+      none: m.usePriceTrail(null),
+    }))
+    const empty = result.current.trail
+    expect(empty).toEqual([])
+    expect(result.current.none).toEqual([])
+
+    const tick = { time: 1_793_452_681_000, value: 95.77, publishTime: 1_793_452_681 }
+    act(() => {
+      const store = m.usePriceStore.getState()
+      store.setFeedState(FEED, { status: 'live', leveled: true, levelAgeSec: 3 })
+      store.setTick(OTHER, tick)
+    })
+    expect(result.current.trail).toBe(empty)
+
+    act(() => m.usePriceStore.getState().setTick(FEED, tick))
+    const trail = result.current.trail
+    expect(trail).toEqual([tick])
+
+    act(() => {
+      const store = m.usePriceStore.getState()
+      store.setLevel(FEED, 1.0007)
+      store.setTick(OTHER, { ...tick, publishTime: tick.publishTime + 1 })
+    })
+    expect(result.current.trail).toBe(trail)
+  })
 })

@@ -287,7 +287,7 @@ function renderMarketPage() {
 
 beforeEach(async () => {
   useDrawingStore.setState({ state: { phase: 'idle' }, totalCheckpoints: 0 })
-  usePriceStore.setState({ ticks: {}, feeds: {}, levels: {} })
+  usePriceStore.setState({ ticks: {}, feeds: {}, levels: {}, trails: {} })
   usePriceFeedSpy.mockClear()
   useCheckpointPricesMock.mockReturnValue([])
   claimMutateMock.mockClear()

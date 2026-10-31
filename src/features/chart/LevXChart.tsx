@@ -14,7 +14,7 @@ import type { Market } from '@/types/market'
 import type { CheckpointPrice } from '@/lib/api/checkpointPrices'
 import { formatPrice } from '@/lib/format'
 import { useDrawingStore } from '@/stores/drawingStore'
-import { useLatestPrice } from '@/lib/price'
+import { useLatestPrice, usePriceTrail } from '@/lib/price'
 import { feedIdForPair } from '@/lib/pyth/feedIds'
 import { buildCheckpointXs } from '@/lib/drawing/geometry'
 import { useYAxisFreeze } from '@/lib/drawing/yFreeze'
@@ -237,14 +237,21 @@ function ChartInner({
   /* ── Live tick subscription ─────────────────────────────── */
   const feedId = pair ? feedIdForPair(pair) : null
   const latestTick = useLatestPrice(feedId)
+  const trail = usePriceTrail(feedId)
 
-  /* ── Merge live tick into visible history ────────────────── */
+  /* ── History, then the once-a-second trail, then the live tick ──
+   * Each point is drawn only when it is newer than the one before it, so the seconds the
+   * history's newest candle already covers are not drawn twice. */
   const mergedHistory = useMemo(() => {
-    if (!latestTick) return history
-    const lastHistoryPoint = history[history.length - 1]
-    if (lastHistoryPoint && latestTick.time <= lastHistoryPoint.time) return history
-    return [...history, { time: latestTick.time, value: latestTick.value }]
-  }, [history, latestTick])
+    let lastTime = history[history.length - 1]?.time ?? -Infinity
+    const tail: PricePoint[] = []
+    for (const tick of latestTick ? [...trail, latestTick] : trail) {
+      if (tick.time <= lastTime) continue
+      tail.push({ time: tick.time, value: tick.value })
+      lastTime = tick.time
+    }
+    return tail.length > 0 ? [...history, ...tail] : history
+  }, [history, trail, latestTick])
 
   const lastHistoryPoint = mergedHistory[mergedHistory.length - 1]
   const isMarketInProgress = nowTime > marketStart && nowTime < marketEnd
@@ -721,6 +728,7 @@ function ChartInner({
 
           {/* ── Historical price line ───────────────── */}
           <LinePath<PricePoint>
+            data-testid="price-line"
             data={mergedHistory}
             x={(d) => timeScale(d.time)}
             y={(d) => priceScale(d.value)}

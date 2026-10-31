@@ -1,4 +1,10 @@
-export { usePriceFeed, useLatestPrice, useFeedState, useLevel } from '@/lib/price/hooks'
+export {
+  usePriceFeed,
+  useLatestPrice,
+  usePriceTrail,
+  useFeedState,
+  useLevel,
+} from '@/lib/price/hooks'
 export { useLeveledFeed } from '@/lib/price/freeFeed'
 export { usePythHermesFeed } from '@/lib/price/pythFeed'
 export { usePriceHistory, useLazyHistoryTrigger } from '@/lib/price/usePriceHistory'

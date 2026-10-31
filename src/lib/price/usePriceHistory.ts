@@ -73,8 +73,8 @@ export interface UsePriceHistoryResult {
  * In the free mode the history is multiplied by the feed's current level, so it joins the leveled
  * live line without a step; history the endpoint took from Pyth alone is already on that level.
  *
- * Live ticks are NOT merged here — callers splice the latest tick onto the tail in the chart layer
- * (see LevXChart.mergedHistory).
+ * Live ticks are NOT merged here — the chart appends the feed's once-a-second trail and its latest
+ * tick after the newest candle (see LevXChart.mergedHistory).
  */
 export function usePriceHistory({
   pair,

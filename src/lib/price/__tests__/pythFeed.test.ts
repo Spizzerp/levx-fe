@@ -69,7 +69,7 @@ describe('usePythHermesFeed', () => {
     mockOnMessage = null
     mockOnError = null
     mockGetPriceUpdatesStream.mockResolvedValue(mockSource)
-    usePriceStore.setState({ ticks: {}, feeds: {}, levels: {} })
+    usePriceStore.setState({ ticks: {}, feeds: {}, levels: {}, trails: {} })
   })
 
   afterEach(() => {

@@ -89,7 +89,7 @@ describe('usePriceHistory', () => {
   beforeEach(() => {
     mockFetchCandles.mockReset()
     mockEnv.APP_PRICE_SOURCE = 'free'
-    usePriceStore.setState({ ticks: {}, feeds: {}, levels: {} })
+    usePriceStore.setState({ ticks: {}, feeds: {}, levels: {}, trails: {} })
   })
 
   afterEach(() => {

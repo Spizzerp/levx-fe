@@ -41,6 +41,7 @@ const paths = buildAiPathFixture({
   totalCheckpoints: 48,
   basePrice: 100,
 })
+const SOL_FEED = '0xef0d8b6fda2ceba41da15d4095d1da392a0d2f8ed0c6c7bc0f4cfac8c280b56d'
 const history = Array.from({ length: 10 }, (_, i) => ({
   time: startTime - (10 - i) * 60_000,
   value: 100 + i,
@@ -48,7 +49,7 @@ const history = Array.from({ length: 10 }, (_, i) => ({
 
 beforeEach(() => {
   useDrawingStore.setState({ state: { phase: 'idle' }, totalCheckpoints: 0 })
-  usePriceStore.setState({ ticks: {}, feeds: {}, levels: {} })
+  usePriceStore.setState({ ticks: {}, feeds: {}, levels: {}, trails: {} })
 })
 
 function renderChart(overrides: Partial<Parameters<typeof LevXChart>[0]> = {}) {
@@ -157,6 +158,41 @@ describe('LevXChart', () => {
     const { container } = renderChart({ pair: 'SOL/USDC' })
     // The merged history path should still render (can't easily assert specific d-value in jsdom, but the component must not crash and SVG must render)
     expect(container.querySelector('svg')).toBeInTheDocument()
+  })
+
+  it('the chart draws the per-second trail since mount between history and the live tick', () => {
+    // A ten-minute market spreads seconds about half a pixel apart on the 704 px plot.
+    const shortEnd = startTime + 10 * 60_000
+    /** The time under each point of an SVG path's `d`, to the nearest second. */
+    function drawnTimes(d: string | null): number[] {
+      const from = startTime - (shortEnd - startTime)
+      const to = shortEnd + (shortEnd - startTime) * 0.05
+      return (d ?? '')
+        .split(/[MLC]/)
+        .filter(Boolean)
+        .map((command) => {
+          const numbers = command.match(/-?\d+(\.\d+)?(e-?\d+)?/g)!.map(Number)
+          const x = numbers[numbers.length - 2]
+          return Math.round((from + (x / (800 - 16 - 80)) * (to - from)) / 1000) * 1000
+        })
+    }
+    const lastCandle = history[history.length - 1].time
+    const { setTick } = usePriceStore.getState()
+    // The two oldest seconds are already covered by the history and are not drawn again.
+    for (const time of [lastCandle - 1000, lastCandle, lastCandle + 1000, lastCandle + 2000]) {
+      setTick(SOL_FEED, { time, value: 109.5, publishTime: time / 1000 })
+    }
+    // The live tick is the newest second
+    setTick(SOL_FEED, { time: lastCandle + 3000, value: 109.7, publishTime: lastCandle / 1000 + 3 })
+
+    renderChart({ pair: 'SOL/USDC', marketEnd: shortEnd, nowTime: lastCandle + 3000 })
+
+    expect(drawnTimes(screen.getByTestId('price-line').getAttribute('d'))).toEqual([
+      ...history.map((p) => p.time),
+      lastCandle + 1000,
+      lastCandle + 2000,
+      lastCandle + 3000,
+    ])
   })
 
   it('invokes renderDrawingOverlay with live scales when provided', () => {

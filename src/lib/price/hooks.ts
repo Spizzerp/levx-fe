@@ -16,6 +16,16 @@ export function useLatestPrice(feedId: string | null): PriceTick | null {
   return usePriceStore((s) => (feedId ? (s.ticks[feedId] ?? null) : null))
 }
 
+const NO_TRAIL: readonly PriceTick[] = []
+
+/**
+ * The feed's accepted ticks, oldest first (the once-a-second line since the feed started, up to
+ * three hours); the same array until the feed's own next tick.
+ */
+export function usePriceTrail(feedId: string | null): readonly PriceTick[] {
+  return usePriceStore((s) => (feedId ? (s.trails[feedId] ?? NO_TRAIL) : NO_TRAIL))
+}
+
 /** How the feed's live price is being produced, or null before the feed has reported. */
 export function useFeedState(feedId: string | null): FeedState | null {
   return usePriceStore((s) => (feedId ? (s.feeds[feedId] ?? null) : null))
