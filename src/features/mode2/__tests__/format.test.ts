@@ -6,6 +6,7 @@ import type { PredictionPath } from '@/types/market'
 import {
   formatCountdownShort,
   formatLeverage,
+  formatMarketSpan,
   formatMarketWindow,
   formatSignedUsdc,
   formatUsdc,
@@ -95,6 +96,14 @@ describe('formatMarketWindow', () => {
   it('shows any other span in minutes', () => {
     expect(formatMarketWindow(at(15, 14, 5), at(15, 14, 35))).toBe('30m · 14:05 → 14:35')
     expect(formatMarketWindow(at(15, 14), at(15, 15, 30))).toBe('90m · 14:00 → 15:30')
+  })
+})
+
+describe('formatMarketSpan', () => {
+  it('shows the span alone, in hours or minutes', () => {
+    expect(formatMarketSpan(0, 3_600_000)).toBe('1h')
+    expect(formatMarketSpan(0, 86_400_000)).toBe('24h')
+    expect(formatMarketSpan(0, 1_800_000)).toBe('30m')
   })
 })
 

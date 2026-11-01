@@ -34,12 +34,17 @@ function clockTime(ms: number): string {
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
 }
 
+/** The market's span: `1h` for whole hours, else minutes (`50m`). */
+export function formatMarketSpan(startMs: number, endMs: number): string {
+  const span = endMs - startMs
+  return span % MS_PER_HOUR === 0
+    ? `${span / MS_PER_HOUR}h`
+    : `${Math.round(span / MS_PER_MINUTE)}m`
+}
+
 /** `1h · 14:00 → 15:00`: the span, then start and end in 24-hour local time. */
 export function formatMarketWindow(startMs: number, endMs: number): string {
-  const span = endMs - startMs
-  const duration =
-    span % MS_PER_HOUR === 0 ? `${span / MS_PER_HOUR}h` : `${Math.round(span / MS_PER_MINUTE)}m`
-  return `${duration} · ${clockTime(startMs)} → ${clockTime(endMs)}`
+  return `${formatMarketSpan(startMs, endMs)} · ${clockTime(startMs)} → ${clockTime(endMs)}`
 }
 
 /** Time left as `m:ss`, flooring partial seconds and stopping at `0:00`. */
