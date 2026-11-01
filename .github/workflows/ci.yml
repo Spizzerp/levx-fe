@@ -27,6 +27,8 @@ jobs:
 
       # .npmrc reads NODE_AUTH_TOKEN to fetch @spizzerp/levx-mode2-client from
       # GitHub Packages; the workflow's packages: read permission covers it.
+      # GITHUB_TOKEN can read the package only after the owner grants levx-fe
+      # access in the package's "Manage Actions access" settings.
       - name: Install dependencies
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
