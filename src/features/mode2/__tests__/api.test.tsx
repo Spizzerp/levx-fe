@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
@@ -53,9 +53,10 @@ vi.mock('@/stores/toastStore', () => ({
   toast: { success: toastSuccessMock, error: toastErrorMock },
 }))
 
-import { mode2Keys, useMode2Market, useOpenMode2Positions } from '../api'
+import { mode2Keys, mode2MarketRefetchMs, useMode2Market, useOpenMode2Positions } from '../api'
 import type { PathOrder } from '../precheck'
-import { FIXTURE_MARKET_ID, FIXTURE_OWNER, makeView } from './fixtures'
+import type { Mode2MarketView } from '../types'
+import { FIXTURE_MARKET_ID, FIXTURE_OWNER, FIXTURE_START_MS, makeGroup, makeView } from './fixtures'
 
 /** 1 unit at 2× and 1 at 3× on slots 0 and 2: two positions at 2.5×. */
 const ORDERS: PathOrder[] = [0, 2].map((slot) => ({
@@ -67,6 +68,9 @@ const ORDERS: PathOrder[] = [0, 2].map((slot) => ({
 }))
 /** `getPriorityFee`'s floor, which it returns when the RPC has no recent fees. */
 const FLOOR_MICRO_LAMPORTS = 10_000
+const MINUTE_MS = 60_000
+const FAST_MS = 5_000
+const SLOW_MS = 60_000
 
 function setup() {
   const queryClient = new QueryClient({
@@ -107,18 +111,58 @@ describe('Mode 2 queries', () => {
   it('is disabled while the switch is off', () => {
     flags.mode2 = false
     const { wrapper } = setup()
-    const { result } = renderHook(() => useMode2Market(FIXTURE_MARKET_ID, 'pending'), { wrapper })
+    const { result } = renderHook(
+      () => useMode2Market(FIXTURE_MARKET_ID, 'pending', FIXTURE_START_MS),
+      { wrapper },
+    )
     expect(result.current.fetchStatus).toBe('idle')
     expect(connection.getMultipleAccountsInfo).not.toHaveBeenCalled()
   })
 
   it('reads the market while the switch is on', async () => {
     const { wrapper } = setup()
-    const { result } = renderHook(() => useMode2Market(FIXTURE_MARKET_ID, 'pending'), { wrapper })
+    const { result } = renderHook(
+      () => useMode2Market(FIXTURE_MARKET_ID, 'pending', FIXTURE_START_MS),
+      { wrapper },
+    )
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
     // No cohort account: the market has no Mode 2 cohort.
     expect(result.current.data).toBeNull()
     expect(connection.getMultipleAccountsInfo).toHaveBeenCalledTimes(1)
+  })
+
+  describe('polling the market (spec §5)', () => {
+    /** The market without a cohort yet: every read finds no account. */
+    function renderNoCohort(startMs: number) {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
+      const { wrapper } = setup()
+      renderHook(() => useMode2Market(FIXTURE_MARKET_ID, 'pending', startMs), { wrapper })
+    }
+    const reads = () => connection.getMultipleAccountsInfo.mock.calls.length
+
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it('reads every 5 s while the market starts within 10 minutes', async () => {
+      renderNoCohort(Date.now() + 5 * MINUTE_MS)
+      await vi.advanceTimersByTimeAsync(0)
+      expect(reads()).toBe(1)
+
+      await vi.advanceTimersByTimeAsync(FAST_MS)
+      expect(reads()).toBe(2)
+    })
+
+    it('reads every 60 s while the start is further out', async () => {
+      renderNoCohort(Date.now() + 20 * MINUTE_MS)
+      await vi.advanceTimersByTimeAsync(0)
+      expect(reads()).toBe(1)
+
+      await vi.advanceTimersByTimeAsync(FAST_MS)
+      expect(reads()).toBe(1)
+      await vi.advanceTimersByTimeAsync(SLOW_MS - FAST_MS)
+      expect(reads()).toBe(2)
+    })
   })
 
   describe('while the owner changes', () => {
@@ -132,7 +176,7 @@ describe('Mode 2 queries', () => {
       const { queryClient, wrapper } = setup()
       const view = makeView({ owner })
       queryClient.setQueryData(mode2Keys.market(marketId, owner), view)
-      const hook = renderHook(({ id }) => useMode2Market(id, 'pending'), {
+      const hook = renderHook(({ id }) => useMode2Market(id, 'pending', FIXTURE_START_MS), {
         wrapper,
         initialProps: { id: marketId },
       })
@@ -219,5 +263,56 @@ describe('Mode 2 queries', () => {
     expect(toastSuccessMock).toHaveBeenCalledWith('Opened 2 positions at 2.5×', {
       txSig: 'admit-sig',
     })
+  })
+})
+
+describe('mode2MarketRefetchMs', () => {
+  /** The group not bound yet: entry is waiting for the paths. */
+  function waitingView(): Mode2MarketView {
+    const view = makeView()
+    return { ...view, group: { ...view.group!, data: makeGroup({ bound: 0 }) } }
+  }
+
+  it('is 5 s while entry is open', () => {
+    // 15 minutes before the start: the open entry alone sets the pace.
+    const nowMs = FIXTURE_START_MS - 15 * MINUTE_MS
+    expect(mode2MarketRefetchMs(makeView(), 'pending', FIXTURE_START_MS, nowMs)).toBe(FAST_MS)
+  })
+
+  it('is 5 s while the market is pending within 10 minutes of the start', () => {
+    const nowMs = FIXTURE_START_MS - 5 * MINUTE_MS
+    expect(mode2MarketRefetchMs(waitingView(), 'pending', FIXTURE_START_MS, nowMs)).toBe(FAST_MS)
+    // Without a cohort the Mode 1 market's start counts.
+    const edgeMs = FIXTURE_START_MS - 10 * MINUTE_MS
+    expect(mode2MarketRefetchMs(null, 'pending', FIXTURE_START_MS, edgeMs)).toBe(FAST_MS)
+  })
+
+  it("counts the cohort's start when the market has one", () => {
+    const nowMs = FIXTURE_START_MS - 5 * MINUTE_MS
+    const laterMs = FIXTURE_START_MS + 60 * MINUTE_MS
+    expect(mode2MarketRefetchMs(waitingView(), 'pending', laterMs, nowMs)).toBe(FAST_MS)
+  })
+
+  it('is 60 s while the market is pending further out or past its start', () => {
+    const farMs = FIXTURE_START_MS - 15 * MINUTE_MS
+    expect(mode2MarketRefetchMs(waitingView(), 'pending', FIXTURE_START_MS, farMs)).toBe(SLOW_MS)
+    const edgeMs = FIXTURE_START_MS - 10 * MINUTE_MS - 1
+    expect(mode2MarketRefetchMs(null, 'pending', FIXTURE_START_MS, edgeMs)).toBe(SLOW_MS)
+    const lateMs = FIXTURE_START_MS + 1_000
+    expect(mode2MarketRefetchMs(null, 'pending', FIXTURE_START_MS, lateMs)).toBe(SLOW_MS)
+  })
+
+  it('is 60 s while the market runs or once it has ended', () => {
+    const nowMs = FIXTURE_START_MS + 5 * MINUTE_MS
+    for (const state of [
+      'active',
+      'sampling',
+      'settling',
+      'maturing',
+      'settled',
+      'void',
+    ] as const) {
+      expect(mode2MarketRefetchMs(makeView(), state, FIXTURE_START_MS, nowMs), state).toBe(SLOW_MS)
+    }
   })
 })

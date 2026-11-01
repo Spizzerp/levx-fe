@@ -332,7 +332,7 @@ export function MarketPage() {
     isLoading: isMode2ReadinessLoading,
     isError: isMode2ReadinessError,
   } = useMode2Readiness({ enabled: !env.APP_MODE2_TRADING && !!market && !market.leverageEnabled })
-  const { data: mode2View } = useMode2Market(market?.marketId, market?.state)
+  const { data: mode2View } = useMode2Market(market?.marketId, market?.state, market?.startTime)
   const { data: mode2Forecasts } = useMode2Forecasts(mode2View)
   const mode2Position = useMode2Position(market, mode2View, mode2Forecasts)
 

@@ -18,6 +18,7 @@ import { useWalletStore } from '@/stores/walletStore'
 import type { MarketState } from '@/types/market'
 import { buildAdmitInstruction, positionCount } from './admission'
 import { fetchMode2Forecasts, fetchMode2Market } from './chain'
+import { entryState } from './entryWindow'
 import { describeMode2Error } from './errors'
 import type { PathOrder } from './precheck'
 import type { Mode2Forecasts, Mode2MarketView } from './types'
@@ -35,21 +36,29 @@ export const mode2Keys = {
 /** The key's market id while the query is disabled for want of one. */
 const NO_MARKET = -1
 const PENDING_REFETCH_MS = 5_000
-const LIVE_REFETCH_MS = 15_000
 const IDLE_REFETCH_MS = 60_000
 const BALANCE_REFETCH_MS = 30_000
-const LIVE_STATES: ReadonlySet<MarketState> = new Set([
-  'active',
-  'sampling',
-  'settling',
-  'maturing',
-])
+/** How long before the start a pending market is read at the pending cadence. */
+const NEAR_START_MS = 10 * 60_000
+const MS_PER_SECOND = 1000
 
-function marketRefetchMs(marketState: MarketState | undefined): number {
-  if (marketState === 'pending') return PENDING_REFETCH_MS
-  return marketState !== undefined && LIVE_STATES.has(marketState)
-    ? LIVE_REFETCH_MS
-    : IDLE_REFETCH_MS
+/**
+ * How often the market view is read (spec §5): every 5 s while entry is open, or while the market
+ * is pending and starts within 10 minutes (the cohort's start, else the Mode 1 market's
+ * `startMs`), so a new cohort and the bind show up in time; every 60 s otherwise.
+ */
+export function mode2MarketRefetchMs(
+  view: Mode2MarketView | null,
+  marketState: MarketState | undefined,
+  startMs: number | undefined,
+  nowMs: number,
+): number {
+  if (marketState !== 'pending') return IDLE_REFETCH_MS
+  if (entryState(view, marketState, nowMs).kind === 'open') return PENDING_REFETCH_MS
+  const start = view === null ? startMs : Number(view.cohort.data.startTime) * MS_PER_SECOND
+  if (start === undefined) return IDLE_REFETCH_MS
+  const untilStart = start - nowMs
+  return untilStart >= 0 && untilStart <= NEAR_START_MS ? PENDING_REFETCH_MS : IDLE_REFETCH_MS
 }
 
 /**
@@ -60,6 +69,7 @@ function marketRefetchMs(marketState: MarketState | undefined): number {
 export function useMode2Market(
   marketId: number | undefined,
   marketState: MarketState | undefined,
+  startMs: number | undefined,
 ): UseQueryResult<Mode2MarketView | null> {
   const owner = useWalletStore((s) => s.publicKey)?.toBase58() ?? null
   const { connection } = useConnection()
@@ -68,7 +78,8 @@ export function useMode2Market(
     queryKey: mode2Keys.market(marketKey, owner),
     queryFn: () => fetchMode2Market(connection, marketId!, owner),
     enabled: env.APP_MODE2_TRADING && marketId !== undefined,
-    refetchInterval: marketRefetchMs(marketState),
+    refetchInterval: (query) =>
+      mode2MarketRefetchMs(query.state.data ?? null, marketState, startMs, Date.now()),
     placeholderData: (previous, previousQuery) => {
       const [, , previousMarket, previousOwner] = previousQuery?.queryKey ?? []
       return previousMarket === marketKey && previousOwner === null ? previous : undefined
