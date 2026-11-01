@@ -23,8 +23,12 @@ import { describeMode2Error } from './errors'
 import type { PathOrder } from './precheck'
 import type { Mode2Forecasts, Mode2MarketView } from './types'
 
-/** The admission's signature fee plus a margin for the priority fee, in lamports. */
-export const ADMIT_FEE_LAMPORTS = 10_000
+/**
+ * The admission's fee in lamports: the 5 000 signature fee plus the priority fee at its floor
+ * (10 000 micro-lamports per CU, `getPriorityFee`) on a certified group's limit of ~1 000 150 CU,
+ * ~10 000 more: ~15 000, with a margin.
+ */
+export const ADMIT_FEE_LAMPORTS = 20_000
 
 export const mode2Keys = {
   market: (marketId: number, owner: string | null) => ['mode2', 'market', marketId, owner] as const,

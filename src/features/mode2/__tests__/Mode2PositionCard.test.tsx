@@ -68,11 +68,19 @@ describe('Mode2PositionCard', () => {
   })
 
   it('shows the checkpoint reached while running', () => {
-    renderCard({ status: 'running', checkpoint: 2 })
-    expect(within(card()).getByText('Running · checkpoint 2 of 6')).toBeInTheDocument()
+    renderCard({ status: 'running', checkpoint: 3 })
+    expect(within(card()).getByText('Running · checkpoint 3 of 6')).toBeInTheDocument()
     const block = summaryBlock('Principal')
     expect(block).toHaveTextContent('40.00 USDC')
     expect(within(block).getByText('Estimate from checkpoint 4')).toBeInTheDocument()
+  })
+
+  it('shows no estimate line from checkpoint 4 on', () => {
+    renderCard({ status: 'running', checkpoint: 4 })
+    expect(within(card()).getByText('Running · checkpoint 4 of 6')).toBeInTheDocument()
+    const block = summaryBlock('Principal')
+    expect(block).toHaveTextContent('40.00 USDC')
+    expect(within(block).queryByText('Estimate from checkpoint 4')).not.toBeInTheDocument()
   })
 
   it('shows the final result and when it is paid once the result is in', () => {
@@ -106,8 +114,14 @@ describe('Mode2PositionCard', () => {
     expect(block).toHaveTextContent('+14.50')
   })
 
-  it('shows the principal refunded when voided', () => {
+  it('says the refund is on its way while the voided receipt is open', () => {
     renderCard({ status: 'voided', checkpoint: 3 })
+    expect(within(card()).getByText('Voided')).toBeInTheDocument()
+    expect(summaryBlock('Refund on its way to your wallet')).toHaveTextContent('40.00 USDC')
+  })
+
+  it('shows the principal refunded once the voided receipt is closed', () => {
+    renderCard({ status: 'voided', checkpoint: 6, paid: 40n * USDC, paths: [] })
     expect(within(card()).getByText('Voided')).toBeInTheDocument()
     expect(summaryBlock('Refunded to your wallet')).toHaveTextContent('40.00 USDC')
   })

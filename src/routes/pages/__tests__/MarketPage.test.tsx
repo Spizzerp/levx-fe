@@ -34,7 +34,7 @@ const mode2 = vi.hoisted(() => ({
   summary: null as PositionSummary | null,
 }))
 vi.mock('@/features/mode2/api', () => ({
-  ADMIT_FEE_LAMPORTS: 10_000,
+  ADMIT_FEE_LAMPORTS: 20_000,
   useMode2Market: () => ({ data: mode2.view }),
   useMode2Forecasts: () => ({ data: mode2.forecasts }),
   useWalletFunds: () => ({ lamports: null, rentLamports: null }),
@@ -1069,6 +1069,33 @@ describe('MarketPage with Mode 2 trading', () => {
     expect(
       screen.getByRole('definition', { name: 'Not available with leverage' }),
     ).toHaveTextContent('Path J')
+  })
+
+  it("hides the path list's 4-path notice while the leverage section is shown", async () => {
+    // Mode 1 paths 0-4: the whole cohort.
+    const paths = ['A', 'B', 'C', 'D', 'E'].map((letter, pathIndex) =>
+      makePath({ id: `path-${pathIndex}`, label: `Path ${letter}`, pathIndex }),
+    )
+    await setPendingCohortMarket({ paths, numPaths: paths.length })
+    const notice = 'Max 4 paths per transaction. Deselect some paths.'
+    const user = userEvent.setup()
+    async function selectEveryPath() {
+      for (const { label } of paths) {
+        await user.click(screen.getByRole('button', { name: new RegExp(label, 'i') }))
+      }
+    }
+
+    const { unmount } = renderMarketPage()
+    await selectEveryPath()
+    expect(screen.getByText(notice)).toBeInTheDocument()
+    unmount()
+
+    flags.mode2 = true
+    renderMarketPage()
+    await selectEveryPath()
+    expect(screen.getByText('Leverage open')).toBeInTheDocument()
+    expect(screen.getByText('Max 4 paths per order')).toBeInTheDocument()
+    expect(screen.queryByText(notice)).not.toBeInTheDocument()
   })
 
   it('says leverage opens when the paths arrive', async () => {

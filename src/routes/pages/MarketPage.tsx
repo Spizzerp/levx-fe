@@ -1040,7 +1040,8 @@ export function MarketPage() {
                       </div>
                     )
                   })}
-                  {selectedPathIds.size > 4 && (
+                  {/* The leverage section names its own cap ("Max 4 paths per order"). */}
+                  {selectedPathIds.size > 4 && !leverageOpen && (
                     <p className="text-accent text-caption px-4 py-2 font-mono">
                       Max 4 paths per transaction. Deselect some paths.
                     </p>

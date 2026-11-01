@@ -4,7 +4,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { PublicKey, SendTransactionError } from '@solana/web3.js'
 import type { Transaction, TransactionInstruction } from '@solana/web3.js'
-import { LEVX_MODE2_PROGRAM_ADDRESS } from '@spizzerp/levx-mode2-client'
+import {
+  COMPUTE_BUDGET_IX_CU,
+  CU_CEILINGS,
+  LEVX_MODE2_PROGRAM_ADDRESS,
+} from '@spizzerp/levx-mode2-client'
 
 import type { BuildTransactionOptions } from '@/lib/chain/buildTransaction'
 import { useWalletStore } from '@/stores/walletStore'
@@ -53,7 +57,13 @@ vi.mock('@/stores/toastStore', () => ({
   toast: { success: toastSuccessMock, error: toastErrorMock },
 }))
 
-import { mode2Keys, mode2MarketRefetchMs, useMode2Market, useOpenMode2Positions } from '../api'
+import {
+  ADMIT_FEE_LAMPORTS,
+  mode2Keys,
+  mode2MarketRefetchMs,
+  useMode2Market,
+  useOpenMode2Positions,
+} from '../api'
 import type { PathOrder } from '../precheck'
 import type { Mode2MarketView } from '../types'
 import { FIXTURE_MARKET_ID, FIXTURE_OWNER, FIXTURE_START_MS, makeGroup, makeView } from './fixtures'
@@ -68,6 +78,8 @@ const ORDERS: PathOrder[] = [0, 2].map((slot) => ({
 }))
 /** `getPriorityFee`'s floor, which it returns when the RPC has no recent fees. */
 const FLOOR_MICRO_LAMPORTS = 10_000
+const MICRO_LAMPORTS_PER_LAMPORT = 1_000_000
+const SIGNATURE_FEE_LAMPORTS = 5_000
 const MINUTE_MS = 60_000
 const FAST_MS = 5_000
 const SLOW_MS = 60_000
@@ -314,5 +326,15 @@ describe('mode2MarketRefetchMs', () => {
     ] as const) {
       expect(mode2MarketRefetchMs(makeView(), state, FIXTURE_START_MS, nowMs), state).toBe(SLOW_MS)
     }
+  })
+})
+
+describe('ADMIT_FEE_LAMPORTS', () => {
+  it("covers a certified group's admission at the priority-fee floor", () => {
+    const computeUnits = CU_CEILINGS.admitCertified + COMPUTE_BUDGET_IX_CU
+    const priorityLamports = Math.ceil(
+      (computeUnits * FLOOR_MICRO_LAMPORTS) / MICRO_LAMPORTS_PER_LAMPORT,
+    )
+    expect(ADMIT_FEE_LAMPORTS).toBeGreaterThanOrEqual(SIGNATURE_FEE_LAMPORTS + priorityLamports)
   })
 })

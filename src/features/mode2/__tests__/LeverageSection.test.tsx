@@ -24,7 +24,7 @@ const mutateMock = vi.hoisted(() => vi.fn())
 const wallet = vi.hoisted(() => ({ usdc: 1000 }))
 
 vi.mock('@/features/mode2/api', () => ({
-  ADMIT_FEE_LAMPORTS: 10_000,
+  ADMIT_FEE_LAMPORTS: 20_000,
   useWalletFunds: () => ({ lamports: 1_000_000_000, rentLamports: 2_449_920 }),
   useOpenMode2Positions: () => ({ mutate: mutateMock, isPending: false }),
 }))
@@ -215,6 +215,12 @@ describe('LeverageSection', () => {
     expect(screen.queryByRole('group', { name: /My path/ })).not.toBeInTheDocument()
     expect(openButton()).toHaveAccessibleName('Open 2 Positions at 2.0×')
     expect(valueOf('Total principal')).toHaveTextContent('40.00 USDC')
+  })
+
+  it('labels the principal per path only for more than one cohort path', () => {
+    renderSection({ selectedPaths: [PATH_1, DRAWN] })
+
+    expect(screen.getByRole('textbox', { name: 'Principal' })).toBeInTheDocument()
   })
 
   it('caps an order at 4 cohort paths', () => {

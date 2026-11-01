@@ -69,6 +69,8 @@ export function LeverageSection({
     positions > 1
       ? `Open ${positions} Positions at ${leverageText}`
       : `Open Position at ${leverageText}`
+  // One breakdown row per cohort path; a selected path outside the cohort takes no principal.
+  const principalLabel = order.rows.length > 1 ? 'Principal per path' : 'Principal'
 
   return (
     <div>
@@ -125,7 +127,7 @@ export function LeverageSection({
       </div>
 
       <Input
-        label={selectedPaths.length > 1 ? 'Principal per path' : 'Principal'}
+        label={principalLabel}
         value={order.principalText}
         onChange={(e) => order.setPrincipalText(e.target.value)}
         onBlur={order.commitPrincipal}

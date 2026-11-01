@@ -48,16 +48,19 @@ interface SummaryContent {
   note: string | null
 }
 
+/** The estimate needs four observations (spec §6.3). */
+const ESTIMATE_CHECKPOINT = 4
+
 function summaryContent(summary: PositionSummary): SummaryContent {
   switch (summary.status) {
     case 'waiting':
     case 'running':
-      // The estimate needs four observations (spec §6.3).
+      // From checkpoint 4 the estimate itself belongs here; until it ships, no line.
       return {
         label: 'Principal',
         amount: summary.principal,
         delta: false,
-        note: 'Estimate from checkpoint 4',
+        note: summary.checkpoint < ESTIMATE_CHECKPOINT ? 'Estimate from checkpoint 4' : null,
       }
     case 'result-in':
       return {
@@ -69,8 +72,10 @@ function summaryContent(summary: PositionSummary): SummaryContent {
     case 'paid':
       return { label: 'Paid to your wallet', amount: summary.paid, delta: true, note: null }
     case 'voided':
+      // The keeper refunds the open receipt and closes it; `paid` is set once it is closed.
       return {
-        label: 'Refunded to your wallet',
+        label:
+          summary.paid === null ? 'Refund on its way to your wallet' : 'Refunded to your wallet',
         amount: summary.principal,
         delta: false,
         note: null,
