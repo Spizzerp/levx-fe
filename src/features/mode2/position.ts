@@ -99,21 +99,24 @@ function combinedLeverage(parts: readonly OrderPart[]): number {
  * The trader's positions in the view's group; null when they hold none, or the receipt is closed
  * and its history does not show the payment yet. A closed receipt has no buckets left to show, and
  * without the forecasts a slot's Mode 1 path is unknown: both leave the path rows out.
+ *
+ * The keeper closes the group and the epoch right after paying, and later the cohort (a null
+ * view): the paid or voided summary then comes from the history alone, with `checkpoint` and
+ * `totalCheckpoints` 0 once the cohort is gone (the paid and voided chips do not read them).
  */
 export function summarizePosition(
-  view: Mode2MarketView,
+  view: Mode2MarketView | null,
   forecasts: Mode2Forecasts | null,
   history: ReceiptHistory | null,
   marketState: MarketState,
   nowMs: number,
 ): PositionSummary | null {
-  const cohort = view.cohort.data
   const progress = {
-    checkpoint: cohort.observationsRecorded,
-    totalCheckpoints: cohort.totalCheckpoints,
+    checkpoint: view?.cohort.data.observationsRecorded ?? 0,
+    totalCheckpoints: view?.cohort.data.totalCheckpoints ?? 0,
   }
 
-  if (view.receipt === null) {
+  if (view === null || view.receipt === null) {
     if (history === null || history.paid === null) return null
     // A void claim pays back exactly what was put in.
     const voided = history.paid === history.principal && marketState === 'void'
@@ -127,6 +130,7 @@ export function summarizePosition(
     }
   }
 
+  const cohort = view.cohort.data
   const group = view.group?.data
   if (group === undefined) return null
   const receipt = view.receipt.data

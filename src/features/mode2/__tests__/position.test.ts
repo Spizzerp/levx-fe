@@ -223,6 +223,58 @@ describe('summarizePosition', () => {
     expect(summarizePosition(closedView(), FORECASTS, unpaid, 'active', RUNNING_MS)).toBeNull()
   })
 
+  describe('after the keeper closed the group and the epoch (Ruling 18)', () => {
+    /** The cohort lingers a while after the group and epoch close. */
+    const cohortOnly = (): Mode2MarketView => ({
+      ...closedView(),
+      group: null,
+      epoch: null,
+      pair: null,
+    })
+
+    it('is paid from the history alone once the cohort is closed too', () => {
+      expect(
+        summarizePosition(null, null, paidHistory(54_500_000n), 'settled', RUNNING_MS),
+      ).toEqual({
+        status: 'paid',
+        principal: 40n * USDC,
+        checkpoint: 0,
+        totalCheckpoints: 0,
+        finalPayout: null,
+        paid: 54_500_000n,
+        paths: [],
+      })
+    })
+
+    it('is voided from the history alone once the cohort is closed too', () => {
+      expect(
+        summarizePosition(null, null, paidHistory(40n * USDC), 'void', RUNNING_MS),
+      ).toMatchObject({ status: 'voided', principal: 40n * USDC, paid: 40n * USDC, paths: [] })
+    })
+
+    it('is paid or voided from the history while only the cohort is left', () => {
+      expect(
+        summarizePosition(cohortOnly(), FORECASTS, paidHistory(54_500_000n), 'settled', RUNNING_MS),
+      ).toEqual({
+        status: 'paid',
+        principal: 40n * USDC,
+        checkpoint: 6,
+        totalCheckpoints: 6,
+        finalPayout: null,
+        paid: 54_500_000n,
+        paths: [],
+      })
+      expect(
+        summarizePosition(cohortOnly(), FORECASTS, paidHistory(40n * USDC), 'void', RUNNING_MS),
+      ).toMatchObject({ status: 'voided', principal: 40n * USDC })
+    })
+
+    it('is null without a history', () => {
+      expect(summarizePosition(null, null, null, 'settled', RUNNING_MS)).toBeNull()
+      expect(summarizePosition(cohortOnly(), FORECASTS, null, 'settled', RUNNING_MS)).toBeNull()
+    })
+  })
+
   it('shows the summary without the path rows while the forecasts are unread', () => {
     const summary = summarizePosition(viewWith(), null, null, 'pending', BEFORE_START_MS)
     expect(summary).toMatchObject({ status: 'waiting', principal: 40n * USDC, paths: [] })
