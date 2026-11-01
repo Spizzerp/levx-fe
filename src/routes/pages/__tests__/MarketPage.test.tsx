@@ -1107,6 +1107,28 @@ describe('MarketPage with Mode 2 trading', () => {
     expect(screen.queryByText('Leverage unavailable')).not.toBeInTheDocument()
   })
 
+  it('hides the legacy leverage slider with the switch on', async () => {
+    vi.setSystemTime(FIXTURE_START_MS + HOUR_MS / 2)
+    await setMarketState('active', {
+      marketId: FIXTURE_MARKET_ID,
+      startTime: FIXTURE_START_MS,
+      endTime: FIXTURE_START_MS + HOUR_MS,
+      checkpointInterval: 600,
+      completedCheckpoints: 3,
+      totalCheckpoints: 6,
+      leverageEnabled: true,
+    })
+    const { unmount } = renderMarketPage()
+    // The legacy slider's caption, e.g. "1× MAX · 50M".
+    expect(screen.getByText(/× MAX ·/)).toBeInTheDocument()
+    unmount()
+
+    flags.mode2 = true
+    renderMarketPage()
+
+    expect(screen.queryByText(/× MAX ·/)).not.toBeInTheDocument()
+  })
+
   it('shows the position card under the trade panel', async () => {
     flags.mode2 = true
     await setPendingCohortMarket()
