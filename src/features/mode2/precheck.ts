@@ -24,6 +24,8 @@ export type PrecheckReason =
   | 'lp-cash'
   | 'usdc'
   | 'sol'
+  /** The order's own cap (spec §4.3), checked by `useLeverageOrder`: not a program refusal. */
+  | 'too-many-paths'
 
 export type PrecheckResult = { ok: true } | { ok: false; reason: PrecheckReason; message: string }
 

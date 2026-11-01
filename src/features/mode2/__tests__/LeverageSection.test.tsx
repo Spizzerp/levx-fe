@@ -68,6 +68,10 @@ const PATH_1 = pathOf(3, 'Path 1', [150, 152])
 const PATH_2 = pathOf(4, 'Path 2', [150, 148])
 const DRAWN = pathOf(9, 'My path', [150, 151])
 const FORECASTS: Mode2Forecasts = { slotToPathIndex: [3, 1, 4, 0, 2], prices: [] }
+/** The whole cohort: one Mode 1 path per slot. */
+const COHORT_PATHS = FORECASTS.slotToPathIndex.map((pathIndex, slot) =>
+  pathOf(pathIndex, `Cohort ${slot + 1}`, [150, 152]),
+)
 
 /** Today's offers with the 3× offer (slot 1), or both, at `admitted === maxAdmissions`. */
 function viewWithFull(...fullSlots: number[]): Mode2MarketView {
@@ -211,6 +215,21 @@ describe('LeverageSection', () => {
     expect(screen.queryByRole('group', { name: /My path/ })).not.toBeInTheDocument()
     expect(openButton()).toHaveAccessibleName('Open 2 Positions at 2.0×')
     expect(valueOf('Total principal')).toHaveTextContent('40.00 USDC')
+  })
+
+  it('caps an order at 4 cohort paths', () => {
+    renderSection({ selectedPaths: COHORT_PATHS })
+
+    expect(openButton()).toBeDisabled()
+    expect(screen.getByText('Max 4 paths per order')).toBeInTheDocument()
+  })
+
+  it('leaves a path outside the cohort out of the 4-path cap', () => {
+    renderSection({ selectedPaths: [...COHORT_PATHS.slice(0, 4), DRAWN] })
+
+    expect(openButton()).toHaveAccessibleName('Open 4 Positions at 2.0×')
+    expect(openButton()).toBeEnabled()
+    expect(screen.queryByText('Max 4 paths per order')).not.toBeInTheDocument()
   })
 
   it('disables the steps a small principal cannot fill', async () => {

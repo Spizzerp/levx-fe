@@ -52,18 +52,27 @@ function marketRefetchMs(marketState: MarketState | undefined): number {
     : IDLE_REFETCH_MS
 }
 
-/** The market's custody accounts for the connected wallet; null when the market has no cohort. */
+/**
+ * The market's custody accounts for the connected wallet; null when the market has no cohort.
+ * Connecting a wallet keeps the disconnected view until the owner's lands, so the trade panel is
+ * not reset (Ruling 22); an account switch keeps nothing of the previous owner's (Review Focus 5).
+ */
 export function useMode2Market(
   marketId: number | undefined,
   marketState: MarketState | undefined,
 ): UseQueryResult<Mode2MarketView | null> {
   const owner = useWalletStore((s) => s.publicKey)?.toBase58() ?? null
   const { connection } = useConnection()
+  const marketKey = marketId ?? NO_MARKET
   return useQuery({
-    queryKey: mode2Keys.market(marketId ?? NO_MARKET, owner),
+    queryKey: mode2Keys.market(marketKey, owner),
     queryFn: () => fetchMode2Market(connection, marketId!, owner),
     enabled: env.APP_MODE2_TRADING && marketId !== undefined,
     refetchInterval: marketRefetchMs(marketState),
+    placeholderData: (previous, previousQuery) => {
+      const [, , previousMarket, previousOwner] = previousQuery?.queryKey ?? []
+      return previousMarket === marketKey && previousOwner === null ? previous : undefined
+    },
   })
 }
 

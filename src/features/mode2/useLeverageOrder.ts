@@ -5,6 +5,7 @@
 import { useMemo, useState } from 'react'
 import type { NettingGroup } from '@spizzerp/levx-mode2-client'
 import type { MarketState, PredictionPath } from '@/types/market'
+import { positionCount } from './admission'
 import { pathBreakdown, totalsOf } from './breakdown'
 import type { BreakdownTotals, PathBreakdown } from './breakdown'
 import { CLOSE_MARGIN_MS } from './entryWindow'
@@ -40,6 +41,7 @@ export interface LeverageOrderState {
   totals: BreakdownTotals
   /** The cohort paths' orders with at least one unit. */
   orders: PathOrder[]
+  /** The orders' pre-check, after the 4-path cap. */
   precheck: PrecheckResult
 }
 
@@ -61,6 +63,14 @@ const DEFAULT_PRINCIPAL_TEXT = formatUsdc(2n * PRINCIPAL_STEP_MICRO)
 
 /** Why a chosen step left the ladder: its offer is past expiry, as the pre-check says. */
 const STEP_CLOSED = 'That leverage step has closed'
+
+/** An order takes up to 4 paths as today's bet does (spec §4.3); non-cohort paths do not count. */
+const MAX_ORDER_PATHS = 4
+const TOO_MANY_PATHS: PrecheckResult = {
+  ok: false,
+  reason: 'too-many-paths',
+  message: `Max ${MAX_ORDER_PATHS} paths per order`,
+}
 
 /** A selected path the cohort holds: its slot and the offers open on it. */
 interface CohortPath {
@@ -209,6 +219,9 @@ export function useLeverageOrder(
     unavailable,
     totals: totalsOf(rows),
     orders,
-    precheck: precheckOrders(view, orders, { ...ctx, nowMs, marketState }),
+    precheck:
+      positionCount(orders) > MAX_ORDER_PATHS
+        ? TOO_MANY_PATHS
+        : precheckOrders(view, orders, { ...ctx, nowMs, marketState }),
   }
 }

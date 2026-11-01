@@ -121,6 +121,51 @@ describe('Mode 2 queries', () => {
     expect(connection.getMultipleAccountsInfo).toHaveBeenCalledTimes(1)
   })
 
+  describe('while the owner changes', () => {
+    /** A second wallet: a fixed address that is nobody's. */
+    const OTHER_OWNER = 'MQik1CL4pkMV5LJ6g17Dy5kzDtrzdBDazr55PHVWt7Z'
+
+    /** The view already read for `owner` on `marketId`; every new read stays in flight. */
+    function renderWithView(owner: string | null, marketId = FIXTURE_MARKET_ID) {
+      connection.getMultipleAccountsInfo.mockReturnValue(new Promise(() => {}))
+      useWalletStore.setState({ publicKey: owner === null ? null : new PublicKey(owner) })
+      const { queryClient, wrapper } = setup()
+      const view = makeView({ owner })
+      queryClient.setQueryData(mode2Keys.market(marketId, owner), view)
+      const hook = renderHook(({ id }) => useMode2Market(id, 'pending'), {
+        wrapper,
+        initialProps: { id: marketId },
+      })
+      expect(hook.result.current.data).toBe(view)
+      return { ...hook, view }
+    }
+
+    it("keeps the view across a wallet connect while the owner's view loads", () => {
+      const { result, view } = renderWithView(null)
+
+      act(() => useWalletStore.setState({ publicKey: new PublicKey(FIXTURE_OWNER) }))
+
+      expect(result.current.isPlaceholderData).toBe(true)
+      expect(result.current.data).toBe(view)
+    })
+
+    it("shows no view of the previous owner's after an account switch", () => {
+      const { result } = renderWithView(FIXTURE_OWNER)
+
+      act(() => useWalletStore.setState({ publicKey: new PublicKey(OTHER_OWNER) }))
+
+      expect(result.current.data).toBeUndefined()
+    })
+
+    it("shows no view of another market's while disconnected", () => {
+      const { result, rerender } = renderWithView(null)
+
+      rerender({ id: FIXTURE_MARKET_ID + 1 })
+
+      expect(result.current.data).toBeUndefined()
+    })
+  })
+
   it('invalidates Mode 2 queries when the order fails', async () => {
     const failure = new SendTransactionError({
       action: 'simulate',
