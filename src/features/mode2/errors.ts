@@ -1,6 +1,6 @@
 /**
  * The custody program's refusals of an admission, read from what the send path throws and named
- * for the trader.
+ * for the trader; also a confirmation that did not arrive and a signature the wallet refused.
  */
 import {
   LEVX_MODE2_ERROR__CAPACITY,
@@ -29,8 +29,48 @@ const HEX_CODE = /custom program error: 0x([0-9a-f]+)/i
 /** A failed confirmation's message: the signature status as JSON. */
 const STATUS_CODE = /"Custom":(\d+)/
 
+/**
+ * web3.js's errors when the confirmation times out or the blockhash expires: the order may still
+ * land. Matched by name, since a second copy of web3.js defeats `instanceof`.
+ */
+const UNCONFIRMED_NAMES: ReadonlySet<string> = new Set([
+  'TransactionExpiredTimeoutError',
+  'TransactionExpiredBlockheightExceededError',
+])
+const UNCONFIRMED_TEXTS = [
+  'was not confirmed in',
+  'block height exceeded',
+  'It is unknown if it succeeded or failed',
+]
+/** The wallet adapter's errors for a signature or a send the wallet did not make. */
+const WALLET_NAMES: ReadonlySet<string> = new Set([
+  'WalletSignTransactionError',
+  'WalletSendTransactionError',
+])
+const REJECTED = /rejected/i
+const USER_REJECTED = 'User rejected'
+const FAILED = 'Transaction failed'
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null
+
+const textOf = (value: unknown): string => (typeof value === 'string' ? value : '')
+
+function isUnconfirmed(err: Record<string, unknown>): boolean {
+  const message = textOf(err.message)
+  return (
+    UNCONFIRMED_NAMES.has(textOf(err.name)) ||
+    UNCONFIRMED_TEXTS.some((text) => message.includes(text))
+  )
+}
+
+/** A wallet error that says the trader rejected it (itself or the wallet's error it wraps). */
+function isCancelled(err: Record<string, unknown>): boolean {
+  if (textOf(err.message).includes(USER_REJECTED)) return true
+  if (!WALLET_NAMES.has(textOf(err.name))) return false
+  const cause = isRecord(err.error) ? err.error : {}
+  return [err.message, cause.name, cause.message].some((text) => REJECTED.test(textOf(text)))
+}
 
 function codeIn(text: unknown): number | null {
   if (typeof text !== 'string') return null
@@ -61,9 +101,15 @@ export function mode2ErrorCode(err: unknown): number | null {
   return null
 }
 
-/** The trader's one-line reason for a failed admission. */
+/**
+ * The trader's one-line reason for a failed admission: the program's refusal when it names one,
+ * else a result not known yet or a cancellation in the wallet, else a plain failure.
+ */
 export function describeMode2Error(err: unknown): string {
   const code = mode2ErrorCode(err)
-  if (code === null) return 'Transaction failed'
-  return MESSAGES[code] ?? `Mode 2 error ${code}`
+  if (code !== null) return MESSAGES[code] ?? `Mode 2 error ${code}`
+  if (!isRecord(err)) return FAILED
+  if (isUnconfirmed(err)) return 'Not confirmed yet — check your positions before trying again'
+  if (isCancelled(err)) return 'Cancelled in your wallet'
+  return FAILED
 }

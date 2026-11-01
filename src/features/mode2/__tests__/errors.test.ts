@@ -1,9 +1,17 @@
 // @vitest-environment node
 import { describe, it, expect } from 'vitest'
-import { SendTransactionError } from '@solana/web3.js'
+import {
+  SendTransactionError,
+  TransactionExpiredBlockheightExceededError,
+  TransactionExpiredTimeoutError,
+} from '@solana/web3.js'
+import { WalletSendTransactionError, WalletSignTransactionError } from '@solana/wallet-adapter-base'
 import { describeMode2Error, mode2ErrorCode } from '../errors'
 
 const PROGRAM = 'A6TNLq28eHjhgvzoYN2FTxGvwEB2j9XWakcED3oEUfbJ'
+const SIGNATURE = '5xyz'
+const NOT_CONFIRMED = 'Not confirmed yet — check your positions before trying again'
+const CANCELLED = 'Cancelled in your wallet'
 
 const MESSAGES: [number, string][] = [
   [6000, 'Leverage is closed for this market'],
@@ -68,8 +76,43 @@ describe('describeMode2Error', () => {
     expect(describeMode2Error(simulationError(6001))).toBe('Mode 2 error 6001')
   })
 
-  it('says the transaction failed without a code', () => {
-    expect(describeMode2Error(new Error('User rejected the request.'))).toBe('Transaction failed')
+  it('says the order may still land when the confirmation times out or the blockhash expires', () => {
+    expect(describeMode2Error(new TransactionExpiredTimeoutError(SIGNATURE, 60))).toBe(
+      NOT_CONFIRMED,
+    )
+    expect(describeMode2Error(new TransactionExpiredBlockheightExceededError(SIGNATURE))).toBe(
+      NOT_CONFIRMED,
+    )
+  })
+
+  it.each([
+    'Transaction was not confirmed in 60.00 seconds.',
+    `Signature ${SIGNATURE} has expired: block height exceeded.`,
+    'It is unknown if it succeeded or failed.',
+  ])('says the order may still land on "%s"', (message) => {
+    expect(describeMode2Error(new Error(message))).toBe(NOT_CONFIRMED)
+  })
+
+  it('says the trader cancelled in the wallet', () => {
+    expect(describeMode2Error(new WalletSignTransactionError('User rejected the request.'))).toBe(
+      CANCELLED,
+    )
+    expect(describeMode2Error(new WalletSendTransactionError('Transaction rejected'))).toBe(
+      CANCELLED,
+    )
+    expect(
+      describeMode2Error(
+        new WalletSignTransactionError(undefined, { name: 'UserRejectedRequestError' }),
+      ),
+    ).toBe(CANCELLED)
+    expect(describeMode2Error(new Error('User rejected the request.'))).toBe(CANCELLED)
+  })
+
+  it('says the transaction failed without a code, a timeout or a rejection', () => {
+    expect(describeMode2Error(new WalletSignTransactionError('Wallet is locked'))).toBe(
+      'Transaction failed',
+    )
+    expect(describeMode2Error(new Error('Network request failed'))).toBe('Transaction failed')
     expect(describeMode2Error('boom')).toBe('Transaction failed')
   })
 })
