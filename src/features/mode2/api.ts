@@ -145,18 +145,14 @@ export function useOpenMode2Positions(): UseMutationResult<string, Error, OpenPo
       }
     },
     onSuccess: (signature, { orders, leverage }) => {
-      void queryClient.invalidateQueries({ queryKey: ['mode2'] })
-      void queryClient.invalidateQueries({ queryKey: ['usdcBalance'] })
+      queryClient.invalidateQueries({ queryKey: ['mode2'] })
+      queryClient.invalidateQueries({ queryKey: ['usdcBalance'] })
       const n = positionCount(orders)
-      toast.success(
-        `Opened ${n} ${n === 1 ? 'position' : 'positions'} at ${leverage.toFixed(1)}×`,
-        {
-          txSig: signature,
-        },
-      )
+      const title = `Opened ${n} ${n === 1 ? 'position' : 'positions'} at ${leverage.toFixed(1)}×`
+      toast.success(title, { txSig: signature })
     },
     onError: (err) => {
-      void queryClient.invalidateQueries({ queryKey: ['mode2'] })
+      queryClient.invalidateQueries({ queryKey: ['mode2'] })
       toast.error('Could not open positions', { message: describeMode2Error(err) })
     },
   })
