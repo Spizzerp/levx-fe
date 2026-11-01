@@ -8,6 +8,8 @@ interface SegmentedSliderProps {
   max: number
   min?: number
   values?: readonly number[]
+  /** Ticks that cannot be chosen: dimmed, inert, and skipped when a drag snaps. */
+  disabledValues?: readonly number[]
   onChange?: (next: number) => void
   formatAriaValue?: (value: number) => string
 }
@@ -37,12 +39,16 @@ function lerpBrand(t: number): string {
  * → brand-green), interpolated by each tick's position along the full
  * min..max scale. Higher leverage → further along the gradient, so the
  * slider reads as a climbing "intensity" bar rather than a flat fill.
+ *
+ * Ticks listed in `disabledValues` stay on the scale but cannot be chosen
+ * (e.g. a leverage step with no room left); dragging snaps past them.
  */
 export function SegmentedSlider({
   value,
   max,
   min = 1,
   values,
+  disabledValues,
   onChange,
   formatAriaValue = (next) => `${next}x`,
 }: SegmentedSliderProps) {
@@ -59,6 +65,8 @@ export function SegmentedSlider({
     [max, min, values],
   )
 
+  const disabledSet = useMemo(() => new Set(disabledValues), [disabledValues])
+
   const valueFromPointer = useCallback(
     (clientX: number): number => {
       const root = rootRef.current
@@ -67,10 +75,19 @@ export function SegmentedSlider({
       const rect = root.getBoundingClientRect()
       const progress =
         rect.width > 0 ? Math.max(0, Math.min(1, (clientX - rect.left) / rect.width)) : 0
-      const index = Math.round(progress * (tickValues.length - 1))
-      return tickValues[Math.max(0, Math.min(tickValues.length - 1, index))]
+      // Ticks are evenly spaced whatever their values, so the nearest enabled tick is the one
+      // with the smallest index distance. A tie goes to the higher tick, as Math.round did.
+      const position = progress * (tickValues.length - 1)
+      let nearest = -1
+      for (let index = 0; index < tickValues.length; index++) {
+        if (disabledSet.has(tickValues[index])) continue
+        if (nearest < 0 || Math.abs(index - position) <= Math.abs(nearest - position)) {
+          nearest = index
+        }
+      }
+      return nearest < 0 ? value : tickValues[nearest]
     },
-    [tickValues, value],
+    [disabledSet, tickValues, value],
   )
 
   const handleThumbPointerDown = useCallback(
@@ -124,6 +141,7 @@ export function SegmentedSlider({
     const nextValue = tickValues[tickIndex]
     const isOn = nextValue < value
     const isThumb = nextValue === value
+    const isDisabled = disabledSet.has(nextValue)
     const fillColor = lerpBrand(tickIndex / span)
     ticks.push(
       <button
@@ -131,6 +149,7 @@ export function SegmentedSlider({
         type="button"
         aria-label={`Set to ${formatAriaValue(nextValue)}`}
         aria-pressed={isThumb}
+        disabled={isDisabled}
         onPointerDown={(event) => handleThumbPointerDown(event, isThumb)}
         onClick={() => {
           if (suppressClickRef.current) {
@@ -142,8 +161,9 @@ export function SegmentedSlider({
         className={cn(
           'h-3 flex-1 cursor-pointer border-0 p-0',
           'duration-micro ease-levx transition-[background]',
-          isOn || isThumb ? '' : 'bg-line hover:bg-line-strong',
+          isOn || isThumb ? '' : 'bg-line enabled:hover:bg-line-strong',
           isThumb && 'h-6 cursor-ew-resize touch-none',
+          isDisabled && 'cursor-not-allowed opacity-30',
         )}
         style={isOn || isThumb ? { backgroundColor: fillColor } : undefined}
       />,
