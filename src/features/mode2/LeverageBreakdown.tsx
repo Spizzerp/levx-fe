@@ -27,7 +27,7 @@ const TONE_CLASSES: Record<RowTone, string> = {
 }
 
 /** A term and its value; the value is named by the term, so it reads as one row. */
-function Row({
+export function Row({
   label,
   tone = 'plain',
   children,
