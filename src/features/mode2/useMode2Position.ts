@@ -28,6 +28,8 @@ const STATUS_TICK_MS = 5_000
 const UNPAID_REFETCH_MS = 15_000
 /** A market has one group (T1), so a closed group's receipts were in group 0. */
 const SOLE_GROUP_INDEX = 0
+/** The key's market id while the market is still loading. */
+const NO_MARKET = -1
 
 /**
  * The receipt address and the owner's ATA: from the view's group and epoch while they exist, else
@@ -45,8 +47,9 @@ function historyAddresses(
   return { receipt: positionPda(group, owner), ata: associatedTokenAddress(owner, mint) }
 }
 
+/** Null while the market or the view is loading (undefined). */
 export function useMode2Position(
-  market: Market,
+  market: Market | undefined,
   view: Mode2MarketView | null | undefined,
   forecasts: Mode2Forecasts | null | undefined,
 ): PositionSummary | null {
@@ -54,15 +57,16 @@ export function useMode2Position(
   const { connection } = useConnection()
   const nowMs = useNowTick(STATUS_TICK_MS)
   const history = useQuery({
-    queryKey: mode2Keys.history(market.marketId, owner),
+    queryKey: mode2Keys.history(market?.marketId ?? NO_MARKET, owner),
     queryFn: () => {
-      const { receipt, ata } = historyAddresses(market, view ?? null, owner as Address)
+      const { receipt, ata } = historyAddresses(market!, view ?? null, owner as Address)
       return fetchReceiptHistory(connection, receipt, ata)
     },
     // Before the start an absent receipt has nothing to show; after it, it may have been paid. A
     // view still loading (undefined) may hold the receipt; a null one means the cohort is gone.
     enabled:
       env.APP_MODE2_TRADING &&
+      market !== undefined &&
       owner !== null &&
       nowMs >= market.startTime &&
       view !== undefined &&
@@ -70,6 +74,6 @@ export function useMode2Position(
     staleTime: (query) => (query.state.data?.paid != null ? Infinity : 0),
     refetchInterval: (query) => (query.state.data?.paid === null ? UNPAID_REFETCH_MS : false),
   })
-  if (view === undefined) return null
+  if (market === undefined || view === undefined) return null
   return summarizePosition(view, forecasts ?? null, history.data ?? null, market.state, nowMs)
 }

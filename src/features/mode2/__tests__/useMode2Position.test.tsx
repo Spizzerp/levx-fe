@@ -119,6 +119,16 @@ describe('useMode2Position', () => {
     expect(fetchReceiptHistoryMock).not.toHaveBeenCalled()
   })
 
+  it('reads no history while the market is still loading', async () => {
+    vi.setSystemTime(AFTER_START_MS)
+    connect(FIXTURE_OWNER)
+    const { result } = renderHook(() => useMode2Position(undefined, null, null), { wrapper })
+    await settle()
+
+    expect(result.current).toBeNull()
+    expect(fetchReceiptHistoryMock).not.toHaveBeenCalled()
+  })
+
   it('reads no history with the switch off', async () => {
     flags.mode2 = false
     vi.setSystemTime(AFTER_START_MS)

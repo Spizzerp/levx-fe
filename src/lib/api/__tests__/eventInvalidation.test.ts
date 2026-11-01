@@ -119,10 +119,17 @@ describe('EVENT_INVALIDATION_MAP', () => {
     expect(snake).toEqual(camel)
   })
 
-  it('CheckpointSampled invalidates only the specific market (high-frequency event)', () => {
+  it('CheckpointSampled invalidates only the specific market and the Mode 2 reads (high-frequency event)', () => {
     const keys = EVENT_INVALIDATION_MAP.CheckpointSampled({ market_id: new BN(3) })
-    expect(keys).toHaveLength(1)
-    expect(keys[0]).toEqual(['market', '3'])
+    expect(keys).toEqual([['market', '3'], ['mode2']])
+  })
+
+  it('settlement and void invalidate the Mode 2 reads', () => {
+    for (const ev of ['MarketSettled', 'MarketFinalized', 'MarketVoided']) {
+      const keys = EVENT_INVALIDATION_MAP[ev]({ market_id: new BN(1) })
+      const flat = keys.map((k) => JSON.stringify(k))
+      expect(flat, `${ev} should invalidate ['mode2']`).toContain(JSON.stringify(['mode2']))
+    }
   })
 
   it('market group link changes invalidate the affected market and market list', () => {

@@ -93,9 +93,9 @@ export const EVENT_INVALIDATION_MAP: Readonly<Record<string, InvalidationFactory
   // ── Market lifecycle ──────────────────────────────────────────────
   MarketCreated: () => [['markets']],
   MarketActivated: withMarket((mk) => [['market', mk], ['markets']]),
-  MarketSettled: withMarket((mk) => [['market', mk], ['markets'], ['userPositions']]),
-  MarketFinalized: withMarket((mk) => [['market', mk], ['markets'], ['userPositions']]),
-  MarketVoided: withMarket((mk) => [['market', mk], ['markets'], ['userPositions']]),
+  MarketSettled: withMarket((mk) => [['market', mk], ['markets'], ['userPositions'], ['mode2']]),
+  MarketFinalized: withMarket((mk) => [['market', mk], ['markets'], ['userPositions'], ['mode2']]),
+  MarketVoided: withMarket((mk) => [['market', mk], ['markets'], ['userPositions'], ['mode2']]),
   MarketClosed: withMarket((mk) => [['market', mk], ['markets'], ['userPositions']]),
   DisputedMarketFinalized: withMarket((mk) => [['market', mk], ['markets'], ['userPositions']]),
 
@@ -134,7 +134,7 @@ export const EVENT_INVALIDATION_MAP: Readonly<Record<string, InvalidationFactory
   PathDissolved: withMarket((mk) => [['market', mk], ['userPositions']]),
 
   // ── Sampling progress ─────────────────────────────────────────────
-  CheckpointSampled: withMarket((mk) => [['market', mk]]),
+  CheckpointSampled: withMarket((mk) => [['market', mk], ['mode2']]),
 
   // ── Disputes ──────────────────────────────────────────────────────
   DisputeRaised: withMarket((mk) => [['market', mk], ['markets']]),
