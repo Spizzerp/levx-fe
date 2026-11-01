@@ -226,6 +226,16 @@ describe('LeverageSection', () => {
     expect(tick('2.5×')).toBeDisabled()
   })
 
+  it('says why the default leverage moved', () => {
+    renderSection({ view: viewWithFull(0) })
+
+    expect(tick('2.0×')).toBeDisabled()
+    expect(tick('3.0×')).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByText('That leverage step is full')).toBeInTheDocument()
+    expect(openButton()).toHaveAccessibleName('Open Position at 3.0×')
+    expect(openButton()).toBeEnabled()
+  })
+
   it('moves the thumb when its step fills up', async () => {
     const user = userEvent.setup()
     const { rerenderWith } = renderSection()

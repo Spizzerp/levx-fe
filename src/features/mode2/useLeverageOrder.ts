@@ -95,10 +95,10 @@ function ladderOf(group: NettingGroup, slots: readonly number[], nowMs: number):
 }
 
 /**
- * The leverage on the slider: the one the trader chose (the lowest enabled step until they choose)
- * while it is enabled, else the nearest enabled step with the reason the chosen one is not (or
- * that it closed, when its offer left the ladder). When every step is blocked the thumb stays on
- * the ladder and the reason is its own.
+ * The leverage on the slider: the one the trader chose (the lowest step until they choose) while
+ * it is enabled, else the nearest enabled step with the reason the chosen one is not (or that it
+ * closed, when its offer left the ladder). When every step is blocked the thumb stays on the
+ * ladder and the reason is its own.
  */
 function chooseLeverage(
   values: readonly number[],
@@ -107,7 +107,7 @@ function chooseLeverage(
 ): { leverage: number; reason: string | null } {
   if (values.length === 0) return { leverage: requested ?? 0, reason: null }
   const enabled = values.filter((v) => blocked.get(v) === null)
-  const wanted = requested ?? enabled[0] ?? values[0]
+  const wanted = requested ?? values[0]
   const reason = values.includes(wanted) ? (blocked.get(wanted) ?? null) : STEP_CLOSED
   if (reason === null) return { leverage: wanted, reason: null }
   const fallback = nearest(enabled, wanted)
