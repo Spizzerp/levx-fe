@@ -176,6 +176,23 @@ describe('precheckOrders', () => {
     )
   })
 
+  it('refuses only the step whose offer is full', () => {
+    // Today's 2× offer has admitted all of its 2 positions; the 3× offer has room.
+    const held = groupHolding([bucket(0, 0, 2)])
+    const group = {
+      ...held,
+      offers: held.offers.map((offer, slot) =>
+        slot === 0 ? { ...offer, maxAdmissions: 2 } : offer,
+      ),
+    }
+    expect(group.offers[0].admitted).toBe(group.offers[0].maxAdmissions)
+    const view = viewWith({ group })
+    expect(precheckOrders(view, [onPath(0, threeX(1))], CTX)).toEqual(OK)
+    expect(precheckOrders(view, [onPath(0, twoX(1))], CTX)).toEqual(
+      refused('offer-full', 'That leverage step is full'),
+    )
+  })
+
   it("refuses an order over the group's positions", () => {
     const view = viewWith({
       group: groupHolding([bucket(0, 2, 2)]),
@@ -303,9 +320,14 @@ describe('precheckOrders', () => {
     expect(precheckOrders(makeView(), orders, { ...CTX, lamports: null })).toEqual(OK)
   })
 
-  it('skips the SOL check when the receipt exists', () => {
+  it('asks a returning trader for the fees only, without the rent', () => {
     const view = viewWith({ group: groupHolding([bucket(0, 0, 2)]), receipt: makeReceipt([2]) })
-    expect(precheckOrders(view, [onPath(0, twoX(1))], { ...CTX, lamports: 0 })).toEqual(OK)
+    const orders = [onPath(0, twoX(1))]
+    expect(precheckOrders(view, orders, { ...CTX, lamports: FEE_LAMPORTS })).toEqual(OK)
+    // 1 lamport short: rounded up to 0.0001 SOL.
+    expect(precheckOrders(view, orders, { ...CTX, lamports: FEE_LAMPORTS - 1 })).toEqual(
+      refused('sol', 'You need 0.0001 SOL more'),
+    )
   })
 
   it('reports the first check the program would fail', () => {

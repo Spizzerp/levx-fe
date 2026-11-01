@@ -73,6 +73,15 @@ describe('entryState', () => {
     })
   })
 
+  it('stays open when every offer is full', () => {
+    // Fills do not close entry: the steps disable instead, with the pre-check's reason.
+    const offers = todayOffers().map((offer) => ({ ...offer, admitted: offer.maxAdmissions }))
+    expect(entryState(viewWith({ group: makeGroup({ offers }) }), 'pending', NOW_MS)).toEqual({
+      kind: 'open',
+      closesAtMs: FIXTURE_START_MS,
+    })
+  })
+
   it('is closed 9 s before the close', () => {
     expect(entryState(makeView(), 'pending', FIXTURE_START_MS - 9_000)).toEqual({ kind: 'closed' })
     expect(entryState(makeView(), 'pending', FIXTURE_START_MS - CLOSE_MARGIN_MS)).toEqual({

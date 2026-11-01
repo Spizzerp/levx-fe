@@ -157,7 +157,8 @@ export function precheckOrders(
     return refuse('epoch-reserve', "The liquidity pool's limit cannot cover that max win")
   }
 
-  // The trader's balances: the principal, and a new receipt's rent with the fees.
+  // The trader's balances: the principal, and the fees with a new receipt's rent (a returning
+  // trader's receipt exists, so only the fees).
   const principal = batch.reduce(
     (sum, order) => sum + BigInt(order.count) * group.offers[order.offerSlot].collateral,
     0n,
@@ -165,8 +166,8 @@ export function precheckOrders(
   if (ctx.usdcMicro !== null && ctx.usdcMicro < principal) {
     return refuse('usdc', `You need ${usdcUp(principal - ctx.usdcMicro)} USDC more`)
   }
-  const lamportsNeeded = ctx.rentLamports + ctx.feeLamports
-  if (view.receipt === null && ctx.lamports !== null && ctx.lamports < lamportsNeeded) {
+  const lamportsNeeded = (view.receipt === null ? ctx.rentLamports : 0) + ctx.feeLamports
+  if (ctx.lamports !== null && ctx.lamports < lamportsNeeded) {
     return refuse('sol', `You need ${solUp(lamportsNeeded - ctx.lamports)} SOL more`)
   }
   return { ok: true }
