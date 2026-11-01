@@ -64,9 +64,13 @@ function viewWith(
   }
 }
 
-/** Staged terminal indices: slot 0 at 0.6, slot 2 at 0.1, the rest at 0. */
+/**
+ * Staged terminal indices: slot 0 at 0.25, slot 2 at 0.23, the rest at 0. Near the entry levels no
+ * profit cap binds and no claim is zero, so the payout depends on each bucket's offer, entry level and
+ * slot.
+ */
 const STAGED_INDICES = Array.from({ length: 16 }, (_, slot) =>
-  slot === 0 ? 600_000n : slot === 2 ? 100_000n : 0n,
+  slot === 0 ? 250_000n : slot === 2 ? 230_000n : 0n,
 )
 
 /** The view after the group was funded and the keeper paid and closed the receipt. */
@@ -138,9 +142,9 @@ describe('summarizePosition', () => {
     })
     const [twoX, threeX] = todayOffers()
     const slot0 =
-      payoffAt(twoX, FIXTURE_ENTRY_LEVELS[0], 600_000n).userClaim +
-      payoffAt(threeX, FIXTURE_ENTRY_LEVELS[0], 600_000n).userClaim
-    const slot2 = 2n * payoffAt(twoX, FIXTURE_ENTRY_LEVELS[2], 100_000n).userClaim
+      payoffAt(twoX, FIXTURE_ENTRY_LEVELS[0], 250_000n).userClaim +
+      payoffAt(threeX, FIXTURE_ENTRY_LEVELS[0], 250_000n).userClaim
+    const slot2 = 2n * payoffAt(twoX, FIXTURE_ENTRY_LEVELS[2], 230_000n).userClaim
 
     const summary = summarizePosition(view, FORECASTS, null, 'maturing', RUNNING_MS)!
     expect(summary.status).toBe('result-in')
