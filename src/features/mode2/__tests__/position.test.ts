@@ -90,7 +90,7 @@ const paidHistory = (paid: bigint): ReceiptHistory => ({
 
 describe('summarizePosition', () => {
   it('is waiting before the start', () => {
-    const summary = summarizePosition(viewWith(), FORECASTS, null, 'pending', BEFORE_START_MS)
+    const summary = summarizePosition(viewWith(), FORECASTS, null, BEFORE_START_MS)
     expect(summary).toMatchObject({
       status: 'waiting',
       principal: 40n * USDC,
@@ -103,7 +103,7 @@ describe('summarizePosition', () => {
 
   it('is running after the start, at the checkpoints recorded', () => {
     const view = viewWith({ observationsRecorded: 2 })
-    const summary = summarizePosition(view, FORECASTS, null, 'active', RUNNING_MS)
+    const summary = summarizePosition(view, FORECASTS, null, RUNNING_MS)
     expect(summary).toMatchObject({
       status: 'running',
       principal: 40n * USDC,
@@ -115,7 +115,7 @@ describe('summarizePosition', () => {
 
   it('shows a path as one position at its combined leverage, 2.5 for 1 unit at 2x and 1 at 3x', () => {
     const view = viewWith()
-    const summary = summarizePosition(view, FORECASTS, null, 'pending', BEFORE_START_MS)!
+    const summary = summarizePosition(view, FORECASTS, null, BEFORE_START_MS)!
     const group = view.group!.data
     const { parts: _first, ...first } = pathBreakdown(group, 0, 3, 2.5, [
       { offerSlot: 0, leverage: 2, units: 1 },
@@ -146,7 +146,7 @@ describe('summarizePosition', () => {
       payoffAt(threeX, FIXTURE_ENTRY_LEVELS[0], 250_000n).userClaim
     const slot2 = 2n * payoffAt(twoX, FIXTURE_ENTRY_LEVELS[2], 230_000n).userClaim
 
-    const summary = summarizePosition(view, FORECASTS, null, 'maturing', RUNNING_MS)!
+    const summary = summarizePosition(view, FORECASTS, null, RUNNING_MS)!
     expect(summary.status).toBe('result-in')
     expect(summary.finalPayout).toBe(slot0 + slot2)
     expect(summary.paths.map((path) => path.finalPayout)).toEqual([slot0, slot2])
@@ -164,7 +164,7 @@ describe('summarizePosition', () => {
         ],
       },
     )
-    const summary = summarizePosition(view, FORECASTS, null, 'settled', RUNNING_MS)!
+    const summary = summarizePosition(view, FORECASTS, null, RUNNING_MS)!
     expect(summary.status).toBe('result-in')
     expect(summary.finalPayout).toBe(54_500_000n)
     expect(summary.paths.map((path) => path.finalPayout)).toEqual([34_700_000n, 19_800_000n])
@@ -172,18 +172,12 @@ describe('summarizePosition', () => {
 
   it('is voided when the group was funded void', () => {
     const view = viewWith({}, { state: GROUP_FUNDED_VOID })
-    const summary = summarizePosition(view, FORECASTS, null, 'void', RUNNING_MS)
+    const summary = summarizePosition(view, FORECASTS, null, RUNNING_MS)
     expect(summary).toMatchObject({ status: 'voided', principal: 40n * USDC, finalPayout: null })
   })
 
   it('is paid once the keeper paid and closed the receipt', () => {
-    const summary = summarizePosition(
-      closedView(),
-      FORECASTS,
-      paidHistory(54_500_000n),
-      'settled',
-      RUNNING_MS,
-    )
+    const summary = summarizePosition(closedView(), FORECASTS, paidHistory(54_500_000n), RUNNING_MS)
     expect(summary).toEqual({
       status: 'paid',
       principal: 40n * USDC,
@@ -195,32 +189,15 @@ describe('summarizePosition', () => {
     })
   })
 
-  it('is voided when a void market paid back exactly the principal', () => {
-    const summary = summarizePosition(
-      closedView(),
-      FORECASTS,
-      paidHistory(40n * USDC),
-      'void',
-      RUNNING_MS,
-    )
+  it('is voided when the closed receipt paid back exactly its principal, as a group voids on its own', () => {
+    const summary = summarizePosition(closedView(), FORECASTS, paidHistory(40n * USDC), RUNNING_MS)
     expect(summary).toMatchObject({ status: 'voided', principal: 40n * USDC, paid: 40n * USDC })
-  })
-
-  it('is paid when a settled market paid back exactly the principal', () => {
-    const summary = summarizePosition(
-      closedView(),
-      FORECASTS,
-      paidHistory(40n * USDC),
-      'settled',
-      RUNNING_MS,
-    )
-    expect(summary?.status).toBe('paid')
   })
 
   it('is null without a receipt until the history shows the payment', () => {
     const unpaid: ReceiptHistory = { principal: 40n * USDC, paid: null, claimSignature: null }
-    expect(summarizePosition(closedView(), FORECASTS, null, 'active', RUNNING_MS)).toBeNull()
-    expect(summarizePosition(closedView(), FORECASTS, unpaid, 'active', RUNNING_MS)).toBeNull()
+    expect(summarizePosition(closedView(), FORECASTS, null, RUNNING_MS)).toBeNull()
+    expect(summarizePosition(closedView(), FORECASTS, unpaid, RUNNING_MS)).toBeNull()
   })
 
   describe('after the keeper closed the group and the epoch (Ruling 18)', () => {
@@ -233,9 +210,7 @@ describe('summarizePosition', () => {
     })
 
     it('is paid from the history alone once the cohort is closed too', () => {
-      expect(
-        summarizePosition(null, null, paidHistory(54_500_000n), 'settled', RUNNING_MS),
-      ).toEqual({
+      expect(summarizePosition(null, null, paidHistory(54_500_000n), RUNNING_MS)).toEqual({
         status: 'paid',
         principal: 40n * USDC,
         checkpoint: 0,
@@ -247,14 +222,17 @@ describe('summarizePosition', () => {
     })
 
     it('is voided from the history alone once the cohort is closed too', () => {
-      expect(
-        summarizePosition(null, null, paidHistory(40n * USDC), 'void', RUNNING_MS),
-      ).toMatchObject({ status: 'voided', principal: 40n * USDC, paid: 40n * USDC, paths: [] })
+      expect(summarizePosition(null, null, paidHistory(40n * USDC), RUNNING_MS)).toMatchObject({
+        status: 'voided',
+        principal: 40n * USDC,
+        paid: 40n * USDC,
+        paths: [],
+      })
     })
 
     it('is paid or voided from the history while only the cohort is left', () => {
       expect(
-        summarizePosition(cohortOnly(), FORECASTS, paidHistory(54_500_000n), 'settled', RUNNING_MS),
+        summarizePosition(cohortOnly(), FORECASTS, paidHistory(54_500_000n), RUNNING_MS),
       ).toEqual({
         status: 'paid',
         principal: 40n * USDC,
@@ -265,18 +243,18 @@ describe('summarizePosition', () => {
         paths: [],
       })
       expect(
-        summarizePosition(cohortOnly(), FORECASTS, paidHistory(40n * USDC), 'void', RUNNING_MS),
+        summarizePosition(cohortOnly(), FORECASTS, paidHistory(40n * USDC), RUNNING_MS),
       ).toMatchObject({ status: 'voided', principal: 40n * USDC })
     })
 
     it('is null without a history', () => {
-      expect(summarizePosition(null, null, null, 'settled', RUNNING_MS)).toBeNull()
-      expect(summarizePosition(cohortOnly(), FORECASTS, null, 'settled', RUNNING_MS)).toBeNull()
+      expect(summarizePosition(null, null, null, RUNNING_MS)).toBeNull()
+      expect(summarizePosition(cohortOnly(), FORECASTS, null, RUNNING_MS)).toBeNull()
     })
   })
 
   it('shows the summary without the path rows while the forecasts are unread', () => {
-    const summary = summarizePosition(viewWith(), null, null, 'pending', BEFORE_START_MS)
+    const summary = summarizePosition(viewWith(), null, null, BEFORE_START_MS)
     expect(summary).toMatchObject({ status: 'waiting', principal: 40n * USDC, paths: [] })
   })
 

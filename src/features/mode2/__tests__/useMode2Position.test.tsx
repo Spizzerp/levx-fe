@@ -159,6 +159,16 @@ describe('useMode2Position', () => {
     },
   )
 
+  it('shows a refund of exactly the principal on a settled market as voided', async () => {
+    // A Mode 2 group voids on its own (e.g. a missing observation) while Mode 1 settles.
+    fetchReceiptHistoryMock.mockResolvedValue({ ...PAID, paid: PAID.principal })
+    vi.setSystemTime(AFTER_START_MS)
+    connect(FIXTURE_OWNER)
+    const { result } = renderPosition(null)
+
+    await waitFor(() => expect(result.current?.status).toBe('voided'))
+  })
+
   it("shows the new owner's history when the wallet switches accounts", async () => {
     vi.setSystemTime(AFTER_START_MS)
     connect(FIXTURE_OWNER)

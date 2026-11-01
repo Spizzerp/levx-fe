@@ -11,7 +11,6 @@ import {
   payoffAt,
 } from '@spizzerp/levx-mode2-client'
 import type { Cohort, NettingGroup, PositionReceipt } from '@spizzerp/levx-mode2-client'
-import type { MarketState } from '@/types/market'
 import { pathBreakdown } from './breakdown'
 import type { ReceiptHistory } from './history'
 import type { OrderPart } from './ladder'
@@ -108,7 +107,6 @@ export function summarizePosition(
   view: Mode2MarketView | null,
   forecasts: Mode2Forecasts | null,
   history: ReceiptHistory | null,
-  marketState: MarketState,
   nowMs: number,
 ): PositionSummary | null {
   const progress = {
@@ -118,8 +116,9 @@ export function summarizePosition(
 
   if (view === null || view.receipt === null) {
     if (history === null || history.paid === null) return null
-    // A void claim pays back exactly what was put in.
-    const voided = history.paid === history.principal && marketState === 'void'
+    // A void claim pays back exactly what was put in, whether Mode 1 voided the market or the
+    // group voided on its own (Ruling 25).
+    const voided = history.paid === history.principal
     return {
       status: voided ? 'voided' : 'paid',
       principal: history.principal,

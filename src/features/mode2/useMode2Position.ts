@@ -75,5 +75,5 @@ export function useMode2Position(
     refetchInterval: (query) => (query.state.data?.paid === null ? UNPAID_REFETCH_MS : false),
   })
   if (market === undefined || view === undefined) return null
-  return summarizePosition(view, forecasts ?? null, history.data ?? null, market.state, nowMs)
+  return summarizePosition(view, forecasts ?? null, history.data ?? null, nowMs)
 }
