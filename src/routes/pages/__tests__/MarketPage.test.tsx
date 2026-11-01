@@ -16,6 +16,7 @@ vi.mock('@/env/env.config', () => ({
     APP_NETWORK: 'mainnet',
     APP_PROGRAM_ID: 'LhDfCNTdm8Xr5cpEaSCfVSsbReA8muHFsS8zgjJn7Kk',
     APP_ADMIN_WALLETS: [],
+    APP_MODE2_TRADING: false,
     APP_SUPABASE_URL: 'http://127.0.0.1:54321',
     APP_SUPABASE_ANON_KEY: 'test-anon-key',
   },
