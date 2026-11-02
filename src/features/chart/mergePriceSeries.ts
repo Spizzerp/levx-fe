@@ -10,8 +10,9 @@ export const TRAIL_GAP_MS = 90_000
 /**
  * The price line: the candle history before the first trail tick, then the once-a-second trail
  * and the latest tick, so a history reload never smooths over the seconds the page recorded.
- * The candles strictly inside a trail gap longer than `maxTrailGapMs` fill that gap. Each point
- * is strictly newer than the one before it.
+ * The candles strictly inside a trail gap longer than `maxTrailGapMs` fill that gap, and when the
+ * newest candle is more than `maxTrailGapMs` past the last live point (a stalled feed), the newer
+ * candles follow it. Each point is strictly newer than the one before it.
  */
 export function mergePriceSeries(
   history: readonly PricePoint[],
@@ -40,5 +41,8 @@ export function mergePriceSeries(
     merged.push({ time: tick.time, value: tick.value })
     lastTime = tick.time
   }
+  // A feed that stalled while the history went on: the newer candles continue the line.
+  const newestCandle = history[history.length - 1]?.time ?? -Infinity
+  if (newestCandle - lastTime > maxTrailGapMs) addCandlesBefore(Infinity)
   return merged
 }

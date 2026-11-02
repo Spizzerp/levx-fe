@@ -41,7 +41,8 @@ describe('mergePriceSeries', () => {
   })
 
   it('fills a long trail gap with the candles inside it', () => {
-    const history = candles(0, 20)
+    // The history ends before the trail does, so no candle follows the last tick.
+    const history = candles(0, 11)
     // A five-minute hole between the ticks at 300 s and 600 s; the candles on its edges stay out.
     const before = ticks(0, 300)
     const after = ticks(600, 700)
@@ -90,6 +91,27 @@ describe('mergePriceSeries', () => {
     for (let i = 1; i < merged.length; i++) {
       expect(merged[i].time).toBeGreaterThan(merged[i - 1].time)
     }
+  })
+
+  it('appends newer candles after a stalled feed', () => {
+    const history = candles(0, 10)
+    // The feed stalled at 120 s while the history goes on to 600 s.
+    const stalled = ticks(100, 120)
+
+    expect(mergePriceSeries(history, stalled, null, TRAIL_GAP_MS)).toEqual([
+      candle(0),
+      candle(1),
+      ...stalled.map(point),
+      ...candles(3, 10),
+    ])
+
+    // A last tick within TRAIL_GAP_MS of the newest candle keeps the line on the trail.
+    const recent = ticks(100, 550)
+    expect(mergePriceSeries(history, recent, null, TRAIL_GAP_MS)).toEqual([
+      candle(0),
+      candle(1),
+      ...recent.map(point),
+    ])
   })
 
   it('returns the history when there is no trail and no tick', () => {
