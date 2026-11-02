@@ -15,13 +15,23 @@ Frontend for LEVX.
 
 ## Setup
 
-Requires Node 22+ and pnpm 10+.
+Requires Node 22.12+ and pnpm 10+.
 
 ```bash
 pnpm i
 cp .env.example .env.local   # then fill in values
 pnpm dev                     # dev server on :3030
 ```
+
+### The Mode 2 client package
+
+The app depends on `@spizzerp/levx-mode2-client`, the TypeScript client of the Mode 2 custody
+program (LevXv2 `clients/mode2`), published on the public npm registry. It needs no registry
+configuration or token, and Node 22.12 or later.
+
+Mode 2 trading on the market page is behind `APP_MODE2_TRADING`: off unless it is `'true'`.
+`.env.example` turns it on for local development; leave it unset in production until the devnet
+proof passes.
 
 ## Scripts
 
@@ -58,6 +68,7 @@ APP_ENV=local
 APP_API_BASE_URL=           # required for chart history: the pipeline's public URL
 APP_ADMIN_WALLETS=          # comma-separated base58 pubkeys
 APP_USE_MOCK=               # "true" to use mock API responses
+APP_MODE2_TRADING=          # "true" turns on Mode 2 trading; unset in production for now
 ```
 
 ### Price sources

@@ -27,6 +27,13 @@ import { SegmentedSlider } from '@/ui/SegmentedSlider'
 import { SlippageSelector } from '@/ui/SlippageSelector'
 import { Stub } from '@/ui/Stub'
 import { UserPositionCard } from '@/features/market/UserPositionCard'
+import { useMode2Forecasts, useMode2Market } from '@/features/mode2/api'
+import { entryState } from '@/features/mode2/entryWindow'
+import { pathLabelsOf } from '@/features/mode2/format'
+import { LeverageSection } from '@/features/mode2/LeverageSection'
+import { Mode2PositionCard } from '@/features/mode2/Mode2PositionCard'
+import { useMode2Position } from '@/features/mode2/useMode2Position'
+import { env } from '@/env/env.config'
 import { cn } from '@/lib/cn'
 import { useCheckpointPrices } from '@/lib/api/checkpointPrices'
 import { useMode2Readiness } from '@/lib/api/hooks'
@@ -319,11 +326,15 @@ export function MarketPage() {
     market?.marketId ?? null,
     market?.completedCheckpoints ?? 0,
   )
+  // The readiness card belongs to the overlay that APP_MODE2_TRADING replaces.
   const {
     data: mode2Readiness,
     isLoading: isMode2ReadinessLoading,
     isError: isMode2ReadinessError,
-  } = useMode2Readiness({ enabled: !!market && !market.leverageEnabled })
+  } = useMode2Readiness({ enabled: !env.APP_MODE2_TRADING && !!market && !market.leverageEnabled })
+  const { data: mode2View } = useMode2Market(market?.marketId, market?.state, market?.startTime)
+  const { data: mode2Forecasts } = useMode2Forecasts(mode2View)
+  const mode2Position = useMode2Position(market, mode2View, mode2Forecasts)
 
   const pair = market?.pair ?? null
   const mode2PairRiskState = useMemo(() => {
@@ -740,8 +751,25 @@ export function MarketPage() {
   const pendingPathTarget = market.targetNumPaths
   const showPendingIndicator = market.state === 'pending' && market.numPaths < pendingPathTarget
   const showPositionRail = !showWagerRail && !showVoidPanel && !!userPosition
+
+  // Mode 2, behind APP_MODE2_TRADING (spec §4.1, §6.1): the leverage section takes the bet
+  // controls' place while entry is open, and the position card joins the rails.
+  const mode2Entry = entryState(mode2View ?? null, market.state, now)
+  const leverageOpen = env.APP_MODE2_TRADING && mode2Entry.kind === 'open'
+  const mode2Card =
+    env.APP_MODE2_TRADING && mode2Position !== null ? (
+      <Mode2PositionCard summary={mode2Position} pathLabels={pathLabelsOf(allPaths)} />
+    ) : null
+  // Where no state rail shows (settling, sampling past the cutoff), the card has a rail of its own.
+  const showMode2Rail =
+    mode2Card !== null && !showWagerRail && !showMaturityCard && !showClaimCard && !showVoidPanel
   const showRail =
-    showWagerRail || showMaturityCard || showClaimCard || showVoidPanel || showPositionRail
+    showWagerRail ||
+    showMaturityCard ||
+    showClaimCard ||
+    showVoidPanel ||
+    showPositionRail ||
+    showMode2Rail
   const relayFailedPaths = visibleUserPaths.filter((p) => p.onChainStatus === 'relay_failed')
 
   return (
@@ -1012,7 +1040,8 @@ export function MarketPage() {
                       </div>
                     )
                   })}
-                  {selectedPathIds.size > 4 && (
+                  {/* The leverage section names its own cap ("Max 4 paths per order"). */}
+                  {selectedPathIds.size > 4 && !leverageOpen && (
                     <p className="text-accent text-caption px-4 py-2 font-mono">
                       Max 4 paths per transaction. Deselect some paths.
                     </p>
@@ -1076,7 +1105,7 @@ export function MarketPage() {
               Drawing requires desktop
             </div>
 
-            {market.leverageEnabled && (
+            {!env.APP_MODE2_TRADING && market.leverageEnabled && (
               <>
                 <hr className="bg-line my-9 mb-8 h-px border-0" />
 
@@ -1103,7 +1132,7 @@ export function MarketPage() {
               </>
             )}
 
-            {!market.leverageEnabled && (
+            {!env.APP_MODE2_TRADING && !market.leverageEnabled && (
               <>
                 <hr className="bg-line my-9 mb-8 h-px border-0" />
                 <Mode2MarketReadinessCard
@@ -1116,75 +1145,106 @@ export function MarketPage() {
               </>
             )}
 
-            <div className="mb-6 flex items-center justify-between gap-3">
-              <UsdcBalance />
-              <RequestUsdcButton />
-            </div>
-
-            <Input
-              label="Collateral"
-              value={collateral}
-              onChange={(e) => setCollateral(e.target.value)}
-              unit="USDC"
-              inputMode="decimal"
-              borderless
-              className="mb-8"
-            />
-            {numWagerable > 1 && (
-              <p className="text-ink-muted text-caption -mt-6 mb-6 font-mono">
-                Total: {formatUSD((parseFloat(collateral) || 0) * numWagerable)} USDC across{' '}
-                {numWagerable} paths
-              </p>
+            {env.APP_MODE2_TRADING && (
+              <>
+                <hr className="bg-line my-9 mb-8 h-px border-0" />
+                {mode2Entry.kind === 'waiting-bind' && (
+                  <p className="text-ink-muted text-caption mb-6 font-mono">
+                    Leverage opens when the paths arrive, about 3 minutes before the start
+                  </p>
+                )}
+                {mode2Entry.kind === 'closed' && wageringOpen && (
+                  <p className="text-ink-muted text-caption mb-6 font-mono">
+                    Leverage closed at the start
+                  </p>
+                )}
+                {leverageOpen && mode2View && (
+                  <LeverageSection
+                    market={market}
+                    view={mode2View}
+                    forecasts={mode2Forecasts ?? null}
+                    selectedPaths={selectedPaths}
+                    nowMs={now}
+                  />
+                )}
+              </>
             )}
 
-            <SlippageSelector className="mb-6" />
+            {!leverageOpen && (
+              <>
+                <div className="mb-6 flex items-center justify-between gap-3">
+                  <UsdcBalance />
+                  <RequestUsdcButton />
+                </div>
 
-            <ConnectGate>
-              <Button
-                variant="primary"
-                fullWidth
-                className="mt-2"
-                disabled={
-                  !wageringOpen ||
-                  numWagerable === 0 ||
-                  numWagerable > 4 ||
-                  placeBatchWager.isPending
-                }
-                onClick={() => {
-                  if (numWagerable === 0) return
-                  const wager = parseFloat(collateral) || 0
-                  const total = wager * numWagerable
-                  // Pre-tx guard only fires when the balance is actually
-                  // known. If the query is still loading or hit a
-                  // transient RPC error, fall through and let the on-chain
-                  // validation surface insufficient-funds — better than
-                  // blocking a valid wager because we couldn't read the
-                  // ATA.
-                  if (usdcBalance && total > usdcBalance.balance) {
-                    toast.error('Insufficient USDC', {
-                      message: `Wager total ${total.toFixed(2)} USDC exceeds your balance of ${usdcBalance.balance.toFixed(2)}. Use "Request test USDC" above.`,
-                    })
-                    return
-                  }
-                  placeBatchWager.mutate({
-                    marketId: market.marketId,
-                    pathIndices: wagerablePaths.map((p) => p.pathIndex),
-                    amount: wager,
-                  })
-                }}
-              >
-                {placeBatchWager.isPending
-                  ? 'Confirming…'
-                  : numWagerable <= 1
-                    ? `Open ${isPathLong(wagerablePaths[0]) ? 'Long' : 'Short'} Position`
-                    : `Open ${numWagerable} Positions`}
-              </Button>
-            </ConnectGate>
-            {placeBatchWager.isError && (
-              <p className="text-accent text-caption mt-2 font-mono">
-                {(placeBatchWager.error as Error).message}
-              </p>
+                <Input
+                  label="Collateral"
+                  value={collateral}
+                  onChange={(e) => setCollateral(e.target.value)}
+                  unit="USDC"
+                  inputMode="decimal"
+                  borderless
+                  className="mb-8"
+                />
+                {numWagerable > 1 && (
+                  <p className="text-ink-muted text-caption -mt-6 mb-6 font-mono">
+                    Total: {formatUSD((parseFloat(collateral) || 0) * numWagerable)} USDC across{' '}
+                    {numWagerable} paths
+                  </p>
+                )}
+
+                <SlippageSelector className="mb-6" />
+
+                <ConnectGate>
+                  <Button
+                    variant="primary"
+                    fullWidth
+                    className="mt-2"
+                    disabled={
+                      !wageringOpen ||
+                      numWagerable === 0 ||
+                      numWagerable > 4 ||
+                      placeBatchWager.isPending
+                    }
+                    onClick={() => {
+                      if (numWagerable === 0) return
+                      const wager = parseFloat(collateral) || 0
+                      const total = wager * numWagerable
+                      // Pre-tx guard only fires when the balance is actually
+                      // known. If the query is still loading or hit a
+                      // transient RPC error, fall through and let the on-chain
+                      // validation surface insufficient-funds — better than
+                      // blocking a valid wager because we couldn't read the
+                      // ATA.
+                      if (usdcBalance && total > usdcBalance.balance) {
+                        toast.error('Insufficient USDC', {
+                          message: `Wager total ${total.toFixed(2)} USDC exceeds your balance of ${usdcBalance.balance.toFixed(2)}. Use "Request test USDC" above.`,
+                        })
+                        return
+                      }
+                      placeBatchWager.mutate({
+                        marketId: market.marketId,
+                        pathIndices: wagerablePaths.map((p) => p.pathIndex),
+                        amount: wager,
+                      })
+                    }}
+                  >
+                    {placeBatchWager.isPending
+                      ? 'Confirming…'
+                      : numWagerable <= 1
+                        ? `Open ${isPathLong(wagerablePaths[0]) ? 'Long' : 'Short'} Position`
+                        : `Open ${numWagerable} Positions`}
+                  </Button>
+                </ConnectGate>
+                {placeBatchWager.isError && (
+                  <p className="text-accent text-caption mt-2 font-mono">
+                    {(placeBatchWager.error as Error).message}
+                  </p>
+                )}
+              </>
             )}
+
+            {mode2Card && <div className="mt-8">{mode2Card}</div>}
           </aside>
         )}
 
@@ -1195,6 +1255,7 @@ export function MarketPage() {
             {userPosition && (
               <UserPositionCard position={userPosition} marketState={market.state} />
             )}
+            {mode2Card}
           </aside>
         )}
 
@@ -1207,6 +1268,7 @@ export function MarketPage() {
             {userPosition && (
               <UserPositionCard position={userPosition} marketState={market.state} hideAction />
             )}
+            {mode2Card}
           </aside>
         )}
 
@@ -1219,13 +1281,17 @@ export function MarketPage() {
             {userPosition && (
               <UserPositionCard position={userPosition} marketState={market.state} hideAction />
             )}
+            {mode2Card}
           </aside>
         )}
 
-        {/* ── Right rail (non-Active markets with a user position) ── */}
-        {showPositionRail && userPosition && (
-          <aside className="flex flex-col">
-            <UserPositionCard position={userPosition} marketState={market.state} />
+        {/* ── Right rail (non-Active markets with a user position, or only leveraged ones) ── */}
+        {((showPositionRail && userPosition) || showMode2Rail) && (
+          <aside className={cn('flex flex-col', showMode2Rail && 'gap-6')}>
+            {showPositionRail && userPosition && (
+              <UserPositionCard position={userPosition} marketState={market.state} />
+            )}
+            {showMode2Rail && mode2Card}
           </aside>
         )}
       </div>

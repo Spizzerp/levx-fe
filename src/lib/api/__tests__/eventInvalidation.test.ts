@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from 'vitest'
 import { BN, BorshEventCoder } from '@coral-xyz/anchor'
+import { QueryClient } from '@tanstack/react-query'
 
+import { mode2Keys } from '@/features/mode2/api'
 import {
   EVENT_INVALIDATION_MAP,
   dispatchEventInvalidation,
@@ -8,6 +10,9 @@ import {
   readField,
 } from '@/lib/api/eventInvalidation'
 import idlJson from '@/idl/levx.json'
+
+/** The Mode 2 events: sampling progress, settlement and void. */
+const MODE2_EVENTS = ['CheckpointSampled', 'MarketSettled', 'MarketFinalized', 'MarketVoided']
 
 describe('marketKey', () => {
   it('handles BN, number, and string inputs uniformly', () => {
@@ -119,10 +124,41 @@ describe('EVENT_INVALIDATION_MAP', () => {
     expect(snake).toEqual(camel)
   })
 
-  it('CheckpointSampled invalidates only the specific market (high-frequency event)', () => {
+  it('CheckpointSampled invalidates only the specific market and its Mode 2 reads (high-frequency event)', () => {
     const keys = EVENT_INVALIDATION_MAP.CheckpointSampled({ market_id: new BN(3) })
-    expect(keys).toHaveLength(1)
-    expect(keys[0]).toEqual(['market', '3'])
+    expect(keys).toEqual([
+      ['market', '3'],
+      ['mode2', 'market', 3],
+      ['mode2', 'history', 3],
+    ])
+  })
+
+  it("Mode 2 events refresh only the event's market view and history", () => {
+    const owner = 'owner'
+    const refreshed = [
+      mode2Keys.market(3, owner),
+      mode2Keys.market(3, null),
+      mode2Keys.history(3, owner),
+    ]
+    const kept = [
+      mode2Keys.market(4, owner),
+      mode2Keys.history(4, owner),
+      mode2Keys.forecasts(3),
+      ['mode2', 'lamports', owner],
+      ['mode2', 'receiptRent'],
+    ]
+    for (const name of MODE2_EVENTS) {
+      const queryClient = new QueryClient()
+      for (const key of [...refreshed, ...kept]) queryClient.setQueryData(key, {})
+
+      // The event's id arrives as a BN, a number or a string; the Mode 2 keys hold numbers.
+      dispatchEventInvalidation(queryClient, { name, data: { market_id: '3' } })
+
+      const invalidated = (key: readonly unknown[]) =>
+        queryClient.getQueryState(key)?.isInvalidated === true
+      expect(refreshed.filter(invalidated), name).toEqual(refreshed)
+      expect(kept.filter(invalidated), name).toEqual([])
+    }
   })
 
   it('market group link changes invalidate the affected market and market list', () => {

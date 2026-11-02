@@ -32,6 +32,7 @@ export type AppEnv = {
   APP_ADMIN_WALLETS: string[]
   APP_PATH_UPLOAD_RELAY_FEE_LAMPORTS: number
   APP_EIGENCACHE_QUOTES_ENABLED: boolean
+  APP_MODE2_TRADING: boolean
   APP_SUPABASE_URL: string
   APP_SUPABASE_ANON_KEY: string
 }
@@ -52,6 +53,7 @@ export const env: AppEnv = {
     (import.meta.env.APP_EIGENCACHE_QUOTES_ENABLED ??
       import.meta.env.VITE_EIGENCACHE_QUOTES_ENABLED ??
       'false') === 'true',
+  APP_MODE2_TRADING: (import.meta.env.APP_MODE2_TRADING ?? 'false') === 'true',
   APP_SUPABASE_URL: requireEnv('APP_SUPABASE_URL'),
   APP_SUPABASE_ANON_KEY: requireEnv('APP_SUPABASE_ANON_KEY'),
 }

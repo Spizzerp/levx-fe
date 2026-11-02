@@ -72,6 +72,18 @@ function eventMarketKey(data: AnyData): string | null {
 type InvalidationFactory = (data: AnyData) => QueryKey[]
 
 /**
+ * The event's market's Mode 2 view and receipt history, for every owner: prefixes of
+ * `mode2Keys.market` and `mode2Keys.history` (src/features/mode2/api.ts), which hold the id as a
+ * number. The forecasts, the rent and the wallet's SOL do not change with a Mode 1 event.
+ */
+function mode2MarketReads(mk: string): QueryKey[] {
+  return [
+    ['mode2', 'market', Number(mk)],
+    ['mode2', 'history', Number(mk)],
+  ]
+}
+
+/**
  * Per-event invalidation. Events not listed are observed but no cache
  * action is taken (e.g. admin-only events like `DisputeConfigUpdated`
  * or rent-reclaim notifications like `PathOutcomeClosed` —
@@ -93,9 +105,24 @@ export const EVENT_INVALIDATION_MAP: Readonly<Record<string, InvalidationFactory
   // ── Market lifecycle ──────────────────────────────────────────────
   MarketCreated: () => [['markets']],
   MarketActivated: withMarket((mk) => [['market', mk], ['markets']]),
-  MarketSettled: withMarket((mk) => [['market', mk], ['markets'], ['userPositions']]),
-  MarketFinalized: withMarket((mk) => [['market', mk], ['markets'], ['userPositions']]),
-  MarketVoided: withMarket((mk) => [['market', mk], ['markets'], ['userPositions']]),
+  MarketSettled: withMarket((mk) => [
+    ['market', mk],
+    ['markets'],
+    ['userPositions'],
+    ...mode2MarketReads(mk),
+  ]),
+  MarketFinalized: withMarket((mk) => [
+    ['market', mk],
+    ['markets'],
+    ['userPositions'],
+    ...mode2MarketReads(mk),
+  ]),
+  MarketVoided: withMarket((mk) => [
+    ['market', mk],
+    ['markets'],
+    ['userPositions'],
+    ...mode2MarketReads(mk),
+  ]),
   MarketClosed: withMarket((mk) => [['market', mk], ['markets'], ['userPositions']]),
   DisputedMarketFinalized: withMarket((mk) => [['market', mk], ['markets'], ['userPositions']]),
 
@@ -134,7 +161,7 @@ export const EVENT_INVALIDATION_MAP: Readonly<Record<string, InvalidationFactory
   PathDissolved: withMarket((mk) => [['market', mk], ['userPositions']]),
 
   // ── Sampling progress ─────────────────────────────────────────────
-  CheckpointSampled: withMarket((mk) => [['market', mk]]),
+  CheckpointSampled: withMarket((mk) => [['market', mk], ...mode2MarketReads(mk)]),
 
   // ── Disputes ──────────────────────────────────────────────────────
   DisputeRaised: withMarket((mk) => [['market', mk], ['markets']]),

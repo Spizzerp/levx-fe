@@ -5,11 +5,16 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       # Reads pnpm version from package.json's `packageManager` field.
       # Do NOT pass `version:` here — pnpm/action-setup@v4 errors out if a

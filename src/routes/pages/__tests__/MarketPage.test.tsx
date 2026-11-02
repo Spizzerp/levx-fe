@@ -1,10 +1,13 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor, act, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import React from 'react'
 import { PublicKey } from '@solana/web3.js'
 import { useWalletStore } from '@/stores/walletStore'
+
+// The Mode 2 switch, off unless a test turns it on
+const flags = vi.hoisted(() => ({ mode2: false }))
 
 // Mock env config before any other imports
 vi.mock('@/env/env.config', () => ({
@@ -16,9 +19,29 @@ vi.mock('@/env/env.config', () => ({
     APP_NETWORK: 'mainnet',
     APP_PROGRAM_ID: 'LhDfCNTdm8Xr5cpEaSCfVSsbReA8muHFsS8zgjJn7Kk',
     APP_ADMIN_WALLETS: [],
+    get APP_MODE2_TRADING() {
+      return flags.mode2
+    },
     APP_SUPABASE_URL: 'http://127.0.0.1:54321',
     APP_SUPABASE_ANON_KEY: 'test-anon-key',
   },
+}))
+
+// The Mode 2 reads as the hooks return them: the market view, the forecasts and the position summary
+const mode2 = vi.hoisted(() => ({
+  view: undefined as Mode2MarketView | null | undefined,
+  forecasts: undefined as Mode2Forecasts | null | undefined,
+  summary: null as PositionSummary | null,
+}))
+vi.mock('@/features/mode2/api', () => ({
+  ADMIT_FEE_LAMPORTS: 20_000,
+  useMode2Market: () => ({ data: mode2.view }),
+  useMode2Forecasts: () => ({ data: mode2.forecasts }),
+  useWalletFunds: () => ({ lamports: null, rentLamports: null }),
+  useOpenMode2Positions: () => ({ mutate: vi.fn(), isPending: false }),
+}))
+vi.mock('@/features/mode2/useMode2Position', () => ({
+  useMode2Position: () => mode2.summary,
 }))
 
 // Mock @visx/responsive ParentSize — jsdom has no layout engine, reports 0x0
@@ -203,6 +226,14 @@ vi.mock('@/lib/supabase/hooks', () => ({
 
 import { useParams } from '@tanstack/react-router'
 import { MarketPage } from '@/routes/pages/MarketPage'
+import {
+  FIXTURE_MARKET_ID,
+  FIXTURE_START_MS,
+  makeGroup,
+  makeView,
+} from '@/features/mode2/__tests__/fixtures'
+import type { PositionSummary } from '@/features/mode2/position'
+import type { Mode2Forecasts, Mode2MarketView } from '@/features/mode2/types'
 import { PYTH_FEED_IDS } from '@/lib/pyth/feedIds'
 import { useDrawingStore } from '@/stores/drawingStore'
 import { usePriceStore } from '@/stores/priceStore'
@@ -290,6 +321,10 @@ function renderMarketPage() {
 }
 
 beforeEach(async () => {
+  flags.mode2 = false
+  mode2.view = undefined
+  mode2.forecasts = undefined
+  mode2.summary = null
   useDrawingStore.setState({ state: { phase: 'idle' }, totalCheckpoints: 0 })
   usePriceStore.setState({ ticks: {}, feeds: {}, levels: {}, trails: {} })
   usePriceFeedSpy.mockClear()
@@ -941,6 +976,231 @@ describe('MarketPage wallet gating', () => {
     expect(() => renderMarketPage()).not.toThrow()
     // Chart + header still render
     expect(screen.getByText(/BTC \/ USDC/i)).toBeInTheDocument()
+  })
+})
+
+describe('MarketPage with Mode 2 trading', () => {
+  const HOUR_MS = 60 * 60 * 1000
+  /** Two minutes before the fixture cohort's start: its entry is open. */
+  const BEFORE_START_MS = FIXTURE_START_MS - 2 * 60 * 1000
+  /** Mode 1 path 3 is cohort slot 0; path 9 is outside the cohort. */
+  const FORECASTS: Mode2Forecasts = { slotToPathIndex: [3, 1, 4, 0, 2], prices: [] }
+  const USDC = 1_000_000n
+
+  function summary(o: Partial<PositionSummary> = {}): PositionSummary {
+    return {
+      status: 'waiting',
+      principal: 20n * USDC,
+      checkpoint: 0,
+      totalCheckpoints: 6,
+      finalPayout: null,
+      paid: null,
+      paths: [],
+      ...o,
+    }
+  }
+
+  /** The fixture cohort's market, pending, with the readiness card's market flag off. */
+  async function setPendingCohortMarket(overrides: TestMarketOverride = {}) {
+    await setMarketState('pending', {
+      marketId: FIXTURE_MARKET_ID,
+      startTime: FIXTURE_START_MS,
+      endTime: FIXTURE_START_MS + HOUR_MS,
+      checkpointInterval: 600,
+      completedCheckpoints: 0,
+      totalCheckpoints: 6,
+      leverageEnabled: false,
+      ...overrides,
+    })
+  }
+
+  const positionCard = () => screen.getByRole('region', { name: 'Leveraged positions' })
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(BEFORE_START_MS)
+    mode2.view = makeView()
+    mode2.forecasts = FORECASTS
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it("renders today's page with the switch off", async () => {
+    await setPendingCohortMarket()
+    mode2.summary = summary()
+
+    renderMarketPage()
+
+    expect(screen.getByText('Leverage unavailable')).toBeInTheDocument()
+    expect(screen.getByLabelText(/^collateral$/i)).toBeInTheDocument()
+    expect(screen.queryByText('Leverage open')).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Leveraged positions' })).not.toBeInTheDocument()
+  })
+
+  it('shows the leverage section while entry is open', async () => {
+    flags.mode2 = true
+    await setPendingCohortMarket()
+
+    renderMarketPage()
+
+    expect(screen.getByText('Leverage open')).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: /^Principal/ })).toBeInTheDocument()
+    expect(screen.queryByLabelText(/^collateral$/i)).not.toBeInTheDocument()
+    expect(screen.queryByText('Leverage unavailable')).not.toBeInTheDocument()
+    // The path list and the draw button stay.
+    expect(screen.getByText('Select Paths')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /draw custom path/i })).toBeInTheDocument()
+  })
+
+  it('gives the leverage section every selected path, not only the wagerable ones', async () => {
+    flags.mode2 = true
+    // Not wagerable in Mode 1 yet (first active at checkpoint 1) and outside the cohort.
+    await setPendingCohortMarket({
+      paths: [makePath({ id: 'path-9', label: 'Path J', pathIndex: 9, firstActiveCheckpoint: 1 })],
+      numPaths: 1,
+    })
+    const user = userEvent.setup()
+    renderMarketPage()
+
+    await user.click(screen.getByRole('button', { name: /path j/i }))
+
+    expect(
+      screen.getByRole('definition', { name: 'Not available with leverage' }),
+    ).toHaveTextContent('Path J')
+  })
+
+  it("hides the path list's 4-path notice while the leverage section is shown", async () => {
+    // Mode 1 paths 0-4: the whole cohort.
+    const paths = ['A', 'B', 'C', 'D', 'E'].map((letter, pathIndex) =>
+      makePath({ id: `path-${pathIndex}`, label: `Path ${letter}`, pathIndex }),
+    )
+    await setPendingCohortMarket({ paths, numPaths: paths.length })
+    const notice = 'Max 4 paths per transaction. Deselect some paths.'
+    const user = userEvent.setup()
+    async function selectEveryPath() {
+      for (const { label } of paths) {
+        await user.click(screen.getByRole('button', { name: new RegExp(label, 'i') }))
+      }
+    }
+
+    const { unmount } = renderMarketPage()
+    await selectEveryPath()
+    expect(screen.getByText(notice)).toBeInTheDocument()
+    unmount()
+
+    flags.mode2 = true
+    renderMarketPage()
+    await selectEveryPath()
+    expect(screen.getByText('Leverage open')).toBeInTheDocument()
+    expect(screen.getByText('Max 4 paths per order')).toBeInTheDocument()
+    expect(screen.queryByText(notice)).not.toBeInTheDocument()
+  })
+
+  it('says leverage opens when the paths arrive', async () => {
+    flags.mode2 = true
+    await setPendingCohortMarket()
+    const view = makeView()
+    mode2.view = { ...view, group: { ...view.group!, data: makeGroup({ bound: 0 }) } }
+
+    renderMarketPage()
+
+    expect(
+      screen.getByText('Leverage opens when the paths arrive, about 3 minutes before the start'),
+    ).toBeInTheDocument()
+    expect(screen.getByLabelText(/^collateral$/i)).toBeInTheDocument()
+    expect(screen.queryByText('Leverage open')).not.toBeInTheDocument()
+    expect(screen.queryByText('Leverage unavailable')).not.toBeInTheDocument()
+  })
+
+  it('says leverage closed at the start', async () => {
+    flags.mode2 = true
+    vi.setSystemTime(FIXTURE_START_MS + HOUR_MS / 2)
+    await setMarketState('active', {
+      marketId: FIXTURE_MARKET_ID,
+      startTime: FIXTURE_START_MS,
+      endTime: FIXTURE_START_MS + HOUR_MS,
+      checkpointInterval: 600,
+      completedCheckpoints: 3,
+      totalCheckpoints: 6,
+      leverageEnabled: false,
+    })
+
+    renderMarketPage()
+
+    expect(screen.getByText('Leverage closed at the start')).toBeInTheDocument()
+    expect(screen.getByLabelText(/^collateral$/i)).toBeInTheDocument()
+    expect(screen.queryByText('Leverage unavailable')).not.toBeInTheDocument()
+  })
+
+  it('hides the legacy leverage slider with the switch on', async () => {
+    vi.setSystemTime(FIXTURE_START_MS + HOUR_MS / 2)
+    await setMarketState('active', {
+      marketId: FIXTURE_MARKET_ID,
+      startTime: FIXTURE_START_MS,
+      endTime: FIXTURE_START_MS + HOUR_MS,
+      checkpointInterval: 600,
+      completedCheckpoints: 3,
+      totalCheckpoints: 6,
+      leverageEnabled: true,
+    })
+    const { unmount } = renderMarketPage()
+    // The legacy slider's caption, e.g. "1× MAX · 50M".
+    expect(screen.getByText(/× MAX ·/)).toBeInTheDocument()
+    unmount()
+
+    flags.mode2 = true
+    renderMarketPage()
+
+    expect(screen.queryByText(/× MAX ·/)).not.toBeInTheDocument()
+  })
+
+  it('shows the position card under the trade panel', async () => {
+    flags.mode2 = true
+    await setPendingCohortMarket()
+    mode2.summary = summary()
+
+    renderMarketPage()
+
+    expect(within(positionCard()).getByText('Waiting for the start')).toBeInTheDocument()
+  })
+
+  it('shows the position card in the settled rail for a trader with only Mode 2 positions', async () => {
+    flags.mode2 = true
+    await setMarketState('settled', { marketId: FIXTURE_MARKET_ID })
+    mode2.view = null
+    mode2.summary = summary({ status: 'paid', checkpoint: 6, paid: 25n * USDC })
+
+    renderMarketPage()
+
+    expect(screen.getByText(/market has settled\. claim your payout below/i)).toBeInTheDocument()
+    expect(within(positionCard()).getByText('Paid')).toBeInTheDocument()
+  })
+
+  it('shows the position card beside the maturing and void rails', async () => {
+    flags.mode2 = true
+    for (const state of ['maturing', 'void'] as const) {
+      await setMarketState(state, { marketId: FIXTURE_MARKET_ID })
+      mode2.summary = summary({ status: state === 'void' ? 'voided' : 'result-in' })
+      const { unmount } = renderMarketPage()
+
+      expect(
+        screen.queryByRole('region', { name: 'Leveraged positions' }),
+        state,
+      ).toBeInTheDocument()
+      unmount()
+    }
+  })
+
+  it('shows the position card on a rail of its own while the market settles', async () => {
+    flags.mode2 = true
+    await setMarketState('settling', { marketId: FIXTURE_MARKET_ID })
+    mode2.summary = summary({ status: 'running', checkpoint: 6 })
+
+    renderMarketPage()
+
+    expect(within(positionCard()).getByText('Running · checkpoint 6 of 6')).toBeInTheDocument()
   })
 })
 
