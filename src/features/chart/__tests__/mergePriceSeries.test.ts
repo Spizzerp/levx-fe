@@ -93,6 +93,45 @@ describe('mergePriceSeries', () => {
     }
   })
 
+  it('fills a gap only when it is longer than TRAIL_GAP_MS', () => {
+    const history = candles(0, 3)
+    const gapSeconds = TRAIL_GAP_MS / 1000
+    // The 120 s and 180 s candles sit inside both gaps.
+    const before = ticks(0, 100)
+    const atThreshold = ticks(100 + gapSeconds, 100 + gapSeconds + 10)
+    const pastThreshold = ticks(100 + gapSeconds + 1, 100 + gapSeconds + 10)
+
+    expect(mergePriceSeries(history, [...before, ...atThreshold], null, TRAIL_GAP_MS)).toEqual(
+      [...before, ...atThreshold].map(point),
+    )
+    expect(mergePriceSeries(history, [...before, ...pastThreshold], null, TRAIL_GAP_MS)).toEqual([
+      ...before.map(point),
+      candle(2),
+      candle(3),
+      ...pastThreshold.map(point),
+    ])
+  })
+
+  it('appends candles after a stall only when it is longer than TRAIL_GAP_MS', () => {
+    const history = candles(0, 4)
+    const lastAtThreshold = 240 - TRAIL_GAP_MS / 1000
+    const atThreshold = ticks(100, lastAtThreshold)
+    const pastThreshold = ticks(100, lastAtThreshold - 1)
+
+    expect(mergePriceSeries(history, atThreshold, null, TRAIL_GAP_MS)).toEqual([
+      candle(0),
+      candle(1),
+      ...atThreshold.map(point),
+    ])
+    expect(mergePriceSeries(history, pastThreshold, null, TRAIL_GAP_MS)).toEqual([
+      candle(0),
+      candle(1),
+      ...pastThreshold.map(point),
+      candle(3),
+      candle(4),
+    ])
+  })
+
   it('appends newer candles after a stalled feed', () => {
     const history = candles(0, 10)
     // The feed stalled at 120 s while the history goes on to 600 s.
