@@ -25,6 +25,7 @@ import { segmentPredictionPathAtTime } from '@/lib/chart/segmentPredictionPath'
 import { DrawingGrid } from '@/features/chart/DrawingGrid'
 import { DrawingToolbar } from '@/features/chart/DrawingToolbar'
 import { ChartMorphLine } from '@/features/chart/ChartMorphLine'
+import { mergePriceSeries, TRAIL_GAP_MS } from '@/features/chart/mergePriceSeries'
 import { Stub } from '@/ui/Stub'
 
 import './LevXChart.css'
@@ -239,19 +240,11 @@ function ChartInner({
   const latestTick = useLatestPrice(feedId)
   const trail = usePriceTrail(feedId)
 
-  /* ── History, then the once-a-second trail, then the live tick ──
-   * Each point is drawn only when it is newer than the one before it, so the seconds the
-   * history's newest candle already covers are not drawn twice. */
-  const mergedHistory = useMemo(() => {
-    let lastTime = history[history.length - 1]?.time ?? -Infinity
-    const tail: PricePoint[] = []
-    for (const tick of latestTick ? [...trail, latestTick] : trail) {
-      if (tick.time <= lastTime) continue
-      tail.push({ time: tick.time, value: tick.value })
-      lastTime = tick.time
-    }
-    return tail.length > 0 ? [...history, ...tail] : history
-  }, [history, trail, latestTick])
+  /* ── The candles before the once-a-second trail, then the trail and the live tick ── */
+  const mergedHistory = useMemo(
+    () => mergePriceSeries(history, trail, latestTick ?? null, TRAIL_GAP_MS),
+    [history, trail, latestTick],
+  )
 
   const lastHistoryPoint = mergedHistory[mergedHistory.length - 1]
   const isMarketInProgress = nowTime > marketStart && nowTime < marketEnd
