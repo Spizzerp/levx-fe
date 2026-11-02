@@ -199,7 +199,7 @@ describe('LevXChart', () => {
     }
     const lastCandle = history[history.length - 1].time
     const { setTick } = usePriceStore.getState()
-    // The two oldest seconds are already covered by the history and are not drawn again.
+    // From the trail's first second on the trail is the line, so the newest candle gives way.
     for (const time of [lastCandle - 1000, lastCandle, lastCandle + 1000, lastCandle + 2000]) {
       setTick(SOL_FEED, { time, value: 109.5, publishTime: time / 1000 })
     }
@@ -209,7 +209,9 @@ describe('LevXChart', () => {
     renderChart({ pair: 'SOL/USDC', marketEnd: shortEnd, nowTime: lastCandle + 3000 })
 
     expect(drawnTimes(screen.getByTestId('price-line').getAttribute('d'))).toEqual([
-      ...history.map((p) => p.time),
+      ...history.slice(0, -1).map((p) => p.time),
+      lastCandle - 1000,
+      lastCandle,
       lastCandle + 1000,
       lastCandle + 2000,
       lastCandle + 3000,
