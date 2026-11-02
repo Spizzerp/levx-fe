@@ -5,10 +5,6 @@ on:
   push:
     branches: [main]
 
-permissions:
-  contents: read
-  packages: read
-
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -25,12 +21,7 @@ jobs:
           node-version: '22'
           cache: pnpm
 
-      # .npmrc reads NODE_AUTH_TOKEN to fetch @spizzerp/levx-mode2-client from GitHub Packages.
-      # The workflow's packages: read permission is needed, and GITHUB_TOKEN can read the
-      # package only after the owner grants levx-fe access in "Manage Actions access".
       - name: Install dependencies
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: pnpm install --frozen-lockfile
 
       # Hard gate — `pnpm build` is `pnpm types && vite build`, so types failing

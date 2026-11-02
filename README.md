@@ -18,7 +18,6 @@ Frontend for LEVX.
 Requires Node 22.12+ and pnpm 10+.
 
 ```bash
-export NODE_AUTH_TOKEN=...   # a GitHub token with read:packages (see below)
 pnpm i
 cp .env.example .env.local   # then fill in values
 pnpm dev                     # dev server on :3030
@@ -26,14 +25,9 @@ pnpm dev                     # dev server on :3030
 
 ### The Mode 2 client package
 
-The app depends on `@spizzerp/levx-mode2-client`, published on GitHub Packages. `.npmrc` reads the
-registry token from `NODE_AUTH_TOKEN`, so a fresh `pnpm install` needs it set to a GitHub token
-with the `read:packages` scope.
-
-- CI installs with the workflow's own token once the package grants this repo access (the
-  package's "Manage Actions access" setting).
-- Vercel needs `NODE_AUTH_TOKEN` in both Production and Preview, and Node 22.12 or later (the
-  client's minimum).
+The app depends on `@spizzerp/levx-mode2-client`, the TypeScript client of the Mode 2 custody
+program (LevXv2 `clients/mode2`), published on the public npm registry. It needs no registry
+configuration or token, and Node 22.12 or later.
 
 Mode 2 trading on the market page is behind `APP_MODE2_TRADING`: off unless it is `'true'`.
 `.env.example` turns it on for local development; leave it unset in production until the devnet

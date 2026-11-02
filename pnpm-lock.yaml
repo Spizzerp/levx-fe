@@ -39,8 +39,8 @@ importers:
         specifier: ^1.98.4
         version: 1.98.4(bufferutil@4.1.0)(typescript@5.7.3)(utf-8-validate@6.0.6)
       '@spizzerp/levx-mode2-client':
-        specifier: 0.5.0
-        version: 0.5.0(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.7.3)(utf-8-validate@6.0.6)
+        specifier: 0.5.1
+        version: 0.5.1(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.7.3)(utf-8-validate@6.0.6)
       '@supabase/supabase-js':
         specifier: ^2.103.3
         version: 2.103.3(bufferutil@4.1.0)(utf-8-validate@6.0.6)
@@ -2217,8 +2217,8 @@ packages:
     peerDependencies:
       '@solana/web3.js': '*'
 
-  '@spizzerp/levx-mode2-client@0.5.0':
-    resolution: {integrity: sha512-AbNYHIg5kkVbF5cdrpt6DjoaeSupLj/OT6pqj2XYFYG0Xi2QJNhkWDfVFMddEvd9yLYyjFcLKRl4950N2IdHvw==, tarball: https://npm.pkg.github.com/download/@spizzerp/levx-mode2-client/0.5.0/878e335a19ca6d1037b5fb24c8cfb615b0f4350e}
+  '@spizzerp/levx-mode2-client@0.5.1':
+    resolution: {integrity: sha512-gA/M0oHNAK4ArpvNTAVPQ7KQ1LOqYGLxG3TL+ygqI+fwRphfa1RdNYBSpGFEubLZL+sitdhk+x8Q83nfqaJOzw==}
     engines: {node: '>=22.12.0'}
 
   '@standard-schema/spec@1.1.0':
@@ -8830,7 +8830,7 @@ snapshots:
       eventemitter3: 5.0.4
       uuid: 9.0.1
 
-  '@spizzerp/levx-mode2-client@0.5.0(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.7.3)(utf-8-validate@6.0.6)':
+  '@spizzerp/levx-mode2-client@0.5.1(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.7.3)(utf-8-validate@6.0.6)':
     dependencies:
       '@noble/hashes': 2.4.0
       '@solana/compat': 8.6.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.7.3)
