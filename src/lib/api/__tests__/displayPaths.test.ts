@@ -17,6 +17,7 @@ vi.mock('@/env/env.config', () => ({
 import {
   attachDisplayData,
   DisplayPathsRequestError,
+  displayPathsQueryOptions,
   displayPathsRefetchInterval,
   fetchDisplayPaths,
 } from '@/lib/api/displayPaths'
@@ -189,5 +190,12 @@ describe('displayPathsRefetchInterval', () => {
   it('polls every 15 s while the pipeline has no record and stops once one exists', () => {
     expect(displayPathsRefetchInterval({ state: { data: null } })).toBe(15_000)
     expect(displayPathsRefetchInterval({ state: { data: record } })).toBe(false)
+  })
+})
+
+describe('displayPathsQueryOptions', () => {
+  it('polls only while pollWhile holds', () => {
+    expect(displayPathsQueryOptions(7, true, true).refetchInterval).toBe(displayPathsRefetchInterval)
+    expect(displayPathsQueryOptions(7, true, false).refetchInterval).toBe(false)
   })
 })

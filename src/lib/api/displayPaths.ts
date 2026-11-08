@@ -4,7 +4,7 @@
  * every one of its checkpoint values equals the chain's predicted price exactly, so the chart never
  * draws a line through a checkpoint the market does not score.
  */
-import { useQuery } from '@tanstack/react-query'
+import { queryOptions, useQuery } from '@tanstack/react-query'
 
 import { env } from '@/env/env.config'
 import { SCALE } from '@/lib/constants'
@@ -164,12 +164,17 @@ export function displayPathsRefetchInterval(query: {
   return query.state.data === null ? DISPLAY_PATHS_POLL_MS : false
 }
 
-/** Mock markets (APP_USE_MOCK) and builds without a pipeline URL have no record, so nothing is fetched. */
-export function useDisplayPaths(
+/**
+ * Mock markets (APP_USE_MOCK) and builds without a pipeline URL have no record, so nothing is fetched.
+ * Records are written before a market starts, so polling for a missing one runs only while `pollWhile`
+ * (the market is pending).
+ */
+export function displayPathsQueryOptions(
   marketId: number | null,
   enabled: boolean,
-): DisplayPathsRecord | null {
-  const { data } = useQuery({
+  pollWhile: boolean,
+) {
+  return queryOptions({
     queryKey: ['display-paths', marketId],
     queryFn: () => fetchDisplayPaths(marketId!),
     enabled:
@@ -178,7 +183,15 @@ export function useDisplayPaths(
       env.APP_API_BASE_URL !== '' &&
       import.meta.env.APP_USE_MOCK !== 'true',
     staleTime: 60_000,
-    refetchInterval: displayPathsRefetchInterval,
+    refetchInterval: pollWhile ? displayPathsRefetchInterval : false,
   })
+}
+
+export function useDisplayPaths(
+  marketId: number | null,
+  enabled: boolean,
+  pollWhile: boolean,
+): DisplayPathsRecord | null {
+  const { data } = useQuery(displayPathsQueryOptions(marketId, enabled, pollWhile))
   return data ?? null
 }

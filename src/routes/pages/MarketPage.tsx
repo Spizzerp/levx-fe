@@ -554,7 +554,11 @@ export function MarketPage() {
   }, [userPaths, market, selfWallet])
 
   // The pipeline's dense series, drawn only on AI paths whose checkpoints match the chain exactly.
-  const displayRecord = useDisplayPaths(market?.marketId ?? null, !!market && aiPaths.length > 0)
+  const displayRecord = useDisplayPaths(
+    market?.marketId ?? null,
+    !!market && aiPaths.length > 0,
+    market?.state === 'pending',
+  )
   const marketForDisplay = useMemo(
     () => ({
       startTimeMs: chartMarketStart,
