@@ -190,6 +190,11 @@ export interface LevXChartProps {
   }) => ReactNode
 }
 
+/** The series a path is drawn with: model resolution when it has one. Checkpoint logic keeps `path.data`. */
+function seriesOf(path: PredictionPath): PricePoint[] {
+  return path.displayData ?? path.data
+}
+
 interface InnerProps extends LevXChartProps {
   width: number
   height: number
@@ -260,19 +265,25 @@ function ChartInner({
   /* ── Dissolved paths end at the checkpoint that dissolved them ──
    * `dissolvedAtCheckpoint` is that checkpoint's 0-based index + 1 (the program counts the
    * checkpoint before dissolving), and checkpointXs[i] is checkpoint i's due time. */
-  const dissolvedPathData = useMemo(() => {
-    const byId = new Map<string, PricePoint[]>()
+  const { dissolvedPathData, dissolvedHoverData } = useMemo(() => {
+    const cut = (series: PricePoint[], cutTime: number) => {
+      const { elapsed } = segmentPredictionPathAtTime(series, cutTime)
+      // A cut on the first point (dissolved at checkpoint 0) keeps that point for the ×.
+      return elapsed.length > 0 ? elapsed : series.filter((p) => p.time <= cutTime)
+    }
+    const drawn = new Map<string, PricePoint[]>()
+    // Hover stays on the checkpoints, so it reads the six-point series cut at the same time.
+    const hover = new Map<string, PricePoint[]>()
     for (const path of predictions) {
       const cutTime = path.dissolved ? checkpointXs[path.dissolvedAtCheckpoint - 1] : undefined
       if (cutTime !== undefined) {
-        const { elapsed } = segmentPredictionPathAtTime(path.data, cutTime)
-        // A cut on the first point (dissolved at checkpoint 0) keeps that point for the ×.
-        byId.set(path.id, elapsed.length > 0 ? elapsed : path.data.filter((p) => p.time <= cutTime))
+        drawn.set(path.id, cut(seriesOf(path), cutTime))
+        hover.set(path.id, cut(path.data, cutTime))
       }
     }
-    return byId
+    return { dissolvedPathData: drawn, dissolvedHoverData: hover }
   }, [predictions, checkpointXs])
-  const drawnData = (path: PredictionPath) => dissolvedPathData.get(path.id) ?? path.data
+  const drawnData = (path: PredictionPath) => dissolvedPathData.get(path.id) ?? seriesOf(path)
 
   /* ── Time domain ────────────────────────────────────────── */
   // Split into two memos so the active one keeps a stable reference: in
@@ -425,7 +436,7 @@ function ChartInner({
       let sourceData: PricePoint[] = mergedHistory
       if (t > nowTime && selectedPathId) {
         const selected = predictions.find((p) => p.id === selectedPathId)
-        if (selected) sourceData = dissolvedPathData.get(selected.id) ?? selected.data
+        if (selected) sourceData = dissolvedHoverData.get(selected.id) ?? selected.data
       }
       if (sourceData.length === 0) return
       const idx = bisectTime(sourceData, t, 1)
@@ -434,7 +445,7 @@ function ChartInner({
       const d = !d1 ? d0 : !d0 ? d1 : t - d0.time > d1.time - t ? d1 : d0
       if (d) setHover({ time: d.time, value: d.value })
     },
-    [innerWidth, selectedPathId, timeScale, mergedHistory, predictions, nowTime, dissolvedPathData],
+    [innerWidth, selectedPathId, timeScale, mergedHistory, predictions, nowTime, dissolvedHoverData],
   )
 
   const handleLeave = useCallback(() => setHover(null), [])
@@ -529,6 +540,7 @@ function ChartInner({
           {predictions.map((path) => {
             const style = pathStyle(path)
             const isSelected = selectedPathId === path.id || selectedPathIds?.has(path.id)
+            const seriesKind = path.displayData ? 'dense' : 'checkpoints'
             const dissolvedData = dissolvedPathData.get(path.id)
             if (dissolvedData) {
               const cut = dissolvedData[dissolvedData.length - 1]
@@ -537,6 +549,8 @@ function ChartInner({
                   {dissolvedData.length > 1 && (
                     <LinePath<PricePoint>
                       data-testid="dissolved-path"
+                      data-series={seriesKind}
+                      data-points={dissolvedData.length}
                       data={dissolvedData}
                       x={(d) => timeScale(d.time)}
                       y={(d) => priceScale(d.value)}
@@ -567,12 +581,15 @@ function ChartInner({
               )
             }
             const segments = isMarketInProgress
-              ? segmentPredictionPathAtTime(path.data, nowTime)
-              : { elapsed: [], future: path.data }
+              ? segmentPredictionPathAtTime(seriesOf(path), nowTime)
+              : { elapsed: [], future: seriesOf(path) }
             return (
               <g key={path.id}>
                 {segments.elapsed.length > 1 && (
                   <LinePath<PricePoint>
+                    data-testid="prediction-path"
+                    data-series={seriesKind}
+                    data-points={segments.elapsed.length}
                     data={segments.elapsed}
                     x={(d) => timeScale(d.time)}
                     y={(d) => priceScale(d.value)}
@@ -587,6 +604,9 @@ function ChartInner({
                 )}
                 {segments.future.length > 1 && (
                   <LinePath<PricePoint>
+                    data-testid="prediction-path"
+                    data-series={seriesKind}
+                    data-points={segments.future.length}
                     data={segments.future}
                     x={(d) => timeScale(d.time)}
                     y={(d) => priceScale(d.value)}

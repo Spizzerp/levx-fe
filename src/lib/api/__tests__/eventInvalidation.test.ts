@@ -161,6 +161,13 @@ describe('EVENT_INVALIDATION_MAP', () => {
     }
   })
 
+  it("PathAdded refreshes the market's display-paths record (keyed by the numeric id)", () => {
+    const keys = EVENT_INVALIDATION_MAP.PathAdded({ market_id: new BN(176) })
+    const flat = keys.map((k) => JSON.stringify(k))
+    expect(flat).toContain(JSON.stringify(['market', '176']))
+    expect(flat).toContain(JSON.stringify(['display-paths', 176]))
+  })
+
   it('market group link changes invalidate the affected market and market list', () => {
     for (const ev of ['MarketLinkedToGroup', 'MarketUnlinkedFromGroup']) {
       const keys = EVENT_INVALIDATION_MAP[ev]({ market_id: new BN(4) })

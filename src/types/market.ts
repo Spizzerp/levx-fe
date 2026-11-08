@@ -127,6 +127,11 @@ export interface PredictionPath {
   multiplier: number
   /** Resolved price trajectory for chart rendering */
   data: PricePoint[]
+  /**
+   * Model-resolution series from the pipeline's display record; drawn instead of `data` when
+   * present; never used for scoring or checkpoints.
+   */
+  displayData?: PricePoint[]
 
   /* ── On-chain PathOutcome fields ─────────────────────────── */
 

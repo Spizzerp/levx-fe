@@ -156,7 +156,8 @@ export const EVENT_INVALIDATION_MAP: Readonly<Record<string, InvalidationFactory
   ClaimPaid: withMarket((mk) => [['market', mk], ['userPosition', mk], ['userPositions']]),
 
   // ── Path lifecycle ────────────────────────────────────────────────
-  PathAdded: withMarket((mk) => [['market', mk], ['markets']]),
+  // The pipeline's display record (src/lib/api/displayPaths.ts, numeric id) follows a new menu.
+  PathAdded: withMarket((mk) => [['market', mk], ['markets'], ['display-paths', Number(mk)]]),
   PathScored: withMarket((mk) => [['market', mk]]),
   PathDissolved: withMarket((mk) => [['market', mk], ['userPositions']]),
 
