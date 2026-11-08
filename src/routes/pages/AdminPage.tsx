@@ -34,7 +34,7 @@ import {
 } from '@/lib/solana/pda'
 import { logTransactionError } from '@/lib/solana/logTransactionError'
 import { buildCreateMarketParams, feedIdToBytes } from '@/lib/solana/createMarketParams'
-import { SCORING_DEFAULTS } from '@/lib/scoringDefaults'
+import { MARKET_DEFAULTS, SCORING_DEFAULTS } from '@/lib/scoringDefaults'
 import { resolveBaseMintLabel } from '@/lib/api/pairLabels'
 import { toast } from '@/stores/toastStore'
 import { useWalletStore } from '@/stores/walletStore'
@@ -378,8 +378,8 @@ export function AdminPage() {
     String(SCORING_DEFAULTS.minimumProbability),
   )
   const [nudgeRate, setNudgeRate] = useState(String(SCORING_DEFAULTS.nudgeRate))
-  const [pathMaxAge, setPathMaxAge] = useState('1800')
-  const [numPaths, setNumPaths] = useState(5)
+  const [pathMaxAge, setPathMaxAge] = useState(String(MARKET_DEFAULTS.pathMaxAge))
+  const [numPaths, setNumPaths] = useState<number>(MARKET_DEFAULTS.targetNumPaths)
   const [groupKeyHashInput, setGroupKeyHashInput] = useState(() => groupSearchParam ?? '')
 
   // Tx state

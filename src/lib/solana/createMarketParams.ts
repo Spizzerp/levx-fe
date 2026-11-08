@@ -3,7 +3,7 @@ import { PublicKey } from '@solana/web3.js'
 
 import type { Levx } from '@/idl/levx'
 import { SCALE } from '@/lib/constants'
-import { SCORING_DEFAULTS } from '@/lib/scoringDefaults'
+import { MARKET_DEFAULTS, SCORING_DEFAULTS } from '@/lib/scoringDefaults'
 
 export type CreateMarketParams = IdlTypes<Levx>['createMarketParams']
 
@@ -49,7 +49,7 @@ function scaled(value: number): BN {
 /**
  * The `create_market` / `create_market_under_group` params. Action
  * alpha/beta, the reference action and the four scoring weights come from
- * `SCORING_DEFAULTS`; the rest from the admin form.
+ * `SCORING_DEFAULTS`, the LMSR alpha from `MARKET_DEFAULTS`; the rest from the admin form.
  */
 export function buildCreateMarketParams(input: CreateMarketParamsInput): CreateMarketParams {
   return {
@@ -72,6 +72,6 @@ export function buildCreateMarketParams(input: CreateMarketParamsInput): CreateM
     weightDd: scaled(SCORING_DEFAULTS.weightDd),
     weightEndpoint: scaled(SCORING_DEFAULTS.weightEndpoint),
     weightDisplacement: scaled(SCORING_DEFAULTS.weightDisplacement),
-    lmsrAlpha: new BN(1_000_000),
+    lmsrAlpha: scaled(MARKET_DEFAULTS.lmsrAlpha),
   }
 }

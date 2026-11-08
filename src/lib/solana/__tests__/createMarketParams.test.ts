@@ -36,6 +36,10 @@ describe('buildCreateMarketParams', () => {
     expect(params.minimumProbability.toNumber()).toBe(10_000)
   })
 
+  it('creates markets with the pipeline LMSR alpha', () => {
+    expect(buildWithDefaults().lmsrAlpha.toNumber()).toBe(5_000_000)
+  })
+
   it('uses weights that sum to one in fixed point', () => {
     const params = buildWithDefaults()
     const sum =
