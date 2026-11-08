@@ -69,18 +69,36 @@ export async function fetchDisplayPaths(marketId: number): Promise<DisplayPathsR
   }
 }
 
-/** A record is drawn from only if its shape holds together; otherwise none of it is. */
+const isFiniteNumber = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isFinite(value)
+
+const isFiniteArray = (value: unknown): value is number[] =>
+  Array.isArray(value) && value.every(isFiniteNumber)
+
+/**
+ * A record is drawn from only if its shape holds together; otherwise none of it is. The body comes
+ * from the network, so every field is checked rather than trusted to match the type.
+ */
 function isConsistent(record: DisplayPathsRecord): boolean {
-  const gridLength = record.times.length
-  const indexes = new Set(record.paths.map((p) => p.path_index))
-  return (
-    record.schema === 'display-paths-v1' &&
-    gridLength > 0 &&
-    record.checkpoint_indices.length === record.total_checkpoints &&
-    record.checkpoint_indices.every((i) => Number.isInteger(i) && i >= 0 && i < gridLength) &&
-    record.paths.every((p) => p.prices_u64.length === gridLength) &&
-    indexes.size === record.paths.length
+  const {
+    times,
+    checkpoint_indices: indices,
+    paths,
+  } = record as unknown as Partial<Record<'times' | 'checkpoint_indices' | 'paths', unknown>>
+  if (record.schema !== 'display-paths-v1') return false
+  if (!isFiniteArray(times) || times.length === 0) return false
+  if (!isFiniteArray(indices) || indices.length !== record.total_checkpoints) return false
+  if (!indices.every((i) => Number.isInteger(i) && i >= 0 && i < times.length)) return false
+  if (!Array.isArray(paths)) return false
+  const pathsHold = paths.every(
+    (p: unknown) =>
+      typeof p === 'object' &&
+      p !== null &&
+      isFiniteNumber((p as { path_index?: unknown }).path_index) &&
+      isFiniteArray((p as { prices_u64?: unknown }).prices_u64) &&
+      (p as { prices_u64: number[] }).prices_u64.length === times.length,
   )
+  return pathsHold && new Set(record.paths.map((p) => p.path_index)).size === paths.length
 }
 
 /**

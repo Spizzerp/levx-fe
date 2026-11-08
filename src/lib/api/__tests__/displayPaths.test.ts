@@ -105,6 +105,22 @@ describe('attachDisplayData', () => {
     }
   })
 
+  it('refuses a record with a missing or non-array field without throwing', () => {
+    const missingTimes = structuredClone(record) as Partial<typeof record>
+    delete missingTimes.times
+    const pathsNotArray = { ...structuredClone(record), paths: { 0: record.paths[0] } }
+    const missingPrices = structuredClone(record) as unknown as { paths: object[] }
+    delete (missingPrices.paths[1] as { prices_u64?: unknown }).prices_u64
+    const nonFiniteTime = structuredClone(record)
+    nonFiniteTime.times[3] = Number.NaN
+
+    for (const bad of [missingTimes, pathsNotArray, missingPrices, nonFiniteTime]) {
+      const out = attachDisplayData(paths, bad as unknown as typeof record, startTimeMs)
+      expect(out).toEqual(paths)
+      expect(out.every((p) => p.displayData === undefined)).toBe(true)
+    }
+  })
+
   it('returns the paths unchanged when there is no record', () => {
     const out = attachDisplayData(paths, null, startTimeMs)
     expect(out).toEqual(paths)
