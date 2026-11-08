@@ -25,7 +25,14 @@ vi.mock('@visx/responsive', () => ({
   ParentSize: ({ children }: { children: (args: { width: number; height: number }) => React.ReactNode }) =>
     children({ width: parentSize.width, height: parentSize.height }),
 }))
+import { attachDisplayData } from '@/lib/api/displayPaths'
 import { buildAiPathFixture } from '@/tests/fixtures/aiPaths'
+import {
+  buildDisplayFixturePaths,
+  buildDisplayPathsRecord,
+  DISPLAY_FIXTURE_ATTACH_MARKET,
+  DISPLAY_FIXTURE_MARKET,
+} from '@/tests/fixtures/displayPaths'
 import { useDrawingStore } from '@/stores/drawingStore'
 import { usePriceStore } from '@/stores/priceStore'
 
@@ -387,5 +394,92 @@ describe('LevXChart checkpoints', () => {
     // Checkpoint 3 is due at start + 90 min, 20 min after now.
     expect(screen.getByText('in 20 m')).toBeInTheDocument()
     expect(screen.getAllByText(/^in \d+ m$/)).toHaveLength(1)
+  })
+})
+
+describe('LevXChart dense display paths', () => {
+  // The display fixture's 6 × 600 s market: 11 model points per path, checkpoints on every second one.
+  const denseStart = DISPLAY_FIXTURE_MARKET.startTime
+  const denseIntervalMs = DISPLAY_FIXTURE_MARKET.checkpointInterval * 1000
+  const denseEnd = denseStart + DISPLAY_FIXTURE_MARKET.totalCheckpoints * denseIntervalMs
+  const denseMarket = {
+    startTime: denseStart,
+    checkpointInterval: DISPLAY_FIXTURE_MARKET.checkpointInterval,
+    totalCheckpoints: DISPLAY_FIXTURE_MARKET.totalCheckpoints,
+  }
+  const chainPaths = buildDisplayFixturePaths()
+  const densePaths = attachDisplayData(
+    chainPaths,
+    buildDisplayPathsRecord(chainPaths),
+    DISPLAY_FIXTURE_ATTACH_MARKET,
+  )
+
+  /** The default market-focused domain over the 800 − 16 − 80 px plot, as the chart computes it. */
+  function xAt(time: number): number {
+    const duration = denseEnd - denseStart
+    const from = denseStart - duration
+    const to = denseEnd + duration * 0.05
+    return ((time - from) / (to - from)) * (800 - 16 - 80)
+  }
+
+  /** The first and last x in an SVG path's `d` (the start and end points of the drawn line). */
+  function endXs(d: string | null): [number, number] {
+    const numbers = (d ?? '').match(/-?\d+(\.\d+)?(e-?\d+)?/g) ?? []
+    return [Number(numbers[0]), Number(numbers[numbers.length - 2])]
+  }
+
+  function renderDense(overrides: Partial<Parameters<typeof LevXChart>[0]> = {}) {
+    return render(
+      <LevXChart
+        history={history}
+        predictions={[densePaths[0]]}
+        nowTime={denseStart - 1}
+        marketStart={denseStart}
+        marketEnd={denseEnd}
+        market={denseMarket}
+        {...overrides}
+      />,
+    )
+  }
+
+  it('draws the dense series when a path has displayData', () => {
+    expect(densePaths[0].displayData).toHaveLength(11)
+    renderDense()
+    // nowTime before the start: one future segment
+    const line = screen.getByTestId('prediction-path')
+    expect(line.getAttribute('data-series')).toBe('dense')
+    expect(line.getAttribute('data-points')).toBe('11')
+  })
+
+  it('falls back to the six points without displayData', () => {
+    renderDense({ predictions: [chainPaths[0]] })
+    const line = screen.getByTestId('prediction-path')
+    expect(line.getAttribute('data-series')).toBe('checkpoints')
+    expect(line.getAttribute('data-points')).toBe('6')
+  })
+
+  it('cuts a dissolved dense path at the dissolving checkpoint', () => {
+    const dissolved = { ...densePaths[0], dissolved: true, dissolvedAtCheckpoint: 3 }
+    const cutTime = denseStart + 2 * denseIntervalMs // checkpointXs[2], dense grid point 4
+    renderDense({ predictions: [dissolved], nowTime: denseStart + 25 * 60_000 })
+    const line = screen.getByTestId('dissolved-path')
+    expect(line.getAttribute('data-series')).toBe('dense')
+    expect(line.getAttribute('data-points')).toBe('5')
+    expect(endXs(line.getAttribute('d'))[1]).toBeCloseTo(xAt(cutTime), 3)
+    expect(Number(screen.getByTestId('dissolve-mark').getAttribute('x'))).toBeCloseTo(
+      xAt(cutTime),
+      3,
+    )
+  })
+
+  it('splits elapsed and future at a nowTime between dense points without a gap', () => {
+    const nowTime = denseStart + 450_000 // between dense points 1 (300 s) and 2 (600 s)
+    renderDense({ nowTime })
+    const [elapsed, future] = screen.getAllByTestId('prediction-path')
+    // 0 s, 300 s and the junction; the junction, then 600 s … 3000 s
+    expect(elapsed.getAttribute('data-points')).toBe('3')
+    expect(future.getAttribute('data-points')).toBe('10')
+    expect(endXs(elapsed.getAttribute('d'))[1]).toBeCloseTo(xAt(nowTime), 3)
+    expect(endXs(future.getAttribute('d'))[0]).toBeCloseTo(xAt(nowTime), 3)
   })
 })
