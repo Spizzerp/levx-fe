@@ -30,10 +30,14 @@ describe('buildCreateMarketParams', () => {
   it('scales the scoring defaults to fixed point', () => {
     const params = buildWithDefaults()
 
-    expect(params.referenceAction.toNumber()).toBe(1_000_000)
+    expect(params.referenceAction.toNumber()).toBe(300)
     expect(params.weightQv.toNumber()).toBe(375_000)
-    expect(params.decoherenceRate.toNumber()).toBe(500_000)
-    expect(params.minimumProbability.toNumber()).toBe(10_000)
+    expect(params.decoherenceRate.toNumber()).toBe(20_000_000)
+    expect(params.minimumProbability.toNumber()).toBe(100_000)
+  })
+
+  it('serializes referenceAction as exactly 300', () => {
+    expect(buildWithDefaults().referenceAction.toString()).toBe('300')
   })
 
   it('creates markets with the pipeline LMSR alpha', () => {
