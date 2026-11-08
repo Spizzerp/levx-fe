@@ -75,20 +75,37 @@ const isFiniteNumber = (value: unknown): value is number =>
 const isFiniteArray = (value: unknown): value is number[] =>
   Array.isArray(value) && value.every(isFiniteNumber)
 
+/** The market a record is checked against; `checkpointInterval` in seconds, as on chain. */
+export interface DisplayPathsMarket {
+  startTimeMs: number
+  checkpointInterval: number
+  totalCheckpoints: number
+}
+
 /**
- * A record is drawn from only if its shape holds together; otherwise none of it is. The body comes
- * from the network, so every field is checked rather than trusted to match the type.
+ * A record is drawn from only if its shape holds together and its time axis is the market's: the
+ * same start, interval and checkpoint count, a strictly increasing grid, and every checkpoint grid
+ * point at exactly the checkpoint's time. Otherwise none of it is. The body comes from the network,
+ * so every field is checked rather than trusted to match the type.
  */
-function isConsistent(record: DisplayPathsRecord): boolean {
+function isConsistent(record: DisplayPathsRecord, market: DisplayPathsMarket): boolean {
   const {
     times,
     checkpoint_indices: indices,
     paths,
   } = record as unknown as Partial<Record<'times' | 'checkpoint_indices' | 'paths', unknown>>
   if (record.schema !== 'display-paths-v1') return false
+  if (record.start_time * 1000 !== market.startTimeMs) return false
+  if (record.checkpoint_interval !== market.checkpointInterval) return false
+  if (record.total_checkpoints !== market.totalCheckpoints) return false
   if (!isFiniteArray(times) || times.length === 0) return false
-  if (!isFiniteArray(indices) || indices.length !== record.total_checkpoints) return false
+  if (!times.every((t, i) => i === 0 || t > times[i - 1])) return false
+  if (!isFiniteArray(indices) || indices.length !== market.totalCheckpoints) return false
   if (!indices.every((i) => Number.isInteger(i) && i >= 0 && i < times.length)) return false
+  const checkpointMs = market.checkpointInterval * 1000
+  if (!indices.every((i, j) => times[i] * 1000 === market.startTimeMs + j * checkpointMs)) {
+    return false
+  }
   if (!Array.isArray(paths)) return false
   const pathsHold = paths.every(
     (p: unknown) =>
@@ -104,14 +121,15 @@ function isConsistent(record: DisplayPathsRecord): boolean {
 /**
  * Each chain path with the record's dense series as `displayData`, when the record has a path of the
  * same `path_index` whose value at every checkpoint the chain holds equals the chain's, to the unit.
- * Grid points before the market start are dropped. Paths that fail the rule are returned as they were.
+ * Grid points before the market start are dropped. Paths that fail the rule are returned as they were,
+ * and a record whose shape or time axis is not the market's (see `isConsistent`) attaches to none.
  */
 export function attachDisplayData(
   paths: readonly PredictionPath[],
   record: DisplayPathsRecord | null,
-  startTimeMs: number,
+  market: DisplayPathsMarket,
 ): PredictionPath[] {
-  if (!record || !isConsistent(record)) return [...paths]
+  if (!record || !isConsistent(record, market)) return [...paths]
   const byIndex = new Map(record.paths.map((p) => [p.path_index, p.prices_u64]))
 
   return paths.map((path) => {
@@ -128,7 +146,7 @@ export function attachDisplayData(
     }
     const displayData = record.times
       .map((t, i) => ({ time: t * 1000, value: prices[i] / SCALE }))
-      .filter((p) => p.time >= startTimeMs)
+      .filter((p) => p.time >= market.startTimeMs)
     return { ...path, displayData }
   })
 }

@@ -14,6 +14,13 @@ export const DISPLAY_FIXTURE_MARKET = {
 
 export const DISPLAY_FIXTURE_MODEL_STEP_SECONDS = 300
 
+/** The fixture market as `attachDisplayData` takes it. */
+export const DISPLAY_FIXTURE_ATTACH_MARKET = {
+  startTimeMs: DISPLAY_FIXTURE_MARKET.startTime,
+  checkpointInterval: DISPLAY_FIXTURE_MARKET.checkpointInterval,
+  totalCheckpoints: DISPLAY_FIXTURE_MARKET.totalCheckpoints,
+} as const
+
 /** `buildAiPathFixture` paths for the fixture market, with prices at the chain's 6 decimals (u64 / SCALE). */
 export function buildDisplayFixturePaths(): PredictionPath[] {
   const quantize = (price: number) => Math.round(price * SCALE) / SCALE
