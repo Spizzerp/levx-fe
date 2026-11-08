@@ -140,7 +140,7 @@ function refusalReason(record: DisplayPathsRecord, market: DisplayPathsMarket): 
  * Each chain path with the record's dense series as `displayData`, when the record has a path of the
  * same `path_index` whose value at every checkpoint the chain holds equals the chain's, to the unit.
  * Grid points before the market start or past the last checkpoint are dropped. Paths that fail the rule are returned as they were,
- * and a record whose shape or time axis is not the market's (see `isConsistent`) attaches to none.
+ * and a record whose shape or time axis is not the market's (see `refusalReason`) attaches to none.
  */
 export function attachDisplayData(
   paths: readonly PredictionPath[],

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/env/env.config', () => ({
   env: {
@@ -32,6 +32,11 @@ const market = DISPLAY_FIXTURE_ATTACH_MARKET
 const startTimeMs = market.startTimeMs
 const paths = buildDisplayFixturePaths()
 const record = buildDisplayPathsRecord(paths)
+
+// Keep the dev-only refusal logs out of the test output; afterEach restores all mocks, so re-spy per test.
+beforeEach(() => {
+  vi.spyOn(console, 'debug').mockImplementation(() => {})
+})
 
 afterEach(() => {
   vi.restoreAllMocks()
@@ -255,7 +260,9 @@ describe('isDisplayPathsEnabled', () => {
 
 describe('displayPathsQueryOptions', () => {
   it('polls only while pollWhile holds', () => {
-    expect(displayPathsQueryOptions(7, true, true).refetchInterval).toBe(displayPathsRefetchInterval)
+    expect(displayPathsQueryOptions(7, true, true).refetchInterval).toBe(
+      displayPathsRefetchInterval,
+    )
     expect(displayPathsQueryOptions(7, true, false).refetchInterval).toBe(false)
   })
 })
