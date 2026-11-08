@@ -843,14 +843,14 @@ export function AdminPage() {
             <div>
               <span className="text-label text-ink-muted flex items-center font-mono uppercase">
                 Decoherence rate
-                <InfoTip text="How fast paths decay when predictions deviate from reality. 0.5 = 50% decay per checkpoint. Higher = faster elimination." />
+                <InfoTip text="How fast paths decay when predictions deviate from reality. 20 = a path 1% off reality loses 20% of its amplitude per checkpoint. Higher = faster elimination." />
               </span>
               <Input value={decoherenceRate} onChange={(e) => setDecoherenceRate(e.target.value)} />
             </div>
             <div>
               <span className="text-label text-ink-muted flex items-center font-mono uppercase">
                 Min probability
-                <InfoTip text="Floor probability (0.01 = 1%). When a path's Born probability drops below this, it dissolves and its pool redistributes to survivors." />
+                <InfoTip text="Floor probability (0.1 = 10%). When a path's Born probability drops below this, it dissolves and its pool redistributes to survivors." />
               </span>
               <Input
                 value={minimumProbability}

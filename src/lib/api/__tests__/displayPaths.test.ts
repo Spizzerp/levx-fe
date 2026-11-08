@@ -33,7 +33,8 @@ const startTimeMs = market.startTimeMs
 const paths = buildDisplayFixturePaths()
 const record = buildDisplayPathsRecord(paths)
 
-// Keep the dev-only refusal logs out of the test output; afterEach restores all mocks, so re-spy per test.
+// Keep the dev-only refusal logs out of the test output; afterEach restores all mocks,
+// so re-spy per test.
 beforeEach(() => {
   vi.spyOn(console, 'debug').mockImplementation(() => {})
 })

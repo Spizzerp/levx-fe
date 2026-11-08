@@ -7,8 +7,8 @@
  * `scripts/scoring-defaults.ts` exists on main, with a copy in LevXv2
  * `keeper/src/`, kept equal by `scripts/__tests__/scoring-defaults.test.ts`.
  * The study fills three fields: `referenceAction`, `decoherenceRate`,
- * `minimumProbability`; these are its "medium" preset (LevXv2
- * `research/scoring-params-2026-11/results/study.md`).
+ * `minimumProbability`; these are its "medium" preset, from LevXv2
+ * `research/scoring-params-2026-11/results/study.md` (Spizzerp/LevXv2#88).
  *
  * `lambda`: the admin form's default is 0 and stays editable; the pipeline
  * creates markets with 0.5 (500_000) — a known divergence, not aligned here.

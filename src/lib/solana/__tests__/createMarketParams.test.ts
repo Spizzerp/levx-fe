@@ -36,7 +36,7 @@ describe('buildCreateMarketParams', () => {
     expect(params.minimumProbability.toNumber()).toBe(100_000)
   })
 
-  it('rounds referenceAction to exactly 300 (0.0003 * SCALE is 299.99999999999994)', () => {
+  it('serializes referenceAction as exactly 300', () => {
     expect(buildWithDefaults().referenceAction.toString()).toBe('300')
   })
 
