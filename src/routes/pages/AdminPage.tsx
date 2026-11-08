@@ -1,7 +1,7 @@
 import { useEffect, useRef, useMemo, useState } from 'react'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { AnchorProvider, BN, parseIdlErrors, translateError } from '@coral-xyz/anchor'
+import { AnchorProvider, parseIdlErrors, translateError } from '@coral-xyz/anchor'
 import { PublicKey, Keypair, SYSVAR_RENT_PUBKEY, SystemProgram, Transaction } from '@solana/web3.js'
 import {
   TOKEN_PROGRAM_ID,
@@ -33,6 +33,8 @@ import {
   deriveProtocolPda,
 } from '@/lib/solana/pda'
 import { logTransactionError } from '@/lib/solana/logTransactionError'
+import { buildCreateMarketParams, feedIdToBytes } from '@/lib/solana/createMarketParams'
+import { SCORING_DEFAULTS } from '@/lib/scoringDefaults'
 import { resolveBaseMintLabel } from '@/lib/api/pairLabels'
 import { toast } from '@/stores/toastStore'
 import { useWalletStore } from '@/stores/walletStore'
@@ -182,24 +184,6 @@ function buildPreviewPaths(
 }
 
 /* ── Helpers ─────────────────────────────────────────────── */
-
-/**
- * Decode a Pyth feed id (0x-prefixed or bare 64-char hex) into the
- * 32-byte array the IDL expects. Throws on malformed input — callers
- * should validate up front and surface a friendly toast rather than
- * relying on the throw.
- */
-function feedIdToBytes(hexFeedId: string): number[] {
-  const hex = hexFeedId.startsWith('0x') ? hexFeedId.slice(2) : hexFeedId
-  if (!/^[0-9a-fA-F]{64}$/.test(hex)) {
-    throw new Error(`Pyth feed id must be 64 hex chars (got ${hex.length})`)
-  }
-  const bytes: number[] = []
-  for (let i = 0; i < 64; i += 2) {
-    bytes.push(parseInt(hex.slice(i, i + 2), 16))
-  }
-  return bytes
-}
 
 /** Inverse of `feedIdToBytes`: 32-byte array → 64-char lowercase hex. */
 function bytesToFeedIdHex(bytes: number[] | Uint8Array): string {
@@ -361,7 +345,7 @@ function toLocalDatetime(ms: number): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-import { CU_LIMITS, GRADIENT, SCALE } from '@/lib/constants'
+import { CU_LIMITS, GRADIENT } from '@/lib/constants'
 
 import { CHIP, CHIP_ACTIVE, CHIP_INACTIVE } from '@/ui/styles'
 
@@ -388,10 +372,12 @@ export function AdminPage() {
   )
   const [checkpointTarget, setCheckpointTarget] = useState(() => naturalCheckpointTarget(7 * 24))
   const previousAutoCheckpointTarget = useRef(checkpointTarget)
-  const [lambda, setLambda] = useState('0')
-  const [decoherenceRate, setDecoherenceRate] = useState('0.5')
-  const [minimumProbability, setMinimumProbability] = useState('0.01')
-  const [nudgeRate, setNudgeRate] = useState('0.05')
+  const [lambda, setLambda] = useState(String(SCORING_DEFAULTS.lambda))
+  const [decoherenceRate, setDecoherenceRate] = useState(String(SCORING_DEFAULTS.decoherenceRate))
+  const [minimumProbability, setMinimumProbability] = useState(
+    String(SCORING_DEFAULTS.minimumProbability),
+  )
+  const [nudgeRate, setNudgeRate] = useState(String(SCORING_DEFAULTS.nudgeRate))
   const [pathMaxAge, setPathMaxAge] = useState('1800')
   const [numPaths, setNumPaths] = useState(5)
   const [groupKeyHashInput, setGroupKeyHashInput] = useState(() => groupSearchParam ?? '')
@@ -546,28 +532,18 @@ export function AdminPage() {
         ? normalizeBytes32Hex(groupKeyHashInput)
         : null
 
-      const params = {
-        baseMint: new PublicKey(pair.baseMint),
-        quoteMint,
-        pythFeedId: feedIdToBytes(pair.feedIdHex),
-        startTime: new BN(startTime),
-        endTime: new BN(endTime),
+      const params = buildCreateMarketParams({
+        pair,
+        startTime,
+        endTime,
         checkpointInterval,
-        actionAlpha: new BN(Math.round(0.7 * SCALE)),
-        actionBeta: new BN(Math.round(0.3 * SCALE)),
-        decoherenceRate: new BN(Math.round(parseFloat(decoherenceRate) * SCALE)),
-        minimumProbability: new BN(Math.round(parseFloat(minimumProbability) * SCALE)),
-        nudgeRate: new BN(Math.round(parseFloat(nudgeRate) * SCALE)),
-        pathMaxAge: new BN(parseInt(pathMaxAge)),
+        pathMaxAge: parseInt(pathMaxAge),
         targetNumPaths: numPaths,
-        lambda: new BN(Math.round(parseFloat(lambda) * SCALE)),
-        referenceAction: new BN(1 * SCALE),
-        weightQv: new BN(Math.round(0.25 * SCALE)),
-        weightDd: new BN(Math.round(0.25 * SCALE)),
-        weightEndpoint: new BN(Math.round(0.25 * SCALE)),
-        weightDisplacement: new BN(Math.round(0.25 * SCALE)),
-        lmsrAlpha: new BN(1_000_000),
-      }
+        decoherenceRate: parseFloat(decoherenceRate),
+        minimumProbability: parseFloat(minimumProbability),
+        nudgeRate: parseFloat(nudgeRate),
+        lambda: parseFloat(lambda),
+      })
 
       const marketGroupPda = normalizedGroupKeyHash
         ? deriveMarketGroupPda(normalizedGroupKeyHash)[0]
