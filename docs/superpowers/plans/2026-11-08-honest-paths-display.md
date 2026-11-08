@@ -8,7 +8,7 @@
 
 **Tech Stack:** React 19, TanStack Query, Vite (`envPrefix: 'APP_'`), Vitest + Testing Library (jsdom), pnpm 10.
 
-**Spec:** `docs/superpowers/specs/2026-11-08-honest-paths-design.md` — a verbatim copy, committed with this plan, of the source of truth in levx-infra (`levx-infra/docs/superpowers/specs/2026-11-08-honest-paths-design.md`); §4 W2, W1.3 record shape, W1.7.
+**Spec:** `levx-infra/docs/superpowers/specs/2026-11-08-honest-paths-design.md` (the design lives in the private levx-infra repo and is not copied here); §4 W2, W1.3 record shape, W1.7.
 
 ## Global Constraints
 
