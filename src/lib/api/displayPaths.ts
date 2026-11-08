@@ -151,6 +151,19 @@ export function attachDisplayData(
   })
 }
 
+/** How often to ask again while the pipeline has no record yet. */
+const DISPLAY_PATHS_POLL_MS = 15_000
+
+/**
+ * The record is written moments after the market's last `PathAdded`, so the event-driven refetch can
+ * miss it (404). Poll while there is none (`null`), and stop once one exists.
+ */
+export function displayPathsRefetchInterval(query: {
+  state: { data: DisplayPathsRecord | null | undefined }
+}): number | false {
+  return query.state.data === null ? DISPLAY_PATHS_POLL_MS : false
+}
+
 /** Mock markets (APP_USE_MOCK) and builds without a pipeline URL have no record, so nothing is fetched. */
 export function useDisplayPaths(
   marketId: number | null,
@@ -165,6 +178,7 @@ export function useDisplayPaths(
       env.APP_API_BASE_URL !== '' &&
       import.meta.env.APP_USE_MOCK !== 'true',
     staleTime: 60_000,
+    refetchInterval: displayPathsRefetchInterval,
   })
   return data ?? null
 }

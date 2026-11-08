@@ -17,6 +17,7 @@ vi.mock('@/env/env.config', () => ({
 import {
   attachDisplayData,
   DisplayPathsRequestError,
+  displayPathsRefetchInterval,
   fetchDisplayPaths,
 } from '@/lib/api/displayPaths'
 import {
@@ -181,5 +182,12 @@ describe('fetchDisplayPaths', () => {
     const error = await fetchDisplayPaths(7).catch((e: unknown) => e)
     expect(error).toBeInstanceOf(DisplayPathsRequestError)
     expect((error as DisplayPathsRequestError).status).toBe(500)
+  })
+})
+
+describe('displayPathsRefetchInterval', () => {
+  it('polls every 15 s while the pipeline has no record and stops once one exists', () => {
+    expect(displayPathsRefetchInterval({ state: { data: null } })).toBe(15_000)
+    expect(displayPathsRefetchInterval({ state: { data: record } })).toBe(false)
   })
 })
