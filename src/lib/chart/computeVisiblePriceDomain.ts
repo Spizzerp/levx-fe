@@ -32,9 +32,9 @@ export function computeVisiblePriceDomain(
     }
   }
 
-  // Iterate prediction paths — typically short arrays, linear scan is fine.
+  // Iterate prediction paths as drawn (model resolution when present) — short arrays, linear scan is fine.
   for (const path of predictions) {
-    for (const pt of path.data) {
+    for (const pt of path.displayData ?? path.data) {
       if (pt.time >= tMin && pt.time <= tMax) {
         if (pt.value < lo) lo = pt.value
         if (pt.value > hi) hi = pt.value
