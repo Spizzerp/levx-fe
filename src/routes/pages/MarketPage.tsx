@@ -36,6 +36,7 @@ import { useMode2Position } from '@/features/mode2/useMode2Position'
 import { env } from '@/env/env.config'
 import { cn } from '@/lib/cn'
 import { useCheckpointPrices } from '@/lib/api/checkpointPrices'
+import { attachDisplayData, useDisplayPaths } from '@/lib/api/displayPaths'
 import { useMode2Readiness } from '@/lib/api/hooks'
 import { useMarket, useUserPosition } from '@/lib/chain'
 import { parseMarketState } from '@/lib/api/adapters'
@@ -552,8 +553,26 @@ export function MarketPage() {
     })
   }, [userPaths, market, selfWallet])
 
+  // The pipeline's dense series, drawn only on AI paths whose checkpoints match the chain exactly.
+  const displayRecord = useDisplayPaths(market?.marketId ?? null, !!market && aiPaths.length > 0)
+  const marketForDisplay = useMemo(
+    () => ({
+      startTimeMs: chartMarketStart,
+      checkpointInterval: chartCheckpointInterval,
+      totalCheckpoints: chartTotalCheckpoints,
+    }),
+    [chartMarketStart, chartCheckpointInterval, chartTotalCheckpoints],
+  )
+  const aiPathsDrawn = useMemo(
+    () => attachDisplayData(aiPaths, displayRecord, marketForDisplay),
+    [aiPaths, displayRecord, marketForDisplay],
+  )
+
   // Combine AI paths + user-drawn paths for chart
-  const allPaths = useMemo(() => [...aiPaths, ...visibleUserPaths], [aiPaths, visibleUserPaths])
+  const allPaths = useMemo(
+    () => [...aiPathsDrawn, ...visibleUserPaths],
+    [aiPathsDrawn, visibleUserPaths],
+  )
 
   const handleConfirmDrawing = async () => {
     if (drawingState.phase !== 'ready' || !market) return
