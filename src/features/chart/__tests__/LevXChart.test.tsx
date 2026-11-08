@@ -472,6 +472,20 @@ describe('LevXChart dense display paths', () => {
     )
   })
 
+  it('snaps the hover on a dissolved dense path to its checkpoints', () => {
+    const dissolved = { ...densePaths[0], dissolved: true, dissolvedAtCheckpoint: 3 }
+    const { container } = renderDense({
+      predictions: [dissolved],
+      selectedPathId: dissolved.id,
+      nowTime: denseStart - 1,
+    })
+    // 400 s is nearest the dense point at 300 s, but nearest checkpoint 1 (600 s) of the six.
+    const hitArea = container.querySelector('rect[fill="transparent"][x="0"][y="0"]')!
+    fireEvent.pointerMove(hitArea, { clientX: 16 + xAt(denseStart + 400_000), buttons: 0 })
+    const crosshair = container.querySelector('line[stroke-dasharray="1 3"]')!
+    expect(Number(crosshair.getAttribute('x1'))).toBeCloseTo(xAt(denseStart + 600_000), 3)
+  })
+
   it('splits elapsed and future at a nowTime between dense points without a gap', () => {
     const nowTime = denseStart + 450_000 // between dense points 1 (300 s) and 2 (600 s)
     renderDense({ nowTime })
