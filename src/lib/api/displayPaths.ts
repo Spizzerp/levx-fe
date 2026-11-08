@@ -13,8 +13,8 @@ import type { PredictionPath } from '@/types/market'
 export interface DisplayPathsRecord {
   schema: 'display-paths-v1'
   market_id: number
-  /** unix seconds */
-  generated_at: number
+  /** ISO-8601 */
+  generated_at: string
   /** unix seconds */
   start_time: number
   /** seconds */
@@ -82,31 +82,45 @@ export interface DisplayPathsMarket {
   totalCheckpoints: number
 }
 
+/** Why a record or path was not attached; printed in dev builds only. */
+function logRefusal(reason: string): void {
+  if (import.meta.env.DEV) console.debug('[display-paths] not attached:', reason)
+}
+
 /**
  * A record is drawn from only if its shape holds together and its time axis is the market's: the
  * same start, interval and checkpoint count, a strictly increasing grid, and every checkpoint grid
  * point at exactly the checkpoint's time. Otherwise none of it is. The body comes from the network,
- * so every field is checked rather than trusted to match the type.
+ * so every field is checked rather than trusted to match the type. Returns why the record is
+ * refused, or null when it holds.
  */
-function isConsistent(record: DisplayPathsRecord, market: DisplayPathsMarket): boolean {
+function refusalReason(record: DisplayPathsRecord, market: DisplayPathsMarket): string | null {
   const {
     times,
     checkpoint_indices: indices,
     paths,
   } = record as unknown as Partial<Record<'times' | 'checkpoint_indices' | 'paths', unknown>>
-  if (record.schema !== 'display-paths-v1') return false
-  if (record.start_time * 1000 !== market.startTimeMs) return false
-  if (record.checkpoint_interval !== market.checkpointInterval) return false
-  if (record.total_checkpoints !== market.totalCheckpoints) return false
-  if (!isFiniteArray(times) || times.length === 0) return false
-  if (!times.every((t, i) => i === 0 || t > times[i - 1])) return false
-  if (!isFiniteArray(indices) || indices.length !== market.totalCheckpoints) return false
-  if (!indices.every((i) => Number.isInteger(i) && i >= 0 && i < times.length)) return false
+  if (record.schema !== 'display-paths-v1') return 'schema is not display-paths-v1'
+  if (record.start_time * 1000 !== market.startTimeMs) return 'start_time differs from the market'
+  if (record.checkpoint_interval !== market.checkpointInterval) {
+    return 'checkpoint_interval differs from the market'
+  }
+  if (record.total_checkpoints !== market.totalCheckpoints) {
+    return 'total_checkpoints differs from the market'
+  }
+  if (!isFiniteArray(times) || times.length === 0) return 'times is not a non-empty number array'
+  if (!times.every((t, i) => i === 0 || t > times[i - 1])) return 'times is not strictly increasing'
+  if (!isFiniteArray(indices) || indices.length !== market.totalCheckpoints) {
+    return 'checkpoint_indices is not one number per checkpoint'
+  }
+  if (!indices.every((i) => Number.isInteger(i) && i >= 0 && i < times.length)) {
+    return 'checkpoint_indices out of range'
+  }
   const checkpointMs = market.checkpointInterval * 1000
   if (!indices.every((i, j) => times[i] * 1000 === market.startTimeMs + j * checkpointMs)) {
-    return false
+    return 'a checkpoint grid point is not at its checkpoint time'
   }
-  if (!Array.isArray(paths)) return false
+  if (!Array.isArray(paths)) return 'paths is not an array'
   const pathsHold = paths.every(
     (p: unknown) =>
       typeof p === 'object' &&
@@ -115,13 +129,17 @@ function isConsistent(record: DisplayPathsRecord, market: DisplayPathsMarket): b
       isFiniteArray((p as { prices_u64?: unknown }).prices_u64) &&
       (p as { prices_u64: number[] }).prices_u64.length === times.length,
   )
-  return pathsHold && new Set(record.paths.map((p) => p.path_index)).size === paths.length
+  if (!pathsHold) return 'a path is malformed or its prices_u64 length differs from times'
+  if (new Set(record.paths.map((p) => p.path_index)).size !== paths.length) {
+    return 'a path_index appears twice'
+  }
+  return null
 }
 
 /**
  * Each chain path with the record's dense series as `displayData`, when the record has a path of the
  * same `path_index` whose value at every checkpoint the chain holds equals the chain's, to the unit.
- * Grid points before the market start are dropped. Paths that fail the rule are returned as they were,
+ * Grid points before the market start or past the last checkpoint are dropped. Paths that fail the rule are returned as they were,
  * and a record whose shape or time axis is not the market's (see `isConsistent`) attaches to none.
  */
 export function attachDisplayData(
@@ -129,7 +147,14 @@ export function attachDisplayData(
   record: DisplayPathsRecord | null,
   market: DisplayPathsMarket,
 ): PredictionPath[] {
-  if (!record || !isConsistent(record, market)) return [...paths]
+  if (!record) return [...paths]
+  const refusal = refusalReason(record, market)
+  if (refusal) {
+    logRefusal(refusal)
+    return [...paths]
+  }
+  const endMs =
+    market.startTimeMs + (market.totalCheckpoints - 1) * market.checkpointInterval * 1000
   const byIndex = new Map(record.paths.map((p) => [p.path_index, p.prices_u64]))
 
   return paths.map((path) => {
@@ -141,12 +166,13 @@ export function attachDisplayData(
         gridIndex === undefined ||
         prices[gridIndex] !== Math.round(path.predictedPrices[j] * SCALE)
       ) {
+        logRefusal(`path ${path.pathIndex}: price at checkpoint ${j} differs from the chain`)
         return path
       }
     }
     const displayData = record.times
       .map((t, i) => ({ time: t * 1000, value: prices[i] / SCALE }))
-      .filter((p) => p.time >= market.startTimeMs)
+      .filter((p) => p.time >= market.startTimeMs && p.time <= endMs)
     return { ...path, displayData }
   })
 }
@@ -164,8 +190,23 @@ export function displayPathsRefetchInterval(query: {
   return query.state.data === null ? DISPLAY_PATHS_POLL_MS : false
 }
 
+/** Mock markets (APP_USE_MOCK) and builds without a pipeline URL have no record, so nothing is fetched. */
+export function isDisplayPathsEnabled({
+  enabled,
+  marketId,
+  baseUrl,
+  useMock,
+}: {
+  enabled: boolean
+  marketId: number | null
+  baseUrl: string
+  useMock: boolean
+}): boolean {
+  return enabled && marketId !== null && baseUrl !== '' && !useMock
+}
+
 /**
- * Mock markets (APP_USE_MOCK) and builds without a pipeline URL have no record, so nothing is fetched.
+ * Fetched only when `isDisplayPathsEnabled`.
  * Records are written before a market starts, so polling for a missing one runs only while `pollWhile`
  * (the market is pending).
  */
@@ -177,11 +218,12 @@ export function displayPathsQueryOptions(
   return queryOptions({
     queryKey: ['display-paths', marketId],
     queryFn: () => fetchDisplayPaths(marketId!),
-    enabled:
-      enabled &&
-      marketId !== null &&
-      env.APP_API_BASE_URL !== '' &&
-      import.meta.env.APP_USE_MOCK !== 'true',
+    enabled: isDisplayPathsEnabled({
+      enabled,
+      marketId,
+      baseUrl: env.APP_API_BASE_URL,
+      useMock: import.meta.env.APP_USE_MOCK === 'true',
+    }),
     staleTime: 60_000,
     refetchInterval: pollWhile ? displayPathsRefetchInterval : false,
   })

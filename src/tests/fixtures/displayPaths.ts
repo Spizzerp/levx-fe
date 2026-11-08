@@ -55,7 +55,7 @@ export function buildDisplayPathsRecord(
   return {
     schema: 'display-paths-v1',
     market_id: marketId,
-    generated_at: startSec - 60,
+    generated_at: new Date((startSec - 60) * 1000).toISOString(),
     start_time: startSec,
     checkpoint_interval: checkpointInterval,
     total_checkpoints: totalCheckpoints,

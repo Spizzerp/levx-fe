@@ -20,6 +20,7 @@ import {
   displayPathsQueryOptions,
   displayPathsRefetchInterval,
   fetchDisplayPaths,
+  isDisplayPathsEnabled,
 } from '@/lib/api/displayPaths'
 import {
   buildDisplayFixturePaths,
@@ -31,6 +32,11 @@ const market = DISPLAY_FIXTURE_ATTACH_MARKET
 const startTimeMs = market.startTimeMs
 const paths = buildDisplayFixturePaths()
 const record = buildDisplayPathsRecord(paths)
+
+afterEach(() => {
+  vi.restoreAllMocks()
+  vi.unstubAllEnvs()
+})
 
 describe('attachDisplayData', () => {
   it('attaches a dense series when every checkpoint value equals the chain', () => {
@@ -53,6 +59,45 @@ describe('attachDisplayData', () => {
     const out = attachDisplayData(paths, r, market)
     expect(out[0].displayData).toHaveLength(11)
     expect(out[0].displayData![0].time).toBe(startTimeMs)
+  })
+
+  it('drops grid points past the last checkpoint', () => {
+    // The pipeline's horizon can overrun the last checkpoint by one model step.
+    const r = structuredClone(record)
+    r.times.push(r.times[r.times.length - 1] + r.model_step_seconds)
+    for (const p of r.paths) p.prices_u64.push(p.prices_u64[p.prices_u64.length - 1])
+    const out = attachDisplayData(paths, r, market)
+    expect(out[0].displayData).toHaveLength(11)
+    expect(out[0].displayData![10].time).toBe(
+      startTimeMs + (market.totalCheckpoints - 1) * market.checkpointInterval * 1000,
+    )
+  })
+
+  it('logs a refused record once with its reason in dev builds only', () => {
+    const debug = vi.spyOn(console, 'debug').mockImplementation(() => {})
+    const shifted = structuredClone(record)
+    shifted.start_time += 60
+
+    vi.stubEnv('DEV', true)
+    attachDisplayData(paths, shifted, market)
+    expect(debug).toHaveBeenCalledTimes(1)
+    expect(debug.mock.calls[0][0]).toMatch(/^\[display-paths\]/)
+    expect(String(debug.mock.calls[0][1])).toMatch(/start_time/)
+
+    debug.mockClear()
+    vi.stubEnv('DEV', false)
+    attachDisplayData(paths, shifted, market)
+    expect(debug).not.toHaveBeenCalled()
+  })
+
+  it('logs a path skipped for a price mismatch in dev builds', () => {
+    const debug = vi.spyOn(console, 'debug').mockImplementation(() => {})
+    const r = structuredClone(record)
+    r.paths[0].prices_u64[0] += 1
+    vi.stubEnv('DEV', true)
+    attachDisplayData(paths, r, market)
+    expect(debug).toHaveBeenCalledTimes(1)
+    expect(String(debug.mock.calls[0][1])).toMatch(/price/)
   })
 
   it('refuses the whole record when its time axis disagrees with the market', () => {
@@ -190,6 +235,21 @@ describe('displayPathsRefetchInterval', () => {
   it('polls every 15 s while the pipeline has no record and stops once one exists', () => {
     expect(displayPathsRefetchInterval({ state: { data: null } })).toBe(15_000)
     expect(displayPathsRefetchInterval({ state: { data: record } })).toBe(false)
+  })
+})
+
+describe('isDisplayPathsEnabled', () => {
+  const on = { enabled: true, marketId: 7, baseUrl: 'https://pipeline.test', useMock: false }
+
+  it('is off without a pipeline URL, in mock mode, or without a market', () => {
+    expect(isDisplayPathsEnabled({ ...on, baseUrl: '' })).toBe(false)
+    expect(isDisplayPathsEnabled({ ...on, useMock: true })).toBe(false)
+    expect(isDisplayPathsEnabled({ ...on, marketId: null })).toBe(false)
+    expect(isDisplayPathsEnabled({ ...on, enabled: false })).toBe(false)
+  })
+
+  it('is on otherwise', () => {
+    expect(isDisplayPathsEnabled(on)).toBe(true)
   })
 })
 
