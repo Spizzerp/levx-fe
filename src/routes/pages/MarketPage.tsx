@@ -773,7 +773,9 @@ export function MarketPage() {
   const showVoidPanel = market.state === 'void'
   const pendingPathTarget = market.targetNumPaths
   const showPendingIndicator = market.state === 'pending' && market.numPaths < pendingPathTarget
-  const showPositionRail = !showWagerRail && !showVoidPanel && !!userPosition
+  // The maturing, settled and void rails render the position card themselves.
+  const showPositionRail =
+    !showWagerRail && !showMaturityCard && !showClaimCard && !showVoidPanel && !!userPosition
 
   // Mode 2, behind APP_MODE2_TRADING (spec §4.1, §6.1): the leverage section takes the bet
   // controls' place while entry is open, and the position card joins the rails.
