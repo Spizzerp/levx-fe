@@ -851,6 +851,45 @@ describe('MarketPage state-gated controls', () => {
     expect(claimMutateMock).toHaveBeenCalledWith({ marketId: 7, pathIndex: 3 })
   })
 
+  it.each(['settling', 'maturing', 'settled', 'void'] as const)(
+    "shows the user's position card once when the market is %s",
+    async (state) => {
+      await setMarketState(state)
+      act(() => connectWallet())
+      const { useUserPosition } = await import('@/lib/api/hooks')
+      const position: UserPosition = {
+        id: '7-3',
+        marketId: '7',
+        marketIdNum: 7,
+        marketState: state,
+        pair: 'BTC/USDC',
+        base: 'BTC',
+        quote: 'USDC',
+        pathId: 'path-3',
+        pathIndex: 3,
+        pathLabel: 'Path D',
+        pathTone: 'bear',
+        collateral: 25,
+        leverage: 1,
+        exposure: 25,
+        entryMultiplier: 1,
+        entryTime: 0,
+        estimatedPayout: 31,
+        dissolved: false,
+        claimed: false,
+      }
+      ;(useUserPosition as ReturnType<typeof vi.fn>).mockReturnValue({
+        data: position,
+        isLoading: false,
+        isError: false,
+      })
+
+      renderMarketPage()
+
+      expect(screen.getAllByText('Your Position')).toHaveLength(1)
+    },
+  )
+
   it('mounts the maturity countdown card only when market.state is Maturing (MARKET-04)', async () => {
     await setMarketState('maturing')
     const { unmount } = renderMarketPage()
