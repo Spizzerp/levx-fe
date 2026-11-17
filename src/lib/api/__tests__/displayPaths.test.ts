@@ -67,6 +67,53 @@ describe('attachDisplayData', () => {
     expect(out[0].displayData![0].time).toBe(startTimeMs)
   })
 
+  it('starts every dense series at the record origin, before the market start', () => {
+    const originTime = record.start_time - record.model_step_seconds
+    const r = { ...structuredClone(record), origin: { time: originTime, price_u64: 99_500_000 } }
+    const out = attachDisplayData(paths, r, market)
+    for (const path of out) {
+      expect(path.displayData).toHaveLength(12)
+      expect(path.displayData![0]).toEqual({ time: originTime * 1000, value: 99.5 })
+      expect(path.displayData![1].time).toBe(startTimeMs)
+    }
+    // The scored series is left as it was.
+    expect(out[0].data).toBe(paths[0].data)
+  })
+
+  it('keeps the grid points between the origin and the market start', () => {
+    // The forecast was made two model steps before the start, so one grid point precedes it.
+    const r = structuredClone(record)
+    const step = r.model_step_seconds
+    r.times.unshift(r.times[0] - step)
+    r.checkpoint_indices = r.checkpoint_indices.map((i) => i + 1)
+    for (const p of r.paths) p.prices_u64.unshift(p.prices_u64[0])
+    const out = attachDisplayData(
+      paths,
+      { ...r, origin: { time: r.start_time - 2 * step, price_u64: 99_500_000 } },
+      market,
+    )
+    expect(out[0].displayData).toHaveLength(13)
+    expect(out[0].displayData!.map((p) => p.time).slice(0, 3)).toEqual([
+      startTimeMs - 2 * step * 1000,
+      startTimeMs - step * 1000,
+      startTimeMs,
+    ])
+  })
+
+  it.each([
+    ['at the market start', { time: record.start_time, price_u64: 99_500_000 }],
+    ['after the market start', { time: record.start_time + 60, price_u64: 99_500_000 }],
+    ['without a finite time', { time: Number.NaN, price_u64: 99_500_000 }],
+    ['without a positive price', { time: record.start_time - 300, price_u64: 0 }],
+    ['that is not an object', 'origin'],
+    ['that is null', null],
+  ])('draws from the market start when the origin is %s', (_name, origin) => {
+    const r = { ...structuredClone(record), origin } as unknown as typeof record
+    const out = attachDisplayData(paths, r, market)
+    expect(out[0].displayData).toHaveLength(11)
+    expect(out[0].displayData![0].time).toBe(startTimeMs)
+  })
+
   it('drops grid points past the last checkpoint', () => {
     // The pipeline's horizon can overrun the last checkpoint by one model step.
     const r = structuredClone(record)

@@ -8,7 +8,7 @@ import { queryOptions, useQuery } from '@tanstack/react-query'
 
 import { env } from '@/env/env.config'
 import { SCALE } from '@/lib/constants'
-import type { PredictionPath } from '@/types/market'
+import type { PredictionPath, PricePoint } from '@/types/market'
 
 export interface DisplayPathsRecord {
   schema: 'display-paths-v1'
@@ -27,6 +27,11 @@ export interface DisplayPathsRecord {
   checkpoint_indices: number[]
   /** `prices_u64`: one per grid point, u64 with 6 decimals */
   paths: { path_index: number; prices_u64: number[] }[]
+  /**
+   * The point every path leaves: the last price the forecast was made from (u64 with 6 decimals)
+   * at its time (unix seconds), before `times[0]`. Records written before it was added have none.
+   */
+  origin?: { time: number; price_u64: number }
 }
 
 /** A non-OK answer other than 404. */
@@ -137,9 +142,25 @@ function refusalReason(record: DisplayPathsRecord, market: DisplayPathsMarket): 
 }
 
 /**
+ * The record's origin as a chart point, or null when it has none that holds: a finite time before
+ * the market start and a positive price. The chain has no such point to check it against, so a
+ * record without a usable one is still drawn, from the market start.
+ */
+function originPoint(record: DisplayPathsRecord, market: DisplayPathsMarket): PricePoint | null {
+  const origin = record.origin as unknown
+  if (typeof origin !== 'object' || origin === null) return null
+  const { time, price_u64: price } = origin as { time?: unknown; price_u64?: unknown }
+  if (!isFiniteNumber(time) || !isFiniteNumber(price) || price <= 0) return null
+  if (time * 1000 >= market.startTimeMs) return null
+  return { time: time * 1000, value: price / SCALE }
+}
+
+/**
  * Each chain path with the record's dense series as `displayData`, when the record has a path of the
  * same `path_index` whose value at every checkpoint the chain holds equals the chain's, to the unit.
- * Grid points before the market start or past the last checkpoint are dropped. Paths that fail the rule are returned as they were,
+ * The series starts at the record's origin, the point all paths share before the market start; a
+ * record without one starts at the market start, and its earlier grid points are dropped. Grid
+ * points past the last checkpoint are dropped. Paths that fail the rule are returned as they were,
  * and a record whose shape or time axis is not the market's (see `refusalReason`) attaches to none.
  */
 export function attachDisplayData(
@@ -156,6 +177,7 @@ export function attachDisplayData(
   const endMs =
     market.startTimeMs + (market.totalCheckpoints - 1) * market.checkpointInterval * 1000
   const byIndex = new Map(record.paths.map((p) => [p.path_index, p.prices_u64]))
+  const origin = originPoint(record, market)
 
   return paths.map((path) => {
     const prices = byIndex.get(path.pathIndex)
@@ -170,9 +192,12 @@ export function attachDisplayData(
         return path
       }
     }
-    const displayData = record.times
+    const grid = record.times
       .map((t, i) => ({ time: t * 1000, value: prices[i] / SCALE }))
-      .filter((p) => p.time >= market.startTimeMs && p.time <= endMs)
+      .filter((p) => p.time <= endMs)
+    const displayData = origin
+      ? [origin, ...grid.filter((p) => p.time > origin.time)]
+      : grid.filter((p) => p.time >= market.startTimeMs)
     return { ...path, displayData }
   })
 }

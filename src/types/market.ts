@@ -129,7 +129,8 @@ export interface PredictionPath {
   data: PricePoint[]
   /**
    * Model-resolution series from the pipeline's display record; drawn instead of `data` when
-   * present; never used for scoring or checkpoints.
+   * present; never used for scoring or checkpoints. It may open with the forecast's origin, a
+   * point before the market start that every path shares.
    */
   displayData?: PricePoint[]
 
