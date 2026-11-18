@@ -75,3 +75,43 @@ export function buildDisplayPathsRecord(
     }),
   }
 }
+
+/**
+ * `record` with a `simulated_fill` every `stepSeconds`: every stored value kept at its anchor, and
+ * each simulated point the straight-line value between its stored neighbours plus 500 units, so a
+ * test can tell the two apart. The fill starts after the record's origin when it has one.
+ */
+export function withSimulatedFill(
+  record: DisplayPathsRecord,
+  stepSeconds = 60,
+): DisplayPathsRecord {
+  const knots = record.origin ? [record.origin.time, ...record.times] : [...record.times]
+  const times: number[] = record.origin ? [] : [record.times[0]]
+  const anchorIndices: number[] = record.origin ? [] : [0]
+  for (let i = 1; i < knots.length; i++) {
+    for (let t = knots[i - 1] + stepSeconds; t <= knots[i]; t += stepSeconds) times.push(t)
+    anchorIndices.push(times.length - 1)
+  }
+  const paths = record.paths.map((path) => {
+    const stored = record.origin ? [record.origin.price_u64, ...path.prices_u64] : path.prices_u64
+    const prices = times.map((t) => {
+      const i = knots.findIndex((knot) => knot >= t)
+      if (knots[i] === t) return stored[i]
+      const share = (t - knots[i - 1]) / (knots[i] - knots[i - 1])
+      return Math.round(stored[i - 1] + share * (stored[i] - stored[i - 1])) + 500
+    })
+    return { path_index: path.path_index, prices_u64: prices }
+  })
+  return {
+    ...record,
+    simulated_fill: {
+      simulated: true,
+      method: 'brownian-bridge-v1',
+      step_seconds: stepSeconds,
+      volatility: 0.6,
+      times,
+      anchor_indices: anchorIndices,
+      paths,
+    },
+  }
+}
