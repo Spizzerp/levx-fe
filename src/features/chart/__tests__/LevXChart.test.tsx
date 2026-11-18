@@ -32,6 +32,7 @@ import {
   buildDisplayPathsRecord,
   DISPLAY_FIXTURE_ATTACH_MARKET,
   DISPLAY_FIXTURE_MARKET,
+  withSimulatedFill,
 } from '@/tests/fixtures/displayPaths'
 import { useDrawingStore } from '@/stores/drawingStore'
 import { usePriceStore } from '@/stores/priceStore'
@@ -82,7 +83,7 @@ function renderChart(overrides: Partial<Parameters<typeof LevXChart>[0]> = {}) {
 }
 
 describe('LevXChart', () => {
-  it('renders historical line using curveMonotoneX and prediction paths using curveCatmullRom.alpha(0.5)', () => {
+  it('renders the historical line and the prediction paths', () => {
     const { container } = renderChart()
     // At minimum, paths render as <path> elements inside the SVG
     const svgPaths = container.querySelectorAll('svg path')
@@ -451,6 +452,20 @@ describe('LevXChart dense display paths', () => {
     expect(line.getAttribute('data-points')).toBe('11')
   })
 
+  it('draws a path as straight segments through its stored points', () => {
+    renderDense()
+    const d = screen.getByTestId('prediction-path').getAttribute('d') ?? ''
+    // only move-to and line-to commands: no curve that rounds corners or bulges between points
+    expect(d).not.toMatch(/[CSQTA]/i)
+    const xs = d
+      .split(/[ML]/)
+      .filter(Boolean)
+      .map((point) => Number(point.split(',')[0]))
+    const stored = densePaths[0].displayData!
+    expect(xs).toHaveLength(stored.length)
+    xs.forEach((x, i) => expect(x).toBeCloseTo(xAt(stored[i].time), 3))
+  })
+
   it('falls back to the six points without displayData', () => {
     renderDense({ predictions: [chainPaths[0]] })
     const line = screen.getByTestId('prediction-path')
@@ -484,6 +499,48 @@ describe('LevXChart dense display paths', () => {
     fireEvent.pointerMove(hitArea, { clientX: 16 + xAt(denseStart + 400_000), buttons: 0 })
     const crosshair = container.querySelector('line[stroke-dasharray="1 3"]')!
     expect(Number(crosshair.getAttribute('x1'))).toBeCloseTo(xAt(denseStart + 600_000), 3)
+  })
+
+  describe('with a simulated fill', () => {
+    const filledPaths = attachDisplayData(
+      chainPaths,
+      withSimulatedFill(buildDisplayPathsRecord(chainPaths), 60),
+      DISPLAY_FIXTURE_ATTACH_MARKET,
+    )
+
+    it('draws the filled series and says on the chart that it is simulated', () => {
+      renderDense({ predictions: [filledPaths[0]] })
+      const line = screen.getByTestId('prediction-path')
+      expect(line.getAttribute('data-series')).toBe('simulated')
+      expect(line.getAttribute('data-points')).toBe('51')
+      expect(screen.getByText(/simulated/i)).toBeTruthy()
+    })
+
+    it('says nothing when no drawn path is filled', () => {
+      renderDense()
+      expect(screen.queryByText(/simulated/i)).toBeNull()
+    })
+
+    it('cuts a dissolved filled path at the dissolving checkpoint', () => {
+      const dissolved = { ...filledPaths[0], dissolved: true, dissolvedAtCheckpoint: 3 }
+      const cutTime = denseStart + 2 * denseIntervalMs
+      renderDense({ predictions: [dissolved], nowTime: denseStart + 25 * 60_000 })
+      const line = screen.getByTestId('dissolved-path')
+      expect(line.getAttribute('data-points')).toBe('21') // 0 s to 1200 s, every 60 s
+      expect(endXs(line.getAttribute('d'))[1]).toBeCloseTo(xAt(cutTime), 3)
+    })
+
+    it('keeps the hover on the scored checkpoints', () => {
+      const { container } = renderDense({
+        predictions: [filledPaths[0]],
+        selectedPathId: filledPaths[0].id,
+      })
+      // 400 s has a simulated point at 420 s, but the readout snaps to checkpoint 1 at 600 s
+      const hitArea = container.querySelector('rect[fill="transparent"][x="0"][y="0"]')!
+      fireEvent.pointerMove(hitArea, { clientX: 16 + xAt(denseStart + 400_000), buttons: 0 })
+      const crosshair = container.querySelector('line[stroke-dasharray="1 3"]')!
+      expect(Number(crosshair.getAttribute('x1'))).toBeCloseTo(xAt(denseStart + 600_000), 3)
+    })
   })
 
   it('splits elapsed and future at a nowTime between dense points without a gap', () => {

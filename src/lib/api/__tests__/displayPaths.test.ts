@@ -16,17 +16,24 @@ vi.mock('@/env/env.config', () => ({
 
 import {
   attachDisplayData,
+  type DisplayPathsRecord,
   DisplayPathsRequestError,
   displayPathsQueryOptions,
   displayPathsRefetchInterval,
   fetchDisplayPaths,
   isDisplayPathsEnabled,
 } from '@/lib/api/displayPaths'
+import { SCALE } from '@/lib/constants'
 import {
   buildDisplayFixturePaths,
   buildDisplayPathsRecord,
   DISPLAY_FIXTURE_ATTACH_MARKET,
+  withSimulatedFill,
 } from '@/tests/fixtures/displayPaths'
+import pipelineRecordJson from '@/tests/fixtures/pipelineDisplayRecord.json'
+import type { PredictionPath } from '@/types/market'
+
+type Fill = NonNullable<DisplayPathsRecord['simulated_fill']>
 
 const market = DISPLAY_FIXTURE_ATTACH_MARKET
 const startTimeMs = market.startTimeMs
@@ -255,6 +262,121 @@ describe('attachDisplayData', () => {
     const out = attachDisplayData(paths, null, market)
     expect(out).toEqual(paths)
     expect(out.every((p) => p.displayData === undefined)).toBe(true)
+  })
+})
+
+describe('attachDisplayData with a simulated fill', () => {
+  const originTime = record.start_time - record.model_step_seconds
+  const withOrigin = {
+    ...structuredClone(record),
+    origin: { time: originTime, price_u64: 99_500_000 },
+  }
+  const filled = withSimulatedFill(withOrigin, 60)
+  const stored = attachDisplayData(paths, withOrigin, market)
+
+  it('draws the fill when it passes through every stored point', () => {
+    const out = attachDisplayData(paths, filled, market)
+    for (const [i, path] of out.entries()) {
+      // the origin, then a point every 60 s up to the last checkpoint 3300 s later
+      expect(path.displayData).toHaveLength(1 + 3300 / 60)
+      expect(path.displaySimulated).toBe(true)
+      expect(path.displayData![0]).toEqual({ time: originTime * 1000, value: 99.5 })
+      // every stored point is still on the line, at its own value
+      for (const point of stored[i].displayData!) expect(path.displayData).toContainEqual(point)
+      // and the scored series is left as it was
+      expect(path.data).toBe(paths[i].data)
+    }
+  })
+
+  it('draws a record without an origin from the market start', () => {
+    const out = attachDisplayData(paths, withSimulatedFill(record, 60), market)
+    expect(out[0].displayData).toHaveLength(1 + 3000 / 60)
+    expect(out[0].displayData![0].time).toBe(startTimeMs)
+    expect(out[0].displaySimulated).toBe(true)
+  })
+
+  it('draws the stored points when the fill misses one of them by a unit', () => {
+    const r = structuredClone(filled)
+    const fill = r.simulated_fill!
+    fill.paths[0].prices_u64[fill.anchor_indices[3]] += 1
+    const out = attachDisplayData(paths, r, market)
+    expect(out[0].displayData).toEqual(stored[0].displayData)
+    expect(out[0].displaySimulated).toBeUndefined()
+    // the other paths' fills still hold
+    expect(out[1].displaySimulated).toBe(true)
+  })
+
+  it.each([
+    ['is not marked simulated', (f: Fill) => void (f.simulated = false as never)],
+    [
+      'has times out of order',
+      (f: Fill) => void ([f.times[1], f.times[2]] = [f.times[2], f.times[1]]),
+    ],
+    ['has an anchor per stored point missing', (f: Fill) => void f.anchor_indices.pop()],
+    ['has an anchor at another time', (f: Fill) => void (f.anchor_indices[2] -= 1)],
+    ['has a path of another length', (f: Fill) => void f.paths[0].prices_u64.pop()],
+    ['has no times array', (f: Fill) => void (f.times = undefined as never)],
+    ['has no paths array', (f: Fill) => void (f.paths = undefined as never)],
+  ])('draws the stored points when the fill %s', (_name, breakIt) => {
+    const r = structuredClone(filled)
+    breakIt(r.simulated_fill!)
+    const out = attachDisplayData(paths, r, market)
+    expect(out[0].displayData).toEqual(stored[0].displayData)
+    expect(out[0].displaySimulated).toBeUndefined()
+  })
+
+  it('still refuses a path whose stored checkpoint differs from the chain', () => {
+    const r = structuredClone(filled)
+    r.paths[0].prices_u64[r.checkpoint_indices[1]] += 1
+    r.simulated_fill!.paths[0].prices_u64[
+      r.simulated_fill!.anchor_indices[r.checkpoint_indices[1] + 1]
+    ] += 1
+    const out = attachDisplayData(paths, r, market)
+    expect(out[0].displayData).toBeUndefined()
+  })
+})
+
+describe('attachDisplayData with a record as the pipeline writes it', () => {
+  // `pipelineDisplayRecord.json` is the output of the pipeline's own `build_display_record`
+  // (levx-infra, pipeline/src/levx_pipeline/display_record.py), serialized as the endpoint serves it.
+  const pipelineRecord = pipelineRecordJson as DisplayPathsRecord
+  const pipelineMarket = {
+    startTimeMs: pipelineRecord.start_time * 1000,
+    checkpointInterval: pipelineRecord.checkpoint_interval,
+    totalCheckpoints: pipelineRecord.total_checkpoints,
+  }
+  // The chain holds each path's value at the checkpoints, and nothing else.
+  const chainPaths: PredictionPath[] = pipelineRecord.paths.map((recordPath) => {
+    const prices = pipelineRecord.checkpoint_indices.map((i) => recordPath.prices_u64[i] / SCALE)
+    return {
+      ...paths[0],
+      id: `path-${recordPath.path_index}`,
+      pathIndex: recordPath.path_index,
+      numCheckpoints: prices.length,
+      predictedPrices: prices,
+      data: prices.map((value, j) => ({
+        time: pipelineMarket.startTimeMs + j * pipelineMarket.checkpointInterval * 1000,
+        value,
+      })),
+    }
+  })
+
+  it('draws every path from the simulated fill, through each stored point', () => {
+    const fill = pipelineRecord.simulated_fill!
+    const out = attachDisplayData(chainPaths, pipelineRecord, pipelineMarket)
+    expect(out).toHaveLength(5)
+    for (const [i, path] of out.entries()) {
+      expect(path.displaySimulated).toBe(true)
+      // the origin, then every time of the fill
+      expect(path.displayData).toHaveLength(1 + fill.times.length)
+      expect(path.displayData![0].time).toBe(pipelineRecord.origin!.time * 1000)
+      for (const [k, t] of pipelineRecord.times.entries()) {
+        expect(path.displayData).toContainEqual({
+          time: t * 1000,
+          value: pipelineRecord.paths[i].prices_u64[k] / SCALE,
+        })
+      }
+    }
   })
 })
 

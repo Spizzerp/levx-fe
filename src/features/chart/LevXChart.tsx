@@ -1,5 +1,5 @@
 import { AxisBottom, AxisRight } from '@visx/axis'
-import { curveCatmullRom, curveMonotoneX } from '@visx/curve'
+import { curveLinear, curveMonotoneX } from '@visx/curve'
 import { GridRows } from '@visx/grid'
 import { Group } from '@visx/group'
 import { ParentSize } from '@visx/responsive'
@@ -30,8 +30,8 @@ import { Stub } from '@/ui/Stub'
 
 import './LevXChart.css'
 
-/* ── Module-level Catmull-Rom factory — created once, never recreated per render ── */
-const CATMULL_ROM_ALPHA_05 = curveCatmullRom.alpha(0.5)
+/* ── Forecast paths are straight segments: the line joins the points of its series and adds no curve between them ── */
+const PATH_CURVE = curveLinear
 
 /* ── Visual config — derived from Nothing tokens ────────────────── */
 
@@ -190,7 +190,7 @@ export interface LevXChartProps {
   }) => ReactNode
 }
 
-/** The series a path is drawn with: model resolution when it has one. Checkpoint logic keeps `path.data`. */
+/** The series a path is drawn with: its display series when it has one. Checkpoint logic keeps `path.data`. */
 function seriesOf(path: PredictionPath): PricePoint[] {
   return path.displayData ?? path.data
 }
@@ -540,7 +540,11 @@ function ChartInner({
           {predictions.map((path) => {
             const style = pathStyle(path)
             const isSelected = selectedPathId === path.id || selectedPathIds?.has(path.id)
-            const seriesKind = path.displayData ? 'dense' : 'checkpoints'
+            const seriesKind = path.displaySimulated
+              ? 'simulated'
+              : path.displayData
+                ? 'dense'
+                : 'checkpoints'
             const dissolvedData = dissolvedPathData.get(path.id)
             if (dissolvedData) {
               const cut = dissolvedData[dissolvedData.length - 1]
@@ -560,7 +564,7 @@ function ChartInner({
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       opacity={isSelected ? 0 : DISSOLVED_PATH_OPACITY}
-                      curve={CATMULL_ROM_ALPHA_05}
+                      curve={PATH_CURVE}
                     />
                   )}
                   {cut && (
@@ -599,7 +603,7 @@ function ChartInner({
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     opacity={isSelected ? 0 : style.opacity}
-                    curve={CATMULL_ROM_ALPHA_05}
+                    curve={PATH_CURVE}
                   />
                 )}
                 {segments.future.length > 1 && (
@@ -616,7 +620,7 @@ function ChartInner({
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     opacity={isSelected ? 0 : style.opacity}
-                    curve={CATMULL_ROM_ALPHA_05}
+                    curve={PATH_CURVE}
                   />
                 )}
               </g>
@@ -643,7 +647,7 @@ function ChartInner({
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         opacity={0.3}
-                        curve={CATMULL_ROM_ALPHA_05}
+                        curve={PATH_CURVE}
                       />
                     )}
                     {segments.future.length > 1 && (
@@ -656,7 +660,7 @@ function ChartInner({
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         opacity={0.3}
-                        curve={CATMULL_ROM_ALPHA_05}
+                        curve={PATH_CURVE}
                       />
                     )}
                   </g>
@@ -681,7 +685,7 @@ function ChartInner({
                       strokeWidth={2.5}
                       strokeLinecap="round"
                       strokeLinejoin="round"
-                      curve={CATMULL_ROM_ALPHA_05}
+                      curve={PATH_CURVE}
                     />
                   )}
                   {segments.future.length > 1 && (
@@ -693,7 +697,7 @@ function ChartInner({
                       strokeWidth={2.5}
                       strokeLinecap="round"
                       strokeLinejoin="round"
-                      curve={CATMULL_ROM_ALPHA_05}
+                      curve={PATH_CURVE}
                     />
                   )}
                 </g>
@@ -718,7 +722,7 @@ function ChartInner({
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     opacity={0.65}
-                    curve={CATMULL_ROM_ALPHA_05}
+                    curve={PATH_CURVE}
                   />
                 )}
                 {segments.future.length > 1 && (
@@ -732,7 +736,7 @@ function ChartInner({
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     opacity={0.65}
-                    curve={CATMULL_ROM_ALPHA_05}
+                    curve={PATH_CURVE}
                   />
                 )}
               </>
@@ -902,6 +906,21 @@ function ChartInner({
           )}
         </g>
         </g>{/* end clip */}
+
+        {/* ── Simulated fill note: the drawn paths hold points that are not forecast ── */}
+        {predictions.some((path) => path.displaySimulated) && (
+          <text
+            x={6}
+            y={innerHeight - 6}
+            fontFamily="Space Mono, monospace"
+            fontSize="9"
+            letterSpacing="0.12em"
+            fill={C.muted}
+            style={{ pointerEvents: 'none' }}
+          >
+            [ PATH MOVEMENT BETWEEN FORECAST POINTS IS SIMULATED ]
+          </text>
+        )}
 
         {/* ── Right Y-axis ────────────────────────── */}
         <AxisRight

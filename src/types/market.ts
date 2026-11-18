@@ -128,11 +128,17 @@ export interface PredictionPath {
   /** Resolved price trajectory for chart rendering */
   data: PricePoint[]
   /**
-   * Model-resolution series from the pipeline's display record; drawn instead of `data` when
-   * present; never used for scoring or checkpoints. It may open with the forecast's origin, a
-   * point before the market start that every path shares.
+   * Series from the pipeline's display record, at the model's resolution or finer (see
+   * `displaySimulated`); drawn instead of `data` when present; never used for scoring or
+   * checkpoints. It may open with the forecast's origin, a point before the market start that
+   * every path shares.
    */
   displayData?: PricePoint[]
+  /**
+   * True when `displayData` holds simulated points between the forecast's stored ones (the display
+   * record's `simulated_fill`). They are for drawing only: never forecast, never scored.
+   */
+  displaySimulated?: boolean
 
   /* ── On-chain PathOutcome fields ─────────────────────────── */
 
