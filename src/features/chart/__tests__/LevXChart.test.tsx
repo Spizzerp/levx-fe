@@ -516,6 +516,16 @@ describe('LevXChart dense display paths', () => {
       expect(screen.getByText(/simulated/i)).toBeTruthy()
     })
 
+    it('keeps the note short and readable where a marker line passes behind it', () => {
+      renderDense({ predictions: [filledPaths[0]] })
+      const note = screen.getByText('[ SIMULATED BETWEEN FORECAST POINTS ]')
+      // a halo in the chart's background colour is painted under the letters, so a start,
+      // end or checkpoint line behind the note does not strike through it
+      expect(note.getAttribute('paint-order')).toBe('stroke')
+      expect(note.getAttribute('stroke')).toContain('--color-surface')
+      expect(Number(note.getAttribute('stroke-width'))).toBeGreaterThanOrEqual(4)
+    })
+
     it('says nothing when no drawn path is filled', () => {
       renderDense()
       expect(screen.queryByText(/simulated/i)).toBeNull()

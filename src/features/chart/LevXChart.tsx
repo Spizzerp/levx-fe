@@ -907,7 +907,8 @@ function ChartInner({
         </g>
         </g>{/* end clip */}
 
-        {/* ── Simulated fill note: the drawn paths hold points that are not forecast ── */}
+        {/* ── Simulated fill note: the drawn paths hold points that are not forecast.
+            The halo keeps it readable where a start, end or checkpoint line passes behind it. ── */}
         {predictions.some((path) => path.displaySimulated) && (
           <text
             x={6}
@@ -916,9 +917,12 @@ function ChartInner({
             fontSize="9"
             letterSpacing="0.12em"
             fill={C.muted}
+            stroke={C.surface}
+            strokeWidth={4}
+            paintOrder="stroke"
             style={{ pointerEvents: 'none' }}
           >
-            [ PATH MOVEMENT BETWEEN FORECAST POINTS IS SIMULATED ]
+            [ SIMULATED BETWEEN FORECAST POINTS ]
           </text>
         )}
 
