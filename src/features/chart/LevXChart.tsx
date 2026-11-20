@@ -398,7 +398,7 @@ function ChartInner({
     // `nice: true` rounds the domain outward to tick boundaries — that makes
     // user-driven scaling feel jittery (tiny drags get absorbed, then the range
     // snaps) and lets the midpoint shift as rounding deltas change with span.
-    // Auto-fit already pads 0.9×/1.05× in computeVisiblePriceDomain, and d3's
+    // Auto-fit already pads by a share of the spread in computeVisiblePriceDomain, and d3's
     // tick selection picks nice round values regardless of domain niceness.
     () => scaleLinear<number>({ domain: effectiveDomain, range: [innerHeight, 0] }),
     [innerHeight, effectiveDomain],
