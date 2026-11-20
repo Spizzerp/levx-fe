@@ -1,5 +1,5 @@
 import { AxisBottom, AxisRight } from '@visx/axis'
-import { curveLinear, curveMonotoneX } from '@visx/curve'
+import { curveMonotoneX } from '@visx/curve'
 import { GridRows } from '@visx/grid'
 import { Group } from '@visx/group'
 import { ParentSize } from '@visx/responsive'
@@ -21,6 +21,7 @@ import { useYAxisFreeze } from '@/lib/drawing/yFreeze'
 import { useChartViewport } from '@/lib/chart/useChartViewport'
 import { useYAxisViewport } from '@/lib/chart/useYAxisViewport'
 import { computeVisiblePriceDomain } from '@/lib/chart/computeVisiblePriceDomain'
+import { PATH_CURVE } from '@/lib/chart/pathCurve'
 import { segmentPredictionPathAtTime } from '@/lib/chart/segmentPredictionPath'
 import { DrawingGrid } from '@/features/chart/DrawingGrid'
 import { DrawingToolbar } from '@/features/chart/DrawingToolbar'
@@ -29,9 +30,6 @@ import { mergePriceSeries, TRAIL_GAP_MS } from '@/features/chart/mergePriceSerie
 import { Stub } from '@/ui/Stub'
 
 import './LevXChart.css'
-
-/* ── Forecast paths are straight segments: the line joins the points of its series and adds no curve between them ── */
-const PATH_CURVE = curveLinear
 
 /* ── Visual config — derived from Nothing tokens ────────────────── */
 
