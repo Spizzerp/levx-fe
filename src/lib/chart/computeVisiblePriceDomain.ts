@@ -1,5 +1,5 @@
 import { bisector } from 'd3-array'
-import type { PricePoint, PredictionPath } from '@/types/market'
+import type { PricePoint } from '@/types/market'
 
 const bisectTime = bisector<PricePoint, number>((d) => d.time).left
 
@@ -12,15 +12,18 @@ export const MIN_VISIBLE_SPAN_FRACTION = 0.005
 /**
  * Compute the price domain [min, max] for data visible within a time window.
  *
- * Uses binary search on sorted history and iterates prediction paths to find
+ * Uses binary search on sorted history and iterates the path series to find
  * the envelope of visible values, then pads it by a share of its own spread. Padding by a share
  * of the price instead squeezes a narrow forecast fan into a sliver of the chart.
+ *
+ * `pathSeries` holds each path's points as the chart draws them, so a dissolved path cut at its
+ * checkpoint does not widen the range with the tail that is hidden.
  *
  * Falls back to `fallback` (or [0, 1]) when no data points fall in the window.
  */
 export function computeVisiblePriceDomain(
   history: PricePoint[],
-  predictions: PredictionPath[],
+  pathSeries: PricePoint[][],
   viewportTime: [number, number],
   fallback?: [number, number],
 ): [number, number] {
@@ -39,9 +42,9 @@ export function computeVisiblePriceDomain(
     }
   }
 
-  // Iterate prediction paths as drawn (model resolution when present) — short arrays, linear scan is fine.
-  for (const path of predictions) {
-    for (const pt of path.displayData ?? path.data) {
+  // Short arrays, linear scan is fine.
+  for (const series of pathSeries) {
+    for (const pt of series) {
       if (pt.time >= tMin && pt.time <= tMax) {
         if (pt.value < lo) lo = pt.value
         if (pt.value > hi) hi = pt.value

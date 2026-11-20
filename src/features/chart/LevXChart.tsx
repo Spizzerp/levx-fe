@@ -283,7 +283,11 @@ function ChartInner({
     }
     return { dissolvedPathData: drawn, dissolvedHoverData: hover }
   }, [predictions, checkpointXs])
-  const drawnData = (path: PredictionPath) => dissolvedPathData.get(path.id) ?? seriesOf(path)
+  /** A path's points as the chart draws them: a dissolved path only up to its cut. */
+  const drawnData = useCallback(
+    (path: PredictionPath) => dissolvedPathData.get(path.id) ?? seriesOf(path),
+    [dissolvedPathData],
+  )
 
   /* ── Time domain ────────────────────────────────────────── */
   // Split into two memos so the active one keeps a stable reference: in
@@ -371,8 +375,9 @@ function ChartInner({
 
   /* ── Price domain: envelope of data visible in viewport ──── */
   const priceDomainLive = useMemo<[number, number]>(
-    () => computeVisiblePriceDomain(mergedHistory, predictions, viewportTimeDomain),
-    [mergedHistory, predictions, viewportTimeDomain],
+    () =>
+      computeVisiblePriceDomain(mergedHistory, predictions.map(drawnData), viewportTimeDomain),
+    [mergedHistory, predictions, drawnData, viewportTimeDomain],
   )
 
   /* ── Y-axis freeze: domain held fixed during sweeping phase ── */

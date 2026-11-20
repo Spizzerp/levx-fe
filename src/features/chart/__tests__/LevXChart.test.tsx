@@ -370,6 +370,22 @@ describe('LevXChart checkpoints', () => {
     )
   })
 
+  it('fits the price axis to a dissolved path as drawn, not to its hidden tail', () => {
+    const dissolved = { ...paths[0], dissolved: true, dissolvedAtCheckpoint: 3 }
+    const cutTime = startTime + 2 * intervalMs
+    // the same path with a tail, past its cut, far above everything the chart draws
+    const tallTail = {
+      ...dissolved,
+      data: dissolved.data.map((p) => (p.time > cutTime ? { ...p, value: p.value * 3 } : p)),
+    }
+    const nowTime = startTime + 3 * 60 * 60_000
+    const first = renderChart({ nowTime, predictions: [dissolved, ...paths.slice(1)] })
+    const priceLine = screen.getByTestId('price-line').getAttribute('d')
+    first.unmount()
+    renderChart({ nowTime, predictions: [tallTail, ...paths.slice(1)] })
+    expect(screen.getByTestId('price-line').getAttribute('d')).toBe(priceLine)
+  })
+
   it('marks a path dissolved at the first checkpoint at the market start', () => {
     const dissolved = { ...paths[0], dissolved: true, dissolvedAtCheckpoint: 1 }
     renderChart({
@@ -464,6 +480,21 @@ describe('LevXChart dense display paths', () => {
     const stored = densePaths[0].displayData!
     expect(xs).toHaveLength(stored.length)
     xs.forEach((x, i) => expect(x).toBeCloseTo(xAt(stored[i].time), 3))
+  })
+
+  it('keeps a dense point above every checkpoint inside the chart', () => {
+    // the price range follows the series as drawn, not only the six checkpoint points
+    const peak = Math.max(...densePaths[0].data.map((p) => p.value)) * 1.5
+    const displayData = densePaths[0].displayData!.map((p, i) =>
+      i === 1 ? { ...p, value: peak } : p,
+    )
+    renderDense({ predictions: [{ ...densePaths[0], displayData }] })
+    const d = screen.getByTestId('prediction-path').getAttribute('d') ?? ''
+    const ys = d
+      .split(/[ML]/)
+      .filter(Boolean)
+      .map((point) => Number(point.split(',')[1]))
+    expect(Math.min(...ys)).toBeGreaterThan(0)
   })
 
   it('falls back to the six points without displayData', () => {
