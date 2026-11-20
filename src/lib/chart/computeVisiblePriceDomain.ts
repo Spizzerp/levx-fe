@@ -3,11 +3,18 @@ import type { PricePoint, PredictionPath } from '@/types/market'
 
 const bisectTime = bisector<PricePoint, number>((d) => d.time).left
 
+/** Padding below and above the visible data, as a share of its spread (high minus low). */
+export const PRICE_DOMAIN_PAD_BELOW = 0.5
+export const PRICE_DOMAIN_PAD_ABOVE = 0.25
+/** A flat or nearly flat series is shown as if it spread this share of its price. */
+export const MIN_VISIBLE_SPAN_FRACTION = 0.005
+
 /**
  * Compute the price domain [min, max] for data visible within a time window.
  *
  * Uses binary search on sorted history and iterates prediction paths to find
- * the envelope of visible values, then applies padding (default 0.9× low, 1.05× high).
+ * the envelope of visible values, then pads it by a share of its own spread. Padding by a share
+ * of the price instead squeezes a narrow forecast fan into a sliver of the chart.
  *
  * Falls back to `fallback` (or [0, 1]) when no data points fall in the window.
  */
@@ -46,5 +53,12 @@ export function computeVisiblePriceDomain(
     return fallback ?? [0, 1]
   }
 
-  return [lo * 0.9, hi * 1.05]
+  const minSpan = ((lo + hi) / 2) * MIN_VISIBLE_SPAN_FRACTION
+  if (hi - lo < minSpan) {
+    const mid = (lo + hi) / 2
+    lo = mid - minSpan / 2
+    hi = mid + minSpan / 2
+  }
+  const span = hi - lo
+  return [lo - span * PRICE_DOMAIN_PAD_BELOW, hi + span * PRICE_DOMAIN_PAD_ABOVE]
 }
