@@ -1,13 +1,12 @@
-import { curveCatmullRom, curveMonotoneX } from '@visx/curve'
+import { curveMonotoneX } from '@visx/curve'
 import { Group } from '@visx/group'
 import { ParentSize } from '@visx/responsive'
 import { scaleLinear, scaleTime } from '@visx/scale'
 import { LinePath } from '@visx/shape'
 import { useMemo } from 'react'
 
+import { PATH_CURVE } from '@/lib/chart/pathCurve'
 import type { PredictionPath, PricePoint } from '@/types/market'
-
-const CATMULL_ROM_ALPHA_05 = curveCatmullRom.alpha(0.5)
 
 const AI_PATH_PALETTE: readonly string[] = ['#5CC8FF', '#FF6BD6', '#F6CE48', '#9AE85B', '#A78BFA']
 
@@ -199,7 +198,7 @@ function MiniChartInner({
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   opacity={style.opacity}
-                  curve={CATMULL_ROM_ALPHA_05}
+                  curve={PATH_CURVE}
                 />
               )}
             </g>

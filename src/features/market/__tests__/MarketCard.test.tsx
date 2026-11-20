@@ -63,6 +63,41 @@ function makeMarket(overrides: Partial<Market> = {}): Market {
   return { ...base, ...overrides }
 }
 
+function makeHydratedPath(market: Market): Market['paths'][number] {
+  return {
+    id: 'path-0',
+    label: 'Path A',
+    tone: 'bull',
+    origin: 'ai',
+    multiplier: 1,
+    data: [
+      { time: market.startTime, value: 100 },
+      { time: market.startTime + 24 * 60 * 60 * 1000, value: 105 },
+      { time: market.endTime, value: 115 },
+    ],
+    pathIndex: 0,
+    predictedPrices: [100, 105, 115],
+    numCheckpoints: 3,
+    generationTimestamp: market.startTime,
+    creator: '',
+    cumulativeAction: 0,
+    compositeScore: 0,
+    peakAmplitude: 0,
+    amplitudeAtDecoherence: 0,
+    dissolved: false,
+    dissolvedAtCheckpoint: 0,
+    checkpointsProcessed: 0,
+    createdAtCheckpoint: 0,
+    firstActiveCheckpoint: 0,
+    totalWagered: 0,
+    totalLeveragedExposure: 0,
+    lmsrSharesOutstanding: 0,
+    totalTimeWeightedExposure: 0,
+    currentImpliedProbability: 0,
+    initialAmplitude: 0,
+  }
+}
+
 describe('MarketCard', () => {
   beforeEach(() => {
     usePriceHistoryMock.mockReturnValue({ data: undefined })
@@ -100,38 +135,7 @@ describe('MarketCard', () => {
         { time: Date.UTC(2026, 4, 8, 12), value: 101 },
       ],
     })
-    const hydratedPath = {
-      id: 'path-0',
-      label: 'Path A',
-      tone: 'bull' as const,
-      origin: 'ai' as const,
-      multiplier: 1,
-      data: [
-        { time: market.startTime, value: 100 },
-        { time: market.startTime + 24 * 60 * 60 * 1000, value: 105 },
-        { time: market.endTime, value: 115 },
-      ],
-      pathIndex: 0,
-      predictedPrices: [100, 105, 115],
-      numCheckpoints: 3,
-      generationTimestamp: market.startTime,
-      creator: '',
-      cumulativeAction: 0,
-      compositeScore: 0,
-      peakAmplitude: 0,
-      amplitudeAtDecoherence: 0,
-      dissolved: false,
-      dissolvedAtCheckpoint: 0,
-      checkpointsProcessed: 0,
-      createdAtCheckpoint: 0,
-      firstActiveCheckpoint: 0,
-      totalWagered: 0,
-      totalLeveragedExposure: 0,
-      lmsrSharesOutstanding: 0,
-      totalTimeWeightedExposure: 0,
-      currentImpliedProbability: 0,
-      initialAmplitude: 0,
-    } satisfies Market['paths'][number]
+    const hydratedPath = makeHydratedPath(market)
 
     const { container } = render(
       <MarketCard
@@ -148,5 +152,22 @@ describe('MarketCard', () => {
     expect(container.querySelector('[data-testid="market-mini-ai-path-clip"]')).toBeNull()
     expect(container.querySelector('svg path[stroke*="color-ink-strong"]')).toBeInTheDocument()
     expect(container.querySelector('.border-line.border-t')).toBeInTheDocument()
+  })
+
+  it('joins the points of an AI path preview with straight segments', () => {
+    const market = makeMarket({ numPaths: 1 })
+    const path = makeHydratedPath(market)
+
+    const { container } = render(
+      <MarketCard
+        market={{ ...market, paths: [path] }}
+        now={market.startTime + 12 * 60 * 60 * 1000}
+        onClick={vi.fn()}
+      />,
+    )
+
+    const d = container.querySelector('[data-testid="market-mini-ai-path"]')?.getAttribute('d')
+    // One move to the first point and one line to each later point: no curve between them.
+    expect(d).toMatch(new RegExp(`^M[^A-Za-z]+(L[^A-Za-z]+){${path.data.length - 1}}$`))
   })
 })
