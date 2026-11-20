@@ -20,17 +20,17 @@ const chainMax = Math.max(...path.data.map((p) => p.value))
 const chainMin = Math.min(...path.data.map((p) => p.value))
 
 describe('computeVisiblePriceDomain', () => {
-  it('widens to a displayData point above every checkpoint point', () => {
+  it('covers the highest point of any series', () => {
     const peak = chainMax + 10
-    const displayData = [...path.data, { time: startTime + 300_000, value: peak }].sort(
+    const dense = [...path.data, { time: startTime + 300_000, value: peak }].sort(
       (a, b) => a.time - b.time,
     )
-    const [, hi] = computeVisiblePriceDomain([], [{ ...path, displayData }], viewport)
+    const [, hi] = computeVisiblePriceDomain([], [path.data, dense], viewport)
     expect(hi).toBeCloseTo(peak + (peak - chainMin) * PRICE_DOMAIN_PAD_ABOVE, 9)
   })
 
-  it('uses the checkpoint points without displayData', () => {
-    const [, hi] = computeVisiblePriceDomain([], [path], viewport)
+  it('fits a single series', () => {
+    const [, hi] = computeVisiblePriceDomain([], [path.data], viewport)
     expect(hi).toBeCloseTo(chainMax + (chainMax - chainMin) * PRICE_DOMAIN_PAD_ABOVE, 9)
   })
 
