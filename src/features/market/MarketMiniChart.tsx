@@ -61,10 +61,20 @@ function buildTimeDomain(args: {
   return [args.marketStart - historyLead, args.marketEnd]
 }
 
-function buildPriceDomain(history: PricePoint[], paths: PredictionPath[]): [number, number] {
+/**
+ * A path's points as the card draws them. `data[i]` is checkpoint i and `dissolvedAtCheckpoint` is
+ * the dissolving checkpoint's index + 1, so a dissolved path keeps its first `dissolvedAtCheckpoint` points.
+ */
+function drawnData(path: PredictionPath): PricePoint[] {
+  return path.dissolved && path.dissolvedAtCheckpoint > 0
+    ? path.data.slice(0, path.dissolvedAtCheckpoint)
+    : path.data
+}
+
+function buildPriceDomain(history: PricePoint[], pathSeries: PricePoint[][]): [number, number] {
   const values = [
     ...history.map((point) => point.value),
-    ...paths.flatMap((path) => path.data.map((point) => point.value)),
+    ...pathSeries.flatMap((series) => series.map((point) => point.value)),
   ].filter(Number.isFinite)
 
   if (values.length === 0) return [0, 100]
@@ -105,9 +115,19 @@ function MiniChartInner({
     () => filterPointsToDomain(history, timeDomain),
     [history, timeDomain],
   )
+  // One list for the lines and the price range, so the range never reads a point that is not drawn.
+  const drawnPaths = useMemo(
+    () =>
+      paths.map((path) => ({ path, data: drawnData(path) })).filter(({ data }) => data.length > 1),
+    [paths],
+  )
   const priceDomain = useMemo(
-    () => buildPriceDomain(visibleHistory, paths),
-    [visibleHistory, paths],
+    () =>
+      buildPriceDomain(
+        visibleHistory,
+        drawnPaths.map(({ data }) => data),
+      ),
+    [visibleHistory, drawnPaths],
   )
 
   const timeScale = scaleTime({ range: [0, innerWidth], domain: timeDomain })
@@ -181,26 +201,24 @@ function MiniChartInner({
           [ ENDS ]
         </text>
 
-        {paths.map((path) => {
+        {drawnPaths.map(({ path, data }) => {
           const style = pathStyle(path)
 
           return (
             <g key={path.id}>
-              {path.data.length > 1 && (
-                <LinePath<PricePoint>
-                  data-testid={path.origin === 'ai' ? 'market-mini-ai-path' : undefined}
-                  data={path.data}
-                  x={(d) => timeScale(d.time) ?? 0}
-                  y={(d) => priceScale(d.value) ?? 0}
-                  stroke={style.stroke}
-                  strokeWidth={1.3}
-                  strokeDasharray={style.dash}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  opacity={style.opacity}
-                  curve={PATH_CURVE}
-                />
-              )}
+              <LinePath<PricePoint>
+                data-testid={path.origin === 'ai' ? 'market-mini-ai-path' : undefined}
+                data={data}
+                x={(d) => timeScale(d.time) ?? 0}
+                y={(d) => priceScale(d.value) ?? 0}
+                stroke={style.stroke}
+                strokeWidth={1.3}
+                strokeDasharray={style.dash}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                opacity={style.opacity}
+                curve={PATH_CURVE}
+              />
             </g>
           )
         })}

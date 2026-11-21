@@ -63,7 +63,10 @@ function makeMarket(overrides: Partial<Market> = {}): Market {
   return { ...base, ...overrides }
 }
 
-function makeHydratedPath(market: Market): Market['paths'][number] {
+function makeHydratedPath(
+  market: Market,
+  overrides: Partial<Market['paths'][number]> = {},
+): Market['paths'][number] {
   return {
     id: 'path-0',
     label: 'Path A',
@@ -95,6 +98,7 @@ function makeHydratedPath(market: Market): Market['paths'][number] {
     totalTimeWeightedExposure: 0,
     currentImpliedProbability: 0,
     initialAmplitude: 0,
+    ...overrides,
   }
 }
 
@@ -169,5 +173,46 @@ describe('MarketCard', () => {
     const d = container.querySelector('[data-testid="market-mini-ai-path"]')?.getAttribute('d')
     // One move to the first point and one line to each later point: no curve between them.
     expect(d).toMatch(new RegExp(`^M[^A-Za-z]+(L[^A-Za-z]+){${path.data.length - 1}}$`))
+  })
+
+  it('ends a dissolved AI path preview at the checkpoint that dissolved it', () => {
+    const market = makeMarket({ numPaths: 1 })
+    // Dissolved at the second checkpoint: the first two points are drawn, the third is not.
+    const path = makeHydratedPath(market, { dissolved: true, dissolvedAtCheckpoint: 2 })
+
+    const { container } = render(
+      <MarketCard market={{ ...market, paths: [path] }} now={market.endTime} onClick={vi.fn()} />,
+    )
+
+    const d = container.querySelector('[data-testid="market-mini-ai-path"]')?.getAttribute('d')
+    expect(d).toMatch(/^M[^A-Za-z]+L[^A-Za-z]+$/)
+  })
+
+  it('fits the price range to a dissolved path as drawn, not to its hidden tail', () => {
+    const market = makeMarket({
+      numPaths: 1,
+      history: [
+        { time: Date.UTC(2026, 4, 7, 12), value: 100 },
+        { time: Date.UTC(2026, 4, 8, 12), value: 101 },
+      ],
+    })
+    const dissolved = { dissolved: true, dissolvedAtCheckpoint: 2 }
+    const historyLine = (path: Market['paths'][number]) => {
+      const { container, unmount } = render(
+        <MarketCard market={{ ...market, paths: [path] }} now={market.endTime} onClick={vi.fn()} />,
+      )
+      const d = container.querySelector('svg path[stroke*="color-ink-strong"]')?.getAttribute('d')
+      unmount()
+      return d
+    }
+
+    const base = makeHydratedPath(market, dissolved)
+    const tallTail = makeHydratedPath(market, {
+      ...dissolved,
+      data: base.data.map((point, i) => (i < 2 ? point : { ...point, value: point.value * 3 })),
+    })
+
+    expect(historyLine(base)).toBeTruthy()
+    expect(historyLine(tallTail)).toBe(historyLine(base))
   })
 })
